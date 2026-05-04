@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "school": { "type": "string" },
+        "role": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["uid"]
+    },
+    "ClassSchedule": {
+      "title": "ClassSchedule",
+      "description": "A class schedule",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "grade": { "type": "string" },
+        "days": { "type": "array", "items": { "type": "number" } },
+        "time": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["name", "grade", "days", "time", "uid"]
+    },
+    "ClassItem": {
+      "title": "ClassItem",
+      "description": "A scheduled class",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" },
+        "className": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "resourceIds": { "type": "array", "items": { "type": "string" } },
+        "uid": { "type": "string" }
+      },
+      "required": ["title", "date", "status", "className", "timestamp", "uid"]
+    },
+    "SavedResource": {
+      "title": "SavedResource",
+      "description": "A saved resource (slide, activity)",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "content": { "type": "string" },
+        "date": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["title", "type", "content", "date", "uid"]
+    },
+    "CustomEvent": {
+      "title": "CustomEvent",
+      "description": "A custom event on the calendar",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["title", "date", "type", "uid"]
+    },
+    "InboxMessage": {
+      "title": "InboxMessage",
+      "description": "A message in the inbox",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string" },
+        "text": { "type": "string" },
+        "date": { "type": "number" },
+        "attachment": { "type": "object" },
+        "uid": { "type": "string" }
+      },
+      "required": ["role", "text", "date", "uid"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "User feedback submission",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "date": { "type": "number" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["text", "date", "uid"]
+    }
+  },
+  "firestore": {
+    "/feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/Feedback" },
+      "description": "User feedback submissions"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles"
+    },
+    "/users/{userId}/schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/ClassSchedule" },
+      "description": "User class schedules"
+    },
+    "/users/{userId}/classes/{classId}": {
+      "schema": { "$ref": "#/entities/ClassItem" },
+      "description": "User scheduled classes"
+    },
+    "/users/{userId}/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/SavedResource" },
+      "description": "User saved resources"
+    },
+    "/users/{userId}/events/{eventId}": {
+      "schema": { "$ref": "#/entities/CustomEvent" },
+      "description": "User custom events"
+    },
+    "/users/{userId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/InboxMessage" },
+      "description": "User inbox messages"
+    }
+  }
+}

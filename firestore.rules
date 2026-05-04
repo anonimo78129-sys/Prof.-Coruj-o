@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      let isEmailAdmin = request.auth.token.email == "LyelsonMF520@gmail.com" && request.auth.token.email_verified == true;
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let isDocAdmin = userDoc != null && userDoc.data.role == 'admin';
+      return isAuthenticated() && (isEmailAdmin || isDocAdmin);
+    }
+    
+    // We create a specific rule for users where we don't call isAdmin if it's the owner, 
+    // to avoid recursive get()
+    function isAdminWithoutGet() {
+       return isAuthenticated() && request.auth.token.email == "LyelsonMF520@gmail.com" && request.auth.token.email_verified == true;
+    }
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    function roleNotModified() {
+      return !('role' in request.resource.data) || request.resource.data.role == resource.data.role;
+    }
+    function noPrivilegedRoleCreated() {
+      return !('role' in request.resource.data) || request.resource.data.role != 'admin';
+    }
+
+    match /feedback/{feedbackId} {
+      allow create: if isAuthenticated() && uidUnchanged();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      // In their own document, we avoid the recursive get() by just checking if they are the owner,
+      // or if they are the designated email admin. For other users, they check if they are an admin.
+      allow read: if isOwner(userId) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      
+      // For create, resource does not exist.
+      allow create: if (isOwner(userId) && uidUnchanged() && noPrivilegedRoleCreated()) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      
+      // For update, they can update their own if they don't modify role/uid, OR they are admin.
+      allow update: if (isOwner(userId) && uidNotModified() && roleNotModified()) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      
+      allow delete: if isOwner(userId) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      
+      match /schedules/{scheduleId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && uidUnchanged();
+        allow update: if isOwner(userId) && uidNotModified();
+        allow delete: if isOwner(userId);
+      }
+      match /classes/{classId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && uidUnchanged();
+        allow update: if isOwner(userId) && uidNotModified();
+        allow delete: if isOwner(userId);
+      }
+      match /resources/{resourceId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && uidUnchanged();
+        allow update: if isOwner(userId) && uidNotModified();
+        allow delete: if isOwner(userId);
+      }
+      match /events/{eventId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && uidUnchanged();
+        allow update: if isOwner(userId) && uidNotModified();
+        allow delete: if isOwner(userId);
+      }
+      match /messages/{messageId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && uidUnchanged();
+        allow update: if isOwner(userId) && uidNotModified();
+        allow delete: if isOwner(userId);
+      }
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && uidUnchanged();
+        allow update: if isOwner(userId) && uidNotModified();
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
