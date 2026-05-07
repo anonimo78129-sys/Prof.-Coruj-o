@@ -3479,19 +3479,18 @@ const CalendarScreen = ({
               return e.status === 'done';
             });
 
-            // build style and class
             let cellStyle: React.CSSProperties = {};
-            let cellClass = 'text-sm font-medium w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all relative overflow-hidden';
+            let cellClass = 'text-sm font-medium w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all relative';
 
             if (isSelected) {
               cellClass += ' bg-indigo-600 text-white shadow-md font-bold';
             } else if (isToday) {
-              cellClass += ' ring-2 ring-indigo-400 text-indigo-600 font-black bg-indigo-50';
+              cellClass += ' ring-2 ring-indigo-500 font-black bg-indigo-600 text-white';
             } else if (dayColor && !allDone) {
-              cellStyle = { backgroundColor: dayColor + '28', color: dayColor };
-              cellClass += ' font-bold';
+              cellStyle = { backgroundColor: dayColor, color: '#fff' };
+              cellClass += ' font-bold shadow-sm';
             } else {
-              cellClass += ' text-gray-600 hover:bg-gray-50';
+              cellClass += ' text-gray-600 hover:bg-gray-100';
             }
 
             return (
@@ -3501,17 +3500,9 @@ const CalendarScreen = ({
                   style={cellStyle}
                   className={cellClass}
                 >
-                  {/* coloured stripe at top for each event type */}
-                  {dayEvents.length > 0 && !isSelected && (
-                    <div className="absolute top-0 left-0 right-0 flex h-1 rounded-t-xl overflow-hidden">
-                      {dayEvents.slice(0, 4).map((e, i) => (
-                        <div key={i} className="flex-1 h-full" style={{ backgroundColor: getEventColor(e) }} />
-                      ))}
-                    </div>
-                  )}
-                  <span className={isToday && !isSelected ? 'mt-0.5' : ''}>{d}</span>
+                  <span>{d}</span>
                   {isToday && !isSelected && (
-                    <span className="text-[7px] font-black text-indigo-400 leading-none -mt-0.5 uppercase tracking-wide">hoje</span>
+                    <span className="text-[7px] font-black leading-none -mt-0.5 uppercase tracking-wide opacity-80">hoje</span>
                   )}
                 </button>
               </div>
