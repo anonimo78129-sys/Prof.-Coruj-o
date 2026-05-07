@@ -273,7 +273,7 @@ interface PresentationTheme {
 
 interface SlideData {
   slideNumber: number;
-  layoutID: 'LAYOUT_COVER' | 'LAYOUT_CONTENT_LEFT' | 'LAYOUT_CONTENT_RIGHT' | 'LAYOUT_CONTENT_TOP' | 'LAYOUT_TOPICS' | 'LAYOUT_REFERENCES';
+  layoutID: 'LAYOUT_COVER' | 'LAYOUT_CONTENT_LEFT' | 'LAYOUT_CONTENT_RIGHT' | 'LAYOUT_CONTENT_TOP' | 'LAYOUT_TOPICS' | 'LAYOUT_REFERENCES' | 'LAYOUT_QUOTE' | 'LAYOUT_TWO_COLUMNS' | 'LAYOUT_FULL_IMAGE' | 'LAYOUT_STATS' | 'LAYOUT_TIMELINE';
   data: {
     title?: string;
     subtitle?: string;
@@ -282,6 +282,12 @@ interface SlideData {
     references?: string[];
     imagePrompt?: string;
     imageUrl?: string;
+    quote?: string;
+    author?: string;
+    column1?: string;
+    column2?: string;
+    stats?: { value: string; label: string; icon?: string }[];
+    events?: { year: string; title: string; description: string }[];
   };
 }
 
@@ -926,6 +932,130 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
     </div>
   );
 
+  if (slide.layoutID === 'LAYOUT_QUOTE') return (
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 100px', position: 'relative', overflow: 'hidden' }}>
+      {/* Giant decorative quote marks */}
+      <div style={{ position: 'absolute', top: 20, left: 48, fontSize: 200, lineHeight: 1, color: theme.primaryColor, opacity: 0.12, fontFamily: 'Georgia, serif', fontWeight: 900, userSelect: 'none' }}>"</div>
+      <div style={{ position: 'absolute', bottom: -30, right: 48, fontSize: 200, lineHeight: 1, color: theme.primaryColor, opacity: 0.12, fontFamily: 'Georgia, serif', fontWeight: 900, userSelect: 'none', transform: 'rotate(180deg)' }}>"</div>
+      {/* Accent bar */}
+      <div style={{ width: 56, height: 5, backgroundColor: theme.accentColor, borderRadius: 3, marginBottom: 32 }} />
+      <textarea value={slide.data.quote || ''} onChange={e => onUpdate({ quote: e.target.value })} placeholder="Citação impactante..."
+        style={{ fontSize: 28, fontStyle: 'italic', color: theme.primaryColor, textAlign: 'center', lineHeight: 1.5, background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', fontFamily: 'Georgia, serif', fontWeight: 600, marginBottom: 24, overflow: 'hidden' }}
+        rows={4} />
+      <div style={{ width: 56, height: 2, backgroundColor: theme.accentColor, borderRadius: 3, marginBottom: 16 }} />
+      <input value={slide.data.author || ''} onChange={e => onUpdate({ author: e.target.value })} placeholder="— Autor"
+        style={{ fontSize: 16, color: '#6B7280', textAlign: 'center', background: 'transparent', border: 'none', outline: 'none', fontWeight: 600, letterSpacing: 1 }} />
+      {slide.data.title && <div style={{ position: 'absolute', top: 28, left: 0, right: 0, textAlign: 'center', fontSize: 12, color: theme.primaryColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 3, opacity: 0.6 }}>{slide.data.title}</div>}
+    </div>
+  );
+
+  if (slide.layoutID === 'LAYOUT_TWO_COLUMNS') return (
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Top accent bar */}
+      <div style={{ height: 6, backgroundColor: theme.primaryColor, flexShrink: 0 }} />
+      <div style={{ padding: '28px 48px 20px', flexShrink: 0 }}>
+        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+          style={{ fontSize: 28, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block' }} />
+        <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 8 }} />
+      </div>
+      <div style={{ display: 'flex', flex: 1, gap: 0, padding: '0 48px 32px' }}>
+        {/* Column 1 */}
+        <div style={{ flex: 1, paddingRight: 24, borderRight: `2px solid ${theme.primaryColor}22` }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: theme.accentColor, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>①</div>
+          <textarea value={slide.data.column1 || ''} onChange={e => onUpdate({ column1: e.target.value })} placeholder="Primeiro bloco de conteúdo..."
+            style={{ fontSize: 14, color: '#374151', lineHeight: 1.65, background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', flex: 1, fontFamily: 'inherit', height: 280 }} />
+        </div>
+        {/* Column 2 */}
+        <div style={{ flex: 1, paddingLeft: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: theme.accentColor, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>②</div>
+          <textarea value={slide.data.column2 || ''} onChange={e => onUpdate({ column2: e.target.value })} placeholder="Segundo bloco de conteúdo..."
+            style={{ fontSize: 14, color: '#374151', lineHeight: 1.65, background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', flex: 1, fontFamily: 'inherit', height: 280 }} />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (slide.layoutID === 'LAYOUT_FULL_IMAGE') {
+    const imgSrcFull = slide.data.imageUrl || getImageUrl(slide.data.imagePrompt, 1200, 800);
+    return (
+      <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: '#111' }}>
+        <img src={imgSrcFull} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+        {/* Dark gradient overlay */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.1) 100%)' }} />
+        {/* Accent left bar */}
+        <div style={{ position: 'absolute', left: 0, top: 0, width: 7, height: '100%', backgroundColor: theme.accentColor }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 64px 48px' }}>
+          <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginBottom: 18 }} />
+          <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+            style={{ fontSize: 44, fontWeight: 900, color: '#ffffff', background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', lineHeight: 1.15, marginBottom: 12, textShadow: '0 2px 12px rgba(0,0,0,0.5)' }} />
+          <input value={slide.data.subtitle || ''} onChange={e => onUpdate({ subtitle: e.target.value })} placeholder="Subtítulo"
+            style={{ fontSize: 18, color: 'rgba(255,255,255,0.82)', background: 'transparent', border: 'none', outline: 'none', fontWeight: 500, letterSpacing: 0.5 }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (slide.layoutID === 'LAYOUT_STATS') return (
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ height: 6, backgroundColor: theme.primaryColor, flexShrink: 0 }} />
+      <div style={{ padding: '24px 48px 16px', flexShrink: 0 }}>
+        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+          style={{ fontSize: 28, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block' }} />
+        <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 8 }} />
+      </div>
+      <div style={{ display: 'flex', gap: 20, flex: 1, padding: '0 48px 36px', alignItems: 'stretch' }}>
+        {(slide.data.stats || [{ value: '', label: '' }, { value: '', label: '' }, { value: '', label: '' }]).slice(0, 4).map((s: any, i: number) => (
+          <div key={i} style={{ flex: 1, background: i % 2 === 0 ? theme.primaryColor : `${theme.primaryColor}12`, borderRadius: 16, padding: '28px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: `2px solid ${theme.primaryColor}22` }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', backgroundColor: i % 2 === 0 ? 'rgba(255,255,255,0.2)' : theme.accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <DynamicIcon name={s.icon || 'BarChart2'} size={22} color={i % 2 === 0 ? '#fff' : '#fff'} />
+            </div>
+            <input value={s.value || ''} onChange={e => onUpdate({ stats: (slide.data.stats || []).map((s2: any, j: number) => j === i ? { ...s2, value: e.target.value } : s2) })} placeholder="00"
+              style={{ fontSize: 38, fontWeight: 900, color: i % 2 === 0 ? '#fff' : theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', textAlign: 'center', width: '100%', lineHeight: 1 }} />
+            <input value={s.label || ''} onChange={e => onUpdate({ stats: (slide.data.stats || []).map((s2: any, j: number) => j === i ? { ...s2, label: e.target.value } : s2) })} placeholder="Rótulo"
+              style={{ fontSize: 13, color: i % 2 === 0 ? 'rgba(255,255,255,0.8)' : '#6B7280', background: 'transparent', border: 'none', outline: 'none', textAlign: 'center', width: '100%', marginTop: 6, fontWeight: 600 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (slide.layoutID === 'LAYOUT_TIMELINE') {
+    const events = slide.data.events || [];
+    return (
+      <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ height: 6, backgroundColor: theme.primaryColor, flexShrink: 0 }} />
+        <div style={{ padding: '24px 48px 16px', flexShrink: 0 }}>
+          <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+            style={{ fontSize: 28, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block' }} />
+          <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 8 }} />
+        </div>
+        {/* Timeline line */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 48px 32px' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+            {/* Horizontal line */}
+            <div style={{ position: 'absolute', top: 20, left: 20, right: 20, height: 3, backgroundColor: theme.primaryColor, zIndex: 0 }} />
+            {events.slice(0, 5).map((ev: any, i: number) => {
+              const cols = Math.min(events.length, 5);
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                  {/* Dot */}
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: i % 2 === 0 ? theme.primaryColor : theme.accentColor, border: `4px solid ${bg}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', marginBottom: 14 }}>
+                    <span style={{ fontSize: 11, color: '#fff', fontWeight: 800 }}>{i + 1}</span>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '0 6px', width: `${100 / cols}%` }}>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: theme.primaryColor, marginBottom: 4 }}>{ev.year || '____'}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1F2937', marginBottom: 4, lineHeight: 1.3 }}>{ev.title || 'Evento'}</div>
+                    <div style={{ fontSize: 11, color: '#6B7280', lineHeight: 1.4 }}>{ev.description || ''}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return null;
 };
 
@@ -1244,37 +1374,45 @@ const PlannerScreen = ({
         
         Crie uma apresentação adaptada a estes parâmetros.
         
-        LAYOUTS OBRIGATÓRIOS (Baseados em referência visual):
-        1. LAYOUT_COVER: Capa. Título à esquerda, Subtítulo abaixo, Imagem à direita.
-        2. LAYOUT_CONTENT_LEFT: Conteúdo. Título topo-esquerda, Texto denso abaixo, Imagem à direita.
-        3. LAYOUT_CONTENT_RIGHT: Conteúdo Invertido. Imagem à esquerda, Título e Texto à direita.
-        4. LAYOUT_CONTENT_TOP: Conteúdo Horizontal. Título e Texto no topo, Imagem larga na base.
-        5. LAYOUT_TOPICS: Tópicos. Título topo-esquerda (estilo conteúdo), 3 colunas com ícone (nome de ícone do Lucide), título e texto curto.
-        6. LAYOUT_REFERENCES: Referências. Título topo-esquerda, Lista de fontes, Fundo escuro.
+        LAYOUTS DISPONÍVEIS — escolha o mais adequado para cada slide:
+        1. LAYOUT_COVER: Capa. Título à esquerda, subtítulo abaixo, imagem à direita. Campos: title, subtitle, illustrationQuery.
+        2. LAYOUT_CONTENT_LEFT: Conteúdo com imagem. Título + texto à esquerda, imagem à direita. Campos: title, text, illustrationQuery.
+        3. LAYOUT_CONTENT_RIGHT: Conteúdo invertido. Imagem à esquerda, título + texto à direita. Campos: title, text, illustrationQuery.
+        4. LAYOUT_CONTENT_TOP: Horizontal. Título + texto no topo, imagem larga embaixo. Campos: title, text, illustrationQuery.
+        5. LAYOUT_TOPICS: 3 colunas de tópicos com ícone Lucide, título e texto curto. Campos: title, topics[{title,content,icon}].
+        6. LAYOUT_REFERENCES: Referências com fundo na cor primária. Campos: title, references[].
+        7. LAYOUT_QUOTE: Citação impactante centralizada com aspas gigantes. Ideal para abrir ou fechar seções. Campos: title, quote, author.
+        8. LAYOUT_TWO_COLUMNS: Dois blocos de texto lado a lado. Ideal para comparação, prós/contras, causa/efeito. Campos: title, column1, column2.
+        9. LAYOUT_FULL_IMAGE: Imagem em tela cheia com sobreposição de gradiente escuro e título em destaque. Máximo impacto visual. Campos: title, subtitle, illustrationQuery.
+        10. LAYOUT_STATS: 3 ou 4 cards de estatísticas/dados com valor em destaque, rótulo e ícone. Ideal para dados numéricos. Campos: title, stats[{value,label,icon}].
+        11. LAYOUT_TIMELINE: Linha do tempo horizontal com 3 a 5 eventos. Ideal para cronologias e processos. Campos: title, events[{year,title,description}].
 
         REGRAS DE DESIGN:
-        - Mantenha um estilo visual consistente.
-        - Se o tema permitir, use cores profissionais adequadas ao tópico.
-        - Use uma paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo).
-        - Garanta ALTO CONTRASTE e LEITURA (evite cores claras sobre fundos claros).
-        - Use **negrito** para termos importantes.
-        - NUNCA use emojis.
-        - Para 'topics', escolha ícones do Lucide-React (ex: 'Brain', 'Target', 'Lightbulb').
-        - Para 'illustrationQuery', forneça apenas 2 ou 3 palavras-chave em inglês que descrevam uma ilustração ou cenário representativo para o slide (ex: 'science, technology', 'classroom, teaching'). Nenhuma palavra escrita na descrição.
-        
-        SAÍDA: JSON estrito (sem Markdown ao redor) com a estrutura:
-        { 
-          "presentationTitle": "...", 
-          "theme": { 
-            "primaryColor": "...", 
-            "accentColor": "...", 
-            "backgroundColor": "...", 
-            "fontTitle": "...", 
-            "fontBody": "..."
-          }, 
-          "slides": [ 
-            { "layoutID": "...", "data": { "title": "...", "subtitle": "...", "text": "...", "imagePrompt": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }], "references": ["..."] } } 
-          ] 
+        - Use pelo menos 4 layouts diferentes para variar o ritmo visual.
+        - Use LAYOUT_QUOTE, LAYOUT_FULL_IMAGE ou LAYOUT_STATS para criar momentos de impacto.
+        - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
+        - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
+        - Paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo) — escolha cores profissionais adequadas ao tema.
+        - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
+        - Use **negrito** para termos importantes no campo "text".
+        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe').
+        - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
+
+        SAÍDA: JSON estrito (sem Markdown ao redor):
+        {
+          "presentationTitle": "...",
+          "theme": { "primaryColor": "#hex", "accentColor": "#hex", "backgroundColor": "#hex", "fontTitle": "...", "fontBody": "..." },
+          "slides": [
+            { "layoutID": "LAYOUT_COVER",        "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_QUOTE",         "data": { "title": "...", "quote": "...", "author": "..." } },
+            { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "title": "...", "column1": "...", "column2": "..." } },
+            { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_STATS",         "data": { "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "..." }] } },
+            { "layoutID": "LAYOUT_TIMELINE",      "data": { "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
+            { "layoutID": "LAYOUT_TOPICS",        "data": { "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }] } },
+            { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "title": "...", "text": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_REFERENCES",    "data": { "title": "Referências", "references": ["..."] } }
+          ]
         }`;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1488,6 +1626,117 @@ const PlannerScreen = ({
             slide.addText(refText, { x: 0.7, y: 1.5, w: 8.5, h: 3.5, valign: 'top' });
           }
           addFooter(slide, si + 1, true);
+
+        } else if (slideData.layoutID === 'LAYOUT_QUOTE') {
+          slide.background = { color: bg };
+          // Giant decorative quote marks
+          slide.addText('“', { x: 0.2, y: -0.3, w: 2.5, h: 2, fontSize: 160, color: pc, transparency: 88, fontFace: 'Georgia', bold: true });
+          slide.addText('”', { x: 7.5, y: 3.0, w: 2.5, h: 2, fontSize: 160, color: pc, transparency: 88, fontFace: 'Georgia', bold: true });
+          // Accent bar
+          slide.addShape(pres.ShapeType.rect, { x: 4.35, y: 0.7, w: 1.3, h: 0.08, fill: { color: ac } });
+          // Topic label
+          if (slideData.data.title) {
+            slide.addText(slideData.data.title, { x: 1, y: 0.55, w: 8, h: 0.35, fontSize: 10, color: pc, bold: true, align: 'center', charSpacing: 3 });
+          }
+          // Quote
+          slide.addText(slideData.data.quote || '', { x: 1, y: 1.2, w: 8, h: 2.6, fontSize: 26, fontFace: 'Georgia', color: pc, bold: false, italic: true, align: 'center', valign: 'middle', lineSpacing: 36 });
+          // Divider
+          slide.addShape(pres.ShapeType.rect, { x: 4.35, y: 3.9, w: 1.3, h: 0.06, fill: { color: ac } });
+          // Author
+          slide.addText(`— ${slideData.data.author || ''}`, { x: 1, y: 4.1, w: 8, h: 0.4, fontSize: 14, color: '6B7280', align: 'center', bold: true, charSpacing: 1 });
+          addFooter(slide, si + 1);
+
+        } else if (slideData.layoutID === 'LAYOUT_TWO_COLUMNS') {
+          slide.background = { color: bg };
+          // Top accent
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
+          // Title
+          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.28, w: 9.2, h: 0.65, fontSize: 26, ...titleOpts });
+          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.98, w: 1.0, h: 0.06, fill: { color: ac } });
+          // Divider line
+          slide.addShape(pres.ShapeType.rect, { x: 5.0, y: 1.2, w: 0.04, h: 3.7, fill: { color: pc, transparency: 80 } });
+          // Col 1 label
+          slide.addShape(pres.ShapeType.ellipse, { x: 0.4, y: 1.15, w: 0.35, h: 0.35, fill: { color: ac } });
+          slide.addText('1', { x: 0.4, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
+          const col1 = parseMarkdown(slideData.data.column1 || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
+          slide.addText(col1, { x: 0.4, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left' });
+          // Col 2 label
+          slide.addShape(pres.ShapeType.ellipse, { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fill: { color: pc } });
+          slide.addText('2', { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
+          const col2 = parseMarkdown(slideData.data.column2 || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
+          slide.addText(col2, { x: 5.3, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left' });
+          addFooter(slide, si + 1);
+
+        } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
+          slide.background = { color: '111111' };
+          if (slideData.data.imageUrl) {
+            slide.addImage({ path: slideData.data.imageUrl, x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
+          }
+          // Dark gradient overlay via semi-transparent rect
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.3, fill: { color: '000000', transparency: 25 } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 3.5, w: 10, h: 2.0, fill: { color: '000000', transparency: 10 } });
+          // Left accent bar
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.12, h: 5.5, fill: { color: ac } });
+          // Accent line above title
+          slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.2, w: 1.0, h: 0.07, fill: { color: ac } });
+          // Title
+          slide.addText(slideData.data.title || '', { x: 0.5, y: 3.35, w: 9, h: 1.3, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: 'Calibri', valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000', transparency: 50 } });
+          // Subtitle
+          if (slideData.data.subtitle) {
+            slide.addText(slideData.data.subtitle, { x: 0.5, y: 4.7, w: 9, h: 0.45, fontSize: 16, color: 'D1D5DB', fontFace: 'Calibri' });
+          }
+
+        } else if (slideData.layoutID === 'LAYOUT_STATS') {
+          slide.background = { color: bg };
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
+          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.28, w: 9.2, h: 0.65, fontSize: 26, ...titleOpts });
+          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.95, w: 1.0, h: 0.06, fill: { color: ac } });
+
+          const stats = (slideData.data.stats || []).slice(0, 4);
+          const cardW = stats.length > 0 ? (9.2 / stats.length) - 0.2 : 2.2;
+          stats.forEach((s: any, i: number) => {
+            const xPos = 0.4 + i * (cardW + 0.2);
+            const isDark = i % 2 === 0;
+            slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: 1.15, w: cardW, h: 3.8, fill: { color: isDark ? pc : 'FFFFFF' }, line: { color: isDark ? pc : 'E5E7EB', width: 0.75 }, rectRadius: 0.15 });
+            // Icon circle
+            slide.addShape(pres.ShapeType.ellipse, { x: xPos + cardW / 2 - 0.35, y: 1.45, w: 0.7, h: 0.7, fill: { color: isDark ? 'FFFFFF' : ac, transparency: isDark ? 80 : 0 } });
+            // Value
+            slide.addText(s.value || '—', { x: xPos + 0.1, y: 2.3, w: cardW - 0.2, h: 1.1, fontSize: 36, bold: true, align: 'center', color: isDark ? 'FFFFFF' : pc });
+            // Label
+            slide.addText(s.label || '', { x: xPos + 0.1, y: 3.45, w: cardW - 0.2, h: 0.9, fontSize: 12, align: 'center', color: isDark ? 'D1D5DB' : '6B7280', valign: 'top' });
+          });
+          addFooter(slide, si + 1);
+
+        } else if (slideData.layoutID === 'LAYOUT_TIMELINE') {
+          slide.background = { color: bg };
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
+          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.28, w: 9.2, h: 0.65, fontSize: 26, ...titleOpts });
+          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.95, w: 1.0, h: 0.06, fill: { color: ac } });
+
+          const events = (slideData.data.events || []).slice(0, 5);
+          if (events.length > 0) {
+            const cols = events.length;
+            const colW = 9.2 / cols;
+            // Horizontal timeline line
+            slide.addShape(pres.ShapeType.rect, { x: 0.4 + colW * 0.5, y: 2.0, w: colW * (cols - 1), h: 0.06, fill: { color: pc } });
+            events.forEach((ev: any, i: number) => {
+              const cx = 0.4 + colW * i + colW * 0.5 - 0.25;
+              const isDot = i % 2 === 0;
+              // Dot
+              slide.addShape(pres.ShapeType.ellipse, { x: cx, y: 1.78, w: 0.5, h: 0.5, fill: { color: isDot ? pc : ac }, line: { color: 'FFFFFF', width: 2 } });
+              slide.addText(`${i + 1}`, { x: cx, y: 1.78, w: 0.5, h: 0.5, fontSize: 11, color: 'FFFFFF', align: 'center', bold: true });
+              // Year
+              slide.addText(ev.year || '', { x: cx - 0.25, y: 1.25, w: 1.0, h: 0.4, fontSize: 12, bold: true, align: 'center', color: pc });
+              // Event title
+              slide.addText(ev.title || '', { x: cx - 0.55, y: 2.4, w: 1.6, h: 0.5, fontSize: 11, bold: true, align: 'center', color: '1F2937' });
+              // Description
+              slide.addText(ev.description || '', { x: cx - 0.55, y: 2.95, w: 1.6, h: 1.8, fontSize: 10, align: 'center', color: '6B7280', valign: 'top', lineSpacing: 16 });
+            });
+          }
+          addFooter(slide, si + 1);
         }
       }
       await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
@@ -4786,37 +5035,45 @@ export default function App() {
         
         Crie uma apresentação adaptada a estes parâmetros.
         
-        LAYOUTS OBRIGATÓRIOS (Baseados em referência visual):
-        1. LAYOUT_COVER: Capa. Título à esquerda, Subtítulo abaixo, Imagem à direita.
-        2. LAYOUT_CONTENT_LEFT: Conteúdo. Título topo-esquerda, Texto denso abaixo, Imagem à direita.
-        3. LAYOUT_CONTENT_RIGHT: Conteúdo Invertido. Imagem à esquerda, Título e Texto à direita.
-        4. LAYOUT_CONTENT_TOP: Conteúdo Horizontal. Título e Texto no topo, Imagem larga na base.
-        5. LAYOUT_TOPICS: Tópicos. Título topo-esquerda (estilo conteúdo), 3 colunas com ícone (nome de ícone do Lucide), título e texto curto.
-        6. LAYOUT_REFERENCES: Referências. Título topo-esquerda, Lista de fontes, Fundo escuro.
+        LAYOUTS DISPONÍVEIS — escolha o mais adequado para cada slide:
+        1. LAYOUT_COVER: Capa. Título à esquerda, subtítulo abaixo, imagem à direita. Campos: title, subtitle, illustrationQuery.
+        2. LAYOUT_CONTENT_LEFT: Conteúdo com imagem. Título + texto à esquerda, imagem à direita. Campos: title, text, illustrationQuery.
+        3. LAYOUT_CONTENT_RIGHT: Conteúdo invertido. Imagem à esquerda, título + texto à direita. Campos: title, text, illustrationQuery.
+        4. LAYOUT_CONTENT_TOP: Horizontal. Título + texto no topo, imagem larga embaixo. Campos: title, text, illustrationQuery.
+        5. LAYOUT_TOPICS: 3 colunas de tópicos com ícone Lucide, título e texto curto. Campos: title, topics[{title,content,icon}].
+        6. LAYOUT_REFERENCES: Referências com fundo na cor primária. Campos: title, references[].
+        7. LAYOUT_QUOTE: Citação impactante centralizada com aspas gigantes. Ideal para abrir ou fechar seções. Campos: title, quote, author.
+        8. LAYOUT_TWO_COLUMNS: Dois blocos de texto lado a lado. Ideal para comparação, prós/contras, causa/efeito. Campos: title, column1, column2.
+        9. LAYOUT_FULL_IMAGE: Imagem em tela cheia com sobreposição de gradiente escuro e título em destaque. Máximo impacto visual. Campos: title, subtitle, illustrationQuery.
+        10. LAYOUT_STATS: 3 ou 4 cards de estatísticas/dados com valor em destaque, rótulo e ícone. Ideal para dados numéricos. Campos: title, stats[{value,label,icon}].
+        11. LAYOUT_TIMELINE: Linha do tempo horizontal com 3 a 5 eventos. Ideal para cronologias e processos. Campos: title, events[{year,title,description}].
 
         REGRAS DE DESIGN:
-        - Mantenha um estilo visual consistente.
-        - Se o tema permitir, use cores profissionais adequadas ao tópico.
-        - Use uma paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo).
-        - Garanta ALTO CONTRASTE e LEITURA (evite cores claras sobre fundos claros).
-        - Use **negrito** para termos importantes.
-        - NUNCA use emojis.
-        - Para 'topics', escolha ícones do Lucide-React (ex: 'Brain', 'Target', 'Lightbulb').
-        - Para 'illustrationQuery', forneça apenas 2 ou 3 palavras-chave em inglês que descrevam uma ilustração ou cenário representativo para o slide (ex: 'science, technology', 'classroom, teaching'). Nenhuma palavra escrita na descrição.
-        
-        SAÍDA: JSON estrito (sem Markdown ao redor) com a estrutura:
-        { 
-          "presentationTitle": "...", 
-          "theme": { 
-            "primaryColor": "...", 
-            "accentColor": "...", 
-            "backgroundColor": "...", 
-            "fontTitle": "...", 
-            "fontBody": "..."
-          }, 
-          "slides": [ 
-            { "layoutID": "...", "data": { "title": "...", "subtitle": "...", "text": "...", "imagePrompt": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }], "references": ["..."] } } 
-          ] 
+        - Use pelo menos 4 layouts diferentes para variar o ritmo visual.
+        - Use LAYOUT_QUOTE, LAYOUT_FULL_IMAGE ou LAYOUT_STATS para criar momentos de impacto.
+        - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
+        - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
+        - Paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo) — escolha cores profissionais adequadas ao tema.
+        - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
+        - Use **negrito** para termos importantes no campo "text".
+        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe').
+        - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
+
+        SAÍDA: JSON estrito (sem Markdown ao redor):
+        {
+          "presentationTitle": "...",
+          "theme": { "primaryColor": "#hex", "accentColor": "#hex", "backgroundColor": "#hex", "fontTitle": "...", "fontBody": "..." },
+          "slides": [
+            { "layoutID": "LAYOUT_COVER",        "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_QUOTE",         "data": { "title": "...", "quote": "...", "author": "..." } },
+            { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "title": "...", "column1": "...", "column2": "..." } },
+            { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_STATS",         "data": { "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "..." }] } },
+            { "layoutID": "LAYOUT_TIMELINE",      "data": { "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
+            { "layoutID": "LAYOUT_TOPICS",        "data": { "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }] } },
+            { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "title": "...", "text": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_REFERENCES",    "data": { "title": "Referências", "references": ["..."] } }
+          ]
         }`;
 
   const getSuggestion = async (optTopic?: string, optClassId?: string) => {
