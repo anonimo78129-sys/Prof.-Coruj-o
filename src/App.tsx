@@ -824,6 +824,103 @@ const AdvancedSettings = ({
 const SLIDE_W = 960;
 const SLIDE_H = 540;
 
+// Rich-text syntax:
+//   **bold**       → negrito
+//   ==text==       → marca-texto (acento)
+//   [[keyword]]    → palavra-chave colorida (primária)
+//   {IconName}     → ícone Lucide inline (preview) / bullet colorido (PPTX)
+//   ## Subtitle    → subtítulo dentro do corpo (linha maior)
+
+const parseRichHtml = (text: string, primaryColor: string, accentColor: string): string => {
+  if (!text) return '';
+  const ac = accentColor || '#6366F1';
+  const pc = primaryColor || '#4F46E5';
+  return text
+    .replace(/^## (.+)$/gm, `<div style="font-size:17px;font-weight:800;color:${pc};margin:10px 0 4px;letter-spacing:-0.3px">$1</div>`)
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/==(.*?)==/g, `<mark style="background:${ac}44;color:inherit;padding:1px 5px;border-radius:4px;font-weight:600">$1</mark>`)
+    .replace(/\[\[(.*?)\]\]/g, `<span style="color:${pc};font-weight:800">$1</span>`)
+    .replace(/\{([A-Za-z0-9]+)\}/g, `<span data-icon="$1" style="color:${pc};font-size:0.85em;vertical-align:middle;margin-right:2px">◆</span>`)
+    .replace(/\n/g, '<br/>');
+};
+
+// Extended parseMarkdown for pptxgenjs text runs
+const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, accentColor?: string): any[] => {
+  if (!text) return [];
+  const str = typeof text === 'string' ? text : JSON.stringify(text);
+  const pc = (primaryColor || '#4F46E5').replace('#', '');
+  const ac = (accentColor || '#6366F1').replace('#', '');
+  const regex = /(\*\*.*?\*\*|==.*?==|\[\[.*?\]\]|\{[A-Za-z0-9]+\}|^## .+$)/gm;
+  const parts = str.split(regex);
+  const runs: any[] = [];
+  parts.forEach(part => {
+    if (!part) return;
+    if (part.startsWith('## ')) {
+      runs.push({ text: part.slice(3), options: { ...baseOpts, bold: true, fontSize: (baseOpts.fontSize || 12) + 4, color: pc, breakLine: true } });
+    } else if (part.startsWith('**') && part.endsWith('**')) {
+      runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true } });
+    } else if (part.startsWith('==') && part.endsWith('==')) {
+      runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, highlight: ac.padEnd(6, '0') } });
+    } else if (part.startsWith('[[') && part.endsWith(']]')) {
+      runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: pc } });
+    } else if (/^\{[A-Za-z0-9]+\}$/.test(part)) {
+      runs.push({ text: '◆ ', options: { ...baseOpts, bold: true, color: ac } });
+    } else {
+      runs.push({ text: part, options: baseOpts });
+    }
+  });
+  return runs;
+};
+
+// Renders rich text inside SlideCanvas (editable toggle)
+const RichBody = ({ value, onChange, style, rows = 6, primaryColor, accentColor }: {
+  value: string; onChange: (v: string) => void;
+  style?: React.CSSProperties; rows?: number;
+  primaryColor: string; accentColor: string;
+}) => {
+  const [editing, setEditing] = useState(false);
+  if (editing) return (
+    <textarea
+      autoFocus
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      onBlur={() => setEditing(false)}
+      rows={rows}
+      style={{ width: '100%', resize: 'none', outline: 'none', border: `2px solid ${primaryColor}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', background: '#fff', ...style }}
+    />
+  );
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      dangerouslySetInnerHTML={{ __html: parseRichHtml(value, primaryColor, accentColor) || '<span style="color:#aaa;font-style:italic">Clique para editar...</span>' }}
+      style={{ cursor: 'text', fontSize: 14, lineHeight: 1.65, color: '#374151', width: '100%', minHeight: 60, ...style }}
+    />
+  );
+};
+
+// Renders an icon inline inside SlideCanvas body (replaces ◆ placeholder)
+const RichBodyWithIcons = ({ value, onChange, style, primaryColor, accentColor }: {
+  value: string; onChange: (v: string) => void;
+  style?: React.CSSProperties; primaryColor: string; accentColor: string;
+}) => {
+  const [editing, setEditing] = useState(false);
+  if (editing) return (
+    <textarea autoFocus value={value} onChange={e => onChange(e.target.value)} onBlur={() => setEditing(false)}
+      rows={7} style={{ width: '100%', resize: 'none', outline: 'none', border: `2px solid ${primaryColor}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, lineHeight: 1.65, fontFamily: 'inherit', background: '#fff', ...style }} />
+  );
+  // Split by icon tokens and render mixed content
+  const parts = value.split(/(\{[A-Za-z0-9]+\})/g);
+  return (
+    <div onClick={() => setEditing(true)} style={{ cursor: 'text', fontSize: 14, lineHeight: 1.7, color: '#374151', width: '100%', ...style }}>
+      {parts.map((p, i) => {
+        const iconMatch = p.match(/^\{([A-Za-z0-9]+)\}$/);
+        if (iconMatch) return <DynamicIcon key={i} name={iconMatch[1]} size={15} color={primaryColor} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />;
+        return <span key={i} dangerouslySetInnerHTML={{ __html: parseRichHtml(p, primaryColor, accentColor) }} />;
+      })}
+    </div>
+  );
+};
+
 const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
   slide: any; theme: any;
   onUpdate: (d: any) => void;
@@ -863,12 +960,16 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
   if (slide.layoutID === 'LAYOUT_CONTENT_LEFT' || slide.layoutID === 'LAYOUT_CONTENT_RIGHT') {
     const isLeft = slide.layoutID === 'LAYOUT_CONTENT_LEFT';
     const textPanel = (
-      <div style={{ width: 480, padding: '48px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <div style={{ width: 480, padding: '44px 40px 44px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}>
         <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 16 }} />
         <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
           style={{ ...titleStyle, fontSize: 30, lineHeight: 1.2, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 20, display: 'block' }} />
-        <textarea value={slide.data.text || ''} onChange={e => onUpdate({ text: e.target.value })} placeholder="Conteúdo"
-          style={{ fontSize: 15, color: '#444', lineHeight: 1.7, background: 'transparent', border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px', width: '100%', height: 240, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+        <RichBodyWithIcons value={slide.data.text || ''} onChange={v => onUpdate({ text: v })}
+          primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
+        {/* Arrow pointing toward image */}
+        <div style={{ position: 'absolute', top: '50%', [isLeft ? 'right' : 'left']: -18, transform: 'translateY(-50%)', fontSize: 28, color: theme.accentColor, fontWeight: 900, lineHeight: 1 }}>
+          {isLeft ? '▶' : '◀'}
+        </div>
       </div>
     );
     const imgPanel = (
@@ -885,14 +986,16 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
 
   if (slide.layoutID === 'LAYOUT_CONTENT_TOP') return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ padding: '36px 48px 20px', flexShrink: 0 }}>
+      <div style={{ padding: '32px 48px 16px', flexShrink: 0 }}>
         <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 14 }} />
         <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-          style={{ ...titleStyle, fontSize: 28, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 14, display: 'block' }} />
-        <textarea value={slide.data.text || ''} onChange={e => onUpdate({ text: e.target.value })} placeholder="Conteúdo"
-          style={{ fontSize: 14, color: '#444', lineHeight: 1.65, background: 'transparent', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px', width: '100%', height: 112, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+          style={{ ...titleStyle, fontSize: 28, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 12, display: 'block' }} />
+        <RichBodyWithIcons value={slide.data.text || ''} onChange={v => onUpdate({ text: v })}
+          primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ minHeight: 80 }} />
+        {/* Arrow pointing down to image */}
+        <div style={{ textAlign: 'center', fontSize: 20, color: theme.accentColor, marginTop: 6, lineHeight: 1 }}>▼</div>
       </div>
-      <div style={{ flex: 1, margin: '0 48px 36px', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ flex: 1, margin: '4px 48px 32px', borderRadius: 14, overflow: 'hidden' }}>
         <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
       </div>
     </div>
@@ -960,16 +1063,30 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
       </div>
       <div style={{ display: 'flex', flex: 1, gap: 0, padding: '0 48px 32px' }}>
         {/* Column 1 */}
-        <div style={{ flex: 1, paddingRight: 24, borderRight: `2px solid ${theme.primaryColor}22` }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: theme.accentColor, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>①</div>
-          <textarea value={slide.data.column1 || ''} onChange={e => onUpdate({ column1: e.target.value })} placeholder="Primeiro bloco de conteúdo..."
-            style={{ fontSize: 14, color: '#374151', lineHeight: 1.65, background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', flex: 1, fontFamily: 'inherit', height: 280 }} />
+        <div style={{ flex: 1, paddingRight: 20, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: theme.accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 800, flexShrink: 0 }}>1</div>
+            <div style={{ height: 2, flex: 1, backgroundColor: `${theme.primaryColor}22` }} />
+          </div>
+          <RichBodyWithIcons value={slide.data.column1 || ''} onChange={v => onUpdate({ column1: v })}
+            primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
+        </div>
+        {/* Arrow divider */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 8px', flexShrink: 0 }}>
+          <div style={{ width: 2, height: 60, backgroundColor: `${theme.primaryColor}22` }} />
+          <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', flexShrink: 0 }}>
+            <span style={{ color: '#fff', fontSize: 16, fontWeight: 900 }}>⟺</span>
+          </div>
+          <div style={{ width: 2, height: 60, backgroundColor: `${theme.primaryColor}22` }} />
         </div>
         {/* Column 2 */}
-        <div style={{ flex: 1, paddingLeft: 24 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: theme.accentColor, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>②</div>
-          <textarea value={slide.data.column2 || ''} onChange={e => onUpdate({ column2: e.target.value })} placeholder="Segundo bloco de conteúdo..."
-            style={{ fontSize: 14, color: '#374151', lineHeight: 1.65, background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', flex: 1, fontFamily: 'inherit', height: 280 }} />
+        <div style={{ flex: 1, paddingLeft: 20, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ height: 2, flex: 1, backgroundColor: `${theme.primaryColor}22` }} />
+            <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 800, flexShrink: 0 }}>2</div>
+          </div>
+          <RichBodyWithIcons value={slide.data.column2 || ''} onChange={v => onUpdate({ column2: v })}
+            primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
         </div>
       </div>
     </div>
@@ -1394,8 +1511,14 @@ const PlannerScreen = ({
         - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
         - Paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo) — escolha cores profissionais adequadas ao tema.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
-        - Use **negrito** para termos importantes no campo "text".
-        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe').
+        - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
+            **palavra** → negrito estratégico para termos-chave
+            ==palavra== → marca-texto com cor de acento (use em definições e conceitos centrais)
+            [[palavra]] → palavra-chave colorida em destaque primário (2-3 por slide máximo)
+            {IconName} → ícone Lucide inline antes de tópicos (ex: {Target} Objetivo, {Brain} Conceito)
+            ## Subtítulo → subtítulo dentro do corpo para hierarquia visual
+        - Combine as marcações: ex: {Target} **[[Objetivo]]**: ==aprender a== estrutura...
+        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe', 'Target', 'CheckCircle', 'AlertTriangle', 'Lightbulb').
         - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
 
         SAÍDA: JSON estrito (sem Markdown ao redor):
@@ -1480,17 +1603,8 @@ const PlannerScreen = ({
     }
   };
 
-  const parseMarkdown = (text: any, baseOpts: any) => {
-    if (!text) return [];
-    const strText = typeof text === 'string' ? text : (text.event || text.name || JSON.stringify(text));
-    const parts = strText.split(/(\*\*.*?\*\*)/g);
-    return parts.map((part: string) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return { text: part.slice(2, -2), options: { ...baseOpts, bold: true } };
-      }
-      return { text: part, options: baseOpts };
-    });
-  };
+  const parseMarkdown = (text: any, baseOpts: any) =>
+    parseRichMarkdown(text, baseOpts, theme.primaryColor, theme.accentColor);
 
   const generateDirectResource = async (targetMode: 'activities' | 'slides' | 'exam') => {
     generateResource(targetMode);
@@ -1573,6 +1687,10 @@ const PlannerScreen = ({
           slide.addText(slideData.data.title || '', { x: contentX, y: 0.38, w: 5.2, h: 0.8, fontSize: 24, ...titleOpts });
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 22 });
           slide.addText(parsedText, { x: contentX, y: 1.3, w: 5.2, h: 3.6, valign: 'top', align: 'left' });
+          // Arrow pointing toward image
+          const arrowX = isLeft ? 5.45 : 4.35;
+          slide.addShape(pres.ShapeType.rect, { x: arrowX, y: 2.45, w: 0.3, h: 0.06, fill: { color: ac } });
+          slide.addShape(pres.ShapeType.rect, { x: isLeft ? arrowX + 0.22 : arrowX, y: 2.27, w: 0.08, h: 0.42, fill: { color: ac }, rotate: isLeft ? 45 : -45 });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_TOP') {
@@ -1581,9 +1699,12 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.22, w: 9.2, h: 0.06, fill: { color: ac } });
           slide.addText(slideData.data.title || '', { x: 0.4, y: 0.36, w: 9.2, h: 0.7, fontSize: 26, ...titleOpts });
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(parsedText, { x: 0.4, y: 1.2, w: 9.2, h: 1.4, valign: 'top', align: 'left' });
+          slide.addText(parsedText, { x: 0.4, y: 1.2, w: 9.2, h: 1.35, valign: 'top', align: 'left' });
+          // Down arrow between text and image
+          slide.addShape(pres.ShapeType.rect, { x: 4.94, y: 2.62, w: 0.12, h: 0.28, fill: { color: ac } });
+          slide.addShape(pres.ShapeType.rect, { x: 4.7, y: 2.78, w: 0.6, h: 0.08, fill: { color: ac }, rotate: 0 });
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 2.75, w: 9.2, h: 2.25, sizing: { type: 'contain', w: 9.2, h: 2.25 } });
+            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
           }
           addFooter(slide, si + 1);
 
@@ -1661,6 +1782,9 @@ const PlannerScreen = ({
           slide.addText('1', { x: 0.4, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
           const col1 = parseMarkdown(slideData.data.column1 || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
           slide.addText(col1, { x: 0.4, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left' });
+          // Central arrow divider
+          slide.addShape(pres.ShapeType.ellipse, { x: 4.63, y: 2.5, w: 0.5, h: 0.5, fill: { color: pc } });
+          slide.addText('⟺', { x: 4.63, y: 2.5, w: 0.5, h: 0.5, fontSize: 13, color: 'FFFFFF', align: 'center', bold: true });
           // Col 2 label
           slide.addShape(pres.ShapeType.ellipse, { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fill: { color: pc } });
           slide.addText('2', { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
@@ -5055,8 +5179,14 @@ export default function App() {
         - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
         - Paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo) — escolha cores profissionais adequadas ao tema.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
-        - Use **negrito** para termos importantes no campo "text".
-        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe').
+        - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
+            **palavra** → negrito estratégico para termos-chave
+            ==palavra== → marca-texto com cor de acento (use em definições e conceitos centrais)
+            [[palavra]] → palavra-chave colorida em destaque primário (2-3 por slide máximo)
+            {IconName} → ícone Lucide inline antes de tópicos (ex: {Target} Objetivo, {Brain} Conceito)
+            ## Subtítulo → subtítulo dentro do corpo para hierarquia visual
+        - Combine as marcações: ex: {Target} **[[Objetivo]]**: ==aprender a== estrutura...
+        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe', 'Target', 'CheckCircle', 'AlertTriangle', 'Lightbulb').
         - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
 
         SAÍDA: JSON estrito (sem Markdown ao redor):
