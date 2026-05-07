@@ -815,6 +815,248 @@ const AdvancedSettings = ({
   );
 };
 
+const SLIDE_W = 960;
+const SLIDE_H = 540;
+
+const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
+  slide: any; theme: any;
+  onUpdate: (d: any) => void;
+  schoolName?: string; teacherName?: string;
+}) => {
+  const isRef = slide.layoutID === 'LAYOUT_REFERENCES';
+  const isCover = slide.layoutID === 'LAYOUT_COVER';
+  const bg = (isRef || isCover) ? theme.primaryColor : theme.backgroundColor;
+  const imgSrc = slide.data.imageUrl || getImageUrl(slide.data.imagePrompt, 1200, 800);
+
+  const titleStyle = { color: isCover || isRef ? '#ffffff' : theme.primaryColor, fontFamily: 'system-ui, sans-serif', fontWeight: 800 };
+
+  if (isCover) return (
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, position: 'relative', display: 'flex', overflow: 'hidden' }}>
+      {/* Accent stripe */}
+      <div style={{ position: 'absolute', left: 462, top: 0, width: 6, height: SLIDE_H, backgroundColor: theme.accentColor, zIndex: 2 }} />
+      {/* Decorative circles */}
+      <div style={{ position: 'absolute', left: -30, bottom: -30, width: 160, height: 160, borderRadius: '50%', backgroundColor: theme.accentColor, opacity: 0.25 }} />
+      {/* Left panel */}
+      <div style={{ width: 460, height: SLIDE_H, padding: '48px 48px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 1 }}>
+        <div>
+          {schoolName && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16 }}>{schoolName}</div>}
+          <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+            style={{ ...titleStyle, fontSize: 46, lineHeight: 1.15, background: 'transparent', border: 'none', borderBottom: '2px solid rgba(255,255,255,0.4)', width: '100%', outline: 'none', color: '#fff', marginBottom: 20, display: 'block' }} />
+          <input value={slide.data.subtitle || ''} onChange={e => onUpdate({ subtitle: e.target.value })} placeholder="Subtítulo"
+            style={{ fontSize: 17, color: 'rgba(255,255,255,0.85)', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.2)', width: '100%', outline: 'none', fontWeight: 600, letterSpacing: 1, display: 'block' }} />
+        </div>
+        {teacherName && <div style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 15 }}>Prof. {teacherName}</div>}
+      </div>
+      {/* Right panel image */}
+      <div style={{ flex: 1, height: SLIDE_H, overflow: 'hidden' }}>
+        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+      </div>
+    </div>
+  );
+
+  if (slide.layoutID === 'LAYOUT_CONTENT_LEFT' || slide.layoutID === 'LAYOUT_CONTENT_RIGHT') {
+    const isLeft = slide.layoutID === 'LAYOUT_CONTENT_LEFT';
+    const textPanel = (
+      <div style={{ width: 480, padding: '48px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 16 }} />
+        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+          style={{ ...titleStyle, fontSize: 30, lineHeight: 1.2, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 20, display: 'block' }} />
+        <textarea value={slide.data.text || ''} onChange={e => onUpdate({ text: e.target.value })} placeholder="Conteúdo"
+          style={{ fontSize: 15, color: '#444', lineHeight: 1.7, background: 'transparent', border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px', width: '100%', height: 240, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+      </div>
+    );
+    const imgPanel = (
+      <div style={{ width: 480, height: SLIDE_H, overflow: 'hidden' }}>
+        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+      </div>
+    );
+    return (
+      <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: isLeft ? 'row' : 'row-reverse', overflow: 'hidden' }}>
+        {textPanel}{imgPanel}
+      </div>
+    );
+  }
+
+  if (slide.layoutID === 'LAYOUT_CONTENT_TOP') return (
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '36px 48px 20px', flexShrink: 0 }}>
+        <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 14 }} />
+        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+          style={{ ...titleStyle, fontSize: 28, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 14, display: 'block' }} />
+        <textarea value={slide.data.text || ''} onChange={e => onUpdate({ text: e.target.value })} placeholder="Conteúdo"
+          style={{ fontSize: 14, color: '#444', lineHeight: 1.65, background: 'transparent', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px', width: '100%', height: 112, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+      </div>
+      <div style={{ flex: 1, margin: '0 48px 36px', borderRadius: 14, overflow: 'hidden' }}>
+        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+      </div>
+    </div>
+  );
+
+  if (slide.layoutID === 'LAYOUT_TOPICS') return (
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', padding: '36px 48px 36px', overflow: 'hidden' }}>
+      <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 14 }} />
+      <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+        style={{ ...titleStyle, fontSize: 28, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 24, display: 'block' }} />
+      <div style={{ display: 'flex', gap: 24, flex: 1 }}>
+        {slide.data.topics?.slice(0, 3).map((t: any, i: number) => (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', flexShrink: 0 }}>
+              <DynamicIcon name={t.icon} size={26} color="white" />
+            </div>
+            <div style={{ flex: 1, width: '100%', borderRadius: 14, padding: '14px 12px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', backgroundColor: `${theme.primaryColor}0A` }}>
+              <input value={t.title || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, title: e.target.value } : t2) })} placeholder="Tópico"
+                style={{ fontSize: 13, fontWeight: 700, color: theme.primaryColor, background: 'transparent', border: 'none', width: '100%', outline: 'none', textAlign: 'center', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }} />
+              <textarea value={t.content || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, content: e.target.value } : t2) })} placeholder="Conteúdo"
+                style={{ fontSize: 12, color: '#555', lineHeight: 1.55, background: 'transparent', border: 'none', width: '100%', outline: 'none', resize: 'none', flex: 1, fontFamily: 'inherit', textAlign: 'center' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (isRef) return (
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', padding: '48px', overflow: 'hidden' }}>
+      <div style={{ width: 8, height: SLIDE_H, backgroundColor: theme.accentColor, position: 'absolute', left: 0, top: 0 }} />
+      <div style={{ position: 'absolute', right: -60, bottom: -60, width: 300, height: 300, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.06)' }} />
+      <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Referências"
+        style={{ fontSize: 34, fontWeight: 800, color: '#fff', background: 'transparent', border: 'none', borderBottom: '2px solid rgba(255,255,255,0.2)', width: '100%', outline: 'none', marginBottom: 28, display: 'block', fontFamily: 'inherit' }} />
+      <textarea value={slide.data.references?.join('\n') || ''} onChange={e => onUpdate({ references: e.target.value.split('\n') })} placeholder="Uma referência por linha"
+        style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.7, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '16px', width: '100%', flex: 1, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+    </div>
+  );
+
+  return null;
+};
+
+const SlidePreviewList = ({
+  presentationData, setPresentationData, profile,
+  isExporting, regenLoading, setRegenLoading, setError,
+  exportPPTX, savedResources, setSavedResources,
+  schedules, classes, setClasses, topic, selectedClassId
+}: {
+  presentationData: PresentationData;
+  setPresentationData: (d: PresentationData | null) => void;
+  profile: UserProfile;
+  isExporting: boolean;
+  regenLoading: boolean;
+  setRegenLoading: (v: boolean) => void;
+  setError: (e: string) => void;
+  exportPPTX: () => void;
+  savedResources: SavedResource[];
+  setSavedResources: (r: any) => void;
+  schedules: ClassSchedule[];
+  classes: ClassItem[];
+  setClasses: (c: ClassItem[]) => void;
+  topic: string;
+  selectedClassId: string;
+}) => {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [regenState, setRegenState] = useState<{ idx: number; prompt: string } | null>(null);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([entry]) => {
+      setScale(entry.contentRect.width / SLIDE_W);
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const updateSlide = (idx: number, newData: any) => {
+    setPresentationData({
+      ...presentationData,
+      slides: presentationData.slides.map((s, i) => i === idx ? { ...s, data: { ...s.data, ...newData } } : s)
+    });
+  };
+
+  const handleRegenerateSlide = async (idx: number, newPrompt: string) => {
+    if (!newPrompt) return;
+    setRegenLoading(true);
+    try {
+      const targetSlide = presentationData.slides[idx];
+      const prompt = `Regenere o slide ${idx + 1} da apresentação sobre "${presentationData.presentationTitle}".
+Layout atual: ${targetSlide.layoutID}. Nova instrução: ${newPrompt}.
+Mantenha o estilo: ${JSON.stringify(presentationData.theme)}.
+SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illustrationQuery": "..." }`;
+      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const newData = JSON.parse(response.text || '{}');
+      const newImgUrl = newData.illustrationQuery ? await fetchPixabayImage(newData.illustrationQuery, 1200, 800) : targetSlide.data.imageUrl;
+      updateSlide(idx, { title: newData.title || targetSlide.data.title, text: newData.text || targetSlide.data.text, imagePrompt: newData.illustrationQuery || targetSlide.data.imagePrompt, imageUrl: newImgUrl });
+    } catch (err) {
+      setError('Erro ao regenerar slide. Tente novamente.');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setRegenLoading(false);
+    }
+  };
+
+  return (
+    <div className="mb-8 border-t border-gray-100 pt-6">
+      <h3 className="text-lg font-bold text-gray-900 mb-4">{presentationData.presentationTitle}</h3>
+      {/* Measure the available width via this invisible full-width div */}
+      <div ref={outerRef} className="w-full" style={{ height: 0 }} />
+      <div className="flex flex-col gap-6 pb-4">
+        {presentationData.slides.map((slide, idx) => (
+          <div key={idx} className="group relative">
+            {/* Outer: sets the displayed size using aspect-ratio + scale */}
+            <div
+              className="w-full rounded-2xl shadow-lg overflow-hidden border border-gray-200"
+              style={{ height: Math.round(SLIDE_H * scale) }}
+            >
+              <div style={{ width: SLIDE_W, height: SLIDE_H, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+                <SlideCanvas
+                  slide={slide}
+                  theme={presentationData.theme}
+                  onUpdate={(d) => updateSlide(idx, d)}
+                  schoolName={profile.schoolName}
+                  teacherName={profile.name}
+                />
+              </div>
+            </div>
+            {/* Controls overlay (above the scaled content) */}
+            <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 backdrop-blur p-2 rounded-xl shadow-lg flex gap-2 items-center">
+              <span className="text-[10px] font-bold text-gray-400 px-1">{idx + 1}</span>
+              {regenState?.idx === idx ? (
+                <>
+                  <input autoFocus placeholder="Nova instrução..." value={regenState.prompt}
+                    onChange={e => setRegenState({ idx, prompt: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') { handleRegenerateSlide(idx, regenState.prompt); setRegenState(null); } if (e.key === 'Escape') setRegenState(null); }}
+                    className="text-xs w-40 p-1.5 border rounded-lg focus:outline-none" />
+                  <button onClick={() => { handleRegenerateSlide(idx, regenState.prompt); setRegenState(null); }} disabled={regenLoading}
+                    className="text-xs bg-emerald-600 text-white px-2 py-1.5 rounded-lg font-bold disabled:opacity-60 flex items-center gap-1">
+                    {regenLoading ? <Loader2 size={11} className="animate-spin" /> : null}OK
+                  </button>
+                  <button onClick={() => setRegenState(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-1.5 rounded-lg font-bold">✕</button>
+                </>
+              ) : (
+                <button onClick={() => setRegenState({ idx, prompt: '' })} className="text-xs bg-emerald-600 text-white px-2 py-1.5 rounded-lg font-bold">Regerar</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-2">
+        <button onClick={exportPPTX} disabled={isExporting}
+          className="flex-1 bg-indigo-600 text-white rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 transition-opacity">
+          {isExporting ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+          {isExporting ? 'Gerando...' : 'Baixar PPTX'}
+        </button>
+        <button
+          onClick={() => {
+            const newResourceId = Math.random().toString(36).substr(2, 9);
+            setSavedResources((prev: SavedResource[]) => [...prev, { id: newResourceId, type: 'slides' as const, title: presentationData.presentationTitle, date: Date.now(), presentationData }]);
+          }}
+          className="flex-1 bg-indigo-50 text-indigo-600 rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-sm">
+          <Archive size={20} /> Salvar Acervo
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const PlannerScreen = ({
   schedules,
   setSchedules,
@@ -1184,7 +1426,7 @@ const PlannerScreen = ({
           const contentX = isLeft ? 0.4 : 4.4;
 
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'cover', w: 3.8, h: 4.8 } });
+            slide.addImage({ path: slideData.data.imageUrl, x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
             slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 75 } });
           }
 
@@ -1203,7 +1445,7 @@ const PlannerScreen = ({
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
           slide.addText(parsedText, { x: 0.4, y: 1.2, w: 9.2, h: 1.4, valign: 'top', align: 'left' });
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 2.75, w: 9.2, h: 2.25, sizing: { type: 'cover', w: 9.2, h: 2.25 } });
+            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 2.75, w: 9.2, h: 2.25, sizing: { type: 'contain', w: 9.2, h: 2.25 } });
           }
           addFooter(slide, si + 1);
 
@@ -1450,191 +1692,23 @@ const PlannerScreen = ({
             )}
             
             {(currentResult && mode === 'slides' && presentationData) && (
-              <div className="mb-8 border-t border-gray-100 pt-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Apresentação</h3>
-                <div className="flex flex-col gap-8 pb-4">
-                  {presentationData.slides.map((slide, idx) => {
-                    const theme = presentationData.theme;
-                    
-                    const updateSlideData = (newData: any) => {
-                      setPresentationData({
-                        ...presentationData,
-                        slides: presentationData.slides.map((s, i) => i === idx ? { ...s, data: { ...s.data, ...newData } } : s)
-                      });
-                    };
-
-                    const handleManualImageChange = async (newQuery: string) => {
-                        if (!newQuery) return;
-                        const url = await fetchPixabayImage(newQuery, 1200, 800);
-                        updateSlideData({ imagePrompt: newQuery, imageUrl: url });
-                    };
-
-                    const handleRegenerateSlide = async (newPrompt: string) => {
-                        if (!newPrompt) return;
-                        setRegenLoading(true);
-                        
-                        try {
-                            const targetSlide = presentationData.slides[idx];
-                            const prompt = `Regenere o slide ${idx + 1} da apresentação sobre "${presentationData.presentationTitle}".
-                            Layout atual: ${targetSlide.layoutID}.
-                            Nova instrução: ${newPrompt}.
-                            Mantenha o estilo consistente com a apresentação: ${JSON.stringify(presentationData.theme)}.
-                            
-                            SAÍDA: JSON estrito apenas com os dados do slide:
-                            { "title": "...", "text": "...", "illustrationQuery": "..." }`;
-
-                            const response = await generateContentWithRetry({
-                                model: 'gemini-3-flash-preview',
-                                contents: prompt,
-                            });
-                            
-                            const newData = JSON.parse(response.text || '{}');
-                            const newQuery = newData.illustrationQuery || targetSlide.data.imagePrompt;
-                            const newImageUrl = newData.illustrationQuery
-                                ? await fetchPixabayImage(newData.illustrationQuery, 1200, 800)
-                                : targetSlide.data.imageUrl;
-                            updateSlideData({
-                                title: newData.title || targetSlide.data.title,
-                                text: newData.text || targetSlide.data.text,
-                                imagePrompt: newQuery,
-                                imageUrl: newImageUrl
-                            });
-                        } catch (err) {
-                            console.error("Erro ao regenerar slide", err);
-                            setError("Erro ao regenerar slide. Tente novamente.");
-                            setTimeout(() => setError(''), 5000);
-                        } finally {
-                            setRegenLoading(false);
-                        }
-                    };
-
-                    return (
-                      <div key={idx} className="w-full max-w-4xl mx-auto aspect-[16/9] rounded-2xl shadow-lg overflow-hidden flex relative border border-gray-100 group" style={{ backgroundColor: (slide.layoutID === 'LAYOUT_REFERENCES' || slide.layoutID === 'LAYOUT_COVER') ? theme.primaryColor : theme.backgroundColor }}>
-                        {/* Edit Controls Overlay */}
-                        <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 p-3 rounded-xl shadow-lg flex gap-2">
-                          {regenState?.idx === idx ? (
-                            <>
-                              <input
-                                autoFocus
-                                placeholder="Nova instrução para o slide..."
-                                value={regenState.prompt}
-                                onChange={(e) => setRegenState({ idx, prompt: e.target.value })}
-                                onKeyDown={(e) => { if (e.key === 'Enter') { handleRegenerateSlide(regenState.prompt); setRegenState(null); } if (e.key === 'Escape') setRegenState(null); }}
-                                className="text-xs w-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                              />
-                              <button onClick={() => { handleRegenerateSlide(regenState.prompt); setRegenState(null); }} disabled={regenLoading} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold disabled:opacity-60 flex items-center gap-1">{regenLoading ? <Loader2 size={12} className="animate-spin" /> : null}OK</button>
-                              <button onClick={() => setRegenState(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-2 rounded-lg font-bold">✕</button>
-                            </>
-                          ) : (
-                            <>
-                              <input placeholder="Nova img..." className="text-xs w-32 p-2 border rounded-lg" onKeyDown={(e) => { if (e.key === 'Enter') handleManualImageChange(e.currentTarget.value); }} />
-                              <button onClick={() => setRegenState({ idx, prompt: '' })} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">Regerar</button>
-                            </>
-                          )}
-                        </div>
-                        
-                        {slide.layoutID === 'LAYOUT_COVER' && (
-                          <div className="absolute inset-0 flex w-full h-full p-10 gap-8">
-                            <div className="w-1/2 flex flex-col justify-between text-left">
-                              <div>
-                                {profileSchoolName && <div className="text-white/80 font-medium text-sm uppercase tracking-widest mb-2">{profileSchoolName}</div>}
-                                <input className="font-bold text-5xl leading-tight mb-4 drop-shadow-sm bg-transparent border-b border-white/50 w-full focus:outline-none placeholder:text-white/50" style={{ color: '#ffffff', fontFamily: theme.fontTitle }} value={slide.data.title} placeholder="Título" onChange={(e) => updateSlideData({ title: e.target.value })} />
-                                <input className="text-lg font-bold uppercase tracking-wider bg-transparent border-b border-white/20 w-full focus:outline-none placeholder:text-white/50" style={{ color: 'rgba(255,255,255,0.9)' }} value={slide.data.subtitle} placeholder="Subtítulo" onChange={(e) => updateSlideData({ subtitle: e.target.value })} />
-                              </div>
-                              {profileName && <div className="text-white/90 font-bold text-lg">{profileName}</div>}
-                            </div>
-                            <div className="w-1/2 h-full rounded-2xl overflow-hidden shadow-lg border-2 border-white/20">
-                              <img src={slide.data.imageUrl || getImageUrl(slide.data.imagePrompt, 1200, 800)} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
-                            </div>
-                          </div>
-                        )}
-                        {(slide.layoutID === 'LAYOUT_CONTENT_LEFT' || slide.layoutID === 'LAYOUT_CONTENT_RIGHT') && (
-                          <div className={`absolute inset-0 flex w-full h-full p-10 gap-8 ${slide.layoutID === 'LAYOUT_CONTENT_RIGHT' ? 'flex-row-reverse' : ''}`}>
-                            <div className="w-1/2 flex flex-col text-left justify-center">
-                              <input className="font-bold text-3xl mb-6 leading-tight bg-transparent border-b border-gray-300 w-full focus:outline-none" style={{ color: theme.primaryColor, fontFamily: theme.fontTitle }} value={slide.data.title} placeholder="Título" onChange={(e) => updateSlideData({ title: e.target.value })} />
-                              <textarea className="text-lg leading-relaxed text-justify bg-transparent border border-gray-200 rounded-xl p-3 w-full h-64 focus:outline-none" style={{ color: '#444' }} value={slide.data.text} placeholder="Conteúdo do slide" onChange={(e) => updateSlideData({ text: e.target.value })} />
-                            </div>
-                            <div className="w-1/2 h-full rounded-2xl overflow-hidden bg-gray-100 shadow-inner">
-                              <img src={slide.data.imageUrl || getImageUrl(slide.data.imagePrompt, 1200, 800)} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
-                            </div>
-                          </div>
-                        )}
-                        {slide.layoutID === 'LAYOUT_CONTENT_TOP' && (
-                          <div className="absolute inset-0 flex flex-col w-full h-full p-10 gap-6">
-                            <div className="text-left">
-                              <input className="font-bold text-3xl mb-4 leading-tight bg-transparent border-b border-gray-300 w-full focus:outline-none" style={{ color: theme.primaryColor, fontFamily: theme.fontTitle }} value={slide.data.title} placeholder="Título" onChange={(e) => updateSlideData({ title: e.target.value })} />
-                              <textarea className="text-lg leading-relaxed text-justify bg-transparent border border-gray-200 rounded-xl p-3 w-full h-32 focus:outline-none" style={{ color: '#444' }} value={slide.data.text} placeholder="Conteúdo do slide" onChange={(e) => updateSlideData({ text: e.target.value })} />
-                            </div>
-                            <div className="flex-1 rounded-2xl overflow-hidden bg-gray-100 shadow-inner">
-                              <img src={slide.data.imageUrl || getImageUrl(slide.data.imagePrompt, 1200, 800)} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
-                            </div>
-                          </div>
-                        )}
-                        {slide.layoutID === 'LAYOUT_TOPICS' && (
-                          <div className="absolute inset-0 w-full h-full p-10 relative flex flex-col">
-                            <input className="font-bold text-3xl mb-8 text-left leading-tight bg-transparent border-b border-gray-300 w-full focus:outline-none" style={{ color: theme.primaryColor, fontFamily: theme.fontTitle }} value={slide.data.title} placeholder="Título" onChange={(e) => updateSlideData({ title: e.target.value })} />
-                            <div className="flex gap-6 flex-1">
-                              {slide.data.topics?.map((t, i) => (
-                                <div key={i} className="flex-1 flex flex-col items-center text-center">
-                                  <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-lg border-2 border-white" style={{ backgroundColor: theme.primaryColor }}>
-                                    <DynamicIcon name={t.icon} size={28} color="white" />
-                                  </div>
-                                  <div className="w-full flex-1 rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col" style={{ backgroundColor: `${theme.primaryColor}08` }}>
-                                    <input className="text-sm font-bold mb-2 uppercase tracking-tight bg-transparent border-none w-full focus:outline-none" style={{ color: theme.primaryColor }} value={t.title} placeholder="Tópico" onChange={(e) => updateSlideData({ topics: slide.data.topics.map((t2, j) => j === i ? {...t2, title: e.target.value} : t2) })} />
-                                    <textarea className="text-sm leading-relaxed flex-1 bg-transparent border-none p-0 focus:outline-none" style={{ color: '#333' }} value={t.content} placeholder="Conteúdo" onChange={(e) => updateSlideData({ topics: slide.data.topics.map((t2, j) => j === i ? {...t2, content: e.target.value} : t2) })} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {slide.layoutID === 'LAYOUT_REFERENCES' && (
-                          <div className="absolute inset-0 w-full h-full p-10 flex flex-col text-left">
-                            <input className="font-bold text-3xl text-white mb-8 border-b border-white/20 pb-4 bg-transparent border-none w-full focus:outline-none" value={slide.data.title} placeholder="Referências" onChange={(e) => updateSlideData({ title: e.target.value })} />
-                            <textarea className="text-lg text-white/90 w-full flex-1 bg-transparent border border-white/20 rounded-xl p-4 focus:outline-none" value={slide.data.references?.join('\n')} placeholder="Referências (cada uma em uma linha)" onChange={(e) => updateSlideData({ references: e.target.value.split('\n') })} />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <button 
-                    onClick={exportPPTX} 
-                    disabled={isExporting}
-                    className="flex-1 bg-indigo-600 text-white rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 transition-opacity"
-                  >
-                    {isExporting ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />} 
-                    {isExporting ? 'Gerando...' : 'Baixar PPTX'}
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const newResourceId = Math.random().toString(36).substr(2, 9);
-                      setSavedResources([...savedResources, {
-                        id: newResourceId,
-                        type: 'slides',
-                        title: presentationData.presentationTitle,
-                        date: Date.now(),
-                        presentationData
-                      }]);
-                      
-                      const selectedClass = schedules.find(c => c.id === selectedClassId);
-                      const className = selectedClass ? selectedClass.name : 'Geral';
-                      const classToUpdate = classes.find(c => c.className === className && c.title.includes(topic));
-                      if (classToUpdate) {
-                        setClasses(classes.map(c => c.id === classToUpdate.id ? { ...c, resourceIds: [...(c.resourceIds || []), newResourceId] } : c));
-                      }
-
-                      if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification('Salvo no Acervo!', { icon: '/favicon.ico' });
-                      }
-                    }}
-                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <Archive size={20} /> Salvar Acervo
-                  </button>
-                </div>
-              </div>
+              <SlidePreviewList
+                presentationData={presentationData}
+                setPresentationData={setPresentationData}
+                profile={profile}
+                isExporting={isExporting}
+                regenLoading={regenLoading}
+                setRegenLoading={setRegenLoading}
+                setError={setError}
+                exportPPTX={exportPPTX}
+                savedResources={savedResources}
+                setSavedResources={setSavedResources}
+                schedules={schedules}
+                classes={classes}
+                setClasses={setClasses}
+                topic={topic}
+                selectedClassId={selectedClassId}
+              />
             )}
             
             {(currentResult && mode !== 'slides') && (
