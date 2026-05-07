@@ -4079,29 +4079,47 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     setResetMessage({ type: '', text: '' });
-    if (!email) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setAuthError('Por favor, insira seu e-mail para recuperar a senha.');
       return;
     }
     setIsAuthProcessing(true);
     try {
-      await sendPasswordResetEmail(auth, email, {
-        url: window.location.origin,
-        handleCodeInApp: false,
-      });
+      await sendPasswordResetEmail(auth, trimmedEmail);
       setResetMessage({ type: 'success', text: 'E-mail de recuperação enviado! Verifique sua caixa de entrada (e a pasta de spam).' });
       setTimeout(() => setIsResetMode(false), 6000);
     } catch (error: any) {
       console.error('Reset error:', error);
-      let message = 'Erro ao enviar e-mail. Tente novamente em instantes.';
-      if (error.code === 'auth/user-not-found') {
-        message = 'Nenhuma conta encontrada com este e-mail.';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'O formato do e-mail é inválido.';
-      } else if (error.code === 'auth/too-many-requests') {
-        message = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.';
-      } else if (error.code === 'auth/network-request-failed') {
-        message = 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+      const code = error?.code || '';
+      let message = '';
+      switch (code) {
+        case 'auth/user-not-found':
+          message = 'Nenhuma conta encontrada com este e-mail.';
+          break;
+        case 'auth/invalid-email':
+          message = 'O formato do e-mail é inválido.';
+          break;
+        case 'auth/too-many-requests':
+          message = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.';
+          break;
+        case 'auth/network-request-failed':
+          message = 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+          break;
+        case 'auth/operation-not-allowed':
+          message = 'Recuperação por e-mail está desativada no Firebase. Ative o provedor "E-mail/Senha" no Firebase Console > Authentication > Sign-in method.';
+          break;
+        case 'auth/unauthorized-continue-uri':
+        case 'auth/invalid-continue-uri':
+        case 'auth/missing-continue-uri':
+          message = 'Domínio do app não autorizado no Firebase. Adicione o domínio em Authentication > Settings > Authorized domains.';
+          break;
+        case 'auth/missing-android-pkg-name':
+        case 'auth/missing-ios-bundle-id':
+          message = 'Configuração do Firebase incompleta. Contate o administrador.';
+          break;
+        default:
+          message = `Erro ao enviar e-mail (${code || error?.message || 'desconhecido'}). Tente novamente em instantes.`;
       }
       setAuthError(message);
     } finally {
