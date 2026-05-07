@@ -3474,10 +3474,9 @@ const CalendarScreen = ({
             const dayEvents = getDayEvents(d);
             const mainEvent = dayEvents.find(e => e.type === 'holiday') || dayEvents.find(e => e.type === 'commemorative') || dayEvents.find(e => e.type === 'class') || dayEvents[0];
             const dayColor = mainEvent ? getEventColorInternal(mainEvent) : null;
-            const allDone = dayEvents.length > 0 && dayEvents.every(e => {
-              if (e.type === 'holiday' || e.type === 'commemorative') return true;
-              return e.status === 'done';
-            });
+            // allDone only considers tasks (classes/prep/admin), never holidays
+            const taskEvents = dayEvents.filter(e => e.type !== 'holiday' && e.type !== 'commemorative');
+            const allDone = taskEvents.length > 0 && taskEvents.every(e => e.status === 'done');
 
             let cellStyle: React.CSSProperties = {};
             let cellClass = 'text-sm font-medium w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all relative';
