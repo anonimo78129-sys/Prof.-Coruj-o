@@ -1137,89 +1137,115 @@ const PlannerScreen = ({
               </button>
             </div>
 
-            {/* --- New Advanced Config Settings --- */}
-            <div className="bg-gray-50 p-4 rounded-2xl mb-6 space-y-4">
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest">Configurações Avançadas</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Tom</label>
-                  <select value={tone} onChange={(e) => setTone(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                    <option value="formal">Formal</option>
-                    <option value="didactic">Didático</option>
-                    <option value="technical">Técnico</option>
-                    <option value="concise">Conciso</option>
-                  </select>
+            {/* --- Advanced Config Settings (collapsible) --- */}
+            {(() => {
+              const [advOpen, setAdvOpen] = useState(false);
+              return (
+                <div className="mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setAdvOpen(o => !o)}
+                    className="w-full flex items-center justify-between text-sm font-bold text-gray-500 bg-gray-50 px-4 py-3 rounded-2xl"
+                  >
+                    <span>Personalizar geração</span>
+                    {advOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                  <AnimatePresence>
+                    {advOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="bg-gray-50 px-4 pb-4 rounded-b-2xl space-y-4 pt-2">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Linguagem do texto</label>
+                              <select value={tone} onChange={(e) => setTone(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                                <option value="didactic">Didática</option>
+                                <option value="formal">Formal</option>
+                                <option value="technical">Técnica</option>
+                                <option value="concise">Direta e curta</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Nível da turma</label>
+                              <select value={complexity} onChange={(e) => setComplexity(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                                <option value="basic">Iniciante</option>
+                                <option value="intermediate">Intermediário</option>
+                                <option value="advanced">Avançado</option>
+                              </select>
+                            </div>
+                            {mode === 'plan' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. de Aulas</label>
+                                  <select value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                                    <option value={0}>Sugerir automaticamente</option>
+                                    <option value={1}>1 aula</option>
+                                    <option value={2}>2 aulas</option>
+                                    <option value={3}>3 aulas</option>
+                                    <option value={4}>4 aulas</option>
+                                    <option value={5}>5 aulas</option>
+                                    <option value={6}>6 aulas</option>
+                                    <option value={8}>8 aulas</option>
+                                    <option value={10}>10 aulas</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">Duração de cada aula</label>
+                                  <select value={lessonTime} onChange={(e) => setLessonTime(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                                    <option value={30}>30 min</option>
+                                    <option value={40}>40 min</option>
+                                    <option value={45}>45 min</option>
+                                    <option value={50}>50 min</option>
+                                    <option value={60}>1 hora</option>
+                                    <option value={90}>1h30</option>
+                                    <option value={120}>2 horas</option>
+                                  </select>
+                                </div>
+                              </>
+                            )}
+                            {(mode === 'activities' || mode === 'exam') && (
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  {mode === 'exam' ? 'Questões de múltipla escolha' : 'Quantidade de questões'}
+                                </label>
+                                <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+                              </div>
+                            )}
+                            {mode === 'slides' && (
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de slides</label>
+                                <input type="number" min="3" max="50" value={slideCount} onChange={(e) => setSlideCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Abordagem do conteúdo</label>
+                            <select value={focus} onChange={(e) => setFocus(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                              <option value="balanced">Equilibrada (teoria + prática)</option>
+                              <option value="practical">Foco em exemplos práticos</option>
+                              <option value="theoretical">Foco em teoria e conceitos</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Material de apoio <span className="font-normal text-gray-400">(opcional)</span></label>
+                            <textarea
+                              value={groundingContent}
+                              onChange={(e) => setGroundingContent(e.target.value)}
+                              placeholder="Cole aqui um texto, apostila ou resumo que a IA deve usar como base..."
+                              className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm h-20 resize-none"
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Complexidade</label>
-                  <select value={complexity} onChange={(e) => setComplexity(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                    <option value="basic">Básico</option>
-                    <option value="intermediate">Intermediário</option>
-                    <option value="advanced">Avançado</option>
-                  </select>
-                </div>
-                {mode === 'plan' && (
-                    <>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. de Aulas</label>
-                        <select value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                          <option value={0}>Auto (Sugerir)</option>
-                          <option value={1}>1</option>
-                          <option value={2}>2</option>
-                          <option value={3}>3</option>
-                          <option value={4}>4</option>
-                          <option value={5}>5</option>
-                          <option value={6}>6</option>
-                          <option value={8}>8</option>
-                          <option value={10}>10</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Tempo da Aula</label>
-                        <select value={lessonTime} onChange={(e) => setLessonTime(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                          <option value={30}>30 min</option>
-                          <option value={40}>40 min</option>
-                          <option value={45}>45 min</option>
-                          <option value={50}>50 min</option>
-                          <option value={60}>60 min</option>
-                          <option value={90}>90 min</option>
-                          <option value={120}>120 min</option>
-                        </select>
-                      </div>
-                    </>
-                )}
-                {(mode === 'activities' || mode === 'exam') && (
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">{mode === 'exam' ? 'Múltipla Escolha' : 'Qtd. Questões'}</label>
-                        <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border-none rounded-xl py-2 px-3 text-sm" />
-                    </div>
-                )}
-                {mode === 'slides' && (
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. Slides</label>
-                        <input type="number" min="3" max="50" value={slideCount} onChange={(e) => setSlideCount(parseInt(e.target.value))} className="w-full bg-white border-none rounded-xl py-2 px-3 text-sm" />
-                    </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Foco Pedagógico</label>
-                <select value={focus} onChange={(e) => setFocus(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                  <option value="practical">Exemplos Práticos</option>
-                  <option value="theoretical">Teoria Profunda</option>
-                  <option value="balanced">Equilibrado</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Contexto Base (Grounding)</label>
-                <textarea 
-                  value={groundingContent}
-                  onChange={(e) => setGroundingContent(e.target.value)}
-                  placeholder="Cole aqui o texto base para a IA..."
-                  className="w-full bg-white border-none rounded-xl py-2 px-3 text-sm h-20 resize-none"
-                />
-              </div>
-            </div>
-            {/* --- End Advanced Settings --- */}
+              );
+            })()}
 
             <AnimatePresence>
               {isAddingClass && (
