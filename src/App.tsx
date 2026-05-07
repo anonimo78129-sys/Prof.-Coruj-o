@@ -4085,16 +4085,23 @@ export default function App() {
     }
     setIsAuthProcessing(true);
     try {
-      await sendPasswordResetEmail(auth, email);
-      setResetMessage({ type: 'success', text: 'E-mail de recuperação enviado! Verifique sua caixa de entrada.' });
-      setTimeout(() => setIsResetMode(false), 4000);
+      await sendPasswordResetEmail(auth, email, {
+        url: window.location.origin,
+        handleCodeInApp: false,
+      });
+      setResetMessage({ type: 'success', text: 'E-mail de recuperação enviado! Verifique sua caixa de entrada (e a pasta de spam).' });
+      setTimeout(() => setIsResetMode(false), 6000);
     } catch (error: any) {
       console.error('Reset error:', error);
-      let message = 'Erro ao enviar e-mail. Verifique se o endereço está correto.';
+      let message = 'Erro ao enviar e-mail. Tente novamente em instantes.';
       if (error.code === 'auth/user-not-found') {
         message = 'Nenhuma conta encontrada com este e-mail.';
       } else if (error.code === 'auth/invalid-email') {
         message = 'O formato do e-mail é inválido.';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.';
+      } else if (error.code === 'auth/network-request-failed') {
+        message = 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
       }
       setAuthError(message);
     } finally {
@@ -4174,7 +4181,14 @@ export default function App() {
               {isResetMode ? 'Recuperar senha' : (isLoginMode ? 'Acesse sua conta' : 'Crie sua conta')}
             </h2>
             {authError && <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{authError}</div>}
-            {resetMessage.text && <div className={`text-sm text-center p-2 rounded-lg ${resetMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{resetMessage.text}</div>}
+            {resetMessage.text && (
+              <div className={`text-sm text-center p-3 rounded-xl font-medium ${resetMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-blue-50 text-blue-700'}`}>
+                {resetMessage.text}
+                {resetMessage.type === 'success' && (
+                  <p className="text-xs font-normal mt-1 text-green-600">Redirecionando para o login em instantes...</p>
+                )}
+              </div>
+            )}
             
             <input
               type="email"
