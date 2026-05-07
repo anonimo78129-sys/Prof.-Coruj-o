@@ -6,7 +6,8 @@ import {
   MoreHorizontal, Play, Clock, CheckCircle2, ChevronRight, ChevronUp, ChevronDown,
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
-  BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2
+  BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
+  MapPin, RefreshCw, ClipboardList, Coffee, Users
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -3299,7 +3300,19 @@ const CalendarScreen = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventType, setNewEventType] = useState<'prep' | 'admin'>('prep');
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const monthAbbrNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  const EVENT_PRESETS = [
+    { label: 'Prova',             icon: FileQuestion,  type: 'admin' as const, color: '#EF4444' },
+    { label: 'Reunião',           icon: Users,         type: 'admin' as const, color: '#3B82F6' },
+    { label: 'Conselho de Classe',icon: MessageSquare, type: 'admin' as const, color: '#8B5CF6' },
+    { label: 'Recesso',           icon: Coffee,        type: 'prep'  as const, color: '#F59E0B' },
+    { label: 'Saída Pedagógica',  icon: MapPin,        type: 'prep'  as const, color: '#10B981' },
+    { label: 'Reposição de Aula', icon: RefreshCw,     type: 'prep'  as const, color: '#6366F1' },
+    { label: 'Entrega de Notas',  icon: ClipboardList, type: 'admin' as const, color: '#F97316' },
+    { label: 'Outro',             icon: Plus,          type: 'prep'  as const, color: '#6B7280' },
+  ];
   
   const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -3381,7 +3394,50 @@ const CalendarScreen = ({
     setCustomEvents([...customEvents, newEvent]);
     setIsModalOpen(false);
     setNewEventTitle('');
+    setSelectedPreset(null);
   };
+
+  const todayReal = new Date();
+  const weekStart = new Date(todayReal);
+  weekStart.setHours(0, 0, 0, 0);
+  const dow = weekStart.getDay();
+  weekStart.setDate(weekStart.getDate() - (dow === 0 ? 6 : dow - 1));
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    return d;
+  });
+
+  const allEventsForWeek = [
+    ...filteredClasses.map(c => ({ ...c, type: 'class' as const })),
+    ...customEvents,
+    ...getDefaultHolidays(todayReal.getFullYear()).filter(
+      h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0]))
+    ),
+    ...getDefaultHolidays(todayReal.getFullYear() + 1).filter(
+      h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0]))
+    ),
+  ];
+
+  const getWeekDayEvents = (date: Date) => {
+    const y = date.getFullYear();
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    return allEventsForWeek.filter(e => {
+      if (e.date.includes('-')) {
+        const [ys, ms, ds] = e.date.split(' ')[0].split('-');
+        return parseInt(ys) === y && parseInt(ms) === m && parseInt(ds) === d;
+      }
+      const parts = e.date.split(' ');
+      const eDay = parseInt(parts[0]);
+      const eMon = parts[1];
+      const abbrs = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+      return eDay === d && eMon === abbrs[date.getMonth()];
+    });
+  };
+
+  const ptDayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
   const getEventColor = (e: any) => {
     if (e.type === 'class') {
@@ -3423,30 +3479,50 @@ const CalendarScreen = ({
       </Header>
       
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
-            <h2 className="text-xl font-bold mb-4">Novo Evento</h2>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-xl font-bold mb-1">Novo Evento</h2>
+            <p className="text-sm text-gray-400 mb-4">{selectedDate} de {monthAbbrNames[currentMonth]}</p>
+
+            <div className="grid grid-cols-4 gap-2 mb-5">
+              {EVENT_PRESETS.map(preset => {
+                const Icon = preset.icon;
+                const isActive = selectedPreset === preset.label;
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => {
+                      setSelectedPreset(preset.label);
+                      setNewEventTitle(preset.label);
+                      setNewEventType(preset.type);
+                    }}
+                    className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl border-2 transition-all ${isActive ? 'border-current scale-105 shadow-sm' : 'border-gray-100 hover:border-gray-200'}`}
+                    style={isActive ? { borderColor: preset.color, backgroundColor: preset.color + '15' } : {}}
+                  >
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: preset.color + '22' }}>
+                      <Icon size={16} style={{ color: preset.color }} />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-600 text-center leading-tight">{preset.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <input
               type="text"
-              placeholder="Título do evento"
+              placeholder="Personalizar título..."
               value={newEventTitle}
               onChange={(e) => setNewEventTitle(e.target.value)}
-              className="w-full p-3 mb-4 border border-gray-200 rounded-xl"
+              className="w-full p-3 mb-4 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
             />
-            <div className="flex gap-2 mb-6">
-              {(['prep', 'admin'] as const).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setNewEventType(t)}
-                  className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${newEventType === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}
-                >
-                  {t === 'prep' ? 'Preparação' : 'Administrativo'}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-4">
-              <button onClick={() => setIsModalOpen(false)} className="flex-1 p-3 rounded-xl bg-gray-100 font-bold">Cancelar</button>
-              <button onClick={handleAddEvent} className="flex-1 p-3 rounded-xl bg-indigo-600 text-white font-bold">Adicionar</button>
+
+            <div className="flex gap-3">
+              <button onClick={() => { setIsModalOpen(false); setSelectedPreset(null); setNewEventTitle(''); }} className="flex-1 p-3 rounded-xl bg-gray-100 font-bold text-sm">Cancelar</button>
+              <button
+                onClick={handleAddEvent}
+                disabled={!newEventTitle.trim()}
+                className="flex-1 p-3 rounded-xl bg-indigo-600 text-white font-bold text-sm disabled:opacity-40"
+              >Adicionar</button>
             </div>
           </div>
         </div>
@@ -3512,26 +3588,56 @@ const CalendarScreen = ({
 
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-gray-900">Eventos do Mês</h2>
+          <h2 className="text-lg font-bold text-gray-900">Esta Semana</h2>
         </div>
-        <div className="space-y-4">
-          {eventsThisMonth.length === 0 ? (
+        <div className="space-y-2">
+          {weekDays.map((date, idx) => {
+            const isToday = date.toDateString() === todayReal.toDateString();
+            const dayEvts = getWeekDayEvents(date);
+            if (!isToday && dayEvts.length === 0) return null;
+            return (
+              <div
+                key={idx}
+                className={`rounded-2xl border shadow-sm overflow-hidden ${isToday ? 'border-indigo-200 bg-indigo-50' : 'border-gray-100 bg-white'}`}
+              >
+                <div className={`flex items-center gap-2 px-4 py-2 ${isToday ? 'bg-indigo-100' : 'bg-gray-50'}`}>
+                  <span className={`text-xs font-bold uppercase tracking-wide ${isToday ? 'text-indigo-700' : 'text-gray-400'}`}>
+                    {ptDayNames[date.getDay()]}
+                  </span>
+                  <span className={`text-sm font-black ${isToday ? 'text-indigo-800' : 'text-gray-700'}`}>
+                    {date.getDate()}
+                  </span>
+                  <span className={`text-xs ${isToday ? 'text-indigo-500' : 'text-gray-400'}`}>
+                    {date.toLocaleString('pt-BR', { month: 'short' }).replace('.', '')}
+                  </span>
+                  {isToday && (
+                    <span className="ml-auto text-[10px] font-black text-indigo-600 bg-indigo-200 rounded-full px-2 py-0.5 uppercase tracking-wide">hoje</span>
+                  )}
+                </div>
+                {dayEvts.length === 0 ? (
+                  <div className="px-4 py-3">
+                    <p className="text-xs text-gray-400 italic">Nenhum evento</p>
+                  </div>
+                ) : (
+                  <div className="px-4 py-2 space-y-1.5">
+                    {dayEvts.map((e: any) => (
+                      <div key={e.id} className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getEventColorInternal(e) }} />
+                        <span className={`text-sm ${e.status === 'done' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                          {e.type === 'class' ? `${e.className}${e.topic ? ` — ${e.topic}` : ''}` : e.title}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {weekDays.every(date => !( date.toDateString() === todayReal.toDateString() || getWeekDayEvents(date).length > 0)) && (
             <div className="text-center py-6 bg-white rounded-2xl border border-gray-50 shadow-sm">
               <CalendarIcon size={24} className="mx-auto text-gray-300 mb-2" />
-              <p className="text-gray-400 text-sm font-medium">Nenhum evento este mês</p>
+              <p className="text-gray-400 text-sm font-medium">Nenhum evento esta semana</p>
             </div>
-          ) : (
-            <Reorder.Group axis="y" values={eventsThisMonth} onReorder={(newEvents) => {
-              const reorderedCustom = newEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday' || e.type === 'commemorative') as any[];
-              const nonCustoms = customEvents.filter(ce => !ce.type || (ce.type !== 'prep' && ce.type !== 'admin' && ce.type !== 'holiday' && ce.type !== 'commemorative'));
-              setCustomEvents([...nonCustoms, ...reorderedCustom]);
-            }} className="space-y-4">
-              {eventsThisMonth.map((e) => (
-                <Reorder.Item key={e.id} value={e} className="w-full" dragListener={true}>
-                    <EventItem e={e} color={getEventColor(e)} onComplete={() => setCustomEvents(customEvents.filter(ce => ce.id !== e.id))} />
-                </Reorder.Item>
-              ))}
-            </Reorder.Group>
           )}
         </div>
       </div>
