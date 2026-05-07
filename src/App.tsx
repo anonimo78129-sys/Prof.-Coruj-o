@@ -1097,79 +1097,127 @@ const PlannerScreen = ({
       const pres = new pptxgen();
       pres.layout = 'LAYOUT_16x9';
       const theme = presentationData.theme;
+      const pc = theme.primaryColor.replace('#', '');
+      const ac = theme.accentColor.replace('#', '');
+      const bg = theme.backgroundColor.replace('#', '');
+      const schoolLabel = profileSchoolName || '';
+      const teacherLabel = profileName || '';
+      const totalSlides = presentationData.slides.length;
 
-      for (const slideData of presentationData.slides) {
+      const addFooter = (slide: any, slideNum: number, darkBg = false) => {
+        const fg = darkBg ? 'FFFFFF' : '9CA3AF';
+        slide.addShape(pres.ShapeType.rect, { x: 0, y: 5.15, w: 10, h: 0.35, fill: { color: pc, transparency: darkBg ? 40 : 85 }, line: { color: pc, transparency: 85, width: 0 } });
+        if (schoolLabel) slide.addText(schoolLabel, { x: 0.2, y: 5.17, w: 6, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false });
+        if (teacherLabel) slide.addText(`Prof. ${teacherLabel}`, { x: 0.2, y: 5.17, w: 6, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false, align: schoolLabel ? 'right' as const : 'left' as const });
+        slide.addText(`${slideNum} / ${totalSlides}`, { x: 9.3, y: 5.17, w: 0.6, h: 0.28, fontSize: 8, color: fg, align: 'right' });
+      };
+
+      const addAccentBar = (slide: any, vertical = false) => {
+        if (vertical) {
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.18, h: 5.1, fill: { color: pc } });
+          slide.addShape(pres.ShapeType.rect, { x: 0.18, y: 0, w: 0.06, h: 5.1, fill: { color: ac, transparency: 40 } });
+        } else {
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
+        }
+      };
+
+      for (let si = 0; si < presentationData.slides.length; si++) {
+        const slideData = presentationData.slides[si];
         const slide = pres.addSlide();
-        slide.background = { color: theme.backgroundColor };
-        
-        const titleOpts = { fontFace: theme.fontTitle, color: theme.primaryColor, bold: true };
-        const bodyOpts = { fontFace: theme.fontBody, color: '333333', fontSize: 14 };
+        const titleOpts = { fontFace: 'Calibri', color: pc, bold: true };
+        const bodyOpts = { fontFace: 'Calibri', color: '374151', fontSize: 13 };
 
         if (slideData.layoutID === 'LAYOUT_COVER') {
-          // Alignment: Left-aligned text group
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 1.2, w: 5, h: 2, fontSize: 44, ...titleOpts, align: 'left', valign: 'middle' });
-          slide.addText(slideData.data.subtitle || '', { x: 0.5, y: 3.2, w: 5, h: 0.8, fontSize: 16, color: theme.accentColor, align: 'left' });
-          
-          // Balance: Large image on the right
-          if (slideData.data.imageUrl || slideData.data.imagePrompt) {
-            slide.addImage({ 
-              path: slideData.data.imageUrl || getImageUrl(slideData.data.imagePrompt, 1200, 800),
-              x: 5.8, y: 0.4, w: 3.8, h: 4.8 
-            });
-          }
-        } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
-          const isLeft = slideData.layoutID === 'LAYOUT_CONTENT_LEFT';
-          const textX = isLeft ? 0.5 : 4.5;
-          const imgX = isLeft ? 6 : 0.5;
+          slide.background = { color: pc };
+          // Right panel light bg
+          slide.addShape(pres.ShapeType.rect, { x: 5.4, y: 0, w: 4.6, h: 5.5, fill: { color: bg } });
+          // Accent stripe
+          slide.addShape(pres.ShapeType.rect, { x: 5.4, y: 0, w: 0.12, h: 5.5, fill: { color: ac } });
+          // Decorative circles
+          slide.addShape(pres.ShapeType.ellipse, { x: -0.4, y: 3.8, w: 1.8, h: 1.8, fill: { color: ac, transparency: 60 } });
+          slide.addShape(pres.ShapeType.ellipse, { x: 3.5, y: -0.4, w: 1.2, h: 1.2, fill: { color: 'FFFFFF', transparency: 80 } });
 
-          // Hierarchy: Clear title vs body distinction
-          slide.addText(slideData.data.title || '', { x: textX, y: 0.4, w: 5, h: 0.8, fontSize: 28, ...titleOpts });
-          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13, lineSpacing: 24 });
-          slide.addText(parsedText, { x: textX, y: 1.4, w: 5, h: 3.8, valign: 'top', align: 'justify' });
-          
-          if (slideData.data.imageUrl || slideData.data.imagePrompt) {
-            slide.addImage({ 
-              path: slideData.data.imageUrl || getImageUrl(slideData.data.imagePrompt, 1200, 800),
-              x: imgX, y: 0.4, w: 3.5, h: 4.8 
-            });
+          slide.addText(slideData.data.title || '', { x: 0.5, y: 1.1, w: 4.7, h: 2.2, fontSize: 38, fontFace: 'Calibri', color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5 });
+          slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.35, w: 1.2, h: 0.06, fill: { color: ac } });
+          slide.addText(slideData.data.subtitle || '', { x: 0.5, y: 3.5, w: 4.7, h: 0.7, fontSize: 14, fontFace: 'Calibri', color: 'D1D5DB', align: 'left' });
+          slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.5, y: 4.6, w: 4.7, h: 0.35, fontSize: 9, fontFace: 'Calibri', color: 'A5B4FC', align: 'left' });
+
+          if (slideData.data.imageUrl) {
+            slide.addImage({ path: slideData.data.imageUrl, x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
           }
+
+        } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
+          slide.background = { color: bg };
+          const isLeft = slideData.layoutID === 'LAYOUT_CONTENT_LEFT';
+          addAccentBar(slide, false);
+          const textX = isLeft ? 0.4 : 0.4;
+          const imgX = isLeft ? 5.8 : 0.4;
+          const contentX = isLeft ? 0.4 : 4.4;
+
+          if (slideData.data.imageUrl) {
+            slide.addImage({ path: slideData.data.imageUrl, x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'cover', w: 3.8, h: 4.8 } });
+            slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 75 } });
+          }
+
+          // Title area with accent
+          slide.addShape(pres.ShapeType.rect, { x: contentX, y: 0.22, w: 5.2, h: 0.08, fill: { color: ac } });
+          slide.addText(slideData.data.title || '', { x: contentX, y: 0.38, w: 5.2, h: 0.8, fontSize: 24, ...titleOpts });
+          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 22 });
+          slide.addText(parsedText, { x: contentX, y: 1.3, w: 5.2, h: 3.6, valign: 'top', align: 'left' });
+          addFooter(slide, si + 1);
+
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_TOP') {
-          // White Space: Generous top margin
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 0.4, w: 9, h: 0.6, fontSize: 28, ...titleOpts });
+          slide.background = { color: bg };
+          addAccentBar(slide, false);
+          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.22, w: 9.2, h: 0.06, fill: { color: ac } });
+          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.36, w: 9.2, h: 0.7, fontSize: 26, ...titleOpts });
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(parsedText, { x: 0.5, y: 1.1, w: 9, h: 1.4, valign: 'top', align: 'justify' });
-          
-          if (slideData.data.imageUrl || slideData.data.imagePrompt) {
-            slide.addImage({ 
-              path: slideData.data.imageUrl || getImageUrl(slideData.data.imagePrompt, 1200, 800),
-              x: 0.5, y: 2.8, w: 9, h: 2.6 
-            });
+          slide.addText(parsedText, { x: 0.4, y: 1.2, w: 9.2, h: 1.4, valign: 'top', align: 'left' });
+          if (slideData.data.imageUrl) {
+            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 2.75, w: 9.2, h: 2.25, sizing: { type: 'cover', w: 9.2, h: 2.25 } });
           }
+          addFooter(slide, si + 1);
+
         } else if (slideData.layoutID === 'LAYOUT_TOPICS') {
-          // Repetition: Consistent column widths and spacing
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 0.4, w: 9, h: 0.8, fontSize: 28, ...titleOpts });
-          
+          slide.background = { color: bg };
+          addAccentBar(slide, true);
+          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.22, w: 9.2, h: 0.7, fontSize: 26, ...titleOpts });
+
           if (slideData.data.topics) {
-            slideData.data.topics.forEach((topic, i) => {
-              const xPos = 0.5 + (i * 3.1);
-              // Proximity: Icon grouped with title and content in a contrasting circle
-              slide.addShape(pres.ShapeType.ellipse, { x: xPos + 0.9, y: 1.4, w: 1.2, h: 1.2, fill: { color: theme.primaryColor } });
-              slide.addText(topic.icon || 'ICON', { x: xPos + 0.9, y: 1.4, w: 1.2, h: 1.2, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
-              
-              slide.addShape(pres.ShapeType.rect, { x: xPos, y: 2.8, w: 2.8, h: 2.5, fill: { color: theme.primaryColor, transparency: 95 } });
-              slide.addText(topic.title, { x: xPos, y: 3.0, w: 2.8, h: 0.4, fontSize: 14, bold: true, align: 'center', color: theme.primaryColor });
-              slide.addText(topic.content, { x: xPos + 0.1, y: 3.5, w: 2.6, h: 1.5, fontSize: 11, align: 'center', color: '#333333' });
+            const cols = Math.min(slideData.data.topics.length, 3);
+            const colW = 9.0 / cols;
+            slideData.data.topics.slice(0, 3).forEach((topic: any, i: number) => {
+              const xPos = 0.5 + i * colW;
+              // Card background
+              slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: 1.1, w: colW - 0.2, h: 3.9, fill: { color: 'FFFFFF' }, line: { color: 'E5E7EB', width: 0.75 }, rectRadius: 0.12 });
+              // Colored header strip on card
+              slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: 1.1, w: colW - 0.2, h: 0.7, fill: { color: pc }, rectRadius: 0.12 });
+              slide.addShape(pres.ShapeType.rect, { x: xPos, y: 1.5, w: colW - 0.2, h: 0.3, fill: { color: pc } });
+              // Icon circle
+              slide.addShape(pres.ShapeType.ellipse, { x: xPos + (colW - 0.2) / 2 - 0.38, y: 1.75, w: 0.76, h: 0.76, fill: { color: ac } });
+              slide.addText(topic.icon ? topic.icon.substring(0, 2).toUpperCase() : '★', { x: xPos + (colW - 0.2) / 2 - 0.38, y: 1.75, w: 0.76, h: 0.76, fontSize: 13, color: 'FFFFFF', align: 'center', bold: true });
+              slide.addText(topic.title || '', { x: xPos + 0.1, y: 2.62, w: colW - 0.4, h: 0.4, fontSize: 12, bold: true, align: 'center', color: pc });
+              slide.addText(topic.content || '', { x: xPos + 0.1, y: 3.08, w: colW - 0.4, h: 1.75, fontSize: 10, align: 'center', color: '4B5563', valign: 'top' });
             });
           }
+          addFooter(slide, si + 1);
+
         } else if (slideData.layoutID === 'LAYOUT_REFERENCES') {
-          slide.background = { color: theme.primaryColor };
-          slide.addText(slideData.data.title || 'Referências', { x: 0.5, y: 0.5, w: 5, h: 1, fontSize: 36, color: 'FFFFFF', bold: true });
+          slide.background = { color: pc };
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 5.5, fill: { color: pc } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.4, h: 5.5, fill: { color: ac } });
+          // Decorative elements
+          slide.addShape(pres.ShapeType.ellipse, { x: 7.5, y: 3.5, w: 3.5, h: 3.5, fill: { color: 'FFFFFF', transparency: 92 } });
+          slide.addShape(pres.ShapeType.ellipse, { x: 8.5, y: -0.5, w: 2, h: 2, fill: { color: ac, transparency: 70 } });
+
+          slide.addText(slideData.data.title || 'Referências', { x: 0.7, y: 0.4, w: 8, h: 0.8, fontSize: 32, color: 'FFFFFF', bold: true, fontFace: 'Calibri' });
+          slide.addShape(pres.ShapeType.rect, { x: 0.7, y: 1.3, w: 2.4, h: 0.06, fill: { color: ac } });
           if (slideData.data.references) {
-            const refText = slideData.data.references.map(r => ({ text: r, options: { bullet: true, breakLine: true, color: 'FFFFFF', fontSize: 14 } }));
-            slide.addText(refText, { x: 0.5, y: 1.8, w: 8, h: 3.3, valign: 'top' });
+            const refText = slideData.data.references.map((r: string) => ({ text: `• ${r}`, options: { breakLine: true, color: 'E0E7FF', fontSize: 13, fontFace: 'Calibri', paraSpaceBefore: 6 } }));
+            slide.addText(refText, { x: 0.7, y: 1.5, w: 8.5, h: 3.5, valign: 'top' });
           }
-          slide.addShape(pres.ShapeType.rect, { x: 8.5, y: 2, w: 1, h: 1, fill: { color: theme.accentColor }, rotate: 15 });
-          slide.addShape(pres.ShapeType.rect, { x: 7.5, y: 4, w: 0.5, h: 0.5, fill: { color: theme.accentColor, transparency: 50 } });
+          addFooter(slide, si + 1, true);
         }
       }
       await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
@@ -1561,54 +1609,66 @@ const PlannerScreen = ({
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button 
+                  <button
                     onClick={() => {
                       const printWindow = window.open('', '_blank');
                       if (printWindow) {
-                        printWindow.document.write(`
-                          <html>
-                            <head>
-                              <title>Exportar Plano</title>
-                              <style>
-                                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; }
-                                h1 { color: #4F46E5; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
-                                h2 { color: #1f2937; margin-top: 30px; }
-                                h3 { color: #4b5563; }
-                                blockquote { border-left: 4px solid #4F46E5; padding-left: 16px; color: #6b7280; font-style: italic; }
-                                ul, ol { padding-left: 24px; }
-                                li { margin-bottom: 8px; }
-                                .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; }
-                                .school-name { font-weight: bold; font-size: 1.2rem; color: #4b5563; }
-                                .teacher-name { font-size: 1rem; color: #6b7280; }
-                                @media print {
-                                  body { padding: 0; }
-                                }
-                              </style>
-                            </head>
-                            <body>
-                              <div class="header">
-                                ${profileSchoolName ? `<div class="school-name">${profileSchoolName}</div>` : ''}
-                                ${profileName ? `<div class="teacher-name">${profileName}</div>` : ''}
-                              </div>
-                              ${(currentResult as string)
-                                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                                .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-                                .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-                                .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-                                .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
-                                .replace(/\*(.*)\*/gim, '<i>$1</i>')
-                                .replace(/!\[(.*?)\]\((.*?)\)/gim, "<img alt='$1' src='$2' />")
-                                .replace(/\[(.*?)\]\((.*?)\)/gim, "<a href='$2'>$1</a>")
-                                .replace(/\n/gim, '<br />')
-                              }
-                            </body>
-                          </html>
-                        `);
+                        const mdToHtml = (md: string) => md
+                          .replace(/^---+$/gim, '<hr class="divider" />')
+                          .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                          .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                          .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                          .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
+                          .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                          .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+                          .replace(/^(\( \) [A-D]\) .+)$/gim, '<div class="mc-option">$1</div>')
+                          .replace(/^(_{10,})$/gim, '<div class="answer-line"></div>')
+                          .replace(/\n\n/g, '</p><p>')
+                          .replace(/\n/g, '<br/>');
+                        printWindow.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Material Didático</title>
+  <style>
+    @page { size: A4; margin: 2cm 2.5cm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.6; color: #111; background: #fff; }
+    .doc-header { border-top: 5px solid #4F46E5; border-bottom: 2px solid #4F46E5; padding: 10px 0; margin-bottom: 18px; display: flex; align-items: center; gap: 16px; }
+    .logo-box { width: 52px; height: 52px; border: 2px solid #c7d2fe; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #818cf8; font-size: 9pt; text-align: center; line-height: 1.2; }
+    .school-info { flex: 1; }
+    .school-name { font-size: 13pt; font-weight: bold; color: #1e1b4b; }
+    .school-sub { font-size: 9pt; color: #6b7280; }
+    .id-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 10pt; }
+    .id-table td { border: 1px solid #d1d5db; padding: 5px 8px; }
+    .id-table td:first-child { font-weight: bold; white-space: nowrap; background: #f3f4f6; width: 110px; }
+    .id-table .full-row td:last-child { width: auto; }
+    h1 { font-size: 15pt; color: #1e1b4b; border-bottom: 2px solid #4F46E5; padding-bottom: 6px; margin: 0 0 14px; text-align: center; }
+    h2 { font-size: 12pt; color: #312e81; background: #eef2ff; padding: 5px 10px; border-left: 4px solid #4F46E5; margin: 22px 0 10px; }
+    h3 { font-size: 11pt; color: #374151; margin: 14px 0 6px; }
+    p { margin: 6px 0; }
+    strong { font-weight: bold; }
+    blockquote { border-left: 4px solid #4F46E5; margin: 10px 0; padding: 6px 14px; color: #4b5563; font-style: italic; background: #f9fafb; }
+    .mc-option { padding: 2px 0 2px 16px; font-size: 11pt; }
+    .answer-line { border-bottom: 1px solid #9ca3af; margin: 10px 0 4px; height: 22px; }
+    .divider { border: none; border-top: 1.5px solid #d1d5db; margin: 16px 0; }
+    .score-box { border: 2px solid #4F46E5; border-radius: 6px; padding: 8px 16px; display: inline-block; margin-top: 12px; font-size: 10pt; color: #312e81; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <div class="doc-header">
+    <div class="logo-box">Logo<br/>Escola</div>
+    <div class="school-info">
+      <div class="school-name">${profileSchoolName || 'Nome da Escola'}</div>
+      <div class="school-sub">Prof. ${profileName || '_______________'} &nbsp;|&nbsp; ${profile.subject || 'Disciplina'}</div>
+    </div>
+  </div>
+  <p>${mdToHtml(currentResult as string)}</p>
+</body>
+</html>`);
                         printWindow.document.close();
-                        // Small delay to ensure images load
-                        setTimeout(() => {
-                          printWindow.print();
-                        }, 500);
+                        setTimeout(() => { printWindow.print(); }, 600);
                       }
                     }}
                     className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
@@ -4764,22 +4824,114 @@ export default function App() {
         const professorStr = profile.name || '_________________';
         const disciplinaStr = profile.subject || '_________________';
         
-        const headerPrompt = `1. COMECE O DOCUMENTO DIRETAMENTE COM ESTE CABEÇALHO (Não escreva nada antes dele):
-        **Escola:** ${escolaStr}
-        **Professor(a):** ${professorStr}
-        **Disciplina:** ${disciplinaStr}
-        **Turma:** ${className}
-        **Data:** ___/___/___
-        **Aluno:** ___________________________________
+        const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
 
-        2. LOGO ABAIXO DO CABEÇALHO, inclua o título:
-        # Atividade sobre ${targetTopic}
-        
-        3. É PROIBIDO incluir qualquer introdução, saudação, comentários ou texto extra antes ou depois do material.`;
+        const prompt = type === 'exam'
+          ? `Você é um professor especialista criando uma avaliação formal para impressão. Gere uma AVALIAÇÃO COMPLETA sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
 
-        const prompt = type === 'exam' 
-          ? `Gere uma avaliação sobre "${targetTopic}" para a turma "${className}". Inclua 5 questões de múltipla escolha e 2 dissertativas. ${headerPrompt} Formate em Markdown.`
-          : `Gere uma lista de ${plannerQuestionCount} atividades sobre "${targetTopic}" para a turma "${className}". ${headerPrompt} Formate em Markdown.`;
+ESTRUTURA OBRIGATÓRIA — siga exatamente:
+
+# Avaliação: ${targetTopic}
+
+**Escola:** ${escolaStr}  |  **Professor(a):** ${professorStr}  |  **Disciplina:** ${disciplinaStr}
+**Turma:** ${className}  |  **Data:** ___/___/______  |  **Nota:** _______
+
+**Nome do aluno:** _________________________________________________________________
+
+---
+
+## Parte I — Questões de Múltipla Escolha *(2 pontos cada — total: 10 pts)*
+
+**Questão 1 (2 pts)** [Enunciado claro e objetivo]
+
+( ) A) [alternativa]
+( ) B) [alternativa]
+( ) C) [alternativa]
+( ) D) [alternativa]
+
+**Questão 2 (2 pts)** [Enunciado]
+
+( ) A) [alternativa]
+( ) B) [alternativa]
+( ) C) [alternativa]
+( ) D) [alternativa]
+
+**Questão 3 (2 pts)** [Enunciado]
+
+( ) A) [alternativa]
+( ) B) [alternativa]
+( ) C) [alternativa]
+( ) D) [alternativa]
+
+**Questão 4 (2 pts)** [Enunciado]
+
+( ) A) [alternativa]
+( ) B) [alternativa]
+( ) C) [alternativa]
+( ) D) [alternativa]
+
+**Questão 5 (2 pts)** [Enunciado]
+
+( ) A) [alternativa]
+( ) B) [alternativa]
+( ) C) [alternativa]
+( ) D) [alternativa]
+
+---
+
+## Parte II — Questões Dissertativas *(5 pontos cada — total: 10 pts)*
+
+**Questão 6 (5 pts)** [Enunciado que exige desenvolvimento]
+
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+
+**Questão 7 (5 pts)** [Enunciado que exige desenvolvimento]
+
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+
+---
+
+*Pontuação total: _______ / 20 pontos*
+
+REGRAS: Substitua os textos entre [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, saudações ou texto fora da estrutura acima.`
+          : `Você é um professor especialista criando uma lista de atividades para impressão. Gere ${plannerQuestionCount} ATIVIDADES sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
+
+ESTRUTURA OBRIGATÓRIA — siga exatamente:
+
+# Atividade: ${targetTopic}
+
+**Escola:** ${escolaStr}  |  **Professor(a):** ${professorStr}  |  **Disciplina:** ${disciplinaStr}
+**Turma:** ${className}  |  **Data:** ___/___/______
+
+**Nome do aluno:** _________________________________________________________________
+
+---
+
+## Atividades
+
+**Atividade 1.** [Enunciado claro — pode ser exercício, análise, criação, leitura ou problema]
+
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+
+**Atividade 2.** [Enunciado — varie o tipo em relação à anterior]
+
+_________________________________________________________________________
+_________________________________________________________________________
+_________________________________________________________________________
+
+[Continue o mesmo padrão para todas as ${plannerQuestionCount} atividades, variando os tipos: completar lacunas, verdadeiro/falso com justificativa, relacionar colunas, produção textual, resolução de problemas, etc.]
+
+REGRAS: Substitua [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções ou texto fora da estrutura.`;
           
         const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
         const result = response.text || '';
