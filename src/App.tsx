@@ -44,7 +44,7 @@ const formatApiError = (error: any, defaultMsg: string): string => {
   return defaultMsg;
 };
 
-const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 10, baseDelayMs = 3000): Promise<T> => {
+const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs = 2000): Promise<T> => {
   let attempt = 0;
   while (attempt < maxRetries) {
     try {
@@ -61,9 +61,9 @@ const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 10, baseDelayMs 
       const status = error?.status || error?.error?.code || (typeof error?.error === 'object' ? error?.error?.status : null);
       const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
       const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-      
+
       if ((is503 || is429) && attempt < maxRetries) {
-        const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + (Math.random() * 1000); // Add jitter
+        const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + (Math.random() * 1000);
         console.warn(`API overloaded (${is503 ? '503' : '429'}). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
@@ -71,15 +71,29 @@ const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 10, baseDelayMs 
       }
     }
   }
-  throw new Error("Max retries reached");
+  throw new Error("Servidor da IA indisponível após várias tentativas. Tente novamente em alguns minutos.");
+};
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Tempo esgotado em ${label} (${Math.round(ms / 1000)}s). Verifique sua conexão e tente novamente.`));
+    }, ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
 };
 
 const generateContentWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0]) => {
-  // Auto-fix for hallucinated model version that might cause issues or demand spikes on older aliases
+  if (!apiKey) {
+    throw new Error('Chave da IA não configurada. Contate o suporte.');
+  }
   if (params.model === 'gemini-2.5-flash') {
     params.model = 'gemini-3-flash-preview';
   }
-  return withRetry(() => ai.models.generateContent(params));
+  return withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
 };
 
 const generateImagesWithRetry = async (params: Parameters<typeof ai.models.generateImages>[0]) => {
@@ -228,7 +242,10 @@ const fetchPixabayImage = async (query: string | undefined, width: number, heigh
   try {
     const cleanQuery = encodeURIComponent(query.replace(/,/g, ' ').trim());
     const url = `https://pixabay.com/api/?key=${apiKey}&q=${cleanQuery}&image_type=photo&safesearch=true&orientation=horizontal&per_page=20&min_width=${Math.min(width, 1280)}`;
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) return fallback;
     const data = await res.json();
     if (!data.hits || data.hits.length === 0) return fallback;
@@ -923,10 +940,21 @@ const PlannerScreen = ({
 
   // States removed as they are now props
   
-  // Derived directly — no separate useState to avoid race condition
   const loading = Object.values(activeTasks).some(t =>
-    t.status === 'processing' && (t.title.includes(topic) || t.type === mode)
+    t.status === 'processing' && t.type === mode
   );
+
+  const recentTaskError = Object.values(activeTasks)
+    .filter(t => t.status === 'error' && t.type === mode)
+    .sort((a, b) => b.startTime - a.startTime)[0]?.error;
+
+  const cancelCurrentGeneration = () => {
+    Object.values(activeTasks).forEach(t => {
+      if (t.status === 'processing' && t.type === mode) {
+        updateTask(t.id, { status: 'error', error: 'Geração cancelada pelo usuário.' });
+      }
+    });
+  };
 
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState('');
@@ -1347,10 +1375,18 @@ const PlannerScreen = ({
               disabled={loading || !topic || !selectedClassId}
               className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
             >
-              {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />} 
+              {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}
               {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
             </button>
-            {error && <p className="text-red-500 text-sm mt-3 text-center font-medium">{error}</p>}
+            {loading && (
+              <button
+                onClick={cancelCurrentGeneration}
+                className="w-full mt-2 text-gray-500 hover:text-red-600 text-sm font-bold py-2 transition-colors"
+              >
+                Cancelar
+              </button>
+            )}
+            {(error || recentTaskError) && <p className="text-red-500 text-sm mt-3 text-center font-medium">{error || recentTaskError}</p>}
           </>
         )}
 
@@ -4313,9 +4349,8 @@ export default function App() {
         [id]: { ...prev[id], ...updates }
       };
     });
-    
+
     if (updates.status === 'completed' || updates.status === 'error') {
-      // Auto-remove completed/error tasks after some time
       setTimeout(() => {
         setActiveTasks(prev => {
           const newState = { ...prev };
@@ -4325,6 +4360,21 @@ export default function App() {
       }, 8000);
     }
   };
+
+  // Watchdog: any task processing for more than 90s is auto-failed.
+  // Prevents the UI from being stuck in "loading" forever if a Promise hangs silently.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      Object.values(activeTasks).forEach(task => {
+        if (task.status === 'processing' && now - task.startTime > 90000) {
+          console.warn(`Task ${task.id} (${task.type}) stuck > 90s — auto-failing.`);
+          updateTask(task.id, { status: 'error', error: 'A geração demorou demais e foi cancelada. Tente novamente.' });
+        }
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [activeTasks]);
 
   const [profile, setProfile] = useFirestoreDoc<UserProfile>(
     user ? `users/${user.uid}` : 'users/temp',
@@ -4806,19 +4856,40 @@ export default function App() {
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount);
         const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
-        try {
-          const parsed = JSON.parse(text);
-          await Promise.all(parsed.slides.map(async (slide: any) => {
-            const q = slide.data.illustrationQuery || slide.data.imagePrompt;
-            if (q) {
-              slide.data.imageUrl = await fetchPixabayImage(q, 1200, 800);
-            }
-          }));
-          setPlannerPresentationData(parsed);
-          updateTask(taskId, { status: 'completed', result: parsed });
-        } catch (e) {
-          updateTask(taskId, { status: 'error', error: 'Erro ao processar JSON dos slides.' });
+        // Recover JSON even if the model wraps it in extra text
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        if (firstBrace > 0 && lastBrace > firstBrace) {
+          text = text.substring(firstBrace, lastBrace + 1);
         }
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(text);
+        } catch (e) {
+          updateTask(taskId, { status: 'error', error: 'A IA retornou um formato inválido. Tente novamente — geralmente funciona na 2ª tentativa.' });
+          return;
+        }
+        if (!parsed?.slides || !Array.isArray(parsed.slides) || parsed.slides.length === 0) {
+          updateTask(taskId, { status: 'error', error: 'A IA não retornou slides válidos. Tente novamente.' });
+          return;
+        }
+        // Image fetch is best-effort and bounded; never block more than 15s total.
+        try {
+          await withTimeout(
+            Promise.all(parsed.slides.map(async (slide: any) => {
+              const q = slide.data?.illustrationQuery || slide.data?.imagePrompt;
+              if (q) {
+                try { slide.data.imageUrl = await fetchPixabayImage(q, 1200, 800); } catch {}
+              }
+            })),
+            15000,
+            'busca de imagens'
+          );
+        } catch (e) {
+          console.warn('Image fetch timed out — proceeding without all images.');
+        }
+        setPlannerPresentationData(parsed);
+        updateTask(taskId, { status: 'completed', result: parsed });
       } else {
         const escolaStr = profile.schoolName || '_________________';
         const professorStr = profile.name || '_________________';
