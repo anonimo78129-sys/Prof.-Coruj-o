@@ -3468,39 +3468,52 @@ const CalendarScreen = ({
           ))}
 
           {dates.map(d => {
+            const today = new Date();
+            const isToday = d === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
             const isSelected = d === selectedDate;
             const dayEvents = getDayEvents(d);
-            const isHoliday = dayEvents.some(e => e.type === 'holiday' || e.type === 'commemorative');
             const mainEvent = dayEvents.find(e => e.type === 'holiday') || dayEvents.find(e => e.type === 'commemorative') || dayEvents.find(e => e.type === 'class') || dayEvents[0];
             const dayColor = mainEvent ? getEventColorInternal(mainEvent) : null;
-
             const allDone = dayEvents.length > 0 && dayEvents.every(e => {
               if (e.type === 'holiday' || e.type === 'commemorative') return true;
               return e.status === 'done';
             });
-            
+
+            // build style and class
+            let cellStyle: React.CSSProperties = {};
+            let cellClass = 'text-sm font-medium w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all relative overflow-hidden';
+
+            if (isSelected) {
+              cellClass += ' bg-indigo-600 text-white shadow-md font-bold';
+            } else if (isToday) {
+              cellClass += ' ring-2 ring-indigo-400 text-indigo-600 font-black bg-indigo-50';
+            } else if (dayColor && !allDone) {
+              cellStyle = { backgroundColor: dayColor + '28', color: dayColor };
+              cellClass += ' font-bold';
+            } else {
+              cellClass += ' text-gray-600 hover:bg-gray-50';
+            }
+
             return (
-              <div key={d} className="relative flex justify-center py-1">
-                <button 
-                  onClick={() => {
-                    setSelectedDate(d);
-                    setScreen('dayDetail');
-                  }}
-                  style={!isSelected && dayColor && !allDone ? { backgroundColor: dayColor + '20', color: dayColor } : {}}
-                  className={`text-base font-medium w-9 h-9 flex items-center justify-center rounded-xl transition-all ${
-                    isSelected ? 'bg-indigo-600 text-white shadow-md' : 
-                    (!dayColor || allDone) ? 'text-gray-600 hover:bg-gray-50' : ''
-                  } ${dayEvents.length > 0 && !isSelected ? 'font-bold' : ''}`}
+              <div key={d} className="relative flex justify-center py-0.5">
+                <button
+                  onClick={() => { setSelectedDate(d); setScreen('dayDetail'); }}
+                  style={cellStyle}
+                  className={cellClass}
                 >
-                  {d}
+                  {/* coloured stripe at top for each event type */}
+                  {dayEvents.length > 0 && !isSelected && (
+                    <div className="absolute top-0 left-0 right-0 flex h-1 rounded-t-xl overflow-hidden">
+                      {dayEvents.slice(0, 4).map((e, i) => (
+                        <div key={i} className="flex-1 h-full" style={{ backgroundColor: getEventColor(e) }} />
+                      ))}
+                    </div>
+                  )}
+                  <span className={isToday && !isSelected ? 'mt-0.5' : ''}>{d}</span>
+                  {isToday && !isSelected && (
+                    <span className="text-[7px] font-black text-indigo-400 leading-none -mt-0.5 uppercase tracking-wide">hoje</span>
+                  )}
                 </button>
-                {dayEvents.length > 0 && !isSelected && (
-                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex gap-0.5">
-                    {dayEvents.map((e, i) => (
-                      <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: getEventColor(e) }} />
-                    ))}
-                  </div>
-                )}
               </div>
             );
           })}
