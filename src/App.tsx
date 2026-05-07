@@ -204,14 +204,41 @@ const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '' }
   return <IconComponent size={size} color={color} className={className} />;
 };
 
+const pixabayCache = new Map<string, string>();
+
 const getImageUrl = (query: string | undefined, width: number, height: number) => {
   if (!query || query.trim().length === 0) {
     return `https://picsum.photos/${width}/${height}?random=${Math.random()}`;
   }
-  // Use a combination of query and random salt to ensure unique, topic-relevant images
-  const cleanQuery = encodeURIComponent(query.replace(/,/g, ' '));
-  const randomSalt = Math.floor(Math.random() * 1000);
-  return `https://picsum.photos/seed/${cleanQuery}${randomSalt}/${width}/${height}`;
+  const cleanQuery = encodeURIComponent(query.replace(/,/g, ' ').trim());
+  return `https://source.unsplash.com/${width}x${height}/?${cleanQuery}`;
+};
+
+const fetchPixabayImage = async (query: string | undefined, width: number, height: number): Promise<string> => {
+  const fallback = getImageUrl(query, width, height);
+  if (!query || query.trim().length === 0) return fallback;
+
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey) return fallback;
+
+  const cacheKey = `${query.trim().toLowerCase()}|${width}x${height}`;
+  if (pixabayCache.has(cacheKey)) return pixabayCache.get(cacheKey)!;
+
+  try {
+    const cleanQuery = encodeURIComponent(query.replace(/,/g, ' ').trim());
+    const url = `https://pixabay.com/api/?key=${apiKey}&q=${cleanQuery}&image_type=photo&safesearch=true&orientation=horizontal&per_page=20&min_width=${Math.min(width, 1280)}`;
+    const res = await fetch(url);
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    if (!data.hits || data.hits.length === 0) return fallback;
+    const pool = data.hits.slice(0, 5);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const chosen = pick.largeImageURL || pick.webformatURL || fallback;
+    pixabayCache.set(cacheKey, chosen);
+    return chosen;
+  } catch {
+    return fallback;
+  }
 };
 
 // --- Types ---
@@ -1279,8 +1306,10 @@ const PlannerScreen = ({
                       });
                     };
 
-                    const handleManualImageChange = (newQuery: string) => {
-                        updateSlideData({ imageUrl: getImageUrl(newQuery, 1200, 800) });
+                    const handleManualImageChange = async (newQuery: string) => {
+                        if (!newQuery) return;
+                        const url = await fetchPixabayImage(newQuery, 1200, 800);
+                        updateSlideData({ imagePrompt: newQuery, imageUrl: url });
                     };
 
                     const handleRegenerateSlide = async (newPrompt: string) => {
@@ -1304,11 +1333,15 @@ const PlannerScreen = ({
                             });
                             
                             const newData = JSON.parse(response.text || '{}');
-                            updateSlideData({ 
+                            const newQuery = newData.illustrationQuery || targetSlide.data.imagePrompt;
+                            const newImageUrl = newData.illustrationQuery
+                                ? await fetchPixabayImage(newData.illustrationQuery, 1200, 800)
+                                : targetSlide.data.imageUrl;
+                            updateSlideData({
                                 title: newData.title || targetSlide.data.title,
                                 text: newData.text || targetSlide.data.text,
-                                imagePrompt: newData.illustrationQuery || targetSlide.data.imagePrompt,
-                                imageUrl: newData.illustrationQuery ? getImageUrl(newData.illustrationQuery, 1200, 800) : targetSlide.data.imageUrl
+                                imagePrompt: newQuery,
+                                imageUrl: newImageUrl
                             });
                         } catch (err) {
                             console.error("Erro ao regenerar slide", err);
@@ -4230,11 +4263,12 @@ export default function App() {
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         try {
           const parsed = JSON.parse(text);
-          for (const slide of parsed.slides) {
-            if (slide.data.illustrationQuery) {
-              slide.data.imageUrl = getImageUrl(slide.data.illustrationQuery, 800, 450);
+          await Promise.all(parsed.slides.map(async (slide: any) => {
+            const q = slide.data.illustrationQuery || slide.data.imagePrompt;
+            if (q) {
+              slide.data.imageUrl = await fetchPixabayImage(q, 1200, 800);
             }
-          }
+          }));
           setPlannerPresentationData(parsed);
           updateTask(taskId, { status: 'completed', result: parsed });
         } catch (e) {
