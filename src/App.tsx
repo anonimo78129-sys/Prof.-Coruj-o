@@ -185,7 +185,7 @@ function useFirestoreDoc<T>(
     setData(resolvedData);
     if (!user || !isLoaded) return;
     try {
-      await setDoc(doc(db, docPath), { ...resolvedData, uid: user.uid, email: user.email || '' });
+      await setDoc(doc(db, docPath), { ...resolvedData, uid: user.uid, email: user.email || '' }, { merge: true });
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
@@ -680,8 +680,125 @@ const renderBoldText = (text?: string) => {
   });
 };
 
-const PlannerScreen = ({ 
-  schedules, 
+const AdvancedSettings = ({
+  mode, tone, setTone, complexity, setComplexity,
+  duration, setDuration, lessonTime, setLessonTime,
+  questionCount, setQuestionCount, slideCount, setSlideCount,
+  focus, setFocus, groundingContent, setGroundingContent
+}: {
+  mode: PlannerMode,
+  tone: string, setTone: (v: any) => void,
+  complexity: string, setComplexity: (v: any) => void,
+  duration: number, setDuration: (v: number) => void,
+  lessonTime: number, setLessonTime: (v: number) => void,
+  questionCount: number, setQuestionCount: (v: number) => void,
+  slideCount: number, setSlideCount: (v: number) => void,
+  focus: string, setFocus: (v: any) => void,
+  groundingContent: string, setGroundingContent: (v: string) => void,
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-6">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-sm font-bold text-gray-500 bg-gray-50 px-4 py-3 rounded-2xl"
+      >
+        <span>Personalizar geração</span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-gray-50 px-4 pb-4 rounded-b-2xl space-y-4 pt-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Linguagem do texto</label>
+                  <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                    <option value="didactic">Didática</option>
+                    <option value="formal">Formal</option>
+                    <option value="technical">Técnica</option>
+                    <option value="concise">Direta e curta</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nível da turma</label>
+                  <select value={complexity} onChange={(e) => setComplexity(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                    <option value="basic">Iniciante</option>
+                    <option value="intermediate">Intermediário</option>
+                    <option value="advanced">Avançado</option>
+                  </select>
+                </div>
+                {mode === 'plan' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. de Aulas</label>
+                      <select value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                        <option value={0}>Sugerir automaticamente</option>
+                        {[1,2,3,4,5,6,8,10].map(n => <option key={n} value={n}>{n} {n === 1 ? 'aula' : 'aulas'}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Duração de cada aula</label>
+                      <select value={lessonTime} onChange={(e) => setLessonTime(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                        <option value={30}>30 min</option>
+                        <option value={40}>40 min</option>
+                        <option value={45}>45 min</option>
+                        <option value={50}>50 min</option>
+                        <option value={60}>1 hora</option>
+                        <option value={90}>1h30</option>
+                        <option value={120}>2 horas</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+                {(mode === 'activities' || mode === 'exam') && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      {mode === 'exam' ? 'Questões de múltipla escolha' : 'Quantidade de questões'}
+                    </label>
+                    <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+                  </div>
+                )}
+                {mode === 'slides' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de slides</label>
+                    <input type="number" min="3" max="50" value={slideCount} onChange={(e) => setSlideCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Abordagem do conteúdo</label>
+                <select value={focus} onChange={(e) => setFocus(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                  <option value="balanced">Equilibrada (teoria + prática)</option>
+                  <option value="practical">Foco em exemplos práticos</option>
+                  <option value="theoretical">Foco em teoria e conceitos</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Material de apoio <span className="font-normal text-gray-400">(opcional)</span></label>
+                <textarea
+                  value={groundingContent}
+                  onChange={(e) => setGroundingContent(e.target.value)}
+                  placeholder="Cole aqui um texto, apostila ou resumo que a IA deve usar como base..."
+                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm h-20 resize-none"
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const PlannerScreen = ({
+  schedules,
   setSchedules,
   addClassItems,
   classes,
@@ -805,19 +922,14 @@ const PlannerScreen = ({
 
   // States removed as they are now props
   
-  // Check if there is a global task running for this topic
-  const isGeneratingTask = Object.values(activeTasks).some(t => 
-    t.status === 'processing' && 
-    (t.title.includes(topic) || t.type === mode)
+  // Derived directly — no separate useState to avoid race condition
+  const loading = Object.values(activeTasks).some(t =>
+    t.status === 'processing' && (t.title.includes(topic) || t.type === mode)
   );
 
-  const [loading, setLoading] = useState(isGeneratingTask);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    setLoading(isGeneratingTask);
-  }, [isGeneratingTask]);
+  const [regenLoading, setRegenLoading] = useState(false);
 
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
   const [regenState, setRegenState] = useState<{ idx: number; prompt: string } | null>(null);
@@ -1062,6 +1174,7 @@ const PlannerScreen = ({
       await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
     } catch (e) {
       console.error(e);
+      alert('Erro ao gerar o arquivo PPTX. Verifique sua conexão e tente novamente.');
     }
     setIsExporting(false);
   };
@@ -1137,115 +1250,16 @@ const PlannerScreen = ({
               </button>
             </div>
 
-            {/* --- Advanced Config Settings (collapsible) --- */}
-            {(() => {
-              const [advOpen, setAdvOpen] = useState(false);
-              return (
-                <div className="mb-6">
-                  <button
-                    type="button"
-                    onClick={() => setAdvOpen(o => !o)}
-                    className="w-full flex items-center justify-between text-sm font-bold text-gray-500 bg-gray-50 px-4 py-3 rounded-2xl"
-                  >
-                    <span>Personalizar geração</span>
-                    {advOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                  <AnimatePresence>
-                    {advOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="bg-gray-50 px-4 pb-4 rounded-b-2xl space-y-4 pt-2">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Linguagem do texto</label>
-                              <select value={tone} onChange={(e) => setTone(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                                <option value="didactic">Didática</option>
-                                <option value="formal">Formal</option>
-                                <option value="technical">Técnica</option>
-                                <option value="concise">Direta e curta</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Nível da turma</label>
-                              <select value={complexity} onChange={(e) => setComplexity(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                                <option value="basic">Iniciante</option>
-                                <option value="intermediate">Intermediário</option>
-                                <option value="advanced">Avançado</option>
-                              </select>
-                            </div>
-                            {mode === 'plan' && (
-                              <>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. de Aulas</label>
-                                  <select value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                                    <option value={0}>Sugerir automaticamente</option>
-                                    <option value={1}>1 aula</option>
-                                    <option value={2}>2 aulas</option>
-                                    <option value={3}>3 aulas</option>
-                                    <option value={4}>4 aulas</option>
-                                    <option value={5}>5 aulas</option>
-                                    <option value={6}>6 aulas</option>
-                                    <option value={8}>8 aulas</option>
-                                    <option value={10}>10 aulas</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">Duração de cada aula</label>
-                                  <select value={lessonTime} onChange={(e) => setLessonTime(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                                    <option value={30}>30 min</option>
-                                    <option value={40}>40 min</option>
-                                    <option value={45}>45 min</option>
-                                    <option value={50}>50 min</option>
-                                    <option value={60}>1 hora</option>
-                                    <option value={90}>1h30</option>
-                                    <option value={120}>2 horas</option>
-                                  </select>
-                                </div>
-                              </>
-                            )}
-                            {(mode === 'activities' || mode === 'exam') && (
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  {mode === 'exam' ? 'Questões de múltipla escolha' : 'Quantidade de questões'}
-                                </label>
-                                <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
-                              </div>
-                            )}
-                            {mode === 'slides' && (
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de slides</label>
-                                <input type="number" min="3" max="50" value={slideCount} onChange={(e) => setSlideCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Abordagem do conteúdo</label>
-                            <select value={focus} onChange={(e) => setFocus(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                              <option value="balanced">Equilibrada (teoria + prática)</option>
-                              <option value="practical">Foco em exemplos práticos</option>
-                              <option value="theoretical">Foco em teoria e conceitos</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Material de apoio <span className="font-normal text-gray-400">(opcional)</span></label>
-                            <textarea
-                              value={groundingContent}
-                              onChange={(e) => setGroundingContent(e.target.value)}
-                              placeholder="Cole aqui um texto, apostila ou resumo que a IA deve usar como base..."
-                              className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm h-20 resize-none"
-                            />
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })()}
+            <AdvancedSettings
+              mode={mode} tone={tone} setTone={setTone}
+              complexity={complexity} setComplexity={setComplexity}
+              duration={duration} setDuration={setDuration}
+              lessonTime={lessonTime} setLessonTime={setLessonTime}
+              questionCount={questionCount} setQuestionCount={setQuestionCount}
+              slideCount={slideCount} setSlideCount={setSlideCount}
+              focus={focus} setFocus={setFocus}
+              groundingContent={groundingContent} setGroundingContent={setGroundingContent}
+            />
 
             <AnimatePresence>
               {isAddingClass && (
@@ -1372,8 +1386,7 @@ const PlannerScreen = ({
 
                     const handleRegenerateSlide = async (newPrompt: string) => {
                         if (!newPrompt) return;
-                        setLoading(true);
-                        setLoadingMessage("Regenerando slide...");
+                        setRegenLoading(true);
                         
                         try {
                             const targetSlide = presentationData.slides[idx];
@@ -1386,7 +1399,7 @@ const PlannerScreen = ({
                             { "title": "...", "text": "...", "illustrationQuery": "..." }`;
 
                             const response = await generateContentWithRetry({
-                                model: 'gemini-2.5-flash',
+                                model: 'gemini-3-flash-preview',
                                 contents: prompt,
                             });
                             
@@ -1404,8 +1417,9 @@ const PlannerScreen = ({
                         } catch (err) {
                             console.error("Erro ao regenerar slide", err);
                             setError("Erro ao regenerar slide. Tente novamente.");
+                            setTimeout(() => setError(''), 5000);
                         } finally {
-                            setLoading(false);
+                            setRegenLoading(false);
                         }
                     };
 
@@ -1423,7 +1437,7 @@ const PlannerScreen = ({
                                 onKeyDown={(e) => { if (e.key === 'Enter') { handleRegenerateSlide(regenState.prompt); setRegenState(null); } if (e.key === 'Escape') setRegenState(null); }}
                                 className="text-xs w-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
                               />
-                              <button onClick={() => { handleRegenerateSlide(regenState.prompt); setRegenState(null); }} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">OK</button>
+                              <button onClick={() => { handleRegenerateSlide(regenState.prompt); setRegenState(null); }} disabled={regenLoading} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold disabled:opacity-60 flex items-center gap-1">{regenLoading ? <Loader2 size={12} className="animate-spin" /> : null}OK</button>
                               <button onClick={() => setRegenState(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-2 rounded-lg font-bold">✕</button>
                             </>
                           ) : (
@@ -3597,7 +3611,7 @@ const EstudioScreen = ({
           try {
             const base64 = (event.target?.result as string).split(',')[1];
             const response = await generateContentWithRetry({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3-flash-preview',
               contents: [
                 { role: 'user', parts: [
                     { inlineData: { data: base64, mimeType: file.type } },
@@ -3649,7 +3663,7 @@ const EstudioScreen = ({
       Assistente:`;
 
       const response = await generateContentWithRetry({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
       });
 
@@ -4320,11 +4334,11 @@ export default function App() {
       const creationTime = user.metadata?.creationTime || profile?.createdAt;
       if (creationTime) {
         const creationDate = new Date(creationTime).getTime();
-        const now = Date.now();
-        const hoursPassed = (now - creationDate) / (1000 * 60 * 60);
+        if (isNaN(creationDate)) return false;
+        const hoursPassed = (Date.now() - creationDate) / (1000 * 60 * 60);
         return hoursPassed > 24;
       }
-    return false;
+      return false;
   }, [user, profile]);
 
   if (!isAuthLoaded) {
