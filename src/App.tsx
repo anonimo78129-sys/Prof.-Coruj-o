@@ -3814,7 +3814,7 @@ const AdminScreen = () => {
 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSysUsers(items);
+      setSysUsers(items.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || '')));
     }, (error) => {
       console.error("Error fetching users:", error);
     });
@@ -3833,6 +3833,28 @@ const AdminScreen = () => {
     }
   };
 
+  const toggleAdmin = async (userId: string, currentRole: string) => {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    try {
+      await setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true });
+    } catch (e) {
+      console.error("Error toggling admin:", e);
+    }
+  };
+
+  const getTrialStatus = (u: any) => {
+    if (u.isPro || u.role === 'admin') return null;
+    if (!u.createdAt) return null;
+    const hours = (Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60);
+    if (hours > 24) return 'expired';
+    const remaining = Math.max(0, 24 - hours);
+    return `${Math.floor(remaining)}h restantes`;
+  };
+
+  const totalUsers = sysUsers.length;
+  const proUsers = sysUsers.filter(u => u.isPro).length;
+  const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && u.createdAt && (Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60) > 24).length;
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
       <div className="flex items-center gap-3 mb-6">
@@ -3845,18 +3867,33 @@ const AdminScreen = () => {
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
+          <p className="text-2xl font-black text-indigo-600">{totalUsers}</p>
+          <p className="text-xs text-gray-500 font-medium">Usuários</p>
+        </div>
+        <div className="bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
+          <p className="text-2xl font-black text-emerald-600">{proUsers}</p>
+          <p className="text-xs text-gray-500 font-medium">PRO</p>
+        </div>
+        <div className="bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
+          <p className="text-2xl font-black text-red-500">{expiredUsers}</p>
+          <p className="text-xs text-gray-500 font-medium">Expirados</p>
+        </div>
+      </div>
+
       <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm">
         <button
           onClick={() => setActiveTab('users')}
           className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'users' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
-          Usuários
+          Usuários ({totalUsers})
         </button>
         <button
           onClick={() => setActiveTab('feedbacks')}
           className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'feedbacks' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
-          Feedbacks
+          Feedbacks ({feedbacks.length})
         </button>
       </div>
 
@@ -3866,7 +3903,7 @@ const AdminScreen = () => {
             <MessageSquare size={20} className="text-indigo-600" />
             Feedbacks dos Usuários
           </h2>
-          
+
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <Loader2 className="animate-spin text-indigo-600" size={32} />
@@ -3886,7 +3923,7 @@ const AdminScreen = () => {
                       <p className="text-xs text-gray-500">{fb.email || 'Sem e-mail'}</p>
                     </div>
                     <span className="text-xs text-gray-400 bg-white px-2 py-1 rounded-lg border border-gray-100">
-                      {new Date(fb.date).toLocaleDateString()}
+                      {new Date(fb.date).toLocaleDateString('pt-BR')} {new Date(fb.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   <p className="text-gray-700 text-sm mt-2">{fb.text}</p>
@@ -3903,22 +3940,43 @@ const AdminScreen = () => {
             <Shield size={20} className="text-indigo-600" />
             Gerenciamento de Usuários
           </h2>
-          
-          <div className="space-y-2 overflow-y-auto no-scrollbar flex-1">
-            {sysUsers.map(u => (
-              <div key={u.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl bg-gray-50">
-                <div className="overflow-hidden">
-                  <p className="font-bold text-sm text-gray-900 truncate">{u.name || 'Sem nome'}</p>
-                  <p className="text-xs text-gray-500 truncate">{u.email || u.id}</p>
+
+          <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
+            {sysUsers.map(u => {
+              const trialStatus = getTrialStatus(u);
+              const isAdmin = u.role === 'admin';
+              return (
+                <div key={u.id} className="p-3 border border-gray-100 rounded-xl bg-gray-50">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="overflow-hidden flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-sm text-gray-900 truncate">{u.name || 'Sem nome'}</p>
+                        {isAdmin && <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-md">ADMIN</span>}
+                        {u.isPro && <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md">PRO</span>}
+                        {trialStatus === 'expired' && <span className="text-[10px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md">EXPIRADO</span>}
+                        {trialStatus && trialStatus !== 'expired' && <span className="text-[10px] font-medium bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md">{trialStatus}</span>}
+                      </div>
+                      <p className="text-xs text-gray-500 truncate mt-0.5">{u.email || u.id}</p>
+                      {u.createdAt && <p className="text-[10px] text-gray-400 mt-0.5">Desde {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => togglePro(u.id, u.isPro)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${u.isPro ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400 hover:text-emerald-600'}`}
+                    >
+                      {u.isPro ? 'PRO ATIVO' : 'ATIVAR PRO'}
+                    </button>
+                    <button
+                      onClick={() => toggleAdmin(u.id, u.role)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${isAdmin ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'}`}
+                    >
+                      {isAdmin ? 'ADMIN ATIVO' : 'DAR ADMIN'}
+                    </button>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => togglePro(u.id, u.isPro)}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg border flex-shrink-0 ml-2 shadow-sm ${u.isPro ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-gray-600 border-gray-200'}`}
-                >
-                  {u.isPro ? 'PRO ATIVO' : 'ATIVAR PRO'}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -4140,6 +4198,7 @@ export default function App() {
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
             name: email.split('@')[0],
+            email: email.toLowerCase().trim(),
             subject: 'Nova Disciplina',
             role: 'user',
             isPro: false,
