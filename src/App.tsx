@@ -4167,7 +4167,7 @@ export default function App() {
 
   const isTrialExpired = useMemo(() => {
     if (!user) return false;
-    if (profile?.role === 'admin' || user?.email === 'LyelsonMF520@gmail.com') return false;
+    if (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') return false;
     if (profile?.isPro) return false;
     
       const creationTime = user.metadata?.creationTime || profile?.createdAt;
@@ -4644,7 +4644,7 @@ export default function App() {
           }} />}
           {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
-          {screen === 'admin' && (profile?.role === 'admin' || user?.email === 'LyelsonMF520@gmail.com') && <AdminScreen key="admin" />}
+          {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
 
         <GlobalTaskIndicator 
@@ -4658,7 +4658,7 @@ export default function App() {
             removeTask(task.id);
           }} 
         />
-        <BottomNav activeScreen={screen} setScreen={setScreen} isAdmin={profile?.role === 'admin' || user?.email === 'LyelsonMF520@gmail.com'} />
+        <BottomNav activeScreen={screen} setScreen={setScreen} isAdmin={profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com'} />
       </div>
       
       {/* Background decoration */}
