@@ -204,14 +204,41 @@ const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '' }
   return <IconComponent size={size} color={color} className={className} />;
 };
 
+const pixabayCache = new Map<string, string>();
+
 const getImageUrl = (query: string | undefined, width: number, height: number) => {
   if (!query || query.trim().length === 0) {
     return `https://picsum.photos/${width}/${height}?random=${Math.random()}`;
   }
-  // Use a combination of query and random salt to ensure unique, topic-relevant images
-  const cleanQuery = encodeURIComponent(query.replace(/,/g, ' '));
-  const randomSalt = Math.floor(Math.random() * 1000);
-  return `https://picsum.photos/seed/${cleanQuery}${randomSalt}/${width}/${height}`;
+  const cleanQuery = encodeURIComponent(query.replace(/,/g, ' ').trim());
+  return `https://source.unsplash.com/${width}x${height}/?${cleanQuery}`;
+};
+
+const fetchPixabayImage = async (query: string | undefined, width: number, height: number): Promise<string> => {
+  const fallback = getImageUrl(query, width, height);
+  if (!query || query.trim().length === 0) return fallback;
+
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey) return fallback;
+
+  const cacheKey = `${query.trim().toLowerCase()}|${width}x${height}`;
+  if (pixabayCache.has(cacheKey)) return pixabayCache.get(cacheKey)!;
+
+  try {
+    const cleanQuery = encodeURIComponent(query.replace(/,/g, ' ').trim());
+    const url = `https://pixabay.com/api/?key=${apiKey}&q=${cleanQuery}&image_type=photo&safesearch=true&orientation=horizontal&per_page=20&min_width=${Math.min(width, 1280)}`;
+    const res = await fetch(url);
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    if (!data.hits || data.hits.length === 0) return fallback;
+    const pool = data.hits.slice(0, 5);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const chosen = pick.largeImageURL || pick.webformatURL || fallback;
+    pixabayCache.set(cacheKey, chosen);
+    return chosen;
+  } catch {
+    return fallback;
+  }
 };
 
 // --- Types ---
@@ -703,8 +730,9 @@ const PlannerScreen = ({
   plannerSlideCount: slideCount,
   setPlannerSlideCount: setSlideCount,
   getSuggestion,
-  getScheduleBuffer
-}: { 
+  getScheduleBuffer,
+  setPlannerMode
+}: {
   schedules: ClassSchedule[], 
   setSchedules: (s: ClassSchedule[]) => void,
   addClassItems: (items: ClassItem[]) => void,
@@ -754,7 +782,8 @@ const PlannerScreen = ({
   plannerSlideCount: number,
   setPlannerSlideCount: (n: number) => void,
   getSuggestion: (topic?: string, classId?: string) => Promise<void>,
-  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[]
+  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
+  setPlannerMode: (m: PlannerMode) => void
 }) => {
   const currentResult = mode === 'plan' ? plan : 
                         mode === 'slides' ? presentationData :
@@ -791,6 +820,7 @@ const PlannerScreen = ({
   }, [isGeneratingTask]);
 
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
+  const [regenState, setRegenState] = useState<{ idx: number; prompt: string } | null>(null);
   const [scheduleStartDate, setScheduleStartDate] = useState<string>(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1045,7 +1075,7 @@ const PlannerScreen = ({
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 flex flex-col">
       <Header 
         setScreen={setScreen}
-        title={mode === 'plan' ? 'Planejador' : mode === 'activities' ? 'Gerador de Atividades' : 'Gerador de Slides'} 
+        title={mode === 'plan' ? 'Planejador' : mode === 'activities' ? 'Gerador de Atividades' : mode === 'exam' ? 'Gerador de Provas' : 'Gerador de Slides'}
         subtitle="Fluxo Automatizado" 
         profile={profile}
       />
@@ -1053,6 +1083,22 @@ const PlannerScreen = ({
       <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-gray-50 mb-6 shrink-0">
         {step === 'input' && (
           <>
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6">
+              {([
+                { key: 'plan', label: 'Plano' },
+                { key: 'activities', label: 'Atividades' },
+                { key: 'slides', label: 'Slides' },
+                { key: 'exam', label: 'Prova' },
+              ] as { key: PlannerMode; label: string }[]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setPlannerMode(key)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${mode === key ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <label className="block text-base font-bold text-gray-700 mb-2">Conteúdo ou Arquivo</label>
             <textarea 
               value={topic}
@@ -1142,9 +1188,9 @@ const PlannerScreen = ({
                       </div>
                     </>
                 )}
-                {mode === 'activities' && (
+                {(mode === 'activities' || mode === 'exam') && (
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. Questões</label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{mode === 'exam' ? 'Múltipla Escolha' : 'Qtd. Questões'}</label>
                         <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border-none rounded-xl py-2 px-3 text-sm" />
                     </div>
                 )}
@@ -1213,7 +1259,7 @@ const PlannerScreen = ({
               className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
             >
               {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />} 
-              {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : 'Gerar Slides')}
+              {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
             </button>
             {error && <p className="text-red-500 text-sm mt-3 text-center font-medium">{error}</p>}
           </>
@@ -1244,23 +1290,36 @@ const PlannerScreen = ({
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900">
-                {mode === 'plan' ? 'Plano Gerado' : mode === 'activities' ? 'Atividades Geradas' : 'Slides Gerados'}
+                {mode === 'plan' ? 'Plano Gerado' : mode === 'activities' ? 'Atividades Geradas' : mode === 'exam' ? 'Prova Gerada' : 'Slides Gerados'}
               </h3>
               <button onClick={() => setStep('input')} className="text-indigo-600 text-sm font-bold">Novo</button>
             </div>
             {mode === 'plan' && (
-              <div className="flex gap-2 mb-6">
-                <button 
-                  onClick={() => generateResource('activities')}
-                  className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+              <div className="flex flex-col gap-2 mb-6">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => generateResource('activities')}
+                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <FileText size={16} /> Atividades
+                  </button>
+                  <button
+                    onClick={() => generateResource('slides')}
+                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <Presentation size={16} /> Slides
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    const selectedClass = schedules.find(s => s.id === selectedClassId);
+                    if (selectedClass) generateAndSetBuffer(scheduleStartDate, scheduleAvoidCollisions, selectedClass);
+                    setShowSchedulePrompt(true);
+                  }}
+                  disabled={!selectedClassId}
+                  className="w-full bg-emerald-50 text-emerald-700 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 border border-emerald-100 disabled:opacity-40"
                 >
-                  <FileText size={16} /> Atividades
-                </button>
-                <button 
-                  onClick={() => generateResource('slides')}
-                  className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                >
-                  <Presentation size={16} /> Slides
+                  <CalendarIcon size={16} /> Agendar no Cronograma
                 </button>
               </div>
             )}
@@ -1279,8 +1338,10 @@ const PlannerScreen = ({
                       });
                     };
 
-                    const handleManualImageChange = (newQuery: string) => {
-                        updateSlideData({ imageUrl: getImageUrl(newQuery, 1200, 800) });
+                    const handleManualImageChange = async (newQuery: string) => {
+                        if (!newQuery) return;
+                        const url = await fetchPixabayImage(newQuery, 1200, 800);
+                        updateSlideData({ imagePrompt: newQuery, imageUrl: url });
                     };
 
                     const handleRegenerateSlide = async (newPrompt: string) => {
@@ -1304,11 +1365,15 @@ const PlannerScreen = ({
                             });
                             
                             const newData = JSON.parse(response.text || '{}');
-                            updateSlideData({ 
+                            const newQuery = newData.illustrationQuery || targetSlide.data.imagePrompt;
+                            const newImageUrl = newData.illustrationQuery
+                                ? await fetchPixabayImage(newData.illustrationQuery, 1200, 800)
+                                : targetSlide.data.imageUrl;
+                            updateSlideData({
                                 title: newData.title || targetSlide.data.title,
                                 text: newData.text || targetSlide.data.text,
-                                imagePrompt: newData.illustrationQuery || targetSlide.data.imagePrompt,
-                                imageUrl: newData.illustrationQuery ? getImageUrl(newData.illustrationQuery, 1200, 800) : targetSlide.data.imageUrl
+                                imagePrompt: newQuery,
+                                imageUrl: newImageUrl
                             });
                         } catch (err) {
                             console.error("Erro ao regenerar slide", err);
@@ -1322,8 +1387,25 @@ const PlannerScreen = ({
                       <div key={idx} className="w-full max-w-4xl mx-auto aspect-[16/9] rounded-2xl shadow-lg overflow-hidden flex relative border border-gray-100 group" style={{ backgroundColor: (slide.layoutID === 'LAYOUT_REFERENCES' || slide.layoutID === 'LAYOUT_COVER') ? theme.primaryColor : theme.backgroundColor }}>
                         {/* Edit Controls Overlay */}
                         <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 p-3 rounded-xl shadow-lg flex gap-2">
-                            <input placeholder="Nova img..." className="text-xs w-32 p-2 border rounded-lg" onKeyDown={(e) => { if(e.key === 'Enter') handleManualImageChange(e.currentTarget.value) }} />
-                            <button onClick={()=>handleRegenerateSlide(prompt("Novo prompt:") || "")} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">Regerar</button>
+                          {regenState?.idx === idx ? (
+                            <>
+                              <input
+                                autoFocus
+                                placeholder="Nova instrução para o slide..."
+                                value={regenState.prompt}
+                                onChange={(e) => setRegenState({ idx, prompt: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { handleRegenerateSlide(regenState.prompt); setRegenState(null); } if (e.key === 'Escape') setRegenState(null); }}
+                                className="text-xs w-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                              />
+                              <button onClick={() => { handleRegenerateSlide(regenState.prompt); setRegenState(null); }} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">OK</button>
+                              <button onClick={() => setRegenState(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-2 rounded-lg font-bold">✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <input placeholder="Nova img..." className="text-xs w-32 p-2 border rounded-lg" onKeyDown={(e) => { if (e.key === 'Enter') handleManualImageChange(e.currentTarget.value); }} />
+                              <button onClick={() => setRegenState({ idx, prompt: '' })} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">Regerar</button>
+                            </>
+                          )}
                         </div>
                         
                         {slide.layoutID === 'LAYOUT_COVER' && (
@@ -1721,11 +1803,11 @@ const PlannerScreen = ({
   );
 };
 
-const ChatScreen = ({ 
-  profile, 
+const ChatScreen = ({
+  profile,
   setProfile,
-  estudioContext, 
-  messages, 
+  estudioContext,
+  messages,
   setMessages,
   classes,
   schedules,
@@ -1742,7 +1824,8 @@ const ChatScreen = ({
   setPlannerTopic,
   plannerSelectedClassId,
   setPlannerSelectedClassId,
-  setPlannerMode
+  setPlannerMode,
+  getScheduleBuffer
 }: { 
   profile: UserProfile, 
   setProfile: (p: UserProfile) => void,
@@ -1764,7 +1847,8 @@ const ChatScreen = ({
   setPlannerTopic: (t: string) => void,
   plannerSelectedClassId: string,
   setPlannerSelectedClassId: (id: string) => void,
-  setPlannerMode: (m: PlannerMode) => void
+  setPlannerMode: (m: PlannerMode) => void,
+  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[]
 }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1826,36 +1910,60 @@ const ChatScreen = ({
     
     try {
       const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-      
+      const now = Date.now();
+
+      const upcomingClasses = [...classes]
+        .filter(c => c.timestamp >= now)
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(0, 10)
+        .map(c => `- ${c.title} (${c.className}) em ${c.date}`)
+        .join('\n') || 'Nenhuma aula agendada';
+
+      const upcomingEvents = customEvents
+        .slice(0, 3)
+        .map(e => `- ${e.title} em ${e.date} [${e.type}]`)
+        .join('\n') || 'Nenhum evento';
+
+      const acervoSummary = savedResources
+        .slice(-5)
+        .map(r => `- ${r.title} (${r.type})`)
+        .join('\n') || 'Acervo vazio';
+
+      const turmas = schedules.map(s => s.name).join(', ') || 'Nenhuma turma cadastrada';
+
       const basePrompt = `Você é o "Prof. Corujão", o assistente pessoal definitivo para professores.
       Você atua como um CONTROLE REMOTO total do aplicativo. Você pode navegar entre telas, criar materiais, agendar aulas e atualizar o perfil.
-      
+
       Hoje é: ${today}.
-      
+
       Contexto Atual:
       - Professor: ${profile.name} (${profile.subject})
       - Escola: ${profile.schoolName || 'Não informada'}
-      - Aulas Agendadas: ${JSON.stringify(classes)}
-      - Turmas/Grade: ${JSON.stringify(schedules)}
-      - Materiais no Acervo: ${JSON.stringify(savedResources)}
-      - Conteúdo do Estúdio: ${estudioContext || 'Vazio'}
-      
+      - Turmas cadastradas: ${turmas}
+      - Próximas aulas (máx. 10):
+      ${upcomingClasses}
+      - Próximos eventos:
+      ${upcomingEvents}
+      - Últimos materiais no Acervo:
+      ${acervoSummary}
+      - Conteúdo do Estúdio: ${estudioContext ? `${estudioContext.substring(0, 300)}...` : 'Vazio'}
+
       Suas Capacidades (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
       1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'acervo'.
-      2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Se o usuário pedir para "criar slides sobre X", use a função generate_slides.
-      3. AGENDAMENTO: Marcar aulas individuais ou em lote (semestre inteiro).
+      2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais são salvos automaticamente no Acervo ao concluir.
+      3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
-      
+
       Regras de Comportamento:
       1. Seja proativo, conciso e profissional.
       2. NUNCA use emojis.
-      3. Se o usuário pedir algo genérico como "Gere um material sobre X", pergunte se ele quer Slides, Plano ou Prova, ou sugira um deles.
-      4. Quando usar uma função de geração (slides, plano, etc), explique que o processo começou e que o professor pode acompanhar na tela do Planejador.
-      5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo (ex: "Vi que você tem aula de História hoje, quer que eu prepare os slides?").
-      
+      3. Se o usuário pedir algo genérico como "Gere um material sobre X", pergunte se ele quer Slides, Plano, Atividades ou Prova, ou sugira um deles.
+      4. Quando usar uma função de geração, informe que o material será salvo automaticamente no Acervo ao concluir.
+      5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo.
+
       Histórico:
-      ${sortedHistory.slice(-10).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
-      
+      ${sortedHistory.slice(-20).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
+
       Responda à última solicitação:`;
 
       const parts: any[] = [{ text: basePrompt }];
@@ -1939,6 +2047,32 @@ const ChatScreen = ({
                 }
               },
               {
+                name: 'generate_exam',
+                description: 'Gerar uma prova/avaliação com questões de múltipla escolha e dissertativas.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    className: { type: Type.STRING }
+                  },
+                  required: ['topic']
+                }
+              },
+              {
+                name: 'schedule_lesson_series',
+                description: 'Agendar uma série de aulas sobre um tópico em lote, distribuídas nos dias de aula da turma.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    className: { type: Type.STRING },
+                    num_classes: { type: Type.NUMBER, description: 'Quantidade de aulas a agendar' },
+                    start_date: { type: Type.STRING, description: 'Data de início no formato YYYY-MM-DD' }
+                  },
+                  required: ['topic', 'className', 'num_classes']
+                }
+              },
+              {
                 name: 'update_profile',
                 description: 'Atualizar informações do perfil do professor.',
                 parameters: {
@@ -1969,34 +2103,55 @@ const ChatScreen = ({
               className: args.className,
               timestamp: Date.now()
             }]);
-            responseText += `✅ Aula "${args.title}" agendada. `;
+            responseText += `Aula "${args.title}" agendada para ${args.date}. `;
           } else if (call.name === 'change_screen') {
             setScreen(args.screen as Screen);
-            responseText += `Navegando para ${args.screen}... `;
+            responseText += `Navegando para ${args.screen}. `;
           } else if (call.name === 'generate_slides') {
-            setPlannerTopic(args.topic);
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('slides');
             generateResource('slides', args.topic, targetClass?.id);
-            responseText += `🚀 Iniciando a criação dos slides sobre "${args.topic}". Você pode ver o progresso no Planejador. `;
+            responseText += `Criando slides sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
           } else if (call.name === 'generate_lesson_plan') {
-            setPlannerTopic(args.topic);
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('plan');
             generatePlan(args.topic, targetClass?.id);
-            responseText += `📝 Criando o plano de aula sobre "${args.topic}". `;
+            responseText += `Criando plano de aula sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
           } else if (call.name === 'generate_activities') {
-            setPlannerTopic(args.topic);
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('activities');
             generateResource('activities', args.topic, targetClass?.id);
-            responseText += `📝 Gerando lista de atividades sobre "${args.topic}". `;
+            responseText += `Gerando atividades sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+          } else if (call.name === 'generate_exam') {
+            const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
+            if (targetClass) setPlannerSelectedClassId(targetClass.id);
+            setPlannerMode('exam');
+            generateResource('exam', args.topic, targetClass?.id);
+            responseText += `Gerando prova sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+          } else if (call.name === 'schedule_lesson_series') {
+            const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            if (targetClass) {
+              const startDate = args.start_date || new Date().toISOString().split('T')[0];
+              const buffer = getScheduleBuffer(args.topic, args.num_classes || 4, startDate, true, targetClass, classes);
+              if (buffer.length > 0) {
+                addClassItems(buffer);
+                responseText += `${buffer.length} aulas sobre "${args.topic}" agendadas para ${targetClass.name}. `;
+              } else {
+                responseText += `Nenhum horário disponível encontrado para "${targetClass.name}" a partir de ${startDate}. `;
+              }
+            } else {
+              responseText += `Turma "${args.className}" não encontrada. Verifique o nome da turma no perfil. `;
+            }
           } else if (call.name === 'update_profile') {
             setProfile({ ...profile, ...args });
-            responseText += `👤 Perfil atualizado com sucesso. `;
+            responseText += `Perfil atualizado com sucesso. `;
           }
         }
         setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: responseText || "Tudo certo! Realizei as ações solicitadas.", date: Date.now() }]);
@@ -3170,13 +3325,24 @@ const CalendarScreen = ({
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
             <h2 className="text-xl font-bold mb-4">Novo Evento</h2>
-            <input 
-              type="text" 
-              placeholder="Título do evento" 
-              value={newEventTitle} 
+            <input
+              type="text"
+              placeholder="Título do evento"
+              value={newEventTitle}
               onChange={(e) => setNewEventTitle(e.target.value)}
-              className="w-full p-3 mb-6 border border-gray-200 rounded-xl"
+              className="w-full p-3 mb-4 border border-gray-200 rounded-xl"
             />
+            <div className="flex gap-2 mb-6">
+              {(['prep', 'admin'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setNewEventType(t)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${newEventType === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}
+                >
+                  {t === 'prep' ? 'Preparação' : 'Administrativo'}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-4">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 p-3 rounded-xl bg-gray-100 font-bold">Cancelar</button>
               <button onClick={handleAddEvent} className="flex-1 p-3 rounded-xl bg-indigo-600 text-white font-bold">Adicionar</button>
@@ -3276,17 +3442,21 @@ const CalendarScreen = ({
   );
 };
 
-const EstudioScreen = ({ 
-  estudioContext, 
-  setEstudioContext, 
+const EstudioScreen = ({
+  estudioContext,
+  setEstudioContext,
+  studioMessages,
+  setStudioMessages,
   profile,
   setScreen,
   setPlannerMode,
   notifications,
   setNotifications
-}: { 
-  estudioContext: string, 
-  setEstudioContext: (c: string | ((prev: string) => string)) => void, 
+}: {
+  estudioContext: string,
+  setEstudioContext: (c: string | ((prev: string) => string)) => void,
+  studioMessages: { id: string; role: 'user' | 'model'; text: string; date: number }[],
+  setStudioMessages: (m: { id: string; role: 'user' | 'model'; text: string; date: number }[] | ((prev: { id: string; role: 'user' | 'model'; text: string; date: number }[]) => { id: string; role: 'user' | 'model'; text: string; date: number }[])) => void,
   profile: UserProfile,
   setScreen: (s: Screen) => void,
   setPlannerMode: (m: PlannerMode) => void,
@@ -3296,19 +3466,20 @@ const EstudioScreen = ({
   const [activeTab, setActiveTab] = useState<'context' | 'chat'>('context');
   const [isUploading, setIsUploading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([
-    { role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?' }
-  ]);
 
   useEffect(() => {
     if (activeTab === 'chat') {
       chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }
-  }, [chatMessages, activeTab]);
+  }, [studioMessages, activeTab]);
 
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const addStudioMessage = (msg: Omit<typeof studioMessages[0], 'id' | 'date'>) => {
+    const newMsg = { ...msg, id: Math.random().toString(36).substr(2, 9), date: Date.now() };
+    setStudioMessages(prev => [...prev, newMsg]);
+    return newMsg;
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3370,36 +3541,34 @@ const EstudioScreen = ({
       alert('Ops! Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
       return;
     }
-    
-    const userMessage = { role: 'user' as const, text: chatInput };
-    // Keep local reference to append for prompt without waiting for react state sync
-    const currentMessages = [...chatMessages, userMessage];
-    
-    setChatMessages(prev => [...prev, userMessage]);
+
+    const userText = chatInput;
+    addStudioMessage({ role: 'user', text: userText });
     setChatInput('');
     setIsChatLoading(true);
 
     try {
+      const historyForPrompt = [...studioMessages, { role: 'user' as const, text: userText }];
       const prompt = `Você é um assistente especialista no material fornecido pelo professor.
       Responda às perguntas baseando-se ESTRITAMENTE no seguinte conteúdo. NUNCA afirme ter gerado relatórios, aulas, ou ter agendado e executado ações. O seu único propósito nesta tela é analisar e responder sobre o texto fornecido.
-      
+
       Conteúdo Base:
       ${estudioContext}
-      
+
       Histórico da conversa:
-      ${currentMessages.map(m => `${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
-      
+      ${historyForPrompt.map(m => `${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
+
       Assistente:`;
 
       const response = await generateContentWithRetry({
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
-      
-      setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
+
+      addStudioMessage({ role: 'model', text: response.text || '' });
     } catch (error) {
       console.error(error);
-      setChatMessages(prev => [...prev, { role: 'model', text: formatApiError(error, 'Desculpe, ocorreu um erro ao analisar o material.') }]);
+      addStudioMessage({ role: 'model', text: formatApiError(error, 'Desculpe, ocorreu um erro ao analisar o material.') });
     }
     setIsChatLoading(false);
   };
@@ -3463,11 +3632,20 @@ const EstudioScreen = ({
 
       {activeTab === 'chat' && (
         <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col min-h-[400px]">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs text-gray-400 font-medium">Conversa salva automaticamente</span>
+            <button
+              onClick={() => setStudioMessages([{ id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }])}
+              className="text-xs text-red-400 font-bold hover:text-red-600"
+            >
+              Limpar
+            </button>
+          </div>
           <div className="flex-1 overflow-y-auto no-scrollbar mb-4 space-y-4 p-2">
             {!estudioContext && (
               <div className="text-center py-8 text-gray-400 text-sm">Adicione conteúdo na Base de Conhecimento primeiro.</div>
             )}
-            {estudioContext && chatMessages.map((msg, i) => (
+            {estudioContext && studioMessages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
                 <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-50 text-gray-800 rounded-bl-none shadow-sm border border-gray-100'}`}>
                   <div className="markdown-body text-sm">
@@ -3839,6 +4017,9 @@ export default function App() {
   ]);
   
   const [estudioContext, setEstudioContext] = useState<string>('');
+  const [studioMessages, setStudioMessages] = useFirestoreSync<{ id: string; role: 'user' | 'model'; text: string; date: number }>('studioMessages', user, [
+    { id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }
+  ]);
 
   // Global Planner States (for persistence across screens)
   const [plannerTopic, setPlannerTopic] = useState('');
@@ -3859,26 +4040,86 @@ export default function App() {
   const [plannerQuestionCount, setPlannerQuestionCount] = useState(5);
   const [plannerSlideCount, setPlannerSlideCount] = useState(10);
 
+  const processedTasksRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    Object.values(activeTasks).forEach(task => {
+      if (task.status === 'completed' && task.result && !processedTasksRef.current.has(task.id)) {
+        processedTasksRef.current.add(task.id);
+        const topicLabel = task.title.replace(/^(Slides|Atividades|Plano|Prova): /, '');
+        const newResourceId = Math.random().toString(36).substr(2, 9);
+        let saved = false;
+        if (task.type === 'slides' && typeof task.result === 'object') {
+          setSavedResources(prev => [...prev, {
+            id: newResourceId, type: 'slides',
+            title: (task.result as PresentationData).presentationTitle || topicLabel,
+            date: Date.now(), presentationData: task.result as PresentationData
+          }]);
+          saved = true;
+        } else if ((task.type === 'activities' || task.type === 'exam' || task.type === 'plan') && typeof task.result === 'string' && task.result.trim()) {
+          setSavedResources(prev => [...prev, {
+            id: newResourceId, type: task.type as 'activities' | 'exam' | 'plan',
+            title: topicLabel, date: Date.now(), content: task.result as string
+          }]);
+          saved = true;
+        }
+        if (saved) {
+          const typeLabel = task.type === 'slides' ? 'Slides' : task.type === 'activities' ? 'Atividades' : task.type === 'exam' ? 'Prova' : 'Plano de Aula';
+          setInboxMessages(prev => [...prev, {
+            id: Math.random().toString(36).substr(2, 9),
+            role: 'model' as const,
+            text: `${typeLabel} sobre "${topicLabel}" gerado e salvo no Acervo automaticamente.`,
+            date: Date.now()
+          }]);
+        }
+      }
+    });
+  }, [activeTasks]);
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     setResetMessage({ type: '', text: '' });
-    if (!email) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setAuthError('Por favor, insira seu e-mail para recuperar a senha.');
       return;
     }
     setIsAuthProcessing(true);
     try {
-      await sendPasswordResetEmail(auth, email);
-      setResetMessage({ type: 'success', text: 'E-mail de recuperação enviado! Verifique sua caixa de entrada.' });
-      setTimeout(() => setIsResetMode(false), 4000);
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setResetMessage({ type: 'success', text: 'E-mail de recuperação enviado! Verifique sua caixa de entrada (e a pasta de spam).' });
+      setTimeout(() => setIsResetMode(false), 6000);
     } catch (error: any) {
       console.error('Reset error:', error);
-      let message = 'Erro ao enviar e-mail. Verifique se o endereço está correto.';
-      if (error.code === 'auth/user-not-found') {
-        message = 'Nenhuma conta encontrada com este e-mail.';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'O formato do e-mail é inválido.';
+      const code = error?.code || '';
+      let message = '';
+      switch (code) {
+        case 'auth/user-not-found':
+          message = 'Nenhuma conta encontrada com este e-mail.';
+          break;
+        case 'auth/invalid-email':
+          message = 'O formato do e-mail é inválido.';
+          break;
+        case 'auth/too-many-requests':
+          message = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.';
+          break;
+        case 'auth/network-request-failed':
+          message = 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+          break;
+        case 'auth/operation-not-allowed':
+          message = 'Recuperação por e-mail está desativada no Firebase. Ative o provedor "E-mail/Senha" no Firebase Console > Authentication > Sign-in method.';
+          break;
+        case 'auth/unauthorized-continue-uri':
+        case 'auth/invalid-continue-uri':
+        case 'auth/missing-continue-uri':
+          message = 'Domínio do app não autorizado no Firebase. Adicione o domínio em Authentication > Settings > Authorized domains.';
+          break;
+        case 'auth/missing-android-pkg-name':
+        case 'auth/missing-ios-bundle-id':
+          message = 'Configuração do Firebase incompleta. Contate o administrador.';
+          break;
+        default:
+          message = `Erro ao enviar e-mail (${code || error?.message || 'desconhecido'}). Tente novamente em instantes.`;
       }
       setAuthError(message);
     } finally {
@@ -3926,7 +4167,7 @@ export default function App() {
 
   const isTrialExpired = useMemo(() => {
     if (!user) return false;
-    if (profile?.role === 'admin' || user?.email === 'LyelsonMF520@gmail.com') return false;
+    if (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') return false;
     if (profile?.isPro) return false;
     
       const creationTime = user.metadata?.creationTime || profile?.createdAt;
@@ -3958,7 +4199,14 @@ export default function App() {
               {isResetMode ? 'Recuperar senha' : (isLoginMode ? 'Acesse sua conta' : 'Crie sua conta')}
             </h2>
             {authError && <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{authError}</div>}
-            {resetMessage.text && <div className={`text-sm text-center p-2 rounded-lg ${resetMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{resetMessage.text}</div>}
+            {resetMessage.text && (
+              <div className={`text-sm text-center p-3 rounded-xl font-medium ${resetMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-blue-50 text-blue-700'}`}>
+                {resetMessage.text}
+                {resetMessage.type === 'success' && (
+                  <p className="text-xs font-normal mt-1 text-green-600">Redirecionando para o login em instantes...</p>
+                )}
+              </div>
+            )}
             
             <input
               type="email"
@@ -4230,11 +4478,12 @@ export default function App() {
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         try {
           const parsed = JSON.parse(text);
-          for (const slide of parsed.slides) {
-            if (slide.data.illustrationQuery) {
-              slide.data.imageUrl = getImageUrl(slide.data.illustrationQuery, 800, 450);
+          await Promise.all(parsed.slides.map(async (slide: any) => {
+            const q = slide.data.illustrationQuery || slide.data.imagePrompt;
+            if (q) {
+              slide.data.imageUrl = await fetchPixabayImage(q, 1200, 800);
             }
-          }
+          }));
           setPlannerPresentationData(parsed);
           updateTask(taskId, { status: 'completed', result: parsed });
         } catch (e) {
@@ -4345,6 +4594,7 @@ export default function App() {
             setPlannerSlideCount={setPlannerSlideCount}
             getSuggestion={getSuggestion}
             getScheduleBuffer={getScheduleBuffer}
+            setPlannerMode={setPlannerMode}
           />}
           {screen === 'chat' && <ChatScreen 
             key="chat" 
@@ -4369,6 +4619,7 @@ export default function App() {
             plannerSelectedClassId={plannerSelectedClassId}
             setPlannerSelectedClassId={setPlannerSelectedClassId}
             setPlannerMode={setPlannerMode}
+            getScheduleBuffer={getScheduleBuffer}
           />}
           {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail" 
@@ -4391,9 +4642,9 @@ export default function App() {
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
             setEstudioContext('');
           }} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
-          {screen === 'admin' && (profile?.role === 'admin' || user?.email === 'LyelsonMF520@gmail.com') && <AdminScreen key="admin" />}
+          {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
 
         <GlobalTaskIndicator 
@@ -4407,7 +4658,7 @@ export default function App() {
             removeTask(task.id);
           }} 
         />
-        <BottomNav activeScreen={screen} setScreen={setScreen} isAdmin={profile?.role === 'admin' || user?.email === 'LyelsonMF520@gmail.com'} />
+        <BottomNav activeScreen={screen} setScreen={setScreen} isAdmin={profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com'} />
       </div>
       
       {/* Background decoration */}
