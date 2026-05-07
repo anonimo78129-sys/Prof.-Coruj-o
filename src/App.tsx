@@ -730,8 +730,9 @@ const PlannerScreen = ({
   plannerSlideCount: slideCount,
   setPlannerSlideCount: setSlideCount,
   getSuggestion,
-  getScheduleBuffer
-}: { 
+  getScheduleBuffer,
+  setPlannerMode
+}: {
   schedules: ClassSchedule[], 
   setSchedules: (s: ClassSchedule[]) => void,
   addClassItems: (items: ClassItem[]) => void,
@@ -781,7 +782,8 @@ const PlannerScreen = ({
   plannerSlideCount: number,
   setPlannerSlideCount: (n: number) => void,
   getSuggestion: (topic?: string, classId?: string) => Promise<void>,
-  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[]
+  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
+  setPlannerMode: (m: PlannerMode) => void
 }) => {
   const currentResult = mode === 'plan' ? plan : 
                         mode === 'slides' ? presentationData :
@@ -818,6 +820,7 @@ const PlannerScreen = ({
   }, [isGeneratingTask]);
 
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
+  const [regenState, setRegenState] = useState<{ idx: number; prompt: string } | null>(null);
   const [scheduleStartDate, setScheduleStartDate] = useState<string>(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1072,7 +1075,7 @@ const PlannerScreen = ({
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 flex flex-col">
       <Header 
         setScreen={setScreen}
-        title={mode === 'plan' ? 'Planejador' : mode === 'activities' ? 'Gerador de Atividades' : 'Gerador de Slides'} 
+        title={mode === 'plan' ? 'Planejador' : mode === 'activities' ? 'Gerador de Atividades' : mode === 'exam' ? 'Gerador de Provas' : 'Gerador de Slides'}
         subtitle="Fluxo Automatizado" 
         profile={profile}
       />
@@ -1080,6 +1083,22 @@ const PlannerScreen = ({
       <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-gray-50 mb-6 shrink-0">
         {step === 'input' && (
           <>
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6">
+              {([
+                { key: 'plan', label: 'Plano' },
+                { key: 'activities', label: 'Atividades' },
+                { key: 'slides', label: 'Slides' },
+                { key: 'exam', label: 'Prova' },
+              ] as { key: PlannerMode; label: string }[]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setPlannerMode(key)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${mode === key ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <label className="block text-base font-bold text-gray-700 mb-2">Conteúdo ou Arquivo</label>
             <textarea 
               value={topic}
@@ -1169,9 +1188,9 @@ const PlannerScreen = ({
                       </div>
                     </>
                 )}
-                {mode === 'activities' && (
+                {(mode === 'activities' || mode === 'exam') && (
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. Questões</label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{mode === 'exam' ? 'Múltipla Escolha' : 'Qtd. Questões'}</label>
                         <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border-none rounded-xl py-2 px-3 text-sm" />
                     </div>
                 )}
@@ -1240,7 +1259,7 @@ const PlannerScreen = ({
               className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
             >
               {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />} 
-              {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : 'Gerar Slides')}
+              {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
             </button>
             {error && <p className="text-red-500 text-sm mt-3 text-center font-medium">{error}</p>}
           </>
@@ -1271,23 +1290,36 @@ const PlannerScreen = ({
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900">
-                {mode === 'plan' ? 'Plano Gerado' : mode === 'activities' ? 'Atividades Geradas' : 'Slides Gerados'}
+                {mode === 'plan' ? 'Plano Gerado' : mode === 'activities' ? 'Atividades Geradas' : mode === 'exam' ? 'Prova Gerada' : 'Slides Gerados'}
               </h3>
               <button onClick={() => setStep('input')} className="text-indigo-600 text-sm font-bold">Novo</button>
             </div>
             {mode === 'plan' && (
-              <div className="flex gap-2 mb-6">
-                <button 
-                  onClick={() => generateResource('activities')}
-                  className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+              <div className="flex flex-col gap-2 mb-6">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => generateResource('activities')}
+                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <FileText size={16} /> Atividades
+                  </button>
+                  <button
+                    onClick={() => generateResource('slides')}
+                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <Presentation size={16} /> Slides
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    const selectedClass = schedules.find(s => s.id === selectedClassId);
+                    if (selectedClass) generateAndSetBuffer(scheduleStartDate, scheduleAvoidCollisions, selectedClass);
+                    setShowSchedulePrompt(true);
+                  }}
+                  disabled={!selectedClassId}
+                  className="w-full bg-emerald-50 text-emerald-700 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 border border-emerald-100 disabled:opacity-40"
                 >
-                  <FileText size={16} /> Atividades
-                </button>
-                <button 
-                  onClick={() => generateResource('slides')}
-                  className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                >
-                  <Presentation size={16} /> Slides
+                  <CalendarIcon size={16} /> Agendar no Cronograma
                 </button>
               </div>
             )}
@@ -1355,8 +1387,25 @@ const PlannerScreen = ({
                       <div key={idx} className="w-full max-w-4xl mx-auto aspect-[16/9] rounded-2xl shadow-lg overflow-hidden flex relative border border-gray-100 group" style={{ backgroundColor: (slide.layoutID === 'LAYOUT_REFERENCES' || slide.layoutID === 'LAYOUT_COVER') ? theme.primaryColor : theme.backgroundColor }}>
                         {/* Edit Controls Overlay */}
                         <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 p-3 rounded-xl shadow-lg flex gap-2">
-                            <input placeholder="Nova img..." className="text-xs w-32 p-2 border rounded-lg" onKeyDown={(e) => { if(e.key === 'Enter') handleManualImageChange(e.currentTarget.value) }} />
-                            <button onClick={()=>handleRegenerateSlide(prompt("Novo prompt:") || "")} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">Regerar</button>
+                          {regenState?.idx === idx ? (
+                            <>
+                              <input
+                                autoFocus
+                                placeholder="Nova instrução para o slide..."
+                                value={regenState.prompt}
+                                onChange={(e) => setRegenState({ idx, prompt: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { handleRegenerateSlide(regenState.prompt); setRegenState(null); } if (e.key === 'Escape') setRegenState(null); }}
+                                className="text-xs w-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                              />
+                              <button onClick={() => { handleRegenerateSlide(regenState.prompt); setRegenState(null); }} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">OK</button>
+                              <button onClick={() => setRegenState(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-2 rounded-lg font-bold">✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <input placeholder="Nova img..." className="text-xs w-32 p-2 border rounded-lg" onKeyDown={(e) => { if (e.key === 'Enter') handleManualImageChange(e.currentTarget.value); }} />
+                              <button onClick={() => setRegenState({ idx, prompt: '' })} className="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">Regerar</button>
+                            </>
+                          )}
                         </div>
                         
                         {slide.layoutID === 'LAYOUT_COVER' && (
@@ -3203,13 +3252,24 @@ const CalendarScreen = ({
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
             <h2 className="text-xl font-bold mb-4">Novo Evento</h2>
-            <input 
-              type="text" 
-              placeholder="Título do evento" 
-              value={newEventTitle} 
+            <input
+              type="text"
+              placeholder="Título do evento"
+              value={newEventTitle}
               onChange={(e) => setNewEventTitle(e.target.value)}
-              className="w-full p-3 mb-6 border border-gray-200 rounded-xl"
+              className="w-full p-3 mb-4 border border-gray-200 rounded-xl"
             />
+            <div className="flex gap-2 mb-6">
+              {(['prep', 'admin'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setNewEventType(t)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${newEventType === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}
+                >
+                  {t === 'prep' ? 'Preparação' : 'Administrativo'}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-4">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 p-3 rounded-xl bg-gray-100 font-bold">Cancelar</button>
               <button onClick={handleAddEvent} className="flex-1 p-3 rounded-xl bg-indigo-600 text-white font-bold">Adicionar</button>
@@ -3309,17 +3369,21 @@ const CalendarScreen = ({
   );
 };
 
-const EstudioScreen = ({ 
-  estudioContext, 
-  setEstudioContext, 
+const EstudioScreen = ({
+  estudioContext,
+  setEstudioContext,
+  studioMessages,
+  setStudioMessages,
   profile,
   setScreen,
   setPlannerMode,
   notifications,
   setNotifications
-}: { 
-  estudioContext: string, 
-  setEstudioContext: (c: string | ((prev: string) => string)) => void, 
+}: {
+  estudioContext: string,
+  setEstudioContext: (c: string | ((prev: string) => string)) => void,
+  studioMessages: { id: string; role: 'user' | 'model'; text: string; date: number }[],
+  setStudioMessages: (m: { id: string; role: 'user' | 'model'; text: string; date: number }[] | ((prev: { id: string; role: 'user' | 'model'; text: string; date: number }[]) => { id: string; role: 'user' | 'model'; text: string; date: number }[])) => void,
   profile: UserProfile,
   setScreen: (s: Screen) => void,
   setPlannerMode: (m: PlannerMode) => void,
@@ -3329,19 +3393,20 @@ const EstudioScreen = ({
   const [activeTab, setActiveTab] = useState<'context' | 'chat'>('context');
   const [isUploading, setIsUploading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([
-    { role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?' }
-  ]);
 
   useEffect(() => {
     if (activeTab === 'chat') {
       chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }
-  }, [chatMessages, activeTab]);
+  }, [studioMessages, activeTab]);
 
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const addStudioMessage = (msg: Omit<typeof studioMessages[0], 'id' | 'date'>) => {
+    const newMsg = { ...msg, id: Math.random().toString(36).substr(2, 9), date: Date.now() };
+    setStudioMessages(prev => [...prev, newMsg]);
+    return newMsg;
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3403,36 +3468,34 @@ const EstudioScreen = ({
       alert('Ops! Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
       return;
     }
-    
-    const userMessage = { role: 'user' as const, text: chatInput };
-    // Keep local reference to append for prompt without waiting for react state sync
-    const currentMessages = [...chatMessages, userMessage];
-    
-    setChatMessages(prev => [...prev, userMessage]);
+
+    const userText = chatInput;
+    addStudioMessage({ role: 'user', text: userText });
     setChatInput('');
     setIsChatLoading(true);
 
     try {
+      const historyForPrompt = [...studioMessages, { role: 'user' as const, text: userText }];
       const prompt = `Você é um assistente especialista no material fornecido pelo professor.
       Responda às perguntas baseando-se ESTRITAMENTE no seguinte conteúdo. NUNCA afirme ter gerado relatórios, aulas, ou ter agendado e executado ações. O seu único propósito nesta tela é analisar e responder sobre o texto fornecido.
-      
+
       Conteúdo Base:
       ${estudioContext}
-      
+
       Histórico da conversa:
-      ${currentMessages.map(m => `${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
-      
+      ${historyForPrompt.map(m => `${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
+
       Assistente:`;
 
       const response = await generateContentWithRetry({
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
-      
-      setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
+
+      addStudioMessage({ role: 'model', text: response.text || '' });
     } catch (error) {
       console.error(error);
-      setChatMessages(prev => [...prev, { role: 'model', text: formatApiError(error, 'Desculpe, ocorreu um erro ao analisar o material.') }]);
+      addStudioMessage({ role: 'model', text: formatApiError(error, 'Desculpe, ocorreu um erro ao analisar o material.') });
     }
     setIsChatLoading(false);
   };
@@ -3496,11 +3559,20 @@ const EstudioScreen = ({
 
       {activeTab === 'chat' && (
         <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col min-h-[400px]">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs text-gray-400 font-medium">Conversa salva automaticamente</span>
+            <button
+              onClick={() => setStudioMessages([{ id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }])}
+              className="text-xs text-red-400 font-bold hover:text-red-600"
+            >
+              Limpar
+            </button>
+          </div>
           <div className="flex-1 overflow-y-auto no-scrollbar mb-4 space-y-4 p-2">
             {!estudioContext && (
               <div className="text-center py-8 text-gray-400 text-sm">Adicione conteúdo na Base de Conhecimento primeiro.</div>
             )}
-            {estudioContext && chatMessages.map((msg, i) => (
+            {estudioContext && studioMessages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
                 <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-50 text-gray-800 rounded-bl-none shadow-sm border border-gray-100'}`}>
                   <div className="markdown-body text-sm">
@@ -3872,6 +3944,9 @@ export default function App() {
   ]);
   
   const [estudioContext, setEstudioContext] = useState<string>('');
+  const [studioMessages, setStudioMessages] = useFirestoreSync<{ id: string; role: 'user' | 'model'; text: string; date: number }>('studioMessages', user, [
+    { id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }
+  ]);
 
   // Global Planner States (for persistence across screens)
   const [plannerTopic, setPlannerTopic] = useState('');
@@ -4379,6 +4454,7 @@ export default function App() {
             setPlannerSlideCount={setPlannerSlideCount}
             getSuggestion={getSuggestion}
             getScheduleBuffer={getScheduleBuffer}
+            setPlannerMode={setPlannerMode}
           />}
           {screen === 'chat' && <ChatScreen 
             key="chat" 
@@ -4425,7 +4501,7 @@ export default function App() {
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
             setEstudioContext('');
           }} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email === 'LyelsonMF520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
