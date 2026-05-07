@@ -557,7 +557,7 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-gray-900 text-base truncate">{e.title}</h3>
-        <p className="text-gray-400 text-sm mt-0.5 truncate">{formatEventDate(e.date)} • {e.type === 'class' ? 'Aula' : e.type === 'prep' ? 'Tempo de Foco' : e.type === 'holiday' ? 'Feriado' : 'Prazo Administrativo'}</p>
+        <p className="text-gray-400 text-sm mt-0.5 truncate">{formatEventDate(e.date)} • {e.type === 'class' ? 'Aula' : e.type === 'prep' ? 'Tempo de Foco' : e.type === 'holiday' ? 'Feriado Nacional' : e.type === 'commemorative' ? 'Data Comemorativa' : 'Prazo Administrativo'}</p>
       </div>
       <button 
         onClick={handleComplete}
@@ -1862,8 +1862,8 @@ const ChatScreen = ({
   schedules: ClassSchedule[],
   savedResources: SavedResource[],
   addClassItems: (items: ClassItem[]) => void,
-  customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday', status?: 'pending' | 'done'}[],
-  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday', status?: 'pending' | 'done'}[]) => void,
+  customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
+  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   setScreen: (s: Screen) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
@@ -2334,8 +2334,8 @@ const ProfileScreen = ({
   savedResources: SavedResource[],
   setScreen: (s: Screen) => void,
   onAddClass: (c: ClassSchedule) => void,
-  customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday', status?: 'pending' | 'done'}[],
-  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday', status?: 'pending' | 'done'}[]) => void,
+  customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
+  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   onResetAccount?: () => void
@@ -2762,30 +2762,30 @@ const ProfileScreen = ({
           </div>
           <div>
             <h2 className="text-lg font-bold text-gray-900">Calendário Escolar</h2>
-            <p className="text-sm text-gray-400">Sincronize feriados e recessos</p>
+            <p className="text-sm text-gray-400">Feriados nacionais e datas comemorativas</p>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => {
             const currentYear = new Date().getFullYear();
             const holidays = getDefaultHolidays(currentYear);
-            
-            // Adiciona também o Recesso especificamente
-            holidays.push({ 
-              id: `recesso-${currentYear}`, 
-              title: 'Recesso Escolar (Fim de Ano)', 
-              date: `${currentYear}-12-20 00:00`, 
-              type: 'holiday' as const 
+
+            holidays.push({
+              id: `recesso-${currentYear}`,
+              title: 'Recesso Escolar (Fim de Ano)',
+              date: `${currentYear}-12-20 00:00`,
+              type: 'holiday' as const
             });
 
-            // Melhorada a lógica de deduplicação: comparar por título e ano da data
-            const newEvents = holidays.filter(h => 
+            const newEvents = holidays.filter(h =>
               !customEvents.some(ce => ce.title === h.title)
             );
-            
+
             if (newEvents.length > 0) {
               setCustomEvents([...customEvents, ...newEvents]);
-              setImportStatus({ message: `${newEvents.length} feriados e recessos foram importados!`, type: 'success' });
+              const nat = newEvents.filter(h => h.type === 'holiday').length;
+              const com = newEvents.filter(h => h.type === 'commemorative').length;
+              setImportStatus({ message: `${nat} feriados nacionais e ${com} datas comemorativas importados!`, type: 'success' });
             } else {
               setImportStatus({ message: "O calendário já está atualizado com os feriados deste ano.", type: 'info' });
             }
@@ -3045,22 +3045,80 @@ const getEventsForDay = (allEvents: any[], year: number, month: number, day: num
   });
 };
 
+const getEasterDate = (year: number): Date => {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+};
+
+const addDays = (date: Date, days: number): Date => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+};
+
+const getNthWeekday = (year: number, month: number, weekday: number, nth: number): Date => {
+  const first = new Date(year, month, 1);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  return new Date(year, month, 1 + offset + (nth - 1) * 7);
+};
+
+const fmt = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00`;
+
 const getDefaultHolidays = (year: number) => {
-  return [
-    { id: `h1-${year}`, title: 'Confraternização Universal', date: `${year}-01-01 00:00`, type: 'holiday' as const },
-    { id: `h2-${year}`, title: 'Carnaval', date: `${year}-02-17 00:00`, type: 'holiday' as const },
-    { id: `h3-${year}`, title: 'Sexta-feira Santa', date: `${year}-04-03 00:00`, type: 'holiday' as const },
-    { id: `h4-${year}`, title: 'Páscoa', date: `${year}-04-05 00:00`, type: 'holiday' as const },
-    { id: `h5-${year}`, title: 'Tiradentes', date: `${year}-04-21 00:00`, type: 'holiday' as const },
-    { id: `h6-${year}`, title: 'Dia do Trabalhador', date: `${year}-05-01 00:00`, type: 'holiday' as const },
-    { id: `h7-${year}`, title: 'Corpus Christi', date: `${year}-06-04 00:00`, type: 'holiday' as const },
-    { id: `h8-${year}`, title: 'Independência do Brasil', date: `${year}-09-07 00:00`, type: 'holiday' as const },
-    { id: `h9-${year}`, title: 'Nossa Sra. Aparecida', date: `${year}-10-12 00:00`, type: 'holiday' as const },
-    { id: `h10-${year}`, title: 'Dia dos Professores', date: `${year}-10-15 00:00`, type: 'holiday' as const },
-    { id: `h11-${year}`, title: 'Finados', date: `${year}-11-02 00:00`, type: 'holiday' as const },
-    { id: `h12-${year}`, title: 'Proclamação da República', date: `${year}-11-15 00:00`, type: 'holiday' as const },
-    { id: `h13-${year}`, title: 'Natal', date: `${year}-12-25 00:00`, type: 'holiday' as const },
-  ];
+  const easter = getEasterDate(year);
+  const carnival = addDays(easter, -47);
+  const goodFriday = addDays(easter, -2);
+  const corpusChristi = addDays(easter, 60);
+  const motherDay = getNthWeekday(year, 4, 0, 2); // 2nd Sunday of May
+  const fatherDay = getNthWeekday(year, 7, 0, 2); // 2nd Sunday of August
+
+  const national = [
+    { id: `h1-${year}`,  title: 'Confraternização Universal',   date: `${year}-01-01 00:00` },
+    { id: `h2-${year}`,  title: 'Carnaval',                     date: fmt(carnival) },
+    { id: `h3-${year}`,  title: 'Sexta-feira Santa',            date: fmt(goodFriday) },
+    { id: `h4-${year}`,  title: 'Páscoa',                       date: fmt(easter) },
+    { id: `h5-${year}`,  title: 'Tiradentes',                   date: `${year}-04-21 00:00` },
+    { id: `h6-${year}`,  title: 'Dia do Trabalhador',           date: `${year}-05-01 00:00` },
+    { id: `h7-${year}`,  title: 'Corpus Christi',               date: fmt(corpusChristi) },
+    { id: `h8-${year}`,  title: 'Independência do Brasil',      date: `${year}-09-07 00:00` },
+    { id: `h9-${year}`,  title: 'Nossa Sra. Aparecida',         date: `${year}-10-12 00:00` },
+    { id: `h10-${year}`, title: 'Dia dos Professores',          date: `${year}-10-15 00:00` },
+    { id: `h11-${year}`, title: 'Finados',                      date: `${year}-11-02 00:00` },
+    { id: `h12-${year}`, title: 'Proclamação da República',     date: `${year}-11-15 00:00` },
+    { id: `h13-${year}`, title: 'Natal',                        date: `${year}-12-25 00:00` },
+  ].map(h => ({ ...h, type: 'holiday' as const }));
+
+  const commemorative = [
+    { id: `c1-${year}`,  title: 'Dia Internacional da Mulher',      date: `${year}-03-08 00:00` },
+    { id: `c2-${year}`,  title: 'Dia Mundial da Água',               date: `${year}-03-22 00:00` },
+    { id: `c3-${year}`,  title: 'Dia do Índio / Povos Indígenas',    date: `${year}-04-19 00:00` },
+    { id: `c4-${year}`,  title: 'Dia das Mães',                      date: fmt(motherDay) },
+    { id: `c5-${year}`,  title: 'Dia Mundial do Meio Ambiente',      date: `${year}-06-05 00:00` },
+    { id: `c6-${year}`,  title: 'Festa Junina / São João',           date: `${year}-06-24 00:00` },
+    { id: `c7-${year}`,  title: 'Dia dos Pais',                      date: fmt(fatherDay) },
+    { id: `c8-${year}`,  title: 'Dia do Folclore',                   date: `${year}-08-22 00:00` },
+    { id: `c9-${year}`,  title: 'Dia do Estudante',                  date: `${year}-08-11 00:00` },
+    { id: `c10-${year}`, title: 'Semana da Pátria',                  date: `${year}-09-01 00:00` },
+    { id: `c11-${year}`, title: 'Dia Mundial da Educação',           date: `${year}-10-05 00:00` },
+    { id: `c12-${year}`, title: 'Dia das Crianças',                  date: `${year}-10-12 00:00` },
+    { id: `c13-${year}`, title: 'Dia da Consciência Negra',          date: `${year}-11-20 00:00` },
+  ].map(h => ({ ...h, type: 'commemorative' as const }));
+
+  return [...national, ...commemorative];
 };
 
 const HolidaySuggestion = ({ holidayName }: { holidayName: string }) => {
@@ -3122,8 +3180,8 @@ const DayDetailScreen = ({
 }) => {
   const monthName = new Date(currentYear, currentMonth).toLocaleString('pt-BR', { month: 'long' });
   const selectedDayEvents = getEventsForDay(allEvents, currentYear, currentMonth, selectedDate);
-  const holiday = selectedDayEvents.find(e => e.type === 'holiday' || e.type === 'admin');
-  const customEvents = allEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday');
+  const holiday = selectedDayEvents.find(e => e.type === 'holiday' || e.type === 'commemorative' || e.type === 'admin');
+  const customEvents = allEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday' || e.type === 'commemorative');
   const classes = allEvents.filter(e => e.type === 'class');
 
   const getEventColor = (e: any) => {
@@ -3132,6 +3190,7 @@ const DayDetailScreen = ({
       return schedule?.color || '#4F46E5'; // Default indigo
     }
     if (e.type === 'holiday') return '#EAB308'; // yellow-500
+    if (e.type === 'commemorative') return '#A855F7'; // purple-500
     if (e.type === 'prep') return '#10B981'; // emerald-500
     return '#F59E0B'; // amber-500
   };
@@ -3153,9 +3212,9 @@ const DayDetailScreen = ({
         {holiday && <HolidaySuggestion holidayName={holiday.title} />}
         {selectedDayEvents.length > 0 ? (
           <Reorder.Group axis="y" values={selectedDayEvents} onReorder={(newEvents) => {
-            const reorderedCustom = newEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday') as any[];
+            const reorderedCustom = newEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday' || e.type === 'commemorative') as any[];
             const reorderedClasses = newEvents.filter(e => e.type === 'class') as any[];
-            
+
             setCustomEvents(reorderedCustom);
             setClasses(reorderedClasses);
           }} className="space-y-4">
@@ -3210,8 +3269,8 @@ const CalendarScreen = ({
   schedules: ClassSchedule[],
   profile: UserProfile,
   inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[],
-  customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday', status?: 'pending' | 'done'}[],
-  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday', status?: 'pending' | 'done'}[]) => void,
+  customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
+  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   selectedDate: number,
   setSelectedDate: (d: number) => void,
   currentMonth: number,
@@ -3248,7 +3307,8 @@ const CalendarScreen = ({
       const schedule = schedules.find(s => s.name === e.className);
       return schedule?.color || '#4F46E5';
     }
-    if (e.type === 'holiday') return '#22C55E';
+    if (e.type === 'holiday') return '#EAB308';      // yellow — feriado nacional
+    if (e.type === 'commemorative') return '#A855F7'; // purple — data comemorativa
     if (e.type === 'prep') return '#10B981';
     return '#F59E0B';
   };
@@ -3312,11 +3372,12 @@ const CalendarScreen = ({
   const getEventColor = (e: any) => {
     if (e.type === 'class') {
       const schedule = schedules.find(s => s.name === e.className);
-      return schedule?.color || '#4F46E5'; // Default indigo
+      return schedule?.color || '#4F46E5';
     }
-    if (e.type === 'holiday') return '#EAB308'; // yellow-500
-    if (e.type === 'prep') return '#10B981'; // emerald-500
-    return '#F59E0B'; // amber-500
+    if (e.type === 'holiday') return '#EAB308';
+    if (e.type === 'commemorative') return '#A855F7';
+    if (e.type === 'prep') return '#10B981';
+    return '#F59E0B';
   };
 
   const formatEventDate = (dateStr: string) => {
@@ -3395,13 +3456,12 @@ const CalendarScreen = ({
           {dates.map(d => {
             const isSelected = d === selectedDate;
             const dayEvents = getDayEvents(d);
-            const isHoliday = dayEvents.some(e => e.type === 'holiday');
-            const mainEvent = dayEvents.find(e => e.type === 'holiday') || dayEvents.find(e => e.type === 'class') || dayEvents[0];
+            const isHoliday = dayEvents.some(e => e.type === 'holiday' || e.type === 'commemorative');
+            const mainEvent = dayEvents.find(e => e.type === 'holiday') || dayEvents.find(e => e.type === 'commemorative') || dayEvents.find(e => e.type === 'class') || dayEvents[0];
             const dayColor = mainEvent ? getEventColorInternal(mainEvent) : null;
-            
-            // Check if all events on this day are done
+
             const allDone = dayEvents.length > 0 && dayEvents.every(e => {
-              if (e.type === 'holiday') return true; // Holidays are always "neutral" (don't force a background disappear by themselves, but don't prevent it if other tasks are done)
+              if (e.type === 'holiday' || e.type === 'commemorative') return true;
               return e.status === 'done';
             });
             
@@ -3444,15 +3504,9 @@ const CalendarScreen = ({
               <p className="text-gray-400 text-sm font-medium">Nenhum evento este mês</p>
             </div>
           ) : (
-            <Reorder.Group axis="y" values={eventsThisMonth} onReorder={(newEvents) => {                
-              // Filter out only the events that are actually displayed in the top 5
-              const top5 = eventsThisMonth.slice(0, 5);
-              const rest = eventsThisMonth.slice(5);
-              
-              // Map the new order to the customEvents array
-              const reorderedCustom = newEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday') as any[];
-              const nonCustoms = customEvents.filter(ce => !ce.type || (ce.type !== 'prep' && ce.type !== 'admin' && ce.type !== 'holiday'));
-              
+            <Reorder.Group axis="y" values={eventsThisMonth} onReorder={(newEvents) => {
+              const reorderedCustom = newEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday' || e.type === 'commemorative') as any[];
+              const nonCustoms = customEvents.filter(ce => !ce.type || (ce.type !== 'prep' && ce.type !== 'admin' && ce.type !== 'holiday' && ce.type !== 'commemorative'));
               setCustomEvents([...nonCustoms, ...reorderedCustom]);
             }} className="space-y-4">
               {eventsThisMonth.map((e) => (
@@ -3463,6 +3517,14 @@ const CalendarScreen = ({
             </Reorder.Group>
           )}
         </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mt-2 mb-6">
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#EAB308]" /><span className="text-xs text-gray-500">Feriado nacional</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#A855F7]" /><span className="text-xs text-gray-500">Data comemorativa</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#10B981]" /><span className="text-xs text-gray-500">Preparação</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" /><span className="text-xs text-gray-500">Administrativo</span></div>
       </div>
     </motion.div>
   );
@@ -4093,7 +4155,7 @@ export default function App() {
   
   const [schedules, setSchedules] = useFirestoreSync<ClassSchedule>('schedules', user, []);
   const [classes, setClasses] = useFirestoreSync<ClassItem>('classes', user, []);
-  const [customEvents, setCustomEvents] = useFirestoreSync<{id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday'}>('events', user, []);
+  const [customEvents, setCustomEvents] = useFirestoreSync<{id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative'}>('events', user, []);
   const [savedResources, setSavedResources] = useFirestoreSync<SavedResource>('resources', user, []);
   const [notifications, setNotifications] = useFirestoreSync<any>('notifications', user, []);
   const [inboxMessages, setInboxMessages] = useFirestoreSync<{id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}>('messages', user, [
