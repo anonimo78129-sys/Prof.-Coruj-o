@@ -1803,11 +1803,11 @@ const PlannerScreen = ({
   );
 };
 
-const ChatScreen = ({ 
-  profile, 
+const ChatScreen = ({
+  profile,
   setProfile,
-  estudioContext, 
-  messages, 
+  estudioContext,
+  messages,
   setMessages,
   classes,
   schedules,
@@ -1824,7 +1824,8 @@ const ChatScreen = ({
   setPlannerTopic,
   plannerSelectedClassId,
   setPlannerSelectedClassId,
-  setPlannerMode
+  setPlannerMode,
+  getScheduleBuffer
 }: { 
   profile: UserProfile, 
   setProfile: (p: UserProfile) => void,
@@ -1846,7 +1847,8 @@ const ChatScreen = ({
   setPlannerTopic: (t: string) => void,
   plannerSelectedClassId: string,
   setPlannerSelectedClassId: (id: string) => void,
-  setPlannerMode: (m: PlannerMode) => void
+  setPlannerMode: (m: PlannerMode) => void,
+  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[]
 }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1908,36 +1910,60 @@ const ChatScreen = ({
     
     try {
       const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-      
+      const now = Date.now();
+
+      const upcomingClasses = [...classes]
+        .filter(c => c.timestamp >= now)
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(0, 10)
+        .map(c => `- ${c.title} (${c.className}) em ${c.date}`)
+        .join('\n') || 'Nenhuma aula agendada';
+
+      const upcomingEvents = customEvents
+        .slice(0, 3)
+        .map(e => `- ${e.title} em ${e.date} [${e.type}]`)
+        .join('\n') || 'Nenhum evento';
+
+      const acervoSummary = savedResources
+        .slice(-5)
+        .map(r => `- ${r.title} (${r.type})`)
+        .join('\n') || 'Acervo vazio';
+
+      const turmas = schedules.map(s => s.name).join(', ') || 'Nenhuma turma cadastrada';
+
       const basePrompt = `Você é o "Prof. Corujão", o assistente pessoal definitivo para professores.
       Você atua como um CONTROLE REMOTO total do aplicativo. Você pode navegar entre telas, criar materiais, agendar aulas e atualizar o perfil.
-      
+
       Hoje é: ${today}.
-      
+
       Contexto Atual:
       - Professor: ${profile.name} (${profile.subject})
       - Escola: ${profile.schoolName || 'Não informada'}
-      - Aulas Agendadas: ${JSON.stringify(classes)}
-      - Turmas/Grade: ${JSON.stringify(schedules)}
-      - Materiais no Acervo: ${JSON.stringify(savedResources)}
-      - Conteúdo do Estúdio: ${estudioContext || 'Vazio'}
-      
+      - Turmas cadastradas: ${turmas}
+      - Próximas aulas (máx. 10):
+      ${upcomingClasses}
+      - Próximos eventos:
+      ${upcomingEvents}
+      - Últimos materiais no Acervo:
+      ${acervoSummary}
+      - Conteúdo do Estúdio: ${estudioContext ? `${estudioContext.substring(0, 300)}...` : 'Vazio'}
+
       Suas Capacidades (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
       1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'acervo'.
-      2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Se o usuário pedir para "criar slides sobre X", use a função generate_slides.
-      3. AGENDAMENTO: Marcar aulas individuais ou em lote (semestre inteiro).
+      2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais são salvos automaticamente no Acervo ao concluir.
+      3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
-      
+
       Regras de Comportamento:
       1. Seja proativo, conciso e profissional.
       2. NUNCA use emojis.
-      3. Se o usuário pedir algo genérico como "Gere um material sobre X", pergunte se ele quer Slides, Plano ou Prova, ou sugira um deles.
-      4. Quando usar uma função de geração (slides, plano, etc), explique que o processo começou e que o professor pode acompanhar na tela do Planejador.
-      5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo (ex: "Vi que você tem aula de História hoje, quer que eu prepare os slides?").
-      
+      3. Se o usuário pedir algo genérico como "Gere um material sobre X", pergunte se ele quer Slides, Plano, Atividades ou Prova, ou sugira um deles.
+      4. Quando usar uma função de geração, informe que o material será salvo automaticamente no Acervo ao concluir.
+      5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo.
+
       Histórico:
-      ${sortedHistory.slice(-10).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
-      
+      ${sortedHistory.slice(-20).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
+
       Responda à última solicitação:`;
 
       const parts: any[] = [{ text: basePrompt }];
@@ -2021,6 +2047,32 @@ const ChatScreen = ({
                 }
               },
               {
+                name: 'generate_exam',
+                description: 'Gerar uma prova/avaliação com questões de múltipla escolha e dissertativas.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    className: { type: Type.STRING }
+                  },
+                  required: ['topic']
+                }
+              },
+              {
+                name: 'schedule_lesson_series',
+                description: 'Agendar uma série de aulas sobre um tópico em lote, distribuídas nos dias de aula da turma.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    className: { type: Type.STRING },
+                    num_classes: { type: Type.NUMBER, description: 'Quantidade de aulas a agendar' },
+                    start_date: { type: Type.STRING, description: 'Data de início no formato YYYY-MM-DD' }
+                  },
+                  required: ['topic', 'className', 'num_classes']
+                }
+              },
+              {
                 name: 'update_profile',
                 description: 'Atualizar informações do perfil do professor.',
                 parameters: {
@@ -2051,34 +2103,55 @@ const ChatScreen = ({
               className: args.className,
               timestamp: Date.now()
             }]);
-            responseText += `✅ Aula "${args.title}" agendada. `;
+            responseText += `Aula "${args.title}" agendada para ${args.date}. `;
           } else if (call.name === 'change_screen') {
             setScreen(args.screen as Screen);
-            responseText += `Navegando para ${args.screen}... `;
+            responseText += `Navegando para ${args.screen}. `;
           } else if (call.name === 'generate_slides') {
-            setPlannerTopic(args.topic);
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('slides');
             generateResource('slides', args.topic, targetClass?.id);
-            responseText += `🚀 Iniciando a criação dos slides sobre "${args.topic}". Você pode ver o progresso no Planejador. `;
+            responseText += `Criando slides sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
           } else if (call.name === 'generate_lesson_plan') {
-            setPlannerTopic(args.topic);
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('plan');
             generatePlan(args.topic, targetClass?.id);
-            responseText += `📝 Criando o plano de aula sobre "${args.topic}". `;
+            responseText += `Criando plano de aula sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
           } else if (call.name === 'generate_activities') {
-            setPlannerTopic(args.topic);
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('activities');
             generateResource('activities', args.topic, targetClass?.id);
-            responseText += `📝 Gerando lista de atividades sobre "${args.topic}". `;
+            responseText += `Gerando atividades sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+          } else if (call.name === 'generate_exam') {
+            const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            setPlannerTopic(args.topic);
+            if (targetClass) setPlannerSelectedClassId(targetClass.id);
+            setPlannerMode('exam');
+            generateResource('exam', args.topic, targetClass?.id);
+            responseText += `Gerando prova sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+          } else if (call.name === 'schedule_lesson_series') {
+            const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
+            if (targetClass) {
+              const startDate = args.start_date || new Date().toISOString().split('T')[0];
+              const buffer = getScheduleBuffer(args.topic, args.num_classes || 4, startDate, true, targetClass, classes);
+              if (buffer.length > 0) {
+                addClassItems(buffer);
+                responseText += `${buffer.length} aulas sobre "${args.topic}" agendadas para ${targetClass.name}. `;
+              } else {
+                responseText += `Nenhum horário disponível encontrado para "${targetClass.name}" a partir de ${startDate}. `;
+              }
+            } else {
+              responseText += `Turma "${args.className}" não encontrada. Verifique o nome da turma no perfil. `;
+            }
           } else if (call.name === 'update_profile') {
             setProfile({ ...profile, ...args });
-            responseText += `👤 Perfil atualizado com sucesso. `;
+            responseText += `Perfil atualizado com sucesso. `;
           }
         }
         setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: responseText || "Tudo certo! Realizei as ações solicitadas.", date: Date.now() }]);
@@ -3967,6 +4040,41 @@ export default function App() {
   const [plannerQuestionCount, setPlannerQuestionCount] = useState(5);
   const [plannerSlideCount, setPlannerSlideCount] = useState(10);
 
+  const processedTasksRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    Object.values(activeTasks).forEach(task => {
+      if (task.status === 'completed' && task.result && !processedTasksRef.current.has(task.id)) {
+        processedTasksRef.current.add(task.id);
+        const topicLabel = task.title.replace(/^(Slides|Atividades|Plano|Prova): /, '');
+        const newResourceId = Math.random().toString(36).substr(2, 9);
+        let saved = false;
+        if (task.type === 'slides' && typeof task.result === 'object') {
+          setSavedResources(prev => [...prev, {
+            id: newResourceId, type: 'slides',
+            title: (task.result as PresentationData).presentationTitle || topicLabel,
+            date: Date.now(), presentationData: task.result as PresentationData
+          }]);
+          saved = true;
+        } else if ((task.type === 'activities' || task.type === 'exam' || task.type === 'plan') && typeof task.result === 'string' && task.result.trim()) {
+          setSavedResources(prev => [...prev, {
+            id: newResourceId, type: task.type as 'activities' | 'exam' | 'plan',
+            title: topicLabel, date: Date.now(), content: task.result as string
+          }]);
+          saved = true;
+        }
+        if (saved) {
+          const typeLabel = task.type === 'slides' ? 'Slides' : task.type === 'activities' ? 'Atividades' : task.type === 'exam' ? 'Prova' : 'Plano de Aula';
+          setInboxMessages(prev => [...prev, {
+            id: Math.random().toString(36).substr(2, 9),
+            role: 'model' as const,
+            text: `${typeLabel} sobre "${topicLabel}" gerado e salvo no Acervo automaticamente.`,
+            date: Date.now()
+          }]);
+        }
+      }
+    });
+  }, [activeTasks]);
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -4479,6 +4587,7 @@ export default function App() {
             plannerSelectedClassId={plannerSelectedClassId}
             setPlannerSelectedClassId={setPlannerSelectedClassId}
             setPlannerMode={setPlannerMode}
+            getScheduleBuffer={getScheduleBuffer}
           />}
           {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail" 
