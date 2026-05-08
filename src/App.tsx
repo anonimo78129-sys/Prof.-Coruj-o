@@ -13,6 +13,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import pptxgen from 'pptxgenjs';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, WidthType, BorderStyle, ShadingType, VerticalAlign, PageOrientation } from 'docx';
 import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
@@ -1334,6 +1335,179 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
 };
 
 // ─── Professional document HTML builder ──────────────────────────────────────
+const buildDocx = async (
+  rawMd: string,
+  docType: 'plan' | 'exam' | 'activities',
+  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number }
+): Promise<Blob> => {
+  const SEP = '\n---GABARITO---\n';
+  const sepIdx = rawMd.indexOf(SEP);
+  const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
+  const gabMd  = sepIdx >= 0 ? rawMd.slice(sepIdx + SEP.length) : '';
+
+  const accentHex = { plan: '059669', exam: 'DC2626', activities: '2563EB' };
+  const darkHex   = { plan: '064E3B', exam: '7F1D1D', activities: '1E3A8A' };
+  const ac = accentHex[docType];
+  const dk = darkHex[docType];
+
+  const bord = { top: { style: BorderStyle.SINGLE, size: 4, color: '888888' }, bottom: { style: BorderStyle.SINGLE, size: 4, color: '888888' }, left: { style: BorderStyle.SINGLE, size: 4, color: '888888' }, right: { style: BorderStyle.SINGLE, size: 4, color: '888888' } };
+  const marg = { top: 80, bottom: 80, left: 150, right: 150 };
+
+  const parseInline = (text: string): TextRun[] => {
+    const runs: TextRun[] = [];
+    const rx = /(\*\*[^*]+?\*\*|\*[^*]+?\*)/g;
+    let last = 0; let m: RegExpExecArray | null;
+    while ((m = rx.exec(text)) !== null) {
+      if (m.index > last) runs.push(new TextRun({ text: text.slice(last, m.index), size: 22 }));
+      const t = m[0];
+      if (t.startsWith('**')) runs.push(new TextRun({ text: t.slice(2, -2), bold: true, size: 22 }));
+      else runs.push(new TextRun({ text: t.slice(1, -1), italics: true, size: 22 }));
+      last = m.index + t.length;
+    }
+    if (last < text.length) runs.push(new TextRun({ text: text.slice(last), size: 22 }));
+    return runs.length ? runs : [new TextRun({ text: '', size: 22 })];
+  };
+
+  const mdParas = (md: string): Paragraph[] =>
+    md.split('\n').map(line => {
+      if (!line.trim()) return new Paragraph({ children: [new TextRun('')], spacing: { after: 60 } });
+      if (line.startsWith('### '))
+        return new Paragraph({ children: [new TextRun({ text: line.slice(4), bold: true, color: dk, size: 22 })], spacing: { before: 120, after: 60 } });
+      if (line.startsWith('## '))
+        return new Paragraph({ children: [new TextRun({ text: line.slice(3), bold: true, color: 'FFFFFF', size: 22 })], shading: { fill: ac, type: ShadingType.CLEAR, color: 'auto' }, spacing: { before: 160, after: 80 } });
+      if (line.startsWith('- ') || line.startsWith('* '))
+        return new Paragraph({ children: [new TextRun({ text: '• ', size: 22 }), ...parseInline(line.slice(2))], indent: { left: 360 }, spacing: { after: 40 } });
+      if (/^\d+\. /.test(line)) {
+        const num = line.match(/^(\d+)\./)?.[1] || '1';
+        return new Paragraph({ children: [new TextRun({ text: `${num}. `, size: 22 }), ...parseInline(line.replace(/^\d+\. /, ''))], indent: { left: 360 }, spacing: { after: 40 } });
+      }
+      return new Paragraph({ children: parseInline(line), spacing: { after: 60 } });
+    });
+
+  const infoCell = (text: string, colSpan?: number) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, size: 20 })], spacing: { before: 40, after: 40 } })], columnSpan: colSpan, borders: bord, margins: marg, verticalAlign: VerticalAlign.CENTER });
+  const secHdrCell = (label: string) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 22 })], spacing: { before: 60, after: 60 } })], borders: bord, shading: { fill: 'F0F0F0', type: ShadingType.CLEAR, color: 'auto' }, margins: marg });
+  const secBodyCell = (paras: Paragraph[]) => new TableCell({ children: paras.length ? paras : [new Paragraph({ children: [new TextRun('')] })], borders: bord, margins: { ...marg, bottom: 360 } });
+
+  const docChildren: (Paragraph | Table)[] = [];
+
+  // ── App header ────────────────────────────────────────────────────────────
+  docChildren.push(new Paragraph({
+    children: [new TextRun({ text: opts.school || 'Nome da Escola', bold: true, size: 30, color: '111111' })],
+    spacing: { after: 60 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: ac } },
+  }));
+  docChildren.push(new Paragraph({
+    children: [
+      new TextRun({ text: opts.teacher ? `Prof. ${opts.teacher}` : '', size: 20, color: '6B7280' }),
+      new TextRun({ text: opts.teacher && opts.subject ? ' · ' : '', size: 20, color: '6B7280' }),
+      new TextRun({ text: opts.subject || '', size: 20, color: '6B7280' }),
+    ],
+    spacing: { after: 220 },
+  }));
+
+  if (docType === 'plan') {
+    // Parse ## sections
+    const secs: Record<string, string> = {};
+    mainMd.split(/\n(?=## )/).forEach(part => {
+      const m = part.match(/^## (.+?)\n([\s\S]*)/);
+      if (m) secs[m[1].trim().toUpperCase()] = m[2].trim();
+    });
+    const get = (...keys: string[]): string => {
+      for (const k of keys) {
+        const u = k.toUpperCase();
+        const found = Object.keys(secs).find(s => s === u || s.replace(/[^A-Z]/g, '').includes(u.replace(/[^A-Z]/g, '')) || u.replace(/[^A-Z]/g, '').includes(s.replace(/[^A-Z]/g, '')));
+        if (found && secs[found]) return secs[found];
+      }
+      return '';
+    };
+
+    // Info table (6-column grid)
+    docChildren.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [infoCell(`ÁREA DE CONHECIMENTO: ${get('ÁREA DE CONHECIMENTO', 'AREA DE CONHECIMENTO')}`, 6)] }),
+        new TableRow({ children: [
+          infoCell(`EIXO/UNIDADE TEMÁTICA: ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}`, 2),
+          infoCell(`ANO/SÉRIE: ${opts.className || '____________'}`, 1),
+          infoCell('TURMA: ____________', 1),
+          infoCell('TURNO: ____________', 2),
+        ]}),
+        new TableRow({ children: [infoCell(`COMPONENTE CURRICULAR: ${opts.subject || '____________'}`, 6)] }),
+        new TableRow({ children: [
+          infoCell(`QUANTIDADE DE AULAS: ${opts.duration ?? '___'}`, 3),
+          infoCell(`DURAÇÃO: ${opts.lessonTime ? opts.lessonTime + ' min' : '____________'}`, 3),
+        ]}),
+        new TableRow({ children: [infoCell(`PROFESSOR(A): ${opts.teacher || '____________'}`, 6)] }),
+      ],
+    }));
+
+    // "PLANO DE AULA" title
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: 'PLANO DE AULA', bold: true, size: 26, underline: {} })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 200, after: 140 },
+    }));
+
+    // Content sections table
+    const secDefs = [
+      { label: 'CONTEÚDO:', keys: ['CONTEÚDO', 'CONTEUDO'] },
+      { label: 'OBJETIVOS:', keys: ['OBJETIVOS'] },
+      { label: 'PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM:', keys: ['PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM', 'PERGUNTAS MOBILIZADORAS', 'PERGUNTAS'] },
+      { label: 'METODOLOGIA:', keys: ['METODOLOGIA'] },
+      { label: 'Habilidade (BNCC):', keys: ['HABILIDADE (BNCC)', 'HABILIDADE BNCC', 'HABILIDADES BNCC', 'HABILIDADE'] },
+      { label: 'RECURSOS DIDÁTICOS:', keys: ['RECURSOS DIDÁTICOS', 'RECURSOS DIDATICOS', 'RECURSOS'] },
+      { label: 'AVALIAÇÃO:', keys: ['AVALIAÇÃO', 'AVALIACAO'] },
+      { label: 'REFERÊNCIAS:', keys: ['REFERÊNCIAS', 'REFERENCIAS'] },
+    ];
+    const contentRows: TableRow[] = [];
+    for (const { label, keys } of secDefs) {
+      const content = get(...keys);
+      contentRows.push(
+        new TableRow({ children: [secHdrCell(label)] }),
+        new TableRow({ children: [secBodyCell(mdParas(content))] }),
+      );
+    }
+    docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: contentRows }));
+
+  } else {
+    // Exam / Activities: generic markdown
+    const typeLabel = docType === 'exam' ? 'AVALIAÇÃO' : 'ATIVIDADES';
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: `${typeLabel}: ${opts.topic || ''}`, bold: true, size: 28, color: ac })],
+      spacing: { after: 160 },
+    }));
+    docChildren.push(...mdParas(mainMd));
+    if (gabMd) {
+      docChildren.push(new Paragraph({
+        children: [new TextRun({ text: 'GABARITO', bold: true, size: 26, color: 'FFFFFF' })],
+        shading: { fill: dk, type: ShadingType.CLEAR, color: 'auto' },
+        spacing: { before: 400, after: 200 },
+        pageBreakBefore: true,
+      }));
+      docChildren.push(...mdParas(gabMd.replace(/^## Gabarito[^\n]*\n?/, '')));
+    }
+  }
+
+  const wordDoc = new Document({
+    sections: [{
+      properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT }, margin: { top: 1134, bottom: 1417, left: 1417, right: 1417 } } },
+      children: docChildren,
+    }],
+  });
+  return Packer.toBlob(wordDoc);
+};
+
+const downloadDocx = async (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 const buildDocHtml = (
   rawMd: string,
   docType: 'plan' | 'exam' | 'activities',
@@ -2286,31 +2460,24 @@ const PlannerScreen = ({
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
-                      const win = window.open('', '_blank');
-                      if (win) {
-                        const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
-                        const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
-                        win.document.write(buildDocHtml(
-                          currentResult as string,
-                          docType,
-                          {
-                            school: profileSchoolName || '',
-                            teacher: profileName || '',
-                            subject: profile.subject || '',
-                            topic,
-                            className: selectedClassForExport?.name || '',
-                            duration,
-                            lessonTime,
-                          }
-                        ));
-                        win.document.close();
-                        setTimeout(() => { win.print(); }, 600);
-                      }
+                    onClick={async () => {
+                      const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
+                      const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
+                      const blob = await buildDocx(currentResult as string, docType, {
+                        school: profileSchoolName || '',
+                        teacher: profileName || '',
+                        subject: profile.subject || '',
+                        topic,
+                        className: selectedClassForExport?.name || '',
+                        duration,
+                        lessonTime,
+                      });
+                      const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
+                      downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
                     }}
                     className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
                   >
-                    <Download size={16} /> Exportar PDF
+                    <Download size={16} /> Exportar Word
                   </button>
                   <button 
                     onClick={() => {
@@ -2358,21 +2525,20 @@ const PlannerScreen = ({
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => {
-                          const win = window.open('', '_blank');
-                          if (win) {
-                            const dt = res.type === 'activities' ? 'activities' : 'plan';
-                            win.document.write(buildDocHtml(
-                              res.content, dt,
-                              { school: profileSchoolName || '', teacher: profileName || '', subject: profile.subject || '', topic }
-                            ));
-                            win.document.close();
-                            setTimeout(() => { win.print(); }, 500);
-                          }
+                        onClick={async () => {
+                          const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
+                          const blob = await buildDocx(res.content, dt, {
+                            school: profileSchoolName || '',
+                            teacher: profileName || '',
+                            subject: profile.subject || '',
+                            topic,
+                          });
+                          const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
+                          downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
                         }}
                         className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
                       >
-                        <Download size={16} /> Exportar
+                        <Download size={16} /> Exportar Word
                       </button>
                       <button 
                         onClick={() => {
