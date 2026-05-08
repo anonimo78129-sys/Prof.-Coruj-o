@@ -1390,21 +1390,6 @@ const buildDocx = async (
 
   const docChildren: (Paragraph | Table)[] = [];
 
-  // ── App header ────────────────────────────────────────────────────────────
-  docChildren.push(new Paragraph({
-    children: [new TextRun({ text: opts.school || 'Nome da Escola', bold: true, size: 30, color: '111111' })],
-    spacing: { after: 60 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: ac } },
-  }));
-  docChildren.push(new Paragraph({
-    children: [
-      new TextRun({ text: opts.teacher ? `Prof. ${opts.teacher}` : '', size: 20, color: '6B7280' }),
-      new TextRun({ text: opts.teacher && opts.subject ? ' · ' : '', size: 20, color: '6B7280' }),
-      new TextRun({ text: opts.subject || '', size: 20, color: '6B7280' }),
-    ],
-    spacing: { after: 220 },
-  }));
-
   if (docType === 'plan') {
     // Parse ## sections
     const secs: Record<string, string> = {};
@@ -1425,6 +1410,7 @@ const buildDocx = async (
     docChildren.push(new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: [
+        new TableRow({ children: [infoCell(`ESCOLA: ${opts.school || '____________'}`, 6)] }),
         new TableRow({ children: [infoCell(`ÁREA DE CONHECIMENTO: ${get('ÁREA DE CONHECIMENTO', 'AREA DE CONHECIMENTO')}`, 6)] }),
         new TableRow({ children: [
           infoCell(`EIXO/UNIDADE TEMÁTICA: ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}`, 2),
