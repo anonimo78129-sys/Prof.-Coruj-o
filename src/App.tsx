@@ -17,6 +17,7 @@ import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEm
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { selectBnccSkills } from './bncc-data';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -5152,8 +5153,9 @@ export default function App() {
     const interval = setInterval(() => {
       const now = Date.now();
       Object.values(activeTasks).forEach(task => {
-        if (task.status === 'processing' && now - task.startTime > 90000) {
-          console.warn(`Task ${task.id} (${task.type}) stuck > 90s — auto-failing.`);
+        const limit = task.type === 'plan' ? 150000 : 90000;
+        if (task.status === 'processing' && now - task.startTime > limit) {
+          console.warn(`Task ${task.id} (${task.type}) stuck > ${limit / 1000}s — auto-failing.`);
           updateTask(task.id, { status: 'error', error: 'A geração demorou demais e foi cancelada. Tente novamente.' });
         }
       });
@@ -5635,6 +5637,13 @@ export default function App() {
       const desenvolvimento = Math.round(plannerLessonTime * 0.65);
       const fechamento = plannerLessonTime - abertura - desenvolvimento;
 
+      // ── Solução 2: selecionar habilidades BNCC do banco local ──────────────
+      const bnccSkills = selectBnccSkills(profile.subject || '', className, targetTopic, 4);
+      const bnccBlock  = bnccSkills.length > 0
+        ? bnccSkills.map(s => `- ${s.code} — ${s.desc}`).join('\n')
+        : '- [escolha habilidades BNCC reais para a disciplina e série]';
+
+      // ── Solução 1: injetar habilidades reais no prompt ──────────────────
       const prompt = `Você é um pedagogo especialista. Gere um PLANO DE AULA profissional para ${plannerDuration} aula(s) de ${plannerLessonTime} minutos sobre: "${targetTopic}".
 Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]} | Turma: "${className}"
 
@@ -5658,8 +5667,8 @@ Use EXATAMENTE esta estrutura Markdown, substituindo todos os campos [ ] por con
 - [objetivo específico 3]
 
 ### Habilidades BNCC
-- [Código ex: EF06GE01] — [descrição resumida da habilidade relacionada]
-- [Código BNCC] — [descrição resumida]
+USE OBRIGATORIAMENTE as habilidades abaixo (são reais e verificadas). Copie os códigos exatamente como estão e adapte a descrição ao tópico:
+${bnccBlock}
 
 ---
 
@@ -5702,9 +5711,36 @@ Use EXATAMENTE esta estrutura Markdown, substituindo todos os campos [ ] por con
 ## Referências
 - [Referência 1 em formato ABNT]
 - [Referência 2]`;
-      
+
       const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
-      const planResult = response.text || '';
+      const planDraft = response.text || '';
+
+      // ── Solução 3: validação pós-geração das habilidades BNCC ──────────
+      let planResult = planDraft;
+      if (bnccSkills.length > 0) {
+        try {
+          const validationPrompt = `Você é especialista em BNCC. No plano de aula abaixo, verifique SOMENTE a seção "### Habilidades BNCC":
+1. Os códigos citados batem com os do banco abaixo?
+2. Se houver código inexistente ou errado, substitua pelo correto do banco.
+3. Não altere NENHUMA outra parte do plano.
+
+BANCO DE HABILIDADES VÁLIDAS (use apenas estes):
+${bnccBlock}
+
+Retorne o plano COMPLETO com a seção corrigida. Sem introduções.
+
+PLANO:
+${planDraft}`;
+          const validated = await withTimeout(
+            generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: validationPrompt }),
+            30000, 'validação BNCC'
+          );
+          if (validated.text) planResult = validated.text;
+        } catch {
+          // validação falhou — usar o rascunho original (melhor do que nada)
+        }
+      }
+
       setPlannerPlan(planResult);
       updateTask(taskId, { status: 'completed', result: planResult });
     } catch (error) {
