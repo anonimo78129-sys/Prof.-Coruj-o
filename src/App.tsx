@@ -7,7 +7,7 @@ import {
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
-  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive
+  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -405,7 +405,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
     { id: 'planner', icon: BookOpen, label: 'Planejar' },
     { id: 'chat', icon: MessageSquare, label: 'Assistente' },
     { id: 'calendar', icon: CalendarIcon, label: 'Agenda' },
-    { id: 'biblioteca', icon: Library, label: 'Biblioteca' },
+    { id: 'biblioteca', icon: FolderOpen, label: 'Biblioteca' },
   ];
 
   if (isAdmin) {
