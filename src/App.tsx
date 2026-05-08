@@ -1337,7 +1337,7 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
 const buildDocHtml = (
   rawMd: string,
   docType: 'plan' | 'exam' | 'activities',
-  opts: { school?: string; teacher?: string; subject?: string; topic?: string }
+  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number }
 ): string => {
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
@@ -1375,6 +1375,62 @@ const buildDocHtml = (
       <div class="gab-body"><p>${mdToHtml(gabMd.replace(/^## Gabarito[^\n]*\n?/, ''))}</p></div>
     </div>` : '';
 
+  // ── Plan: parse ## sections and render as PDF table layout ──────────────
+  let planBody = '';
+  if (docType === 'plan') {
+    const sections: Record<string, string> = {};
+    mainMd.split(/\n(?=## )/).forEach(part => {
+      const m = part.match(/^## (.+?)\n([\s\S]*)/);
+      if (m) sections[m[1].trim().toUpperCase()] = m[2].trim();
+    });
+    const get = (...keys: string[]) => {
+      for (const key of keys) {
+        const upper = key.toUpperCase();
+        const found = Object.keys(sections).find(k => k === upper || k.replace(/[^A-Z]/g, '').includes(upper.replace(/[^A-Z]/g, '')) || upper.replace(/[^A-Z]/g, '').includes(k.replace(/[^A-Z]/g, '')));
+        if (found && sections[found]) return mdToHtml(sections[found]);
+      }
+      return '&nbsp;';
+    };
+
+    planBody = `
+  <table class="info-tbl">
+    <tr><td class="info-cell" colspan="5"><strong>ÁREA DE CONHECIMENTO:</strong> ${get('ÁREA DE CONHECIMENTO', 'AREA DE CONHECIMENTO')}</td></tr>
+    <tr>
+      <td class="info-cell" colspan="2"><strong>EIXO/UNIDADE TEMÁTICA:</strong> ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}</td>
+      <td class="info-cell"><strong>ANO/SÉRIE:</strong> ${opts.className || '___________'}</td>
+      <td class="info-cell"><strong>TURMA:</strong> ___________</td>
+      <td class="info-cell"><strong>TURNO:</strong> ___________</td>
+    </tr>
+    <tr><td class="info-cell" colspan="5"><strong>COMPONENTE CURRICULAR:</strong> ${opts.subject || '___________'}</td></tr>
+    <tr>
+      <td class="info-cell" colspan="2"><strong>QUANTIDADE DE AULAS:</strong> ${opts.duration ?? '___'}</td>
+      <td class="info-cell" colspan="3"><strong>DURAÇÃO:</strong> ${opts.lessonTime ? opts.lessonTime + ' min' : '___________'}</td>
+    </tr>
+    <tr><td class="info-cell" colspan="5"><strong>PROFESSOR(A):</strong> ${opts.teacher || '___________'}</td></tr>
+  </table>
+
+  <p class="plan-title">PLANO DE AULA</p>
+
+  <table class="plan-tbl">
+    <tr><td class="sec-hdr">CONTEÚDO:</td></tr>
+    <tr><td class="sec-body">${get('CONTEÚDO', 'CONTEUDO')}</td></tr>
+    <tr><td class="sec-hdr">OBJETIVOS:</td></tr>
+    <tr><td class="sec-body">${get('OBJETIVOS')}</td></tr>
+    <tr><td class="sec-hdr">PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM:</td></tr>
+    <tr><td class="sec-body">${get('PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM', 'PERGUNTAS MOBILIZADORAS', 'PERGUNTAS')}</td></tr>
+    <tr><td class="sec-hdr">METODOLOGIA:</td></tr>
+    <tr><td class="sec-body">${get('METODOLOGIA')}</td></tr>
+    <tr><td class="sec-hdr">Habilidade (BNCC):</td></tr>
+    <tr><td class="sec-body">${get('HABILIDADE (BNCC)', 'HABILIDADE BNCC', 'HABILIDADES BNCC', 'HABILIDADE')}</td></tr>
+    <tr><td class="sec-hdr">RECURSOS DIDÁTICOS:</td></tr>
+    <tr><td class="sec-body">${get('RECURSOS DIDÁTICOS', 'RECURSOS DIDATICOS', 'RECURSOS')}</td></tr>
+    <tr><td class="sec-hdr">AVALIAÇÃO:</td></tr>
+    <tr><td class="sec-body">${get('AVALIAÇÃO', 'AVALIACAO')}</td></tr>
+    <tr><td class="sec-hdr">REFERÊNCIAS:</td></tr>
+    <tr><td class="sec-body">${get('REFERÊNCIAS', 'REFERENCIAS')}</td></tr>
+  </table>`;
+  }
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1384,14 +1440,14 @@ const buildDocHtml = (
   @page { size: A4; margin: 1.8cm 2.2cm 2.2cm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.7; color: #111; background: #fff; }
-  /* ── Header ── */
+  /* ── App header ── */
   .doc-hdr { display:flex; align-items:center; gap:14px; border-bottom:4px solid ${ac}; padding-bottom:10px; margin-bottom:18px; }
   .logo-box { width:54px; height:54px; border:2px solid #c7d2fe; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#818cf8; font-size:8pt; text-align:center; line-height:1.2; flex-shrink:0; }
   .sch-block { flex:1; }
   .sch-name { font-size:13pt; font-weight:700; color:#111; }
   .sch-sub { font-size:9pt; color:#6b7280; margin-top:2px; }
   .doc-badge { background:${ac}; color:#fff; font-size:9pt; font-weight:700; padding:5px 16px; border-radius:20px; white-space:nowrap; letter-spacing:0.5px; }
-  /* ── Typography ── */
+  /* ── Typography (exam/activities) ── */
   h1 { font-size:15pt; font-weight:700; color:#111; margin:0 0 14px; text-align:center; }
   h2 { font-size:10.5pt; font-weight:700; color:#fff; background:${ac}; padding:5px 12px; border-radius:4px; margin:22px 0 10px; }
   h3 { font-size:11pt; font-weight:700; color:${dk}; margin:14px 0 6px; padding-left:10px; border-left:4px solid ${ac}; }
@@ -1414,6 +1470,14 @@ const buildDocHtml = (
   .gab-body { font-size:11pt; line-height:1.9; }
   .gab-body strong { color:${ac}; }
   .gab-body h2 { background:${dk}; color:#fff; padding:5px 12px; border-radius:4px; margin:16px 0 8px; font-size:10.5pt; }
+  /* ── Plan table layout ── */
+  .info-tbl { width:100%; border-collapse:collapse; margin-bottom:14px; font-size:10.5pt; }
+  .info-cell { border:1px solid #555; padding:5px 10px; vertical-align:middle; }
+  .plan-title { text-align:center; font-weight:700; font-size:12pt; margin:8px 0 10px; text-decoration:underline; }
+  .plan-tbl { width:100%; border-collapse:collapse; font-size:10.5pt; }
+  .sec-hdr { border:1px solid #555; padding:5px 10px; font-weight:700; background:#f0f0f0; }
+  .sec-body { border:1px solid #555; padding:8px 10px 28px; vertical-align:top; }
+  .sec-body p, .sec-body br { display:inline; }
   @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style>
 </head>
@@ -1426,7 +1490,7 @@ const buildDocHtml = (
     </div>
     <div class="doc-badge">${labels[docType]}</div>
   </div>
-  <p>${mdToHtml(mainMd)}</p>
+  ${docType === 'plan' ? planBody : `<p>${mdToHtml(mainMd)}</p>`}
   ${gabHtml}
 </body>
 </html>`;
@@ -2226,10 +2290,19 @@ const PlannerScreen = ({
                       const win = window.open('', '_blank');
                       if (win) {
                         const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
+                        const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
                         win.document.write(buildDocHtml(
                           currentResult as string,
                           docType,
-                          { school: profileSchoolName || '', teacher: profileName || '', subject: profile.subject || '', topic }
+                          {
+                            school: profileSchoolName || '',
+                            teacher: profileName || '',
+                            subject: profile.subject || '',
+                            topic,
+                            className: selectedClassForExport?.name || '',
+                            duration,
+                            lessonTime,
+                          }
                         ));
                         win.document.close();
                         setTimeout(() => { win.print(); }, 600);
@@ -5630,9 +5703,6 @@ export default function App() {
       const complexityMap: Record<string, string> = { basic: 'Básico', intermediate: 'Intermediário', advanced: 'Avançado' };
       const focusMap: Record<string, string> = { practical: 'Exemplos Práticos', theoretical: 'Embasamento Teórico', balanced: 'Equilibrado' };
 
-      const escolaStr = profile.schoolName || '_________________';
-      const professorStr = profile.name || '_________________';
-      const disciplinaStr = profile.subject || '_________________';
       const abertura = Math.round(plannerLessonTime * 0.15);
       const desenvolvimento = Math.round(plannerLessonTime * 0.65);
       const fechamento = plannerLessonTime - abertura - desenvolvimento;
@@ -5644,73 +5714,46 @@ export default function App() {
         : '- [escolha habilidades BNCC reais para a disciplina e série]';
 
       // ── Solução 1: injetar habilidades reais no prompt ──────────────────
-      const prompt = `Você é um pedagogo especialista. Gere um PLANO DE AULA profissional para ${plannerDuration} aula(s) de ${plannerLessonTime} minutos sobre: "${targetTopic}".
-Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]} | Turma: "${className}"
+      const prompt = `Você é um pedagogo especialista. Gere um PLANO DE AULA completo e profissional.
+Tópico: "${targetTopic}" | Turma: "${className}" | Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]}
+Quantidade de aulas: ${plannerDuration} | Duração por aula: ${plannerLessonTime} min (abertura: ${abertura}min · desenvolvimento: ${desenvolvimento}min · fechamento: ${fechamento}min)
 
-Use EXATAMENTE esta estrutura Markdown, substituindo todos os campos [ ] por conteúdo real. PROIBIDO introduções ou texto fora da estrutura.
+Responda SOMENTE com as seções abaixo em Markdown, substituindo todos os campos [ ] por conteúdo real e pertinente.
+PROIBIDO: introduções, saudações, comentários ou qualquer texto fora da estrutura abaixo.
 
-# Plano de Aula: ${targetTopic}
+## ÁREA DE CONHECIMENTO
+[Área — ex: Ciências da Natureza, Linguagens, Matemática, Ciências Humanas, Ensino Religioso]
 
-**Escola:** ${escolaStr}  |  **Professor(a):** ${professorStr}  |  **Disciplina:** ${disciplinaStr}
-**Turma:** ${className}  |  **Duração:** ${plannerDuration} aula(s) × ${plannerLessonTime} min  |  **Data:** ___/___/______
+## EIXO/UNIDADE TEMÁTICA
+[Eixo temático ou unidade curricular que abrange "${targetTopic}"]
 
----
+## CONTEÚDO
+[Lista dos conteúdos a serem trabalhados na(s) aula(s)]
 
-## Objetivos de Aprendizagem
+## OBJETIVOS
+[Lista de objetivos de aprendizagem em verbos de ação — identificar, analisar, comparar, produzir, etc.]
 
-### Objetivo Geral
-[Um objetivo geral em 1-2 frases, começando com verbo no infinitivo]
+## PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM
+[2 ou 3 perguntas que orientam e motivam a aprendizagem sobre "${targetTopic}"]
 
-### Objetivos Específicos
-- [objetivo específico 1 — verbo de ação + conteúdo]
-- [objetivo específico 2]
-- [objetivo específico 3]
+## METODOLOGIA
+[Sequência didática detalhada:
+• Abertura (${abertura}min): estratégia de motivação ou levantamento de conhecimentos prévios
+• Desenvolvimento (${desenvolvimento}min): sequência de atividades com metodologia ativa, explicação e fixação
+• Fechamento (${fechamento}min): síntese, avaliação formativa e consolidação]
 
-### Habilidades BNCC
-USE OBRIGATORIAMENTE as habilidades abaixo (são reais e verificadas). Copie os códigos exatamente como estão e adapte a descrição ao tópico:
+## Habilidade (BNCC)
+USE OBRIGATORIAMENTE as habilidades abaixo (são códigos reais verificados). Copie os códigos exatamente:
 ${bnccBlock}
 
----
+## RECURSOS DIDÁTICOS
+[Lista de recursos necessários — ex: quadro branco, projetor, materiais manipulativos, textos]
 
-## Conteúdo Programático
+## AVALIAÇÃO
+[Instrumento de avaliação e critérios — ex: observação, lista de exercícios, portfólio, rubricas]
 
-- [tópico 1]
-- [tópico 2]
-- [tópico 3]
-- [tópico 4 se necessário]
-
----
-
-## Desenvolvimento da Aula
-
-### Abertura *(${abertura} min)* — Motivação e Conhecimentos Prévios
-[Atividade de sensibilização, pergunta motivadora ou dinâmica de levantamento de conhecimentos prévios]
-
-### Desenvolvimento *(${desenvolvimento} min)* — Conteúdo e Metodologia Ativa
-[Descrição detalhada da sequência didática, incluindo explicação, exemplos práticos e atividade de fixação]
-
-### Fechamento *(${fechamento} min)* — Síntese e Avaliação Formativa
-[Atividade de consolidação: resumo coletivo, saída reflexiva ou exercício de verificação rápida]
-
----
-
-## Recursos Didáticos
-- [recurso 1 — ex: quadro branco, projetor]
-- [recurso 2]
-- [recurso 3]
-
----
-
-## Avaliação
-
-**Instrumento:** [tipo — ex: lista de exercícios, observação, portfólio]
-**Critérios:** [critérios de avaliação claros e objetivos]
-
----
-
-## Referências
-- [Referência 1 em formato ABNT]
-- [Referência 2]`;
+## REFERÊNCIAS
+[2 ou 3 referências bibliográficas em formato ABNT]`;
 
       const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
       const planDraft = response.text || '';
@@ -5719,7 +5762,7 @@ ${bnccBlock}
       let planResult = planDraft;
       if (bnccSkills.length > 0) {
         try {
-          const validationPrompt = `Você é especialista em BNCC. No plano de aula abaixo, verifique SOMENTE a seção "### Habilidades BNCC":
+          const validationPrompt = `Você é especialista em BNCC. No plano de aula abaixo, verifique SOMENTE a seção "## Habilidade (BNCC)":
 1. Os códigos citados batem com os do banco abaixo?
 2. Se houver código inexistente ou errado, substitua pelo correto do banco.
 3. Não altere NENHUMA outra parte do plano.
