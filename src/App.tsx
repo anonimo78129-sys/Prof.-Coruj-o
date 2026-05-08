@@ -1304,6 +1304,106 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
   );
 };
 
+// ─── Professional document HTML builder ──────────────────────────────────────
+const buildDocHtml = (
+  rawMd: string,
+  docType: 'plan' | 'exam' | 'activities',
+  opts: { school?: string; teacher?: string; subject?: string; topic?: string }
+): string => {
+  const SEP = '\n---GABARITO---\n';
+  const sepIdx = rawMd.indexOf(SEP);
+  const mainMd  = sepIdx >= 0 ? rawMd.slice(0, sepIdx)      : rawMd;
+  const gabMd   = sepIdx >= 0 ? rawMd.slice(sepIdx + SEP.length) : '';
+
+  const mdToHtml = (md: string) => md
+    .replace(/^---+$/gim, '<hr class="divider">')
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
+    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+    .replace(/^(\( \) [A-D]\) .+)$/gim, '<div class="mc-opt">$1</div>')
+    .replace(/^(_{10,})$/gim, '<div class="ans-line"></div>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br/>');
+
+  const labels = { plan: 'PLANO DE AULA', exam: 'AVALIAÇÃO', activities: 'ATIVIDADES' };
+  const accent = { plan: '#059669', exam: '#dc2626', activities: '#2563eb' };
+  const dark   = { plan: '#064e3b', exam: '#7f1d1d', activities: '#1e3a8a' };
+  const ac = accent[docType];
+  const dk = dark[docType];
+
+  const gabHtml = gabMd ? `
+    <div class="gab-page">
+      <div class="gab-hdr">
+        <div class="gab-badge">GABARITO</div>
+        <div>
+          <div class="gab-title">${opts.topic || 'Material Didático'}</div>
+          <div class="gab-meta">${opts.teacher ? `Prof. ${opts.teacher}` : ''}${opts.subject ? ` · ${opts.subject}` : ''}${opts.school ? ` · ${opts.school}` : ''}</div>
+        </div>
+      </div>
+      <div class="gab-body"><p>${mdToHtml(gabMd.replace(/^## Gabarito[^\n]*\n?/, ''))}</p></div>
+    </div>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>${labels[docType]} — ${opts.topic || ''}</title>
+<style>
+  @page { size: A4; margin: 1.8cm 2.2cm 2.2cm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.7; color: #111; background: #fff; }
+  /* ── Header ── */
+  .doc-hdr { display:flex; align-items:center; gap:14px; border-bottom:4px solid ${ac}; padding-bottom:10px; margin-bottom:18px; }
+  .logo-box { width:54px; height:54px; border:2px solid #c7d2fe; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#818cf8; font-size:8pt; text-align:center; line-height:1.2; flex-shrink:0; }
+  .sch-block { flex:1; }
+  .sch-name { font-size:13pt; font-weight:700; color:#111; }
+  .sch-sub { font-size:9pt; color:#6b7280; margin-top:2px; }
+  .doc-badge { background:${ac}; color:#fff; font-size:9pt; font-weight:700; padding:5px 16px; border-radius:20px; white-space:nowrap; letter-spacing:0.5px; }
+  /* ── Typography ── */
+  h1 { font-size:15pt; font-weight:700; color:#111; margin:0 0 14px; text-align:center; }
+  h2 { font-size:10.5pt; font-weight:700; color:#fff; background:${ac}; padding:5px 12px; border-radius:4px; margin:22px 0 10px; }
+  h3 { font-size:11pt; font-weight:700; color:${dk}; margin:14px 0 6px; padding-left:10px; border-left:4px solid ${ac}; }
+  p { margin:6px 0; }
+  strong { font-weight:700; }
+  em { font-style:italic; }
+  blockquote { border-left:4px solid ${ac}; padding:6px 14px; color:#4b5563; font-style:italic; background:#f9fafb; border-radius:0 6px 6px 0; margin:10px 0; }
+  ul, ol { padding-left:22px; margin:6px 0; }
+  li { margin-bottom:4px; }
+  /* ── Exam / Activity ── */
+  .mc-opt { padding:3px 0 3px 18px; font-size:11pt; }
+  .ans-line { border-bottom:1.5px solid #9ca3af; height:26px; margin:5px 0; }
+  .divider { border:none; border-top:1.5px solid #e5e7eb; margin:18px 0; }
+  /* ── Gabarito page ── */
+  .gab-page { page-break-before:always; padding-top:4px; }
+  .gab-hdr { background:${dk}; color:#fff; padding:18px 22px; border-radius:10px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+  .gab-badge { background:#f59e0b; color:#1a1a1a; font-size:10pt; font-weight:800; padding:6px 18px; border-radius:20px; letter-spacing:1px; flex-shrink:0; }
+  .gab-title { font-size:14pt; font-weight:700; margin-bottom:3px; }
+  .gab-meta { font-size:9pt; color:#a5b4fc; }
+  .gab-body { font-size:11pt; line-height:1.9; }
+  .gab-body strong { color:${ac}; }
+  .gab-body h2 { background:${dk}; color:#fff; padding:5px 12px; border-radius:4px; margin:16px 0 8px; font-size:10.5pt; }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style>
+</head>
+<body>
+  <div class="doc-hdr">
+    <div class="logo-box">Logo<br/>Escola</div>
+    <div class="sch-block">
+      <div class="sch-name">${opts.school || 'Nome da Escola'}</div>
+      <div class="sch-sub">${opts.teacher ? `Prof. ${opts.teacher}` : ''}${opts.subject ? ` · ${opts.subject}` : ''}</div>
+    </div>
+    <div class="doc-badge">${labels[docType]}</div>
+  </div>
+  <p>${mdToHtml(mainMd)}</p>
+  ${gabHtml}
+</body>
+</html>`;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 const PlannerScreen = ({
   schedules,
   setSchedules,
@@ -2094,64 +2194,16 @@ const PlannerScreen = ({
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      const printWindow = window.open('', '_blank');
-                      if (printWindow) {
-                        const mdToHtml = (md: string) => md
-                          .replace(/^---+$/gim, '<hr class="divider" />')
-                          .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                          .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-                          .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-                          .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-                          .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-                          .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-                          .replace(/^(\( \) [A-D]\) .+)$/gim, '<div class="mc-option">$1</div>')
-                          .replace(/^(_{10,})$/gim, '<div class="answer-line"></div>')
-                          .replace(/\n\n/g, '</p><p>')
-                          .replace(/\n/g, '<br/>');
-                        printWindow.document.write(`<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Material Didático</title>
-  <style>
-    @page { size: A4; margin: 2cm 2.5cm; }
-    * { box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.6; color: #111; background: #fff; }
-    .doc-header { border-top: 5px solid #4F46E5; border-bottom: 2px solid #4F46E5; padding: 10px 0; margin-bottom: 18px; display: flex; align-items: center; gap: 16px; }
-    .logo-box { width: 52px; height: 52px; border: 2px solid #c7d2fe; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #818cf8; font-size: 9pt; text-align: center; line-height: 1.2; }
-    .school-info { flex: 1; }
-    .school-name { font-size: 13pt; font-weight: bold; color: #1e1b4b; }
-    .school-sub { font-size: 9pt; color: #6b7280; }
-    .id-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 10pt; }
-    .id-table td { border: 1px solid #d1d5db; padding: 5px 8px; }
-    .id-table td:first-child { font-weight: bold; white-space: nowrap; background: #f3f4f6; width: 110px; }
-    .id-table .full-row td:last-child { width: auto; }
-    h1 { font-size: 15pt; color: #1e1b4b; border-bottom: 2px solid #4F46E5; padding-bottom: 6px; margin: 0 0 14px; text-align: center; }
-    h2 { font-size: 12pt; color: #312e81; background: #eef2ff; padding: 5px 10px; border-left: 4px solid #4F46E5; margin: 22px 0 10px; }
-    h3 { font-size: 11pt; color: #374151; margin: 14px 0 6px; }
-    p { margin: 6px 0; }
-    strong { font-weight: bold; }
-    blockquote { border-left: 4px solid #4F46E5; margin: 10px 0; padding: 6px 14px; color: #4b5563; font-style: italic; background: #f9fafb; }
-    .mc-option { padding: 2px 0 2px 16px; font-size: 11pt; }
-    .answer-line { border-bottom: 1px solid #9ca3af; margin: 10px 0 4px; height: 22px; }
-    .divider { border: none; border-top: 1.5px solid #d1d5db; margin: 16px 0; }
-    .score-box { border: 2px solid #4F46E5; border-radius: 6px; padding: 8px 16px; display: inline-block; margin-top: 12px; font-size: 10pt; color: #312e81; }
-    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-  </style>
-</head>
-<body>
-  <div class="doc-header">
-    <div class="logo-box">Logo<br/>Escola</div>
-    <div class="school-info">
-      <div class="school-name">${profileSchoolName || 'Nome da Escola'}</div>
-      <div class="school-sub">Prof. ${profileName || '_______________'} &nbsp;|&nbsp; ${profile.subject || 'Disciplina'}</div>
-    </div>
-  </div>
-  <p>${mdToHtml(currentResult as string)}</p>
-</body>
-</html>`);
-                        printWindow.document.close();
-                        setTimeout(() => { printWindow.print(); }, 600);
+                      const win = window.open('', '_blank');
+                      if (win) {
+                        const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
+                        win.document.write(buildDocHtml(
+                          currentResult as string,
+                          docType,
+                          { school: profileSchoolName || '', teacher: profileName || '', subject: profile.subject || '', topic }
+                        ));
+                        win.document.close();
+                        setTimeout(() => { win.print(); }, 600);
                       }
                     }}
                     className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
@@ -2203,49 +2255,17 @@ const PlannerScreen = ({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button 
+                      <button
                         onClick={() => {
-                          const printWindow = window.open('', '_blank');
-                          if (printWindow) {
-                            printWindow.document.write(`
-                              <html>
-                                <head>
-                                  <title>Exportar ${res.type === 'activities' ? 'Atividades' : 'Roteiro'}</title>
-                                  <style>
-                                    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; }
-                                    h1 { color: #4F46E5; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
-                                    h2 { color: #1f2937; margin-top: 30px; }
-                                    h3 { color: #4b5563; }
-                                    blockquote { border-left: 4px solid #4F46E5; padding-left: 16px; color: #6b7280; font-style: italic; }
-                                    ul, ol { padding-left: 24px; }
-                                    li { margin-bottom: 8px; }
-                                    .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; }
-                                    .school-name { font-weight: bold; font-size: 1.2rem; color: #4b5563; }
-                                    .teacher-name { font-size: 1rem; color: #6b7280; }
-                                    @media print { body { padding: 0; } }
-                                  </style>
-                                </head>
-                                <body>
-                                  <div class="header">
-                                    ${profileSchoolName ? `<div class="school-name">${profileSchoolName}</div>` : ''}
-                                    ${profileName ? `<div class="teacher-name">${profileName}</div>` : ''}
-                                  </div>
-                                  ${res.content
-                                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-                                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-                                    .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-                                    .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
-                                    .replace(/\*(.*)\*/gim, '<i>$1</i>')
-                                    .replace(/!\[(.*?)\]\((.*?)\)/gim, "<img alt='$1' src='$2' />")
-                                    .replace(/\[(.*?)\]\((.*?)\)/gim, "<a href='$2'>$1</a>")
-                                    .replace(/\n/gim, '<br />')
-                                  }
-                                </body>
-                              </html>
-                            `);
-                            printWindow.document.close();
-                            setTimeout(() => { printWindow.print(); }, 500);
+                          const win = window.open('', '_blank');
+                          if (win) {
+                            const dt = res.type === 'activities' ? 'activities' : 'plan';
+                            win.document.write(buildDocHtml(
+                              res.content, dt,
+                              { school: profileSchoolName || '', teacher: profileName || '', subject: profile.subject || '', topic }
+                            ));
+                            win.document.close();
+                            setTimeout(() => { win.print(); }, 500);
                           }
                         }}
                         className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
@@ -5290,9 +5310,80 @@ export default function App() {
       const complexityMap: Record<string, string> = { basic: 'Básico', intermediate: 'Intermediário', advanced: 'Avançado' };
       const focusMap: Record<string, string> = { practical: 'Exemplos Práticos', theoretical: 'Embasamento Teórico', balanced: 'Equilibrado' };
 
-      const prompt = `Crie um plano de aula detalhado para ${plannerDuration} aulas (de ${plannerLessonTime} minutos cada) sobre: "${targetTopic}". Adapte a linguagem e a profundidade para alunos da turma: "${className}".
-      Use o tom ${toneMap[plannerTone]}, nível de complexidade ${complexityMap[plannerComplexity]}, e foco pedagógico ${focusMap[plannerFocus]}.
-      Inclua objetivos BNCC, metodologia e avaliação. Formate em Markdown.`;
+      const escolaStr = profile.schoolName || '_________________';
+      const professorStr = profile.name || '_________________';
+      const disciplinaStr = profile.subject || '_________________';
+      const abertura = Math.round(plannerLessonTime * 0.15);
+      const desenvolvimento = Math.round(plannerLessonTime * 0.65);
+      const fechamento = plannerLessonTime - abertura - desenvolvimento;
+
+      const prompt = `Você é um pedagogo especialista. Gere um PLANO DE AULA profissional para ${plannerDuration} aula(s) de ${plannerLessonTime} minutos sobre: "${targetTopic}".
+Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]} | Turma: "${className}"
+
+Use EXATAMENTE esta estrutura Markdown, substituindo todos os campos [ ] por conteúdo real. PROIBIDO introduções ou texto fora da estrutura.
+
+# Plano de Aula: ${targetTopic}
+
+**Escola:** ${escolaStr}  |  **Professor(a):** ${professorStr}  |  **Disciplina:** ${disciplinaStr}
+**Turma:** ${className}  |  **Duração:** ${plannerDuration} aula(s) × ${plannerLessonTime} min  |  **Data:** ___/___/______
+
+---
+
+## Objetivos de Aprendizagem
+
+### Objetivo Geral
+[Um objetivo geral em 1-2 frases, começando com verbo no infinitivo]
+
+### Objetivos Específicos
+- [objetivo específico 1 — verbo de ação + conteúdo]
+- [objetivo específico 2]
+- [objetivo específico 3]
+
+### Habilidades BNCC
+- [Código ex: EF06GE01] — [descrição resumida da habilidade relacionada]
+- [Código BNCC] — [descrição resumida]
+
+---
+
+## Conteúdo Programático
+
+- [tópico 1]
+- [tópico 2]
+- [tópico 3]
+- [tópico 4 se necessário]
+
+---
+
+## Desenvolvimento da Aula
+
+### Abertura *(${abertura} min)* — Motivação e Conhecimentos Prévios
+[Atividade de sensibilização, pergunta motivadora ou dinâmica de levantamento de conhecimentos prévios]
+
+### Desenvolvimento *(${desenvolvimento} min)* — Conteúdo e Metodologia Ativa
+[Descrição detalhada da sequência didática, incluindo explicação, exemplos práticos e atividade de fixação]
+
+### Fechamento *(${fechamento} min)* — Síntese e Avaliação Formativa
+[Atividade de consolidação: resumo coletivo, saída reflexiva ou exercício de verificação rápida]
+
+---
+
+## Recursos Didáticos
+- [recurso 1 — ex: quadro branco, projetor]
+- [recurso 2]
+- [recurso 3]
+
+---
+
+## Avaliação
+
+**Instrumento:** [tipo — ex: lista de exercícios, observação, portfólio]
+**Critérios:** [critérios de avaliação claros e objetivos]
+
+---
+
+## Referências
+- [Referência 1 em formato ABNT]
+- [Referência 2]`;
       
       const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
       const planResult = response.text || '';
@@ -5361,7 +5452,7 @@ export default function App() {
         const prompt = type === 'exam'
           ? `Você é um professor especialista criando uma avaliação formal para impressão. Gere uma AVALIAÇÃO COMPLETA sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
 
-ESTRUTURA OBRIGATÓRIA — siga exatamente:
+ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteúdo real):
 
 # Avaliação: ${targetTopic}
 
@@ -5372,37 +5463,37 @@ ESTRUTURA OBRIGATÓRIA — siga exatamente:
 
 ---
 
-## Parte I — Questões de Múltipla Escolha *(2 pontos cada — total: 10 pts)*
+## Parte I — Questões de Múltipla Escolha *(2 pts cada — total: 10 pts)*
 
-**Questão 1 (2 pts)** [Enunciado claro e objetivo]
+**Questão 1 (2 pts)** [enunciado claro e objetivo]
 
-( ) A) [alternativa]
-( ) B) [alternativa]
-( ) C) [alternativa]
-( ) D) [alternativa]
+( ) A) [alternativa incorreta]
+( ) B) [alternativa correta]
+( ) C) [alternativa incorreta]
+( ) D) [alternativa incorreta]
 
-**Questão 2 (2 pts)** [Enunciado]
-
-( ) A) [alternativa]
-( ) B) [alternativa]
-( ) C) [alternativa]
-( ) D) [alternativa]
-
-**Questão 3 (2 pts)** [Enunciado]
+**Questão 2 (2 pts)** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 4 (2 pts)** [Enunciado]
+**Questão 3 (2 pts)** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 5 (2 pts)** [Enunciado]
+**Questão 4 (2 pts)** [enunciado]
+
+( ) A) [alternativa]
+( ) B) [alternativa]
+( ) C) [alternativa]
+( ) D) [alternativa]
+
+**Questão 5 (2 pts)** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
@@ -5411,32 +5502,45 @@ ESTRUTURA OBRIGATÓRIA — siga exatamente:
 
 ---
 
-## Parte II — Questões Dissertativas *(5 pontos cada — total: 10 pts)*
+## Parte II — Questões Dissertativas *(5 pts cada — total: 10 pts)*
 
-**Questão 6 (5 pts)** [Enunciado que exige desenvolvimento]
+**Questão 6 (5 pts)** [enunciado que exige desenvolvimento e reflexão]
 
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
 
-**Questão 7 (5 pts)** [Enunciado que exige desenvolvimento]
+**Questão 7 (5 pts)** [enunciado que exige desenvolvimento]
 
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
 
 ---
 
 *Pontuação total: _______ / 20 pontos*
 
-REGRAS: Substitua os textos entre [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, saudações ou texto fora da estrutura acima.`
-          : `Você é um professor especialista criando uma lista de atividades para impressão. Gere ${plannerQuestionCount} ATIVIDADES sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
+---GABARITO---
 
-ESTRUTURA OBRIGATÓRIA — siga exatamente:
+## Gabarito — Avaliação: ${targetTopic}
+
+**Q1:** [letra correta — ex: B]
+**Q2:** [letra correta]
+**Q3:** [letra correta]
+**Q4:** [letra correta]
+**Q5:** [letra correta]
+
+**Q6:** [elementos essenciais esperados na resposta: liste 2-3 pontos chave]
+**Q7:** [elementos essenciais esperados na resposta: liste 2-3 pontos chave]
+
+REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções ou texto fora da estrutura.`
+          : `Você é um professor especialista criando uma lista de atividades para impressão. Gere ${plannerQuestionCount} ATIVIDADES variadas sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
+
+ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteúdo real):
 
 # Atividade: ${targetTopic}
 
@@ -5447,23 +5551,24 @@ ESTRUTURA OBRIGATÓRIA — siga exatamente:
 
 ---
 
-## Atividades
+## Questões
 
-**Atividade 1.** [Enunciado claro — pode ser exercício, análise, criação, leitura ou problema]
+**1.** [Enunciado — tipo: múltipla escolha, completar lacunas, V/F com justificativa, relacionar colunas, produção textual ou resolução de problema. Varie os tipos entre as questões.]
 
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
+_______________________________________________________________________________
 
-**Atividade 2.** [Enunciado — varie o tipo em relação à anterior]
+[Continue numerando até a questão ${plannerQuestionCount}, cada uma com 3 linhas de resposta]
 
-_________________________________________________________________________
-_________________________________________________________________________
-_________________________________________________________________________
+---GABARITO---
 
-[Continue o mesmo padrão para todas as ${plannerQuestionCount} atividades, variando os tipos: completar lacunas, verdadeiro/falso com justificativa, relacionar colunas, produção textual, resolução de problemas, etc.]
+## Gabarito — Atividade: ${targetTopic}
 
-REGRAS: Substitua [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções ou texto fora da estrutura.`;
+**1.** [resposta correta ou critérios de correção objetivos]
+[Continue para todas as ${plannerQuestionCount} questões]
+
+REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções ou texto fora da estrutura.`;
           
         const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
         const result = response.text || '';
