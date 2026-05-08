@@ -1470,21 +1470,123 @@ const buildDocx = async (
     docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: contentRows }));
 
   } else {
-    // Exam / Activities: generic markdown
-    const typeLabel = docType === 'exam' ? 'AVALIAÇÃO' : 'ATIVIDADES';
+    // ── Exam / Activities: structured rendering ────────────────────────────
+    const isExam = docType === 'exam';
+    const typeLabel = isExam ? 'AVALIAÇÃO' : 'ATIVIDADE';
+
+    // Header info table (6-column grid)
+    docChildren.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [
+          infoCell(`ESCOLA: ${opts.school || '____________'}`, 3),
+          infoCell(`PROFESSOR(A): ${opts.teacher || '____________'}`, 2),
+          infoCell(`DISCIPLINA: ${opts.subject || '____________'}`, 1),
+        ]}),
+        new TableRow({ children: [
+          infoCell(`TURMA: ${opts.className || '____________'}`, 2),
+          infoCell('DATA: ___/___/______', 2),
+          infoCell(isExam ? 'NOTA: _______' : 'ENTREGA: ____________', 2),
+        ]}),
+      ],
+    }));
+
+    // Student name underline
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: 'NOME DO(A) ALUNO(A): ', bold: true, size: 22 })],
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '555555' } },
+      spacing: { before: 160, after: 240 },
+    }));
+
+    // Centered document title
     docChildren.push(new Paragraph({
       children: [new TextRun({ text: `${typeLabel}: ${opts.topic || ''}`, bold: true, size: 28, color: ac })],
-      spacing: { after: 160 },
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 80, after: 200 },
     }));
-    docChildren.push(...mdParas(mainMd));
+
+    // Parse content — skip header lines already rendered above
+    const skipLine = (line: string) =>
+      /^# /.test(line) ||
+      /^\*\*(Escola|Professor|Turma|Nome do|Disciplina):/i.test(line.trim()) ||
+      /^---$/.test(line.trim());
+
+    for (const line of mainMd.split('\n')) {
+      if (skipLine(line)) continue;
+
+      if (!line.trim()) {
+        docChildren.push(new Paragraph({ children: [new TextRun('')], spacing: { after: 40 } }));
+        continue;
+      }
+
+      // ## Section header
+      if (line.startsWith('## ')) {
+        docChildren.push(new Paragraph({
+          children: [new TextRun({ text: line.slice(3), bold: true, color: 'FFFFFF', size: 24 })],
+          shading: { fill: ac, type: ShadingType.CLEAR, color: 'auto' },
+          spacing: { before: 200, after: 100 },
+          indent: { left: 120, right: 120 },
+        }));
+        continue;
+      }
+
+      // Answer lines (10+ underscores) → real underline
+      if (/^_{10,}$/.test(line.trim())) {
+        docChildren.push(new Paragraph({
+          children: [new TextRun('')],
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '999999' } },
+          spacing: { before: 40, after: 180 },
+        }));
+        continue;
+      }
+
+      // Multiple choice: ( ) A) ...
+      if (/^\( \) [A-D]\)/.test(line.trim())) {
+        docChildren.push(new Paragraph({
+          children: [new TextRun({ text: '○  ', size: 22 }), ...parseInline(line.replace(/^\( \)/, '').trim())],
+          indent: { left: 480 },
+          spacing: { after: 40 },
+        }));
+        continue;
+      }
+
+      // Italic score line: *text*
+      if (/^\*[^*].*[^*]\*$/.test(line.trim())) {
+        docChildren.push(new Paragraph({
+          children: [new TextRun({ text: line.trim().slice(1, -1), italics: true, size: 22 })],
+          alignment: AlignmentType.RIGHT,
+          spacing: { before: 80, after: 80 },
+        }));
+        continue;
+      }
+
+      // Default paragraph
+      docChildren.push(new Paragraph({
+        children: parseInline(line),
+        spacing: { after: 60 },
+      }));
+    }
+
+    // Gabarito — page break
     if (gabMd) {
       docChildren.push(new Paragraph({
-        children: [new TextRun({ text: 'GABARITO', bold: true, size: 26, color: 'FFFFFF' })],
+        children: [new TextRun({ text: 'GABARITO', bold: true, size: 28, color: 'FFFFFF' })],
         shading: { fill: dk, type: ShadingType.CLEAR, color: 'auto' },
-        spacing: { before: 400, after: 200 },
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 200, after: 160 },
         pageBreakBefore: true,
       }));
-      docChildren.push(...mdParas(gabMd.replace(/^## Gabarito[^\n]*\n?/, '')));
+      docChildren.push(new Paragraph({
+        children: [new TextRun({ text: `${typeLabel}: ${opts.topic || ''}`, bold: true, size: 24, color: ac })],
+        spacing: { after: 160 },
+      }));
+      for (const line of gabMd.replace(/^## Gabarito[^\n]*\n?/, '').split('\n')) {
+        if (!line.trim()) {
+          docChildren.push(new Paragraph({ children: [new TextRun('')], spacing: { after: 40 } }));
+          continue;
+        }
+        docChildren.push(new Paragraph({ children: parseInline(line), spacing: { after: 80 } }));
+      }
     }
   }
 
