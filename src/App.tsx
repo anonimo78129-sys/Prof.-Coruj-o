@@ -1327,7 +1327,7 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
             setSavedResources((prev: SavedResource[]) => [...prev, { id: newResourceId, type: 'slides' as const, title: presentationData.presentationTitle, date: Date.now(), presentationData }]);
           }}
           className="flex-1 bg-indigo-50 text-indigo-600 rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-sm">
-          <Archive size={20} /> Salvar Acervo
+          <Archive size={20} /> Salvar Histórico
         </button>
       </div>
     </div>
@@ -2586,7 +2586,7 @@ const PlannerScreen = ({
                       }
 
                       if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification('Salvo no Acervo!', { icon: '/favicon.ico' });
+                        new Notification('Material salvo!', { icon: '/favicon.ico' });
                       }
                     }}
                     className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
@@ -2639,7 +2639,7 @@ const PlannerScreen = ({
                             content: res.content
                           }]);
                           if ('Notification' in window && Notification.permission === 'granted') {
-                            new Notification('Salvo no Acervo!', { icon: '/favicon.ico' });
+                            new Notification('Material salvo!', { icon: '/favicon.ico' });
                           }
                         }}
                         className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
@@ -2887,7 +2887,7 @@ const ChatScreen = ({
       const acervoSummary = savedResources
         .slice(-5)
         .map(r => `- ${r.title} (${r.type})`)
-        .join('\n') || 'Acervo vazio';
+        .join('\n') || 'Histórico vazio';
 
       const turmas = schedules.map(s => s.name).join(', ') || 'Nenhuma turma cadastrada';
 
@@ -2904,13 +2904,13 @@ const ChatScreen = ({
       ${upcomingClasses}
       - Próximos eventos:
       ${upcomingEvents}
-      - Últimos materiais no Acervo:
+      - Últimos materiais gerados:
       ${acervoSummary}
       - Conteúdo do Estúdio: ${estudioContext ? `${estudioContext.substring(0, 300)}...` : 'Vazio'}
 
       Suas Capacidades (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
       1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca'.
-      2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais são salvos automaticamente no Acervo ao concluir.
+      2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais ficam disponíveis no histórico ao concluir.
       3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
 
@@ -2918,7 +2918,7 @@ const ChatScreen = ({
       1. Seja proativo, conciso e profissional.
       2. NUNCA use emojis.
       3. Se o usuário pedir algo genérico como "Gere um material sobre X", pergunte se ele quer Slides, Plano, Atividades ou Prova, ou sugira um deles.
-      4. Quando usar uma função de geração, informe que o material será salvo automaticamente no Acervo ao concluir.
+      4. Quando usar uma função de geração, informe que o material ficará disponível no histórico ao concluir.
       5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo.
 
       Histórico:
@@ -3073,28 +3073,28 @@ const ChatScreen = ({
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('slides');
             generateResource('slides', args.topic, targetClass?.id);
-            responseText += `Criando slides sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+            responseText += `Criando slides sobre "${args.topic}". O material ficará disponível no histórico ao concluir.`;
           } else if (call.name === 'generate_lesson_plan') {
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
             setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('plan');
             generatePlan(args.topic, targetClass?.id);
-            responseText += `Criando plano de aula sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+            responseText += `Criando plano de aula sobre "${args.topic}". O material ficará disponível no histórico ao concluir.`;
           } else if (call.name === 'generate_activities') {
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
             setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('activities');
             generateResource('activities', args.topic, targetClass?.id);
-            responseText += `Gerando atividades sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+            responseText += `Gerando atividades sobre "${args.topic}". O material ficará disponível no histórico ao concluir.`;
           } else if (call.name === 'generate_exam') {
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
             setPlannerTopic(args.topic);
             if (targetClass) setPlannerSelectedClassId(targetClass.id);
             setPlannerMode('exam');
             generateResource('exam', args.topic, targetClass?.id);
-            responseText += `Gerando prova sobre "${args.topic}". O material será salvo automaticamente no Acervo ao concluir. `;
+            responseText += `Gerando prova sobre "${args.topic}". O material ficará disponível no histórico ao concluir.`;
           } else if (call.name === 'schedule_lesson_series') {
             const targetClass = schedules.find(s => s.name.toLowerCase().includes((args.className || '').toLowerCase()));
             if (targetClass) {
@@ -4822,41 +4822,25 @@ const EstudioScreen = ({
 const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, notifications, setNotifications }: { savedResources: SavedResource[], setSavedResources: (r: SavedResource[]) => void, profile: UserProfile, setScreen: (s: Screen) => void, notifications?: any[], setNotifications?: (n: any[]) => void }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Meu Acervo" subtitle="Histórico e Favoritos" profile={profile} notifications={notifications} setNotifications={setNotifications} />
-      
+      <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={notifications} setNotifications={setNotifications} />
       {savedResources.length === 0 ? (
-        <div className="text-center py-6 px-4">
-          <div className="w-full flex justify-center mb-6">
-            <img src="https://i.ibb.co/QZxVTvB/Design-sem-nome-20260419-214616-0000.png" alt="Acervo Vazio" className="w-56 h-auto object-contain rounded-3xl" referrerPolicy="no-referrer" />
-          </div>
-          <h3 className="font-bold text-gray-900 mb-2">Acervo Vazio</h3>
-          <p className="text-sm text-gray-400 mb-6">Você ainda não salvou nenhum material.</p>
-          <button onClick={() => setScreen('planner')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-full text-base font-bold shadow-sm">
-            Criar Material
-          </button>
+        <div className="text-center py-12 text-gray-400">
+          <Archive size={44} className="mx-auto mb-3 opacity-20" />
+          <p className="text-sm font-medium">Nenhum material salvo</p>
+          <button onClick={() => setScreen('planner')} className="mt-4 bg-indigo-600 text-white px-6 py-2.5 rounded-full text-sm font-bold">Criar Material</button>
         </div>
       ) : (
         <div className="space-y-4">
           {savedResources.map(resource => (
             <div key={resource.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 ${
-                resource.type === 'slides' ? 'bg-indigo-500' : resource.type === 'activities' ? 'bg-amber-500' : resource.type === 'plan' ? 'bg-cyan-500' : 'bg-emerald-500'
-              }`}>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 ${resource.type === 'slides' ? 'bg-indigo-500' : resource.type === 'activities' ? 'bg-amber-500' : resource.type === 'plan' ? 'bg-cyan-500' : 'bg-emerald-500'}`}>
                 {resource.type === 'slides' ? <Presentation size={20} /> : resource.type === 'activities' ? <FileText size={20} /> : resource.type === 'plan' ? <BookOpen size={20} /> : <FileQuestion size={20} />}
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-gray-900 truncate">{resource.title}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-gray-400">{new Date(resource.date).toLocaleDateString()}</span>
-                  <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold uppercase">
-                    {resource.type === 'slides' ? 'Slides' : resource.type === 'activities' ? 'Atividades' : resource.type === 'plan' ? 'Plano de Aula' : 'Prova'}
-                  </span>
-                </div>
+                <span className="text-xs text-gray-400">{new Date(resource.date).toLocaleDateString()}</span>
               </div>
-              <button 
-                onClick={() => setSavedResources(savedResources.filter(r => r.id !== resource.id))}
-                className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-colors"
-              >
+              <button onClick={() => setSavedResources(savedResources.filter(r => r.id !== resource.id))} className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-colors">
                 <Plus size={20} className="rotate-45" />
               </button>
             </div>
@@ -4930,15 +4914,24 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
   notifications?: any[]; setNotifications?: (n: any[]) => void;
 }) => {
   const [items, setItems] = useState<LibraryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [downloading, setDownloading] = useState<string | null>(null);
   const [todayStats, setTodayStats] = useState({ count: 0, bytes: 0 });
   const [errMsg, setErrMsg] = useState('');
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'library'), snap => {
-      setItems(snap.docs.map(d => d.data() as LibraryItem).sort((a, b) => b.uploadDate - a.uploadDate));
-    });
+    const unsub = onSnapshot(
+      collection(db, 'library'),
+      snap => {
+        setItems(snap.docs.map(d => d.data() as LibraryItem).sort((a, b) => b.uploadDate - a.uploadDate));
+        setLoading(false);
+      },
+      _err => {
+        setLoading(false);
+        setErrMsg('Não foi possível carregar os materiais. Verifique sua conexão.');
+      }
+    );
     return unsub;
   }, []);
 
@@ -5025,7 +5018,12 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
       {errMsg && <div className="bg-red-50 border border-red-100 text-red-600 text-sm font-medium rounded-xl p-3 mb-4">{errMsg}</div>}
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16 text-gray-400">
+          <Loader2 size={32} className="mx-auto mb-3 animate-spin text-indigo-400" />
+          <p className="text-sm font-medium">Carregando materiais...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Library size={44} className="mx-auto mb-3 opacity-20" />
           <p className="text-sm font-medium">Nenhum material disponível</p>
@@ -5560,7 +5558,7 @@ export default function App() {
           setInboxMessages(prev => [...prev, {
             id: Math.random().toString(36).substr(2, 9),
             role: 'model' as const,
-            text: `${typeLabel} sobre "${topicLabel}" gerado e salvo no Acervo automaticamente.`,
+            text: `${typeLabel} sobre "${topicLabel}" gerado com sucesso.`,
             date: Date.now()
           }]);
         }
@@ -6276,7 +6274,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                 setNotifications([...notifications, {
                   id: Math.random().toString(36).substr(2, 9),
                   title: 'Material Salvo',
-                  message: 'Um novo material foi salvo no seu Acervo.',
+                  message: 'Novo material gerado com sucesso.',
                   date: Date.now(),
                   read: false
                 }]);
