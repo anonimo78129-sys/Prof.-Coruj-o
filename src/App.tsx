@@ -7,15 +7,16 @@ import {
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
-  MapPin, RefreshCw, ClipboardList, Coffee, Users
+  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import pptxgen from 'pptxgenjs';
-import { auth, db, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
+import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -260,7 +261,7 @@ const fetchPixabayImage = async (query: string | undefined, width: number, heigh
 };
 
 // --- Types ---
-type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'acervo' | 'admin';
+type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin';
 type PlannerMode = 'plan' | 'activities' | 'slides' | 'exam';
 
 interface PresentationTheme {
@@ -338,6 +339,33 @@ interface SavedResource {
   presentationData?: PresentationData;
 }
 
+interface LibraryItem {
+  id: string;
+  title: string;
+  type: 'slides' | 'activities' | 'exam' | 'plan';
+  subject: string;
+  grade: string;
+  description?: string;
+  fileUrl: string;
+  fileName: string;
+  fileSizeBytes: number;
+  uploadDate: number;
+  downloadCount: number;
+}
+
+// ── Library constants ──────────────────────────────────────────────────────────
+const LIBRARY_LIMIT_BYTES = Math.floor(4.9 * 1024 * 1024 * 1024); // 4.9 GB hard cap
+const DOWNLOAD_LIMIT_PER_DAY = 30;                                 // max downloads/user/day
+const DOWNLOAD_MB_PER_DAY    = 500;                                // max MB/user/day
+
+const fmtBytes = (b: number) => {
+  if (b < 1024)               return `${b} B`;
+  if (b < 1024 * 1024)        return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface ClassItem {
   id: string;
   title: string;
@@ -375,7 +403,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
     { id: 'planner', icon: BookOpen, label: 'Planejar' },
     { id: 'chat', icon: MessageSquare, label: 'Assistente' },
     { id: 'calendar', icon: CalendarIcon, label: 'Agenda' },
-    { id: 'acervo', icon: Archive, label: 'Acervo' },
+    { id: 'biblioteca', icon: Library, label: 'Biblioteca' },
   ];
 
   if (isAdmin) {
@@ -2553,7 +2581,7 @@ const ChatScreen = ({
       - Conteúdo do Estúdio: ${estudioContext ? `${estudioContext.substring(0, 300)}...` : 'Vazio'}
 
       Suas Capacidades (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
-      1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'acervo'.
+      1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca'.
       2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais são salvos automaticamente no Acervo ao concluir.
       3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
@@ -2607,7 +2635,7 @@ const ChatScreen = ({
                   properties: {
                     screen: { 
                       type: Type.STRING, 
-                      enum: ['home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'acervo'],
+                      enum: ['home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca'],
                       description: 'Nome da tela de destino'
                     }
                   },
@@ -3306,12 +3334,12 @@ const ProfileScreen = ({
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold text-gray-900 !pt-[12px]">Histórico de Criações</h2>
-          <button onClick={() => setScreen('acervo')} className="text-indigo-600 text-sm font-bold">Ver tudo</button>
+          <button onClick={() => setScreen('biblioteca')} className="text-indigo-600 text-sm font-bold">Ver tudo</button>
         </div>
         <div className="space-y-3">
           {savedResources.length > 0 ? (
             savedResources.slice(0, 2).map(resource => (
-              <div key={resource.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm flex items-center gap-4 cursor-pointer" onClick={() => setScreen('acervo')}>
+              <div key={resource.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm flex items-center gap-4 cursor-pointer" onClick={() => setScreen('biblioteca')}>
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 ${
                   resource.type === 'slides' ? 'bg-indigo-500' : resource.type === 'activities' ? 'bg-amber-500' : resource.type === 'plan' ? 'bg-cyan-500' : 'bg-emerald-500'
                 }`}>
@@ -4568,13 +4596,221 @@ const GlobalTaskIndicator = ({ tasks, onTaskClick }: { tasks: Record<string, Bac
   );
 };
 
+// ─── Biblioteca (professor view) ──────────────────────────────────────────────
+const LibraryScreen = ({ user, setScreen, profile, notifications, setNotifications }: {
+  user: any; setScreen: (s: any) => void; profile: any;
+  notifications?: any[]; setNotifications?: (n: any[]) => void;
+}) => {
+  const [items, setItems] = useState<LibraryItem[]>([]);
+  const [filter, setFilter] = useState<string>('all');
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [todayStats, setTodayStats] = useState({ count: 0, bytes: 0 });
+  const [errMsg, setErrMsg] = useState('');
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'library'), snap => {
+      setItems(snap.docs.map(d => d.data() as LibraryItem).sort((a, b) => b.uploadDate - a.uploadDate));
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, 'downloadStats', user.uid)).then(snap => {
+      if (!snap.exists()) return;
+      const s = snap.data();
+      const today = new Date().toISOString().slice(0, 10);
+      if (s.date === today) setTodayStats({ count: s.count || 0, bytes: s.bytes || 0 });
+    });
+  }, [user]);
+
+  const handleDownload = async (item: LibraryItem) => {
+    if (!user) return;
+    setErrMsg('');
+    const today = new Date().toISOString().slice(0, 10);
+    if (todayStats.count >= DOWNLOAD_LIMIT_PER_DAY) {
+      setErrMsg(`Limite de ${DOWNLOAD_LIMIT_PER_DAY} downloads/dia atingido. Tente amanhã.`); return;
+    }
+    if (todayStats.bytes + item.fileSizeBytes > DOWNLOAD_MB_PER_DAY * 1024 * 1024) {
+      setErrMsg(`Limite de ${DOWNLOAD_MB_PER_DAY} MB/dia atingido. Tente amanhã.`); return;
+    }
+    setDownloading(item.id);
+    try {
+      window.open(item.fileUrl, '_blank');
+      const newStats = { date: today, count: todayStats.count + 1, bytes: todayStats.bytes + item.fileSizeBytes, lastDownload: Date.now() };
+      await setDoc(doc(db, 'downloadStats', user.uid), newStats);
+      await setDoc(doc(db, 'library', item.id), { downloadCount: increment(1) }, { merge: true });
+      setTodayStats({ count: newStats.count, bytes: newStats.bytes });
+    } catch {
+      setErrMsg('Erro ao baixar. Tente novamente.');
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const filtered = filter === 'all' ? items : items.filter(i => i.type === filter);
+  const typeMeta: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
+    slides:     { color: 'bg-indigo-500', label: 'Slides',    icon: <Presentation size={18} /> },
+    activities: { color: 'bg-amber-500',  label: 'Atividades',icon: <FileText size={18} /> },
+    exam:       { color: 'bg-red-500',    label: 'Prova',     icon: <FileQuestion size={18} /> },
+    plan:       { color: 'bg-cyan-500',   label: 'Plano',     icon: <BookOpen size={18} /> },
+  };
+  const usedPct = Math.round((todayStats.bytes / (DOWNLOAD_MB_PER_DAY * 1024 * 1024)) * 100);
+  const dlPct   = Math.round((todayStats.count / DOWNLOAD_LIMIT_PER_DAY) * 100);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+
+      {/* Daily quota card */}
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Cota diária</p>
+        <div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-gray-500">Downloads</span>
+            <span className="font-bold text-gray-700">{todayStats.count} / {DOWNLOAD_LIMIT_PER_DAY}</span>
+          </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${Math.min(dlPct, 100)}%` }} />
+          </div>
+        </div>
+        <div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-gray-500">Volume</span>
+            <span className="font-bold text-gray-700">{fmtBytes(todayStats.bytes)} / {DOWNLOAD_MB_PER_DAY} MB</span>
+          </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${Math.min(usedPct, 100)}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
+        {[['all','Todos'],['slides','Slides'],['activities','Atividades'],['exam','Provas'],['plan','Planos']].map(([v,l]) => (
+          <button key={v} onClick={() => setFilter(v)}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex-shrink-0 transition-colors ${filter===v ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {errMsg && <div className="bg-red-50 border border-red-100 text-red-600 text-sm font-medium rounded-xl p-3 mb-4">{errMsg}</div>}
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <Library size={44} className="mx-auto mb-3 opacity-20" />
+          <p className="text-sm font-medium">Nenhum material disponível</p>
+          <p className="text-xs mt-1">Em breve novos materiais serão adicionados</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(item => {
+            const meta = typeMeta[item.type] || typeMeta.activities;
+            return (
+              <div key={item.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0 ${meta.color}`}>
+                    {meta.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-gray-900 leading-snug">{item.title}</h3>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      <span className={`text-[10px] text-white px-2 py-0.5 rounded-full font-bold ${meta.color}`}>{meta.label}</span>
+                      {item.subject && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{item.subject}</span>}
+                      {item.grade   && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{item.grade}</span>}
+                    </div>
+                    {item.description && <p className="text-xs text-gray-400 mt-1.5 leading-relaxed line-clamp-2">{item.description}</p>}
+                    <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-400">
+                      <span className="flex items-center gap-1"><HardDrive size={10} />{fmtBytes(item.fileSizeBytes)}</span>
+                      <span>·</span>
+                      <span className="flex items-center gap-1"><Download size={10} />{item.downloadCount || 0} downloads</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDownload(item)}
+                  disabled={!!downloading}
+                  className="mt-3 w-full bg-indigo-600 active:bg-indigo-700 text-white rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                >
+                  {downloading === item.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                  {downloading === item.id ? 'Baixando...' : 'Baixar PDF'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 // --- Main App ---
 
 const AdminScreen = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca'>('users');
+
+  // ── Biblioteca state ──────────────────────────────────────────────────────
+  const [libItems, setLibItems] = useState<LibraryItem[]>([]);
+  const [storageUsed, setStorageUsed] = useState(0);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadForm, setUploadForm] = useState({ title: '', type: 'activities' as LibraryItem['type'], subject: '', grade: '', description: '' });
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadErr, setUploadErr] = useState('');
+
+  const reloadStorage = async () => {
+    const snap = await getDoc(doc(db, 'config', 'storage'));
+    setStorageUsed(snap.exists() ? (snap.data().totalBytes || 0) : 0);
+  };
+
+  useEffect(() => {
+    const unsubLib = onSnapshot(collection(db, 'library'), snap => {
+      setLibItems(snap.docs.map(d => d.data() as LibraryItem).sort((a, b) => b.uploadDate - a.uploadDate));
+    });
+    reloadStorage();
+    return unsubLib;
+  }, []);
+
+  const handleUpload = async () => {
+    if (!uploadFile || !uploadForm.title.trim()) { setUploadErr('Preencha o título e selecione um arquivo.'); return; }
+    setUploadErr('');
+    if (storageUsed + uploadFile.size > LIBRARY_LIMIT_BYTES) {
+      setUploadErr(`Limite de 4.9 GB atingido. Apague materiais para liberar espaço.`); return;
+    }
+    const id = Math.random().toString(36).substr(2, 9);
+    const sRef = storageRef(storage, `library/${id}/${uploadFile.name}`);
+    const task = uploadBytesResumable(sRef, uploadFile);
+    setUploadProgress(0);
+    task.on('state_changed',
+      snap => setUploadProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
+      err  => { setUploadErr(`Erro: ${err.message}`); setUploadProgress(null); },
+      async () => {
+        const fileUrl = await getDownloadURL(task.snapshot.ref);
+        const item: LibraryItem = { id, ...uploadForm, fileUrl, fileName: uploadFile.name, fileSizeBytes: uploadFile.size, uploadDate: Date.now(), downloadCount: 0 };
+        await setDoc(doc(db, 'library', id), item);
+        await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(uploadFile.size) }, { merge: true });
+        setStorageUsed(p => p + uploadFile.size);
+        setUploadProgress(null);
+        setUploadFile(null);
+        setUploadForm({ title: '', type: 'activities', subject: '', grade: '', description: '' });
+      }
+    );
+  };
+
+  const handleDeleteLib = async (item: LibraryItem) => {
+    if (!confirm(`Apagar "${item.title}"?`)) return;
+    try {
+      await deleteObject(storageRef(storage, `library/${item.id}/${item.fileName}`));
+      await deleteDoc(doc(db, 'library', item.id));
+      await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(-item.fileSizeBytes) }, { merge: true });
+      setStorageUsed(p => Math.max(0, p - item.fileSizeBytes));
+    } catch (e: any) { alert(`Erro: ${e.message}`); }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const unsubFeedbacks = onSnapshot(collection(db, 'feedback'), (snapshot) => {
@@ -4656,18 +4892,18 @@ const AdminScreen = () => {
         </div>
       </div>
 
-      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm">
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'users' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Usuários ({totalUsers})
+      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1">
+        <button onClick={() => setActiveTab('users')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'users' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
+          Usuários
         </button>
-        <button
-          onClick={() => setActiveTab('feedbacks')}
-          className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'feedbacks' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Feedbacks ({feedbacks.length})
+        <button onClick={() => setActiveTab('feedbacks')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'feedbacks' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
+          Feedbacks
+        </button>
+        <button onClick={() => setActiveTab('biblioteca')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'biblioteca' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
+          Biblioteca
         </button>
       </div>
 
@@ -4705,6 +4941,88 @@ const AdminScreen = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'biblioteca' && (
+        <div className="space-y-4 mb-8">
+          {/* Storage bar */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-gray-700 flex items-center gap-2"><HardDrive size={16} className="text-indigo-500" />Armazenamento</span>
+              <span className="text-xs font-bold text-gray-500">{fmtBytes(storageUsed)} / 4.9 GB</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${storageUsed / LIBRARY_LIMIT_BYTES > 0.9 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                style={{ width: `${Math.min((storageUsed / LIBRARY_LIMIT_BYTES) * 100, 100)}%` }}
+              />
+            </div>
+            {storageUsed / LIBRARY_LIMIT_BYTES > 0.85 && (
+              <p className="text-xs text-red-500 font-medium mt-1">⚠ Espaço quase esgotado — apague materiais antigos</p>
+            )}
+          </div>
+
+          {/* Upload form */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Upload size={16} className="text-indigo-500" />Adicionar Material</h3>
+            <div className="space-y-2">
+              <input value={uploadForm.title} onChange={e => setUploadForm(f => ({...f, title: e.target.value}))} placeholder="Título do material *"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400" />
+              <div className="grid grid-cols-2 gap-2">
+                <select value={uploadForm.type} onChange={e => setUploadForm(f => ({...f, type: e.target.value as LibraryItem['type']}))}
+                  className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white">
+                  <option value="activities">Atividades</option>
+                  <option value="exam">Prova</option>
+                  <option value="plan">Plano de Aula</option>
+                  <option value="slides">Slides (PDF)</option>
+                </select>
+                <input value={uploadForm.subject} onChange={e => setUploadForm(f => ({...f, subject: e.target.value}))} placeholder="Disciplina"
+                  className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400" />
+              </div>
+              <input value={uploadForm.grade} onChange={e => setUploadForm(f => ({...f, grade: e.target.value}))} placeholder="Série / Nível (ex: 8º ano)"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400" />
+              <textarea value={uploadForm.description} onChange={e => setUploadForm(f => ({...f, description: e.target.value}))} placeholder="Descrição breve (opcional)" rows={2}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 resize-none" />
+              <label className="flex items-center gap-3 border-2 border-dashed border-gray-200 rounded-xl p-3 cursor-pointer hover:border-indigo-400 transition-colors">
+                <Upload size={20} className="text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-500 truncate">{uploadFile ? uploadFile.name : 'Selecionar PDF…'}</span>
+                <input type="file" accept=".pdf" className="hidden" onChange={e => { setUploadFile(e.target.files?.[0] || null); setUploadErr(''); }} />
+              </label>
+              {uploadFile && <p className="text-xs text-gray-400 text-right">{fmtBytes(uploadFile.size)}</p>}
+              {uploadErr && <p className="text-xs text-red-500 font-medium">{uploadErr}</p>}
+              {uploadProgress !== null && (
+                <div className="space-y-1">
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-500 text-right">{uploadProgress}%</p>
+                </div>
+              )}
+              <button onClick={handleUpload} disabled={uploadProgress !== null || !uploadFile}
+                className="w-full bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+                {uploadProgress !== null ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                {uploadProgress !== null ? 'Enviando...' : 'Fazer Upload'}
+              </button>
+            </div>
+          </div>
+
+          {/* Existing items */}
+          <div className="space-y-2">
+            {libItems.length === 0 ? (
+              <p className="text-center text-sm text-gray-400 py-6">Nenhum material na biblioteca ainda</p>
+            ) : libItems.map(item => (
+              <div key={item.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm text-gray-900 truncate">{item.title}</p>
+                  <p className="text-xs text-gray-400">{item.subject} · {item.grade} · {fmtBytes(item.fileSizeBytes)} · {item.downloadCount} downloads</p>
+                </div>
+                <button onClick={() => handleDeleteLib(item)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -5702,7 +6020,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setEstudioContext('');
           }} />}
           {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
-          {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={notifications} setNotifications={setNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
 
