@@ -2160,6 +2160,7 @@ const PlannerScreen = ({
   };
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingDoc, setIsExportingDoc] = useState(false);
 
   const exportPPTX = async () => {
     if (!presentationData) return;
@@ -2656,26 +2657,36 @@ const PlannerScreen = ({
                 <div className="flex gap-2">
                   <button
                     onClick={async () => {
-                      const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
-                      const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
-                      const blob = await buildDocx(currentResult as string, docType, {
-                        school: profileSchoolName || '',
-                        teacher: profileName || '',
-                        subject: profile.subject || '',
-                        topic,
-                        className: selectedClassForExport?.name || '',
-                        duration,
-                        lessonTime,
-                        turn,
-                        examValue,
-                        examDuration,
-                      });
-                      const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
-                      downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                      if (isExportingDoc) return;
+                      setIsExportingDoc(true);
+                      try {
+                        const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
+                        const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
+                        const blob = await buildDocx(currentResult as string, docType, {
+                          school: profileSchoolName || '',
+                          teacher: profileName || '',
+                          subject: profile.subject || '',
+                          topic,
+                          className: selectedClassForExport?.name || '',
+                          duration,
+                          lessonTime,
+                          turn,
+                          examValue,
+                          examDuration,
+                        });
+                        const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
+                        await downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                      } catch (e) {
+                        console.error('Erro ao exportar Word:', e);
+                        alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                      } finally {
+                        setIsExportingDoc(false);
+                      }
                     }}
-                    className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                    disabled={isExportingDoc}
+                    className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                   >
-                    <Download size={16} /> Exportar Word
+                    {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                   </button>
                   <button 
                     onClick={() => {
@@ -2724,19 +2735,36 @@ const PlannerScreen = ({
                     <div className="flex gap-2">
                       <button
                         onClick={async () => {
-                          const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
-                          const blob = await buildDocx(res.content, dt, {
-                            school: profileSchoolName || '',
-                            teacher: profileName || '',
-                            subject: profile.subject || '',
-                            topic,
-                          });
-                          const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
-                          downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                          if (isExportingDoc) return;
+                          setIsExportingDoc(true);
+                          try {
+                            const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
+                            const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
+                            const blob = await buildDocx(res.content, dt, {
+                              school: profileSchoolName || '',
+                              teacher: profileName || '',
+                              subject: profile.subject || '',
+                              topic,
+                              className: selectedClassForExport?.name || '',
+                              duration,
+                              lessonTime,
+                              turn,
+                              examValue,
+                              examDuration,
+                            });
+                            const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
+                            await downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                          } catch (e) {
+                            console.error('Erro ao exportar Word:', e);
+                            alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                          } finally {
+                            setIsExportingDoc(false);
+                          }
                         }}
-                        className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                        disabled={isExportingDoc}
+                        className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                       >
-                        <Download size={16} /> Exportar Word
+                        {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                       </button>
                       <button 
                         onClick={() => {
