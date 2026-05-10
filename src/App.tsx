@@ -1669,15 +1669,18 @@ const buildDocx = async (
   return Packer.toBlob(wordDoc);
 };
 
-const downloadDocx = async (blob: Blob, filename: string) => {
+const downloadDocx = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    if (document.body.contains(a)) document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 1000);
 };
 
 const buildDocHtml = (
@@ -2682,7 +2685,7 @@ const PlannerScreen = ({
                           examDuration,
                         });
                         const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
-                        await downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                        downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
                       } catch (e) {
                         console.error('Erro ao exportar Word:', e);
                         alert('Erro ao gerar o arquivo Word. Tente novamente.');
@@ -2760,7 +2763,7 @@ const PlannerScreen = ({
                               examDuration,
                             });
                             const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
-                            await downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                            downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
                           } catch (e) {
                             console.error('Erro ao exportar Word:', e);
                             alert('Erro ao gerar o arquivo Word. Tente novamente.');
