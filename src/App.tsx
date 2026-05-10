@@ -738,7 +738,9 @@ const AdvancedSettings = ({
   mode, tone, setTone, complexity, setComplexity,
   duration, setDuration, lessonTime, setLessonTime,
   questionCount, setQuestionCount, slideCount, setSlideCount,
-  focus, setFocus, groundingContent, setGroundingContent
+  focus, setFocus, groundingContent, setGroundingContent,
+  turn, setTurn, questionType, setQuestionType,
+  examValue, setExamValue, examDuration, setExamDuration,
 }: {
   mode: PlannerMode,
   tone: string, setTone: (v: any) => void,
@@ -749,142 +751,204 @@ const AdvancedSettings = ({
   slideCount: number, setSlideCount: (v: number) => void,
   focus: string, setFocus: (v: any) => void,
   groundingContent: string, setGroundingContent: (v: string) => void,
+  turn: string, setTurn: (v: any) => void,
+  questionType: string, setQuestionType: (v: any) => void,
+  examValue: number, setExamValue: (v: number) => void,
+  examDuration: number, setExamDuration: (v: number) => void,
+}) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Linguagem do texto</label>
+        <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+          <option value="didactic">Didática</option>
+          <option value="formal">Formal</option>
+          <option value="technical">Técnica</option>
+          <option value="concise">Direta e curta</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Nível da turma</label>
+        <select value={complexity} onChange={(e) => setComplexity(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+          <option value="basic">Iniciante</option>
+          <option value="intermediate">Intermediário</option>
+          <option value="advanced">Avançado</option>
+        </select>
+      </div>
+      {mode === 'plan' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. de Aulas</label>
+            <select value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+              <option value={0}>Sugerir automaticamente</option>
+              {[1,2,3,4,5,6,8,10].map(n => <option key={n} value={n}>{n} {n === 1 ? 'aula' : 'aulas'}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Duração de cada aula</label>
+            <select value={lessonTime} onChange={(e) => setLessonTime(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+              <option value={30}>30 min</option>
+              <option value={40}>40 min</option>
+              <option value={45}>45 min</option>
+              <option value={50}>50 min</option>
+              <option value={60}>1 hora</option>
+              <option value={90}>1h30</option>
+              <option value={120}>2 horas</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Turno</label>
+            <select value={turn} onChange={(e) => setTurn(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+              <option value="matutino">Matutino</option>
+              <option value="vespertino">Vespertino</option>
+              <option value="noturno">Noturno</option>
+            </select>
+          </div>
+        </>
+      )}
+      {mode === 'activities' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de questões</label>
+            <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de questão</label>
+            <select value={questionType} onChange={(e) => setQuestionType(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+              <option value="mista">Mista (variada)</option>
+              <option value="multipla_escolha">Só múltipla escolha</option>
+              <option value="dissertativa">Só dissertativa</option>
+            </select>
+          </div>
+        </>
+      )}
+      {mode === 'exam' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Valor total da prova</label>
+            <select value={examValue} onChange={(e) => setExamValue(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+              {[5,10,20,50,100].map(v => <option key={v} value={v}>{v} pontos</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tempo da prova</label>
+            <select value={examDuration} onChange={(e) => setExamDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+              <option value={30}>30 min</option>
+              <option value={45}>45 min</option>
+              <option value={60}>1 hora</option>
+              <option value={90}>1h30</option>
+              <option value={120}>2 horas</option>
+              <option value={180}>3 horas</option>
+            </select>
+          </div>
+        </>
+      )}
+      {mode === 'slides' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de slides</label>
+          <input type="number" min="3" max="50" value={slideCount} onChange={(e) => setSlideCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+        </div>
+      )}
+    </div>
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">Abordagem do conteúdo</label>
+      <select value={focus} onChange={(e) => setFocus(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+        <option value="balanced">Equilibrada (teoria + prática)</option>
+        <option value="practical">Foco em exemplos práticos</option>
+        <option value="theoretical">Foco em teoria e conceitos</option>
+      </select>
+    </div>
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">Material de apoio <span className="font-normal text-gray-400">(opcional)</span></label>
+      <textarea
+        value={groundingContent}
+        onChange={(e) => setGroundingContent(e.target.value)}
+        placeholder="Cole aqui um texto, apostila ou resumo que a IA deve usar como base..."
+        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm h-20 resize-none"
+      />
+    </div>
+  </div>
+);
+
+const GenerateModal = ({
+  show, onClose, onGenerate, mode,
+  tone, setTone, complexity, setComplexity,
+  duration, setDuration, lessonTime, setLessonTime,
+  questionCount, setQuestionCount, slideCount, setSlideCount,
+  focus, setFocus, groundingContent, setGroundingContent,
+  turn, setTurn, questionType, setQuestionType,
+  examValue, setExamValue, examDuration, setExamDuration,
+}: {
+  show: boolean, onClose: () => void, onGenerate: () => void,
+  mode: PlannerMode,
+  tone: string, setTone: (v: any) => void,
+  complexity: string, setComplexity: (v: any) => void,
+  duration: number, setDuration: (v: number) => void,
+  lessonTime: number, setLessonTime: (v: number) => void,
+  questionCount: number, setQuestionCount: (v: number) => void,
+  slideCount: number, setSlideCount: (v: number) => void,
+  focus: string, setFocus: (v: any) => void,
+  groundingContent: string, setGroundingContent: (v: string) => void,
+  turn: string, setTurn: (v: any) => void,
+  questionType: string, setQuestionType: (v: any) => void,
+  examValue: number, setExamValue: (v: number) => void,
+  examDuration: number, setExamDuration: (v: number) => void,
 }) => {
-  const [open, setOpen] = useState(false);
+  const label = mode === 'plan' ? 'Plano de Aula' : mode === 'activities' ? 'Atividades' : mode === 'exam' ? 'Prova' : 'Slides';
   return (
-    <div className="mb-6">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between text-sm font-bold text-gray-500 bg-gray-50 px-4 py-3 rounded-2xl"
-      >
-        <span>Personalizar geração</span>
-        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-      </button>
-      <AnimatePresence>
-        {open && (
+    <AnimatePresence>
+      {show && (
+        <>
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-50 flex flex-col max-h-[90vh]"
           >
-            <div className="bg-gray-50 px-4 pb-4 rounded-b-2xl space-y-4 pt-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Linguagem do texto</label>
-                  <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                    <option value="didactic">Didática</option>
-                    <option value="formal">Formal</option>
-                    <option value="technical">Técnica</option>
-                    <option value="concise">Direta e curta</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Nível da turma</label>
-                  <select value={complexity} onChange={(e) => setComplexity(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                    <option value="basic">Iniciante</option>
-                    <option value="intermediate">Intermediário</option>
-                    <option value="advanced">Avançado</option>
-                  </select>
-                </div>
-                {mode === 'plan' && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. de Aulas</label>
-                      <select value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                        <option value={0}>Sugerir automaticamente</option>
-                        {[1,2,3,4,5,6,8,10].map(n => <option key={n} value={n}>{n} {n === 1 ? 'aula' : 'aulas'}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Duração de cada aula</label>
-                      <select value={lessonTime} onChange={(e) => setLessonTime(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                        <option value={30}>30 min</option>
-                        <option value={40}>40 min</option>
-                        <option value={45}>45 min</option>
-                        <option value={50}>50 min</option>
-                        <option value={60}>1 hora</option>
-                        <option value={90}>1h30</option>
-                        <option value={120}>2 horas</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Turno</label>
-                      <select value={turn} onChange={(e) => setTurn(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                        <option value="matutino">Matutino</option>
-                        <option value="vespertino">Vespertino</option>
-                        <option value="noturno">Noturno</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-                {mode === 'activities' && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de questões</label>
-                      <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de questão</label>
-                      <select value={questionType} onChange={(e) => setQuestionType(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                        <option value="mista">Mista (variada)</option>
-                        <option value="multipla_escolha">Só múltipla escolha</option>
-                        <option value="dissertativa">Só dissertativa</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-                {mode === 'exam' && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Valor total da prova</label>
-                      <select value={examValue} onChange={(e) => setExamValue(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                        {[5,10,20,50,100].map(v => <option key={v} value={v}>{v} pontos</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Tempo da prova</label>
-                      <select value={examDuration} onChange={(e) => setExamDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                        <option value={30}>30 min</option>
-                        <option value={45}>45 min</option>
-                        <option value={60}>1 hora</option>
-                        <option value={90}>1h30</option>
-                        <option value={120}>2 horas</option>
-                        <option value={180}>3 horas</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-                {mode === 'slides' && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de slides</label>
-                    <input type="number" min="3" max="50" value={slideCount} onChange={(e) => setSlideCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Abordagem do conteúdo</label>
-                <select value={focus} onChange={(e) => setFocus(e.target.value)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
-                  <option value="balanced">Equilibrada (teoria + prática)</option>
-                  <option value="practical">Foco em exemplos práticos</option>
-                  <option value="theoretical">Foco em teoria e conceitos</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Material de apoio <span className="font-normal text-gray-400">(opcional)</span></label>
-                <textarea
-                  value={groundingContent}
-                  onChange={(e) => setGroundingContent(e.target.value)}
-                  placeholder="Cole aqui um texto, apostila ou resumo que a IA deve usar como base..."
-                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm h-20 resize-none"
-                />
-              </div>
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+              <h2 className="text-lg font-bold text-gray-900">Personalizar {label}</h2>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              <AdvancedSettings
+                mode={mode} tone={tone} setTone={setTone}
+                complexity={complexity} setComplexity={setComplexity}
+                duration={duration} setDuration={setDuration}
+                lessonTime={lessonTime} setLessonTime={setLessonTime}
+                questionCount={questionCount} setQuestionCount={setQuestionCount}
+                slideCount={slideCount} setSlideCount={setSlideCount}
+                focus={focus} setFocus={setFocus}
+                groundingContent={groundingContent} setGroundingContent={setGroundingContent}
+                turn={turn} setTurn={setTurn}
+                questionType={questionType} setQuestionType={setQuestionType}
+                examValue={examValue} setExamValue={setExamValue}
+                examDuration={examDuration} setExamDuration={setExamDuration}
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-2">
+              <button
+                onClick={onGenerate}
+                className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2"
+              >
+                <Sparkles size={18} /> Gerar {label}
+              </button>
+              <button
+                onClick={onGenerate}
+                className="w-full text-gray-400 text-sm py-2 font-medium"
+              >
+                Gerar assim mesmo
+              </button>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+        </>
+      )}
+    </AnimatePresence>
   );
 };
 
@@ -1968,6 +2032,7 @@ const PlannerScreen = ({
   
   const [isAddingClass, setIsAddingClass] = useState(false);
   const [newClassName, setNewClassName] = useState('');
+  const [showGenModal, setShowGenModal] = useState(false);
   const profileName = profile.name;
   const profileSchoolName = profile.schoolName;
 
@@ -2450,17 +2515,6 @@ const PlannerScreen = ({
               </button>
             </div>
 
-            <AdvancedSettings
-              mode={mode} tone={tone} setTone={setTone}
-              complexity={complexity} setComplexity={setComplexity}
-              duration={duration} setDuration={setDuration}
-              lessonTime={lessonTime} setLessonTime={setLessonTime}
-              questionCount={questionCount} setQuestionCount={setQuestionCount}
-              slideCount={slideCount} setSlideCount={setSlideCount}
-              focus={focus} setFocus={setFocus}
-              groundingContent={groundingContent} setGroundingContent={setGroundingContent}
-            />
-
             <AnimatePresence>
               {isAddingClass && (
                 <motion.div 
@@ -2493,14 +2547,38 @@ const PlannerScreen = ({
                 </motion.div>
               )}
             </AnimatePresence>
-            <button 
-              onClick={handleMainAction}
+            <button
+              onClick={() => {
+                if (mode === 'plan' && duration === 0) {
+                  getSuggestion();
+                } else {
+                  setShowGenModal(true);
+                }
+              }}
               disabled={loading || !topic || !selectedClassId}
               className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
             >
               {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}
               {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
             </button>
+            <GenerateModal
+              show={showGenModal}
+              onClose={() => setShowGenModal(false)}
+              onGenerate={() => { setShowGenModal(false); handleMainAction(); }}
+              mode={mode}
+              tone={tone} setTone={setTone}
+              complexity={complexity} setComplexity={setComplexity}
+              duration={duration} setDuration={setDuration}
+              lessonTime={lessonTime} setLessonTime={setLessonTime}
+              questionCount={questionCount} setQuestionCount={setQuestionCount}
+              slideCount={slideCount} setSlideCount={setSlideCount}
+              focus={focus} setFocus={setFocus}
+              groundingContent={groundingContent} setGroundingContent={setGroundingContent}
+              turn={turn} setTurn={setTurn}
+              questionType={questionType} setQuestionType={setQuestionType}
+              examValue={examValue} setExamValue={setExamValue}
+              examDuration={examDuration} setExamDuration={setExamDuration}
+            />
             {loading && (
               <button
                 onClick={cancelCurrentGeneration}
