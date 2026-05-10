@@ -13,7 +13,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import pptxgen from 'pptxgenjs';
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, WidthType, BorderStyle, ShadingType, VerticalAlign, PageOrientation } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation } from 'docx';
 import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
@@ -1451,9 +1451,6 @@ const buildDocx = async (
   const ac = accentHex[docType];
   const dk = darkHex[docType];
 
-  const bord = { top: { style: BorderStyle.SINGLE, size: 4, color: '888888' }, bottom: { style: BorderStyle.SINGLE, size: 4, color: '888888' }, left: { style: BorderStyle.SINGLE, size: 4, color: '888888' }, right: { style: BorderStyle.SINGLE, size: 4, color: '888888' } };
-  const marg = { top: 80, bottom: 80, left: 150, right: 150 };
-
   const parseInline = (text: string): TextRun[] => {
     const runs: TextRun[] = [];
     const rx = /(\*\*[^*]+?\*\*|\*[^*]+?\*)/g;
@@ -1469,13 +1466,24 @@ const buildDocx = async (
     return runs.length ? runs : [new TextRun({ text: '', size: 22 })];
   };
 
+  const hr = () => new Paragraph({
+    children: [new TextRun('')],
+    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' } },
+    spacing: { before: 40, after: 40 },
+  });
+
+  const infoLine = (text: string) => new Paragraph({
+    children: [new TextRun({ text, size: 20, color: '333333' })],
+    spacing: { before: 30, after: 30 },
+  });
+
   const mdParas = (md: string): Paragraph[] =>
     md.split('\n').map(line => {
       if (!line.trim()) return new Paragraph({ children: [new TextRun('')], spacing: { after: 60 } });
       if (line.startsWith('### '))
         return new Paragraph({ children: [new TextRun({ text: line.slice(4), bold: true, color: dk, size: 22 })], spacing: { before: 120, after: 60 } });
       if (line.startsWith('## '))
-        return new Paragraph({ children: [new TextRun({ text: line.slice(3), bold: true, color: 'FFFFFF', size: 22 })], shading: { fill: ac, type: ShadingType.CLEAR, color: 'auto' }, spacing: { before: 160, after: 80 } });
+        return new Paragraph({ children: [new TextRun({ text: line.slice(3), bold: true, color: dk, size: 22 })], spacing: { before: 160, after: 80 } });
       if (line.startsWith('- ') || line.startsWith('* '))
         return new Paragraph({ children: [new TextRun({ text: '• ', size: 22 }), ...parseInline(line.slice(2))], indent: { left: 360 }, spacing: { after: 40 } });
       if (/^\d+\. /.test(line)) {
@@ -1485,14 +1493,9 @@ const buildDocx = async (
       return new Paragraph({ children: parseInline(line), spacing: { after: 60 } });
     });
 
-  const infoCell = (text: string, colSpan?: number) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, size: 20 })], spacing: { before: 40, after: 40 } })], columnSpan: colSpan, borders: bord, margins: marg, verticalAlign: VerticalAlign.CENTER });
-  const secHdrCell = (label: string) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 22 })], spacing: { before: 60, after: 60 } })], borders: bord, shading: { fill: 'F0F0F0', type: ShadingType.CLEAR, color: 'auto' }, margins: marg });
-  const secBodyCell = (paras: Paragraph[]) => new TableCell({ children: paras.length ? paras : [new Paragraph({ children: [new TextRun('')] })], borders: bord, margins: { ...marg, bottom: 360 } });
-
-  const docChildren: (Paragraph | Table)[] = [];
+  const docChildren: Paragraph[] = [];
 
   if (docType === 'plan') {
-    // Parse ## sections
     const secs: Record<string, string> = {};
     mainMd.split(/\n(?=## )/).forEach(part => {
       const m = part.match(/^## (.+?)\n([\s\S]*)/);
@@ -1507,82 +1510,62 @@ const buildDocx = async (
       return '';
     };
 
-    // Info table (6-column grid)
-    docChildren.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [infoCell(`ESCOLA: ${opts.school || '____________'}`, 6)] }),
-        new TableRow({ children: [infoCell(`ÁREA DE CONHECIMENTO: ${get('ÁREA DE CONHECIMENTO', 'AREA DE CONHECIMENTO')}`, 6)] }),
-        new TableRow({ children: [
-          infoCell(`EIXO/UNIDADE TEMÁTICA: ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}`, 2),
-          infoCell(`ANO/SÉRIE: ${opts.className || '____________'}`, 1),
-          infoCell('TURMA: ____________', 1),
-          infoCell(`TURNO: ${opts.turn ? opts.turn.charAt(0).toUpperCase() + opts.turn.slice(1) : '____________'}`, 2),
-        ]}),
-        new TableRow({ children: [infoCell(`COMPONENTE CURRICULAR: ${opts.subject || '____________'}`, 6)] }),
-        new TableRow({ children: [
-          infoCell(`QUANTIDADE DE AULAS: ${opts.duration ?? '___'}`, 3),
-          infoCell(`DURAÇÃO: ${opts.lessonTime ? opts.lessonTime + ' min' : '____________'}`, 3),
-        ]}),
-        new TableRow({ children: [infoCell(`PROFESSOR(A): ${opts.teacher || '____________'}`, 6)] }),
-      ],
-    }));
+    const turnoStr = opts.turn ? opts.turn.charAt(0).toUpperCase() + opts.turn.slice(1) : '____________';
 
-    // "PLANO DE AULA" title
+    // Header info block
+    docChildren.push(infoLine(`ESCOLA: ${opts.school || '____________'}`));
+    docChildren.push(infoLine(`ÁREA DE CONHECIMENTO: ${get('ÁREA DE CONHECIMENTO', 'AREA DE CONHECIMENTO')}`));
+    docChildren.push(infoLine(`EIXO/UNIDADE TEMÁTICA: ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}   |   ANO/SÉRIE: ${opts.className || '____________'}   |   TURNO: ${turnoStr}`));
+    docChildren.push(infoLine(`COMPONENTE CURRICULAR: ${opts.subject || '____________'}`));
+    docChildren.push(infoLine(`QUANTIDADE DE AULAS: ${opts.duration ?? '___'}   |   DURAÇÃO: ${opts.lessonTime ? opts.lessonTime + ' min por aula' : '____________'}`));
+    docChildren.push(infoLine(`PROFESSOR(A): ${opts.teacher || '____________'}`));
+    docChildren.push(hr());
+
+    // Title
     docChildren.push(new Paragraph({
-      children: [new TextRun({ text: 'PLANO DE AULA', bold: true, size: 26, underline: {} })],
+      children: [new TextRun({ text: 'PLANO DE AULA', bold: true, size: 28, color: dk })],
       alignment: AlignmentType.CENTER,
-      spacing: { before: 200, after: 140 },
+      spacing: { before: 160, after: 160 },
     }));
 
-    // Content sections table
+    // Content sections
     const secDefs = [
-      { label: 'CONTEÚDO:', keys: ['CONTEÚDO', 'CONTEUDO'] },
-      { label: 'OBJETIVOS:', keys: ['OBJETIVOS'] },
-      { label: 'PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM:', keys: ['PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM', 'PERGUNTAS MOBILIZADORAS', 'PERGUNTAS'] },
-      { label: 'METODOLOGIA:', keys: ['METODOLOGIA'] },
-      { label: 'Habilidade (BNCC):', keys: ['HABILIDADE (BNCC)', 'HABILIDADE BNCC', 'HABILIDADES BNCC', 'HABILIDADE'] },
-      { label: 'RECURSOS DIDÁTICOS:', keys: ['RECURSOS DIDÁTICOS', 'RECURSOS DIDATICOS', 'RECURSOS'] },
-      { label: 'AVALIAÇÃO:', keys: ['AVALIAÇÃO', 'AVALIACAO'] },
-      { label: 'REFERÊNCIAS:', keys: ['REFERÊNCIAS', 'REFERENCIAS'] },
+      { label: 'CONTEÚDO', keys: ['CONTEÚDO', 'CONTEUDO'] },
+      { label: 'OBJETIVOS', keys: ['OBJETIVOS'] },
+      { label: 'PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM', keys: ['PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM', 'PERGUNTAS MOBILIZADORAS', 'PERGUNTAS'] },
+      { label: 'METODOLOGIA', keys: ['METODOLOGIA'] },
+      { label: 'HABILIDADE (BNCC)', keys: ['HABILIDADE (BNCC)', 'HABILIDADE BNCC', 'HABILIDADES BNCC', 'HABILIDADE'] },
+      { label: 'RECURSOS DIDÁTICOS', keys: ['RECURSOS DIDÁTICOS', 'RECURSOS DIDATICOS', 'RECURSOS'] },
+      { label: 'AVALIAÇÃO', keys: ['AVALIAÇÃO', 'AVALIACAO'] },
+      { label: 'REFERÊNCIAS', keys: ['REFERÊNCIAS', 'REFERENCIAS'] },
     ];
-    const contentRows: TableRow[] = [];
+
     for (const { label, keys } of secDefs) {
       const content = get(...keys);
-      contentRows.push(
-        new TableRow({ children: [secHdrCell(label)] }),
-        new TableRow({ children: [secBodyCell(mdParas(content))] }),
-      );
+      docChildren.push(new Paragraph({
+        children: [new TextRun({ text: label, bold: true, size: 22, color: 'FFFFFF' })],
+        shading: { fill: ac, type: ShadingType.CLEAR, color: 'auto' },
+        spacing: { before: 140, after: 60 },
+        indent: { left: 80, right: 80 },
+      }));
+      docChildren.push(...mdParas(content));
+      docChildren.push(hr());
     }
-    docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: contentRows }));
 
   } else {
-    // ── Exam / Activities: structured rendering ────────────────────────────
     const isExam = docType === 'exam';
     const typeLabel = isExam ? 'AVALIAÇÃO' : 'ATIVIDADE';
 
-    // Header info table (6-column grid)
-    docChildren.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [
-          infoCell(`ESCOLA: ${opts.school || '____________'}`, 3),
-          infoCell(`PROFESSOR(A): ${opts.teacher || '____________'}`, 2),
-          infoCell(`DISCIPLINA: ${opts.subject || '____________'}`, 1),
-        ]}),
-        new TableRow({ children: [
-          infoCell(`TURMA: ${opts.className || '____________'}`, 2),
-          infoCell('DATA: ___/___/______', 2),
-          infoCell(isExam ? 'NOTA: _______' : 'ENTREGA: ____________', 2),
-        ]}),
-      ],
-    }));
+    // Header info
+    docChildren.push(infoLine(`ESCOLA: ${opts.school || '____________'}   |   PROFESSOR(A): ${opts.teacher || '____________'}   |   DISCIPLINA: ${opts.subject || '____________'}`));
+    docChildren.push(infoLine(`TURMA: ${opts.className || '____________'}   |   DATA: ___/___/______   |   ${isExam ? 'NOTA: _______' : 'ENTREGA: ____________'}`));
+    docChildren.push(hr());
 
     // Student name underline
     docChildren.push(new Paragraph({
       children: [new TextRun({ text: 'NOME DO(A) ALUNO(A): ', bold: true, size: 22 })],
       border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '555555' } },
-      spacing: { before: 160, after: 240 },
+      spacing: { before: 80, after: 200 },
     }));
 
     // Centered document title
@@ -1592,7 +1575,6 @@ const buildDocx = async (
       spacing: { before: 80, after: 200 },
     }));
 
-    // Parse content — skip header lines already rendered above
     const skipLine = (line: string) =>
       /^# /.test(line) ||
       /^\*\*(Escola|Professor|Turma|Nome do|Disciplina):/i.test(line.trim()) ||
@@ -1606,18 +1588,16 @@ const buildDocx = async (
         continue;
       }
 
-      // ## Section header
       if (line.startsWith('## ')) {
         docChildren.push(new Paragraph({
           children: [new TextRun({ text: line.slice(3), bold: true, color: 'FFFFFF', size: 24 })],
           shading: { fill: ac, type: ShadingType.CLEAR, color: 'auto' },
           spacing: { before: 200, after: 100 },
-          indent: { left: 120, right: 120 },
+          indent: { left: 80, right: 80 },
         }));
         continue;
       }
 
-      // Answer lines (10+ underscores) → real underline
       if (/^_{10,}$/.test(line.trim())) {
         docChildren.push(new Paragraph({
           children: [new TextRun('')],
@@ -1627,7 +1607,6 @@ const buildDocx = async (
         continue;
       }
 
-      // Multiple choice: ( ) A) ...
       if (/^\( \) [A-D]\)/.test(line.trim())) {
         docChildren.push(new Paragraph({
           children: [new TextRun({ text: '○  ', size: 22 }), ...parseInline(line.replace(/^\( \)/, '').trim())],
@@ -1637,7 +1616,6 @@ const buildDocx = async (
         continue;
       }
 
-      // Italic score line: *text*
       if (/^\*[^*].*[^*]\*$/.test(line.trim())) {
         docChildren.push(new Paragraph({
           children: [new TextRun({ text: line.trim().slice(1, -1), italics: true, size: 22 })],
@@ -1647,14 +1625,12 @@ const buildDocx = async (
         continue;
       }
 
-      // Default paragraph
       docChildren.push(new Paragraph({
         children: parseInline(line),
         spacing: { after: 60 },
       }));
     }
 
-    // Gabarito — page break
     if (gabMd) {
       docChildren.push(new Paragraph({
         children: [new TextRun({ text: 'GABARITO', bold: true, size: 28, color: 'FFFFFF' })],
