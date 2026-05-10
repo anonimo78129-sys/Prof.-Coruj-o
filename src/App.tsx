@@ -809,15 +809,52 @@ const AdvancedSettings = ({
                         <option value={120}>2 horas</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Turno</label>
+                      <select value={turn} onChange={(e) => setTurn(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                        <option value="matutino">Matutino</option>
+                        <option value="vespertino">Vespertino</option>
+                        <option value="noturno">Noturno</option>
+                      </select>
+                    </div>
                   </>
                 )}
-                {(mode === 'activities' || mode === 'exam') && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      {mode === 'exam' ? 'Questões de múltipla escolha' : 'Quantidade de questões'}
-                    </label>
-                    <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
-                  </div>
+                {mode === 'activities' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de questões</label>
+                      <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de questão</label>
+                      <select value={questionType} onChange={(e) => setQuestionType(e.target.value as any)} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                        <option value="mista">Mista (variada)</option>
+                        <option value="multipla_escolha">Só múltipla escolha</option>
+                        <option value="dissertativa">Só dissertativa</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+                {mode === 'exam' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Valor total da prova</label>
+                      <select value={examValue} onChange={(e) => setExamValue(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                        {[5,10,20,50,100].map(v => <option key={v} value={v}>{v} pontos</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Tempo da prova</label>
+                      <select value={examDuration} onChange={(e) => setExamDuration(parseInt(e.target.value))} className="w-full bg-indigo-600 text-white border-none rounded-xl py-2 px-3 text-sm font-bold">
+                        <option value={30}>30 min</option>
+                        <option value={45}>45 min</option>
+                        <option value={60}>1 hora</option>
+                        <option value={90}>1h30</option>
+                        <option value={120}>2 horas</option>
+                        <option value={180}>3 horas</option>
+                      </select>
+                    </div>
+                  </>
                 )}
                 {mode === 'slides' && (
                   <div>
@@ -1338,7 +1375,7 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
 const buildDocx = async (
   rawMd: string,
   docType: 'plan' | 'exam' | 'activities',
-  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number }
+  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): Promise<Blob> => {
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
@@ -1416,7 +1453,7 @@ const buildDocx = async (
           infoCell(`EIXO/UNIDADE TEMÁTICA: ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}`, 2),
           infoCell(`ANO/SÉRIE: ${opts.className || '____________'}`, 1),
           infoCell('TURMA: ____________', 1),
-          infoCell('TURNO: ____________', 2),
+          infoCell(`TURNO: ${opts.turn ? opts.turn.charAt(0).toUpperCase() + opts.turn.slice(1) : '____________'}`, 2),
         ]}),
         new TableRow({ children: [infoCell(`COMPONENTE CURRICULAR: ${opts.subject || '____________'}`, 6)] }),
         new TableRow({ children: [
@@ -1599,7 +1636,7 @@ const downloadDocx = async (blob: Blob, filename: string) => {
 const buildDocHtml = (
   rawMd: string,
   docType: 'plan' | 'exam' | 'activities',
-  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number }
+  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): string => {
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
@@ -1661,7 +1698,7 @@ const buildDocHtml = (
       <td class="info-cell" colspan="2"><strong>EIXO/UNIDADE TEMÁTICA:</strong> ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}</td>
       <td class="info-cell"><strong>ANO/SÉRIE:</strong> ${opts.className || '___________'}</td>
       <td class="info-cell"><strong>TURMA:</strong> ___________</td>
-      <td class="info-cell"><strong>TURNO:</strong> ___________</td>
+      <td class="info-cell"><strong>TURNO:</strong> ${opts.turn ? opts.turn.charAt(0).toUpperCase() + opts.turn.slice(1) : '___________'}</td>
     </tr>
     <tr><td class="info-cell" colspan="5"><strong>COMPONENTE CURRICULAR:</strong> ${opts.subject || '___________'}</td></tr>
     <tr>
@@ -1808,6 +1845,14 @@ const PlannerScreen = ({
   setPlannerQuestionCount: setQuestionCount,
   plannerSlideCount: slideCount,
   setPlannerSlideCount: setSlideCount,
+  plannerTurn: turn,
+  setPlannerTurn: setTurn,
+  plannerQuestionType: questionType,
+  setPlannerQuestionType: setQuestionType,
+  plannerExamValue: examValue,
+  setPlannerExamValue: setExamValue,
+  plannerExamDuration: examDuration,
+  setPlannerExamDuration: setExamDuration,
   getSuggestion,
   getScheduleBuffer,
   setPlannerMode
@@ -1860,6 +1905,14 @@ const PlannerScreen = ({
   setPlannerQuestionCount: (n: number) => void,
   plannerSlideCount: number,
   setPlannerSlideCount: (n: number) => void,
+  plannerTurn: 'matutino' | 'vespertino' | 'noturno',
+  setPlannerTurn: (t: 'matutino' | 'vespertino' | 'noturno') => void,
+  plannerQuestionType: 'mista' | 'multipla_escolha' | 'dissertativa',
+  setPlannerQuestionType: (t: 'mista' | 'multipla_escolha' | 'dissertativa') => void,
+  plannerExamValue: number,
+  setPlannerExamValue: (n: number) => void,
+  plannerExamDuration: number,
+  setPlannerExamDuration: (n: number) => void,
   getSuggestion: (topic?: string, classId?: string) => Promise<void>,
   getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
   setPlannerMode: (m: PlannerMode) => void
@@ -2559,6 +2612,9 @@ const PlannerScreen = ({
                         className: selectedClassForExport?.name || '',
                         duration,
                         lessonTime,
+                        turn,
+                        examValue,
+                        examDuration,
                       });
                       const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
                       downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
@@ -5530,6 +5586,10 @@ export default function App() {
   const [plannerGroundingContent, setPlannerGroundingContent] = useState('');
   const [plannerQuestionCount, setPlannerQuestionCount] = useState(5);
   const [plannerSlideCount, setPlannerSlideCount] = useState(10);
+  const [plannerTurn, setPlannerTurn] = useState<'matutino' | 'vespertino' | 'noturno'>('matutino');
+  const [plannerQuestionType, setPlannerQuestionType] = useState<'mista' | 'multipla_escolha' | 'dissertativa'>('mista');
+  const [plannerExamValue, setPlannerExamValue] = useState(10);
+  const [plannerExamDuration, setPlannerExamDuration] = useState(60);
 
   const processedTasksRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -5967,7 +6027,7 @@ export default function App() {
 
       // ── Solução 1: injetar habilidades reais no prompt ──────────────────
       const prompt = `Você é um pedagogo especialista. Gere um PLANO DE AULA completo e profissional.
-Tópico: "${targetTopic}" | Turma: "${className}" | Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]}
+Tópico: "${targetTopic}" | Turma: "${className}" | Turno: ${plannerTurn.charAt(0).toUpperCase() + plannerTurn.slice(1)} | Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]}
 Quantidade de aulas: ${plannerDuration} | Duração por aula: ${plannerLessonTime} min (abertura: ${abertura}min · desenvolvimento: ${desenvolvimento}min · fechamento: ${fechamento}min)
 
 Responda SOMENTE com as seções abaixo em Markdown, substituindo todos os campos [ ] por conteúdo real e pertinente.
@@ -6097,52 +6157,59 @@ ${planDraft}`;
         const disciplinaStr = profile.subject || '_________________';
         
         const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
+        const mcPts  = parseFloat((plannerExamValue / 10).toFixed(1));
+        const dissPts = parseFloat((plannerExamValue / 4).toFixed(1));
+        const examDurStr = plannerExamDuration < 60 ? `${plannerExamDuration} min` : plannerExamDuration === 60 ? '1 hora' : `${Math.floor(plannerExamDuration/60)}h${plannerExamDuration%60 > 0 ? plannerExamDuration%60+'min' : ''}`;
+
+        const qtLabel: Record<string, string> = { mista: 'Varie os tipos entre as questões: múltipla escolha, completar lacunas, V/F com justificativa, relacionar colunas, produção textual ou resolução de problema.', multipla_escolha: 'Todas as questões são de MÚLTIPLA ESCOLHA com 4 alternativas (A, B, C, D), apenas uma correta.', dissertativa: 'Todas as questões são DISSERTATIVAS (resposta aberta), com 5 linhas de resposta.' };
+        const qtInstruction = qtLabel[plannerQuestionType] || qtLabel.mista;
 
         const prompt = type === 'exam'
-          ? `Você é um professor especialista criando uma avaliação formal para impressão. Gere uma AVALIAÇÃO COMPLETA sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
+          ? `Você é um professor especialista. Gere uma AVALIAÇÃO FORMAL sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
+Valor total: ${plannerExamValue} pontos | Tempo: ${examDurStr}
 
 ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteúdo real):
 
 # Avaliação: ${targetTopic}
 
 **Escola:** ${escolaStr}  |  **Professor(a):** ${professorStr}  |  **Disciplina:** ${disciplinaStr}
-**Turma:** ${className}  |  **Data:** ___/___/______  |  **Nota:** _______
+**Turma:** ${className}  |  **Tempo:** ${examDurStr}  |  **Valor:** ${plannerExamValue} pts  |  **Data:** ___/___/______
 
 **Nome do aluno:** _________________________________________________________________
 
 ---
 
-## Parte I — Questões de Múltipla Escolha *(2 pts cada — total: 10 pts)*
+## Parte I — Questões de Múltipla Escolha *(${mcPts} pts cada — total: ${(mcPts*5).toFixed(1)} pts)*
 
-**Questão 1 (2 pts)** [enunciado claro e objetivo]
+**Questão 1 (${mcPts} pts)** [enunciado claro e objetivo]
 
 ( ) A) [alternativa incorreta]
 ( ) B) [alternativa correta]
 ( ) C) [alternativa incorreta]
 ( ) D) [alternativa incorreta]
 
-**Questão 2 (2 pts)** [enunciado]
+**Questão 2 (${mcPts} pts)** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 3 (2 pts)** [enunciado]
+**Questão 3 (${mcPts} pts)** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 4 (2 pts)** [enunciado]
+**Questão 4 (${mcPts} pts)** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 5 (2 pts)** [enunciado]
+**Questão 5 (${mcPts} pts)** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
@@ -6151,9 +6218,9 @@ ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteú
 
 ---
 
-## Parte II — Questões Dissertativas *(5 pts cada — total: 10 pts)*
+## Parte II — Questões Dissertativas *(${dissPts} pts cada — total: ${(dissPts*2).toFixed(1)} pts)*
 
-**Questão 6 (5 pts)** [enunciado que exige desenvolvimento e reflexão]
+**Questão 6 (${dissPts} pts)** [enunciado que exige desenvolvimento e reflexão]
 
 _______________________________________________________________________________
 _______________________________________________________________________________
@@ -6161,7 +6228,7 @@ _______________________________________________________________________________
 _______________________________________________________________________________
 _______________________________________________________________________________
 
-**Questão 7 (5 pts)** [enunciado que exige desenvolvimento]
+**Questão 7 (${dissPts} pts)** [enunciado que exige desenvolvimento]
 
 _______________________________________________________________________________
 _______________________________________________________________________________
@@ -6171,7 +6238,7 @@ _______________________________________________________________________________
 
 ---
 
-*Pontuação total: _______ / 20 pontos*
+*Pontuação total: _______ / ${plannerExamValue} pontos*
 
 ---GABARITO---
 
@@ -6187,7 +6254,8 @@ _______________________________________________________________________________
 **Q7:** [elementos essenciais esperados na resposta: liste 2-3 pontos chave]
 
 REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções ou texto fora da estrutura.`
-          : `Você é um professor especialista criando uma lista de atividades para impressão. Gere ${plannerQuestionCount} ATIVIDADES variadas sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
+          : `Você é um professor especialista. Gere ${plannerQuestionCount} QUESTÕES sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
+Tipo de questão: ${qtInstruction}
 
 ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteúdo real):
 
@@ -6202,13 +6270,13 @@ ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteú
 
 ## Questões
 
-**1.** [Enunciado — tipo: múltipla escolha, completar lacunas, V/F com justificativa, relacionar colunas, produção textual ou resolução de problema. Varie os tipos entre as questões.]
+**1.** [Enunciado. ${qtInstruction}]
 
 _______________________________________________________________________________
 _______________________________________________________________________________
 _______________________________________________________________________________
 
-[Continue numerando até a questão ${plannerQuestionCount}, cada uma com 3 linhas de resposta]
+[Continue numerando até a questão ${plannerQuestionCount}, seguindo o mesmo formato e tipo de questão]
 
 ---GABARITO---
 
@@ -6300,6 +6368,14 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerQuestionCount={setPlannerQuestionCount}
             plannerSlideCount={plannerSlideCount}
             setPlannerSlideCount={setPlannerSlideCount}
+            plannerTurn={plannerTurn}
+            setPlannerTurn={setPlannerTurn}
+            plannerQuestionType={plannerQuestionType}
+            setPlannerQuestionType={setPlannerQuestionType}
+            plannerExamValue={plannerExamValue}
+            setPlannerExamValue={setPlannerExamValue}
+            plannerExamDuration={plannerExamDuration}
+            setPlannerExamDuration={setPlannerExamDuration}
             getSuggestion={getSuggestion}
             getScheduleBuffer={getScheduleBuffer}
             setPlannerMode={setPlannerMode}
