@@ -897,64 +897,49 @@ const GenerateModal = ({
   examDuration: number, setExamDuration: (v: number) => void,
 }) => {
   const label = mode === 'plan' ? 'Plano de Aula' : mode === 'activities' ? 'Atividades' : mode === 'exam' ? 'Prova' : 'Slides';
+  if (!show) return null;
   return createPortal(
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          key="generate-modal"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9999]"
-        >
-          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col max-h-[90vh]"
+    <div className="fixed inset-0 z-[9999] modal-fade-in">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col max-h-[90vh] modal-slide-up">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+          <h2 className="text-lg font-bold text-gray-900">Personalizar {label}</h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          <AdvancedSettings
+            mode={mode} tone={tone} setTone={setTone}
+            complexity={complexity} setComplexity={setComplexity}
+            duration={duration} setDuration={setDuration}
+            lessonTime={lessonTime} setLessonTime={setLessonTime}
+            questionCount={questionCount} setQuestionCount={setQuestionCount}
+            slideCount={slideCount} setSlideCount={setSlideCount}
+            focus={focus} setFocus={setFocus}
+            groundingContent={groundingContent} setGroundingContent={setGroundingContent}
+            turn={turn} setTurn={setTurn}
+            questionType={questionType} setQuestionType={setQuestionType}
+            examValue={examValue} setExamValue={setExamValue}
+            examDuration={examDuration} setExamDuration={setExamDuration}
+          />
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-2">
+          <button
+            onClick={onGenerate}
+            className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2"
           >
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
-              <h2 className="text-lg font-bold text-gray-900">Personalizar {label}</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-6 py-4">
-              <AdvancedSettings
-                mode={mode} tone={tone} setTone={setTone}
-                complexity={complexity} setComplexity={setComplexity}
-                duration={duration} setDuration={setDuration}
-                lessonTime={lessonTime} setLessonTime={setLessonTime}
-                questionCount={questionCount} setQuestionCount={setQuestionCount}
-                slideCount={slideCount} setSlideCount={setSlideCount}
-                focus={focus} setFocus={setFocus}
-                groundingContent={groundingContent} setGroundingContent={setGroundingContent}
-                turn={turn} setTurn={setTurn}
-                questionType={questionType} setQuestionType={setQuestionType}
-                examValue={examValue} setExamValue={setExamValue}
-                examDuration={examDuration} setExamDuration={setExamDuration}
-              />
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-2">
-              <button
-                onClick={onGenerate}
-                className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2"
-              >
-                <Sparkles size={18} /> Gerar {label}
-              </button>
-              <button
-                onClick={onGenerate}
-                className="w-full text-gray-400 text-sm py-2 font-medium"
-              >
-                Gerar assim mesmo
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
+            <Sparkles size={18} /> Gerar {label}
+          </button>
+          <button
+            onClick={onGenerate}
+            className="w-full text-gray-400 text-sm py-2 font-medium"
+          >
+            Gerar assim mesmo
+          </button>
+        </div>
+      </div>
+    </div>,
     document.body
   );
 };
