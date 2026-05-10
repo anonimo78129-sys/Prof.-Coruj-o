@@ -6226,13 +6226,6 @@ ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteú
 
 # Avaliação: ${targetTopic}
 
-**Escola:** ${escolaStr}  |  **Professor(a):** ${professorStr}  |  **Disciplina:** ${disciplinaStr}
-**Turma:** ${className}  |  **Tempo:** ${examDurStr}  |  **Valor:** ${plannerExamValue} pts  |  **Data:** ___/___/______
-
-**Nome do aluno:** _________________________________________________________________
-
----
-
 ## Parte I — Questões de Múltipla Escolha *(${mcPts} pts cada — total: ${(mcPts*5).toFixed(1)} pts)*
 
 **Questão 1 (${mcPts} pts)** [enunciado claro e objetivo]
@@ -6314,13 +6307,6 @@ Tipo de questão: ${qtInstruction}
 ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteúdo real):
 
 # Atividade: ${targetTopic}
-
-**Escola:** ${escolaStr}  |  **Professor(a):** ${professorStr}  |  **Disciplina:** ${disciplinaStr}
-**Turma:** ${className}  |  **Data:** ___/___/______
-
-**Nome do aluno:** _________________________________________________________________
-
----
 
 ## Questões
 
