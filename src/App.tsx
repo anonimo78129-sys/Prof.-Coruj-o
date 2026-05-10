@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import * as LucideIcons from 'lucide-react';
 import { 
@@ -895,7 +896,7 @@ const GenerateModal = ({
   examDuration: number, setExamDuration: (v: number) => void,
 }) => {
   const label = mode === 'plan' ? 'Plano de Aula' : mode === 'activities' ? 'Atividades' : mode === 'exam' ? 'Prova' : 'Slides';
-  return (
+  return createPortal(
     <AnimatePresence>
       {show && (
         <motion.div
@@ -903,7 +904,7 @@ const GenerateModal = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-40"
+          className="fixed inset-0 z-[9999]"
         >
           <div className="absolute inset-0 bg-black/50" onClick={onClose} />
           <motion.div
@@ -952,7 +953,8 @@ const GenerateModal = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 
