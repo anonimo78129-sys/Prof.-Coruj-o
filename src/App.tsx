@@ -6085,7 +6085,7 @@ Tópico: "${targetTopic}" | Turma: "${className}" | Turno: ${plannerTurn.charAt(
 Quantidade de aulas: ${plannerDuration} | Duração por aula: ${plannerLessonTime} min (abertura: ${abertura}min · desenvolvimento: ${desenvolvimento}min · fechamento: ${fechamento}min)
 
 Responda SOMENTE com as seções abaixo em Markdown, substituindo todos os campos [ ] por conteúdo real e pertinente.
-PROIBIDO: introduções, saudações, comentários ou qualquer texto fora da estrutura abaixo.
+PROIBIDO: introduções, saudações, comentários, tabelas Markdown (| coluna |) ou qualquer texto fora da estrutura abaixo.
 
 ## ÁREA DE CONHECIMENTO
 [Área — ex: Ciências da Natureza, Linguagens, Matemática, Ciências Humanas, Ensino Religioso]
@@ -6307,7 +6307,7 @@ _______________________________________________________________________________
 **Q6:** [elementos essenciais esperados na resposta: liste 2-3 pontos chave]
 **Q7:** [elementos essenciais esperados na resposta: liste 2-3 pontos chave]
 
-REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções ou texto fora da estrutura.`
+REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`
           : `Você é um professor especialista. Gere ${plannerQuestionCount} QUESTÕES sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
 Tipo de questão: ${qtInstruction}
 
@@ -6339,7 +6339,7 @@ _______________________________________________________________________________
 **1.** [resposta correta ou critérios de correção objetivos]
 [Continue para todas as ${plannerQuestionCount} questões]
 
-REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções ou texto fora da estrutura.`;
+REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`;
           
         const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
         const result = response.text || '';
