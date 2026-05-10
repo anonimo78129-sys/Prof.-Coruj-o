@@ -8,7 +8,7 @@ import {
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
-  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen
+  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -216,11 +216,11 @@ function useFirestoreDoc<T>(
 }
 
 // --- Helper Components ---
-const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '' }: { name: string, size?: number, color?: string, className?: string }) => {
+const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', style }: { name: string, size?: number, color?: string, className?: string, style?: React.CSSProperties }) => {
   // Normalize icon name (e.g., "BrainCircuit" or "brain-circuit")
   const normalizedName = name.charAt(0).toUpperCase() + name.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
   const IconComponent = (LucideIcons as any)[normalizedName] || LucideIcons.HelpCircle;
-  return <IconComponent size={size} color={color} className={className} />;
+  return <IconComponent size={size} color={color} className={className} style={style} />;
 };
 
 const pixabayCache = new Map<string, string>();
@@ -319,6 +319,7 @@ interface UserProfile {
   role?: string;
   email?: string;
   isPro?: boolean;
+  createdAt?: string;
 }
 
 interface ClassSchedule {
@@ -2159,7 +2160,7 @@ const PlannerScreen = ({
   };
 
   const parseMarkdown = (text: any, baseOpts: any) =>
-    parseRichMarkdown(text, baseOpts, theme.primaryColor, theme.accentColor);
+    parseRichMarkdown(text, baseOpts, presentationData?.theme?.primaryColor ?? '#6366f1', presentationData?.theme?.accentColor ?? '#f59e0b');
 
   const generateDirectResource = async (targetMode: 'activities' | 'slides' | 'exam') => {
     generateResource(targetMode);
@@ -2361,7 +2362,7 @@ const PlannerScreen = ({
           // Accent line above title
           slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.2, w: 1.0, h: 0.07, fill: { color: ac } });
           // Title
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 3.35, w: 9, h: 1.3, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: 'Calibri', valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000', transparency: 50 } });
+          slide.addText(slideData.data.title || '', { x: 0.5, y: 3.35, w: 9, h: 1.3, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: 'Calibri', valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000' } });
           // Subtitle
           if (slideData.data.subtitle) {
             slide.addText(slideData.data.subtitle, { x: 0.5, y: 4.7, w: 9, h: 0.45, fontSize: 16, color: 'D1D5DB', fontFace: 'Calibri' });
@@ -4615,7 +4616,7 @@ const CalendarScreen = ({
             const dayColor = mainEvent ? getEventColorInternal(mainEvent) : null;
             // allDone only considers tasks (classes/prep/admin), never holidays
             const taskEvents = dayEvents.filter(e => e.type !== 'holiday' && e.type !== 'commemorative');
-            const allDone = taskEvents.length > 0 && taskEvents.every(e => e.status === 'done');
+            const allDone = taskEvents.length > 0 && taskEvents.every(e => (e as any).status === 'done');
 
             let cellStyle: React.CSSProperties = {};
             let cellClass = 'text-sm font-medium w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all relative';
