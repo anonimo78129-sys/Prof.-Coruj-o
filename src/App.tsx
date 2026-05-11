@@ -2191,6 +2191,9 @@ const PlannerScreen = ({
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingDoc, setIsExportingDoc] = useState(false);
 
+  // Reset export state when mode changes so the button is never stuck across modes
+  useEffect(() => { setIsExportingDoc(false); }, [mode]);
+
   const exportPPTX = async () => {
     if (!presentationData) return;
     setIsExporting(true);
@@ -2687,6 +2690,7 @@ const PlannerScreen = ({
                     onClick={async () => {
                       if (isExportingDoc) return;
                       setIsExportingDoc(true);
+                      const safetyTimer = setTimeout(() => setIsExportingDoc(false), 30000);
                       try {
                         const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
                         const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
@@ -2708,6 +2712,7 @@ const PlannerScreen = ({
                         console.error('Erro ao exportar Word:', e);
                         alert('Erro ao gerar o arquivo Word. Tente novamente.');
                       } finally {
+                        clearTimeout(safetyTimer);
                         setIsExportingDoc(false);
                       }
                     }}
@@ -2738,6 +2743,7 @@ const PlannerScreen = ({
                         onClick={async () => {
                           if (isExportingDoc) return;
                           setIsExportingDoc(true);
+                          const safetyTimer = setTimeout(() => setIsExportingDoc(false), 30000);
                           try {
                             const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
                             const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
@@ -2759,6 +2765,7 @@ const PlannerScreen = ({
                             console.error('Erro ao exportar Word:', e);
                             alert('Erro ao gerar o arquivo Word. Tente novamente.');
                           } finally {
+                            clearTimeout(safetyTimer);
                             setIsExportingDoc(false);
                           }
                         }}
