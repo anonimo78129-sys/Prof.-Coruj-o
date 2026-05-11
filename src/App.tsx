@@ -1669,6 +1669,40 @@ const buildDocx = async (
   return Packer.toBlob(wordDoc);
 };
 
+const stripSlideMarkup = (s: any): string =>
+  typeof s === 'string' ? s.replace(/\[\[|\]\]/g, '') : (s ?? '');
+
+const sanitizeSlideData = (parsed: any): any => {
+  if (!parsed?.slides) return parsed;
+  return {
+    ...parsed,
+    slides: parsed.slides.map((slide: any) => {
+      const d = slide.data || {};
+      return {
+        ...slide,
+        data: {
+          ...d,
+          title: stripSlideMarkup(d.title),
+          subtitle: stripSlideMarkup(d.subtitle),
+          author: stripSlideMarkup(d.author),
+          quote: stripSlideMarkup(d.quote),
+          // text / column1 / column2 intentionally kept — parsed by parseRichHtml
+          topics: Array.isArray(d.topics)
+            ? d.topics.map((t: any) => ({ ...t, title: stripSlideMarkup(t.title), content: stripSlideMarkup(t.content) }))
+            : d.topics,
+          events: Array.isArray(d.events)
+            ? d.events.map((e: any) => ({ ...e, year: stripSlideMarkup(e.year), title: stripSlideMarkup(e.title), description: stripSlideMarkup(e.description) }))
+            : d.events,
+          stats: Array.isArray(d.stats)
+            ? d.stats.map((s: any) => ({ ...s, value: stripSlideMarkup(s.value), label: stripSlideMarkup(s.label) }))
+            : d.stats,
+          references: Array.isArray(d.references) ? d.references.map(stripSlideMarkup) : d.references,
+        },
+      };
+    }),
+  };
+};
+
 const downloadDocx = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2664,8 +2698,7 @@ const PlannerScreen = ({
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
+                <button
                     onClick={async () => {
                       if (isExportingDoc) return;
                       setIsExportingDoc(true);
@@ -2694,37 +2727,10 @@ const PlannerScreen = ({
                       }
                     }}
                     disabled={isExportingDoc}
-                    className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                    className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                   </button>
-                  <button 
-                    onClick={() => {
-                      const newResourceId = Math.random().toString(36).substr(2, 9);
-                      setSavedResources([...savedResources, {
-                        id: newResourceId,
-                        type: mode === 'plan' ? 'plan' : mode === 'exam' ? 'exam' : 'activities',
-                        title: topic || 'Material Didático',
-                        date: Date.now(),
-                        content: currentResult
-                      }]);
-                      
-                      const selectedClass = schedules.find(c => c.id === selectedClassId);
-                      const className = selectedClass ? selectedClass.name : 'Geral';
-                      const classToUpdate = classes.find(c => c.className === className && c.title.includes(topic));
-                      if (classToUpdate) {
-                        setClasses(classes.map(c => c.id === classToUpdate.id ? { ...c, resourceIds: [...(c.resourceIds || []), newResourceId] } : c));
-                      }
-
-                      if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification('Material salvo!', { icon: '/favicon.ico' });
-                      }
-                    }}
-                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                  >
-                    <Archive size={16} /> Salvar
-                  </button>
-                </div>
               </div>
             )}
 
@@ -2772,27 +2778,9 @@ const PlannerScreen = ({
                           }
                         }}
                         disabled={isExportingDoc}
-                        className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                        className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                       >
                         {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const newResourceId = Math.random().toString(36).substr(2, 9);
-                          setSavedResources([...savedResources, {
-                            id: newResourceId,
-                            type: res.type as any,
-                            title: `${topic} - ${res.type === 'activities' ? 'Atividades' : 'Roteiro'}`,
-                            date: Date.now(),
-                            content: res.content
-                          }]);
-                          if ('Notification' in window && Notification.permission === 'granted') {
-                            new Notification('Material salvo!', { icon: '/favicon.ico' });
-                          }
-                        }}
-                        className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                      >
-                        <Archive size={16} /> Salvar
                       </button>
                     </div>
                   </div>
@@ -6241,8 +6229,9 @@ ${planDraft}`;
         } catch (e) {
           console.warn('Image fetch timed out — proceeding without all images.');
         }
-        setPlannerPresentationData(parsed);
-        updateTask(taskId, { status: 'completed', result: parsed });
+        const sanitized = sanitizeSlideData(parsed);
+        setPlannerPresentationData(sanitized);
+        updateTask(taskId, { status: 'completed', result: sanitized });
       } else {
         const escolaStr = profile.schoolName || '_________________';
         const professorStr = profile.name || '_________________';
