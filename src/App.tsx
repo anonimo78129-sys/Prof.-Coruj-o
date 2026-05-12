@@ -2189,10 +2189,21 @@ const PlannerScreen = ({
   };
 
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingDoc, setIsExportingDoc] = useState(false);
+  const [preparingDoc, setPreparingDoc] = useState<'main' | number | null>(null);
+  const [docReady, setDocReady] = useState<{url: string; filename: string; target: 'main' | number} | null>(null);
 
-  // Reset export state when mode changes so the button is never stuck across modes
-  useEffect(() => { setIsExportingDoc(false); }, [mode]);
+  // Clean up download URL and reset state on mode change
+  useEffect(() => {
+    if (docReady) URL.revokeObjectURL(docReady.url);
+    setDocReady(null);
+    setPreparingDoc(null);
+  }, [mode]);
+
+  // When content changes (new generation), reset download state
+  useEffect(() => {
+    if (docReady) URL.revokeObjectURL(docReady.url);
+    setDocReady(null);
+  }, [currentResult]);
 
   const exportPPTX = async () => {
     if (!presentationData) return;
@@ -2686,11 +2697,20 @@ const PlannerScreen = ({
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
                   </div>
                 </div>
-                <button
+                {docReady?.target === 'main' ? (
+                  <a
+                    href={docReady.url}
+                    download={docReady.filename}
+                    onClick={() => setTimeout(() => { URL.revokeObjectURL(docReady!.url); setDocReady(null); }, 1000)}
+                    className="w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <Download size={16} /> Baixar Word
+                  </a>
+                ) : (
+                  <button
                     onClick={async () => {
-                      if (isExportingDoc) return;
-                      setIsExportingDoc(true);
-                      const safetyTimer = setTimeout(() => setIsExportingDoc(false), 30000);
+                      if (preparingDoc !== null || docReady !== null) return;
+                      setPreparingDoc('main');
                       try {
                         const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
                         const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
@@ -2707,20 +2727,21 @@ const PlannerScreen = ({
                           examDuration,
                         });
                         const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
-                        downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                        const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
+                        setDocReady({ url: URL.createObjectURL(blob), filename, target: 'main' });
                       } catch (e) {
                         console.error('Erro ao exportar Word:', e);
                         alert('Erro ao gerar o arquivo Word. Tente novamente.');
                       } finally {
-                        clearTimeout(safetyTimer);
-                        setIsExportingDoc(false);
+                        setPreparingDoc(null);
                       }
                     }}
-                    disabled={isExportingDoc}
+                    disabled={preparingDoc !== null || docReady !== null}
                     className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                   >
-                    {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
+                    {preparingDoc === 'main' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                   </button>
+                )}
               </div>
             )}
 
@@ -2739,41 +2760,51 @@ const PlannerScreen = ({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          if (isExportingDoc) return;
-                          setIsExportingDoc(true);
-                          const safetyTimer = setTimeout(() => setIsExportingDoc(false), 30000);
-                          try {
-                            const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
-                            const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
-                            const blob = await buildDocx(res.content, dt, {
-                              school: profileSchoolName || '',
-                              teacher: profileName || '',
-                              subject: profile.subject || '',
-                              topic,
-                              className: selectedClassForExport?.name || '',
-                              duration,
-                              lessonTime,
-                              turn,
-                              examValue,
-                              examDuration,
-                            });
-                            const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
-                            downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
-                          } catch (e) {
-                            console.error('Erro ao exportar Word:', e);
-                            alert('Erro ao gerar o arquivo Word. Tente novamente.');
-                          } finally {
-                            clearTimeout(safetyTimer);
-                            setIsExportingDoc(false);
-                          }
-                        }}
-                        disabled={isExportingDoc}
-                        className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-                      >
-                        {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
-                      </button>
+                      {docReady?.target === i ? (
+                        <a
+                          href={docReady.url}
+                          download={docReady.filename}
+                          onClick={() => setTimeout(() => { URL.revokeObjectURL(docReady!.url); setDocReady(null); }, 1000)}
+                          className="w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                        >
+                          <Download size={16} /> Baixar Word
+                        </a>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (preparingDoc !== null || docReady !== null) return;
+                            setPreparingDoc(i);
+                            try {
+                              const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
+                              const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
+                              const blob = await buildDocx(res.content, dt, {
+                                school: profileSchoolName || '',
+                                teacher: profileName || '',
+                                subject: profile.subject || '',
+                                topic,
+                                className: selectedClassForExport?.name || '',
+                                duration,
+                                lessonTime,
+                                turn,
+                                examValue,
+                                examDuration,
+                              });
+                              const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
+                              const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
+                              setDocReady({ url: URL.createObjectURL(blob), filename, target: i });
+                            } catch (e) {
+                              console.error('Erro ao exportar Word:', e);
+                              alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                            } finally {
+                              setPreparingDoc(null);
+                            }
+                          }}
+                          disabled={preparingDoc !== null || docReady !== null}
+                          className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                        >
+                          {preparingDoc === i ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
