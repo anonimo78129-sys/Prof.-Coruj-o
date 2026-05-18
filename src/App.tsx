@@ -19,7 +19,7 @@ import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEm
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { selectBnccSkills } from './bncc-data';
+import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -313,7 +313,7 @@ interface BackgroundTask {
 
 interface UserProfile {
   name: string;
-  subject: string;
+  subject?: string;
   photo: string;
   schoolName?: string;
   role?: string;
@@ -321,6 +321,7 @@ interface UserProfile {
   isPro?: boolean;
   createdAt?: string;
   generationsUsed?: number;
+  onboarded?: boolean;
 }
 
 interface ClassSchedule {
@@ -333,6 +334,9 @@ interface ClassSchedule {
   color?: string;
   level?: string;
   classProfile?: string;
+  subject?: string;
+  school?: string;
+  shift?: string;
 }
 
 interface SavedResource {
@@ -2047,6 +2051,7 @@ const PlannerScreen = ({
   const [showGenModal, setShowGenModal] = useState(false);
   const profileName = profile.name;
   const profileSchoolName = profile.schoolName;
+  const selectedClass = schedules.find(s => s.id === selectedClassId);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -2222,7 +2227,7 @@ const PlannerScreen = ({
       const pc = theme.primaryColor.replace('#', '');
       const ac = theme.accentColor.replace('#', '');
       const bg = theme.backgroundColor.replace('#', '');
-      const schoolLabel = profileSchoolName || '';
+      const schoolLabel = selectedClass?.school || profileSchoolName || '';
       const teacherLabel = profileName || '';
       const totalSlides = presentationData.slides.length;
 
@@ -2758,13 +2763,12 @@ const PlannerScreen = ({
                       setPreparingDoc('main');
                       try {
                         const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
-                        const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
                         const blob = await buildDocx(currentResult as string, docType, {
-                          school: profileSchoolName || '',
+                          school: selectedClass?.school || profileSchoolName || '',
                           teacher: profileName || '',
-                          subject: profile.subject || '',
+                          subject: selectedClass?.subject || profile.subject || '',
                           topic,
-                          className: selectedClassForExport?.name || '',
+                          className: selectedClass?.name || '',
                           duration,
                           lessonTime,
                           turn,
@@ -2821,13 +2825,12 @@ const PlannerScreen = ({
                             setPreparingDoc(i);
                             try {
                               const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
-                              const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
                               const blob = await buildDocx(res.content, dt, {
-                                school: profileSchoolName || '',
+                                school: selectedClass?.school || profileSchoolName || '',
                                 teacher: profileName || '',
-                                subject: profile.subject || '',
+                                subject: selectedClass?.subject || profile.subject || '',
                                 topic,
-                                className: selectedClassForExport?.name || '',
+                                className: selectedClass?.name || '',
                                 duration,
                                 lessonTime,
                                 turn,
@@ -3101,7 +3104,7 @@ const ChatScreen = ({
       Hoje é: ${today}.
 
       Contexto Atual:
-      - Professor: ${profile.name} (${profile.subject})
+      - Professor: ${profile.name}
       - Escola: ${profile.schoolName || 'Não informada'}
       - Turmas cadastradas: ${turmas}
       - Próximas aulas (máx. 10):
@@ -3481,7 +3484,7 @@ const ProfileScreen = ({
   const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
   const [showScheduleConfig, setShowScheduleConfig] = useState(false);
   const [showAddClassModal, setShowAddClassModal] = useState(false);
-  const [newClassData, setNewClassData] = useState({ name: '', level: 'Ensino Fundamental II', profile: '', color: '#4F46E5' });
+  const [newClassData, setNewClassData] = useState({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
   const [classFormError, setClassFormError] = useState<string | null>(null);
   const classColors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
 
@@ -3520,11 +3523,14 @@ const ProfileScreen = ({
       time: '08:00',
       color: newClassData.color,
       level: newClassData.level,
+      subject: newClassData.subject || undefined,
+      school: newClassData.school || undefined,
+      shift: newClassData.shift || undefined,
       classProfile: newClassData.profile
     };
     onAddClass(newClass);
     setShowAddClassModal(false);
-    setNewClassData({ name: '', level: 'Ensino Fundamental II', profile: '', color: '#4F46E5' });
+    setNewClassData({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
   };
 
   const deleteClass = (id: string) => {
@@ -3593,7 +3599,7 @@ const ProfileScreen = ({
   };
 
   const saveProfile = () => {
-    setProfile({ ...profile, name: profileName, subject: profileSubject, schoolName: profileSchoolName });
+    setProfile({ ...profile, name: profileName, subject: profileSubject || undefined, schoolName: profileSchoolName || undefined });
     setIsEditingProfile(false);
   };
 
@@ -3620,49 +3626,55 @@ const ProfileScreen = ({
         {isEditingProfile ? (
           <div className="w-full space-y-3 mt-4">
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome do Professor</label>
-              <input 
-                value={profileName} 
-                onChange={e => setProfileName(e.target.value)} 
-                className="w-full text-base font-bold text-gray-900 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Seu Nome</label>
+              <input
+                value={profileName}
+                onChange={e => setProfileName(e.target.value)}
+                className="w-full text-base font-bold text-gray-900 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1"
                 autoFocus
               />
             </div>
+            <p className="text-xs text-gray-400 text-left px-1 pt-1">
+              Disciplina e escola são configurados em cada turma. Os campos abaixo são usados como padrão quando você gerar material sem turma selecionada.
+            </p>
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina / Turmas</label>
-              <input 
-                value={profileSubject} 
-                onChange={e => setProfileSubject(e.target.value)} 
-                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
-              />
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina padrão</label>
+              <select
+                value={profileSubject}
+                onChange={e => setProfileSubject(e.target.value)}
+                className="w-full text-sm text-gray-700 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1 bg-transparent"
+              >
+                <option value="">Nenhuma</option>
+                {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Escola (Cabeçalho)</label>
-              <input 
-                value={profileSchoolName} 
-                onChange={e => setProfileSchoolName(e.target.value)} 
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escola padrão</label>
+              <input
+                value={profileSchoolName}
+                onChange={e => setProfileSchoolName(e.target.value)}
                 placeholder="Ex: Escola Estadual Padrão"
-                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
+                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1"
               />
             </div>
           </div>
         ) : (
           <>
-            <h2 className="text-xl font-bold text-gray-900 mt-2">{profile.name}</h2>
-            <p className="text-base text-gray-500 mt-1">{profile.subject}</p>
+            <h2 className="text-xl font-bold text-gray-900 mt-2">{profile.name || 'Professor'}</h2>
+            {profile.subject && <p className="text-sm text-gray-400 mt-0.5">{profile.subject}</p>}
             {profile.schoolName && (
-              <p className="text-sm text-indigo-600 font-medium mt-2 bg-indigo-50 px-3 py-1 rounded-full">
+              <p className="text-sm text-indigo-600 font-medium mt-1 bg-indigo-50 px-3 py-1 rounded-full">
                 {profile.schoolName}
               </p>
             )}
           </>
         )}
-        
-        <button 
+
+        <button
           onClick={() => isEditingProfile ? saveProfile() : setIsEditingProfile(true)}
           className="mt-6 bg-[#F8F9FE] text-indigo-600 px-6 py-2.5 rounded-full text-base font-bold w-full"
         >
-          {isEditingProfile ? 'Salvar Identidade Padrão' : 'Editar Identidade Padrão'}
+          {isEditingProfile ? 'Salvar' : 'Editar Perfil'}
         </button>
       </div>
 
@@ -3714,28 +3726,40 @@ const ProfileScreen = ({
                       </div>
                     )}
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma</label>
-                        <input 
-                          type="text" 
-                          placeholder="Ex: 8º Ano A" 
-                          value={newClassData.name} 
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma *</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 8º Ano A"
+                          value={newClassData.name}
                           onChange={(e) => setNewClassData({...newClassData, name: e.target.value})}
                           className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
                         />
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Ensino</label>
-                        <select 
-                          value={newClassData.level} 
-                          onChange={(e) => setNewClassData({...newClassData, level: e.target.value})}
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina *</label>
+                        <select
+                          value={newClassData.subject}
+                          onChange={(e) => setNewClassData({...newClassData, subject: e.target.value})}
                           className={`w-full p-3 mt-1 rounded-xl focus:outline-none transition-all ${
-                            newClassData.level 
-                              ? 'bg-indigo-600 text-white font-bold border-none shadow-sm' 
+                            newClassData.subject
+                              ? 'bg-indigo-600 text-white font-bold border-none shadow-sm'
                               : 'bg-white text-gray-700 border border-gray-200'
                           }`}
+                        >
+                          <option value="">Selecione a disciplina</option>
+                          {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Ensino</label>
+                        <select
+                          value={newClassData.level}
+                          onChange={(e) => setNewClassData({...newClassData, level: e.target.value})}
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 bg-white text-gray-700"
                         >
                           <option value="Ensino Fundamental I">Ensino Fundamental I</option>
                           <option value="Ensino Fundamental II">Ensino Fundamental II</option>
@@ -3745,12 +3769,38 @@ const ProfileScreen = ({
                       </div>
 
                       <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
+                        <div className="flex gap-2 mt-1">
+                          {['Manhã', 'Tarde', 'Noite'].map(s => (
+                            <button
+                              key={s}
+                              onClick={() => setNewClassData({...newClassData, shift: s})}
+                              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${newClassData.shift === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Escola</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Escola Estadual João Silva"
+                          value={newClassData.school}
+                          onChange={(e) => setNewClassData({...newClassData, school: e.target.value})}
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
                         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Perfil da Turma (Opcional)</label>
-                        <textarea 
-                          placeholder="Ex: Turma agitada, prefere aulas práticas. 2 alunos com TDAH." 
-                          value={newClassData.profile} 
+                        <textarea
+                          placeholder="Ex: Turma agitada, prefere aulas práticas. 2 alunos com TDAH."
+                          value={newClassData.profile}
                           onChange={(e) => setNewClassData({...newClassData, profile: e.target.value})}
-                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-20 text-sm"
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-16 text-sm"
                         />
                       </div>
 
@@ -3790,7 +3840,10 @@ const ProfileScreen = ({
                     >
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900">{s.name}</h4>
-                        {s.level && <p className="text-xs text-gray-400">{s.level}</p>}
+                        <p className="text-xs text-gray-400">
+                          {[s.subject, s.level, s.shift].filter(Boolean).join(' · ')}
+                        </p>
+                        {s.school && <p className="text-xs text-indigo-400 font-medium truncate">{s.school}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         <div 
@@ -5720,6 +5773,33 @@ export default function App() {
   ]);
   
   const [estudioContext, setEstudioContext] = useState<string>('');
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2>(0);
+  const [onboardingName, setOnboardingName] = useState('');
+  const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
+
+  const showOnboarding = !!user && !profile.onboarded;
+
+  const finishOnboarding = async (skipClass = false) => {
+    const newName = onboardingName.trim() || 'Professor';
+    const updates: Partial<UserProfile> = { name: newName, onboarded: true };
+    setProfile({ ...profile, ...updates } as UserProfile);
+    if (!skipClass && onboardingClass.name.trim()) {
+      const newClass: ClassSchedule = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: onboardingClass.name,
+        days: [1, 2, 3, 4, 5],
+        time: '08:00',
+        subject: onboardingClass.subject || undefined,
+        school: onboardingClass.school || undefined,
+        shift: onboardingClass.shift || undefined,
+        level: onboardingClass.level,
+      };
+      setSchedules([...schedules, newClass]);
+    }
+    setOnboardingStep(0);
+  };
   const [studioMessages, setStudioMessages] = useFirestoreSync<{ id: string; role: 'user' | 'model'; text: string; date: number }>('studioMessages', user, [
     { id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }
   ]);
@@ -6185,7 +6265,7 @@ export default function App() {
       const fechamento = plannerLessonTime - abertura - desenvolvimento;
 
       // ── Solução 2: selecionar habilidades BNCC do banco local ──────────────
-      const bnccSkills = selectBnccSkills(profile.subject || '', className, targetTopic, 4);
+      const bnccSkills = selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4);
       const bnccBlock  = bnccSkills.length > 0
         ? bnccSkills.map(s => `- ${s.code} — ${s.desc}`).join('\n')
         : '- [escolha habilidades BNCC reais para a disciplina e série]';
@@ -6312,9 +6392,9 @@ ${bnccBlock}
         updateTask(taskId, { status: 'completed', result: sanitized });
         recordGeneration();
       } else {
-        const escolaStr = profile.schoolName || '_________________';
+        const escolaStr = selectedClass?.school || profile.schoolName || '_________________';
         const professorStr = profile.name || '_________________';
-        const disciplinaStr = profile.subject || '_________________';
+        const disciplinaStr = selectedClass?.subject || profile.subject || '_________________';
         
         const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
         const mcPts  = parseFloat((plannerExamValue / 10).toFixed(1));
@@ -6447,6 +6527,121 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
 
   return (
     <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+
+      {/* ── Onboarding Modal ───────────────────────────────────────────── */}
+      {showOnboarding && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-end justify-center p-0">
+          <div className="bg-white w-full max-w-md rounded-t-[2.5rem] p-6 pb-10 shadow-2xl">
+            {onboardingStep === 0 && (
+              <>
+                <div className="flex flex-col items-center text-center mb-6">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
+                    <span className="text-3xl">🦉</span>
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
+                  <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em 2 passos rápidos.</p>
+                </div>
+                <div className="mb-5">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Qual é o seu nome?</label>
+                  <input
+                    autoFocus
+                    value={onboardingName}
+                    onChange={e => setOnboardingName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && onboardingName.trim() && setOnboardingStep(2)}
+                    placeholder="Ex: Maria Souza"
+                    className="w-full mt-2 p-4 border-2 border-gray-200 rounded-2xl text-lg font-bold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <button
+                  onClick={() => onboardingName.trim() && setOnboardingStep(2)}
+                  disabled={!onboardingName.trim()}
+                  className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold disabled:opacity-40"
+                >
+                  Continuar →
+                </button>
+              </>
+            )}
+
+            {onboardingStep === 2 && (
+              <>
+                <div className="mb-4">
+                  <h2 className="text-xl font-black text-gray-900">Cadastre sua primeira turma</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">Você pode adicionar mais turmas depois no Perfil.</p>
+                </div>
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma *</label>
+                    <input
+                      value={onboardingClass.name}
+                      onChange={e => setOnboardingClass(c => ({...c, name: e.target.value}))}
+                      placeholder="Ex: 6º Ano A"
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina *</label>
+                    <select
+                      value={onboardingClass.subject}
+                      onChange={e => setOnboardingClass(c => ({...c, subject: e.target.value}))}
+                      className={`w-full mt-1 p-3 rounded-xl focus:outline-none transition-all ${onboardingClass.subject ? 'bg-indigo-600 text-white font-bold border-none' : 'border border-gray-200 bg-white text-gray-700'}`}
+                    >
+                      <option value="">Selecione</option>
+                      {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível</label>
+                    <select
+                      value={onboardingClass.level}
+                      onChange={e => setOnboardingClass(c => ({...c, level: e.target.value}))}
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 bg-white text-gray-700"
+                    >
+                      <option value="Ensino Fundamental I">Ensino Fundamental I</option>
+                      <option value="Ensino Fundamental II">Ensino Fundamental II</option>
+                      <option value="Ensino Médio">Ensino Médio</option>
+                      <option value="EJA">EJA</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
+                    <div className="flex gap-2 mt-1">
+                      {['Manhã', 'Tarde', 'Noite'].map(s => (
+                        <button key={s} onClick={() => setOnboardingClass(c => ({...c, shift: s}))}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${onboardingClass.shift === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escola</label>
+                    <input
+                      value={onboardingClass.school}
+                      onChange={e => setOnboardingClass(c => ({...c, school: e.target.value}))}
+                      placeholder="Nome da escola"
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-5">
+                  <button onClick={() => finishOnboarding(true)}
+                    className="flex-1 bg-gray-100 text-gray-600 rounded-2xl py-3.5 text-sm font-bold">
+                    Pular
+                  </button>
+                  <button
+                    onClick={() => finishOnboarding(false)}
+                    disabled={!onboardingClass.name.trim() || !onboardingClass.subject}
+                    className="flex-[2] bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold disabled:opacity-40"
+                  >
+                    Começar →
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
           {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={notifications} setNotifications={setNotifications} setSelectedDate={(d: Date) => {
