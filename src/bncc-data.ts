@@ -463,3 +463,20 @@ export const selectBnccSkills = (
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, count).map(s => s.skill);
 };
+
+export const SUBJECT_OPTIONS = [
+  'Língua Portuguesa',
+  'Matemática',
+  'Ciências',
+  'História',
+  'Geografia',
+  'Arte',
+  'Educação Física',
+  'Física',
+  'Química',
+  'Biologia',
+  'Sociologia',
+  'Filosofia',
+  'Língua Inglesa',
+  'Outra',
+];

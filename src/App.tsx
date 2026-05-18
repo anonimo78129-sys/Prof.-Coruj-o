@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
+import DOMPurify from 'dompurify';
 import * as LucideIcons from 'lucide-react';
 import { 
   Search, Bell, Home, Calendar as CalendarIcon, User,
@@ -13,19 +14,19 @@ import {
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import pptxgen from 'pptxgenjs';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation } from 'docx';
 import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { selectBnccSkills } from './bncc-data';
+import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   console.error("CRITICAL: GEMINI_API_KEY está ausente no ambiente!");
 }
 const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
+
+const AI_MODEL = 'gemini-2.0-flash';
 
 const formatApiError = (error: any, defaultMsg: string): string => {
   let msg = '';
@@ -50,6 +51,7 @@ const formatApiError = (error: any, defaultMsg: string): string => {
 
 const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs = 2000): Promise<T> => {
   let attempt = 0;
+  let rateLimit429Attempts = 0;
   while (attempt < maxRetries) {
     try {
       return await fn();
@@ -66,9 +68,17 @@ const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs =
       const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
       const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
 
-      if ((is503 || is429) && attempt < maxRetries) {
+      if (is429) {
+        rateLimit429Attempts++;
+        if (rateLimit429Attempts <= 1) {
+          // Wait 30s for per-minute quota window to reset, then try once more
+          await new Promise(resolve => setTimeout(resolve, 30000 + Math.random() * 5000));
+          continue;
+        }
+        throw error; // Second 429: quota is exhausted, give up
+      } else if (is503 && attempt < maxRetries) {
         const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + (Math.random() * 1000);
-        console.warn(`API overloaded (${is503 ? '503' : '429'}). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
+        console.warn(`API overloaded (503). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         throw error;
@@ -94,14 +104,8 @@ const generateContentWithRetry = async (params: Parameters<typeof ai.models.gene
   if (!apiKey) {
     throw new Error('Chave da IA não configurada. Contate o suporte.');
   }
-  if (params.model === 'gemini-2.5-flash') {
-    params.model = 'gemini-3-flash-preview';
-  }
+  if (!params.model) params.model = AI_MODEL;
   return withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
-};
-
-const generateImagesWithRetry = async (params: Parameters<typeof ai.models.generateImages>[0]) => {
-  return withRetry(() => ai.models.generateImages(params));
 };
 
 function useFirestoreSync<T extends { id: string }>(
@@ -169,7 +173,7 @@ function useFirestoreSync<T extends { id: string }>(
     } catch (err) {
       console.error(`Error in useFirestoreSync for ${collectionName}:`, err);
       setData(previousData);
-      alert("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("Falha de conexão: As alterações não foram salvas na nuvem.");
     }
   };
 
@@ -208,12 +212,85 @@ function useFirestoreDoc<T>(
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
-      alert("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("Falha de conexão: As alterações não foram salvas na nuvem.");
     }
   };
 
   return [data, updateData];
 }
+
+// --- Error Boundary ---
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">🦉</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Algo deu errado</h2>
+            <p className="text-sm text-gray-500 mb-6">O Corujão encontrou um problema inesperado. Seus dados estão salvos na nuvem.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-indigo-600 text-white rounded-2xl py-3 font-bold text-sm"
+            >
+              Recarregar o app
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// --- Toast System ---
+type ToastType = 'error' | 'success' | 'info';
+interface Toast { id: string; message: string; type: ToastType; }
+
+let _toastSetter: ((t: Toast[]) => void) | null = null;
+
+const toast = {
+  show(message: string, type: ToastType = 'info') {
+    if (!_toastSetter) { console.warn('[toast]', message); return; }
+    const id = Math.random().toString(36).slice(2);
+    _toastSetter(prev => [...prev.slice(-3), { id, message, type }]);
+    setTimeout(() => _toastSetter!(prev => prev.filter(t => t.id !== id)), 4500);
+  },
+  error(msg: string) { this.show(msg, 'error'); },
+  success(msg: string) { this.show(msg, 'success'); },
+  info(msg: string) { this.show(msg, 'info'); },
+};
+
+const ToastContainer = () => {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  useEffect(() => { _toastSetter = setToasts; return () => { _toastSetter = null; }; }, []);
+  if (!toasts.length) return null;
+  return createPortal(
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
+      {toasts.map(t => (
+        <div key={t.id} className={`rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-lg pointer-events-auto flex items-start gap-2 ${
+          t.type === 'error' ? 'bg-red-500' : t.type === 'success' ? 'bg-emerald-500' : 'bg-gray-800'
+        }`}>
+          <span className="flex-1">{t.message}</span>
+          <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="opacity-70 hover:opacity-100 shrink-0 mt-0.5">✕</button>
+        </div>
+      ))}
+    </div>,
+    document.body
+  );
+};
 
 // --- Helper Components ---
 const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', style }: { name: string, size?: number, color?: string, className?: string, style?: React.CSSProperties }) => {
@@ -223,7 +300,16 @@ const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', 
   return <IconComponent size={size} color={color} className={className} style={style} />;
 };
 
-const pixabayCache = new Map<string, string>();
+const PIXABAY_CACHE_KEY = '__pxcache__';
+const pixabayCache = {
+  get(k: string): string | undefined {
+    try { const s = sessionStorage.getItem(PIXABAY_CACHE_KEY); if (!s) return undefined; return JSON.parse(s)[k]; } catch { return undefined; }
+  },
+  set(k: string, v: string) {
+    try { const s = sessionStorage.getItem(PIXABAY_CACHE_KEY); const obj = s ? JSON.parse(s) : {}; obj[k] = v; sessionStorage.setItem(PIXABAY_CACHE_KEY, JSON.stringify(obj)); } catch { /* quota full — ignore */ }
+  },
+  has(k: string): boolean { return this.get(k) !== undefined; },
+};
 
 const getImageUrl = (query: string | undefined, width: number, height: number) => {
   if (!query || query.trim().length === 0) {
@@ -313,7 +399,7 @@ interface BackgroundTask {
 
 interface UserProfile {
   name: string;
-  subject: string;
+  subject?: string;
   photo: string;
   schoolName?: string;
   role?: string;
@@ -321,6 +407,7 @@ interface UserProfile {
   isPro?: boolean;
   createdAt?: string;
   generationsUsed?: number;
+  onboarded?: boolean;
 }
 
 interface ClassSchedule {
@@ -333,6 +420,9 @@ interface ClassSchedule {
   color?: string;
   level?: string;
   classProfile?: string;
+  subject?: string;
+  school?: string;
+  shift?: string;
 }
 
 interface SavedResource {
@@ -1016,7 +1106,7 @@ const RichBody = ({ value, onChange, style, rows = 6, primaryColor, accentColor 
   return (
     <div
       onClick={() => setEditing(true)}
-      dangerouslySetInnerHTML={{ __html: parseRichHtml(value, primaryColor, accentColor) || '<span style="color:#aaa;font-style:italic">Clique para editar...</span>' }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseRichHtml(value, primaryColor, accentColor) || '<span style="color:#aaa;font-style:italic">Clique para editar...</span>') }}
       style={{ cursor: 'text', fontSize: 14, lineHeight: 1.65, color: '#374151', width: '100%', minHeight: 60, ...style }}
     />
   );
@@ -1039,7 +1129,7 @@ const RichBodyWithIcons = ({ value, onChange, style, primaryColor, accentColor }
       {parts.map((p, i) => {
         const iconMatch = p.match(/^\{([A-Za-z0-9]+)\}$/);
         if (iconMatch) return <DynamicIcon key={i} name={iconMatch[1]} size={15} color={primaryColor} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />;
-        return <span key={i} dangerouslySetInnerHTML={{ __html: parseRichHtml(p, primaryColor, accentColor) }} />;
+        return <span key={i} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseRichHtml(p, primaryColor, accentColor)) }} />;
       })}
     </div>
   );
@@ -1352,7 +1442,7 @@ const SlidePreviewList = ({
 Layout atual: ${targetSlide.layoutID}. Nova instrução: ${newPrompt}.
 Mantenha o estilo: ${JSON.stringify(presentationData.theme)}.
 SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illustrationQuery": "..." }`;
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const newData = JSON.parse(response.text || '{}');
       const newImgUrl = newData.illustrationQuery ? await fetchPixabayImage(newData.illustrationQuery, 1200, 800) : targetSlide.data.imageUrl;
       updateSlide(idx, { title: newData.title || targetSlide.data.title, text: newData.text || targetSlide.data.text, imagePrompt: newData.illustrationQuery || targetSlide.data.imagePrompt, imageUrl: newImgUrl });
@@ -1434,6 +1524,7 @@ const buildDocx = async (
   docType: 'plan' | 'exam' | 'activities',
   opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): Promise<Blob> => {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation } = await import('docx');
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
@@ -2047,6 +2138,7 @@ const PlannerScreen = ({
   const [showGenModal, setShowGenModal] = useState(false);
   const profileName = profile.name;
   const profileSchoolName = profile.schoolName;
+  const selectedClass = schedules.find(s => s.id === selectedClassId);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -2126,7 +2218,13 @@ const PlannerScreen = ({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. O limite é 10 MB.');
+      e.target.value = '';
+      return;
+    }
+
     // If it's a text file, read it directly
     if (file.type.startsWith('text/') || file.name.endsWith('.md') || file.name.endsWith('.csv')) {
       const text = await file.text();
@@ -2138,7 +2236,7 @@ const PlannerScreen = ({
         try {
           const base64 = (event.target?.result as string).split(',')[1];
           const response = await generateContentWithRetry({
-            model: 'gemini-3-flash-preview',
+            model: AI_MODEL,
             contents: [
               { role: 'user', parts: [
                 { inlineData: { data: base64, mimeType: file.type } },
@@ -2150,7 +2248,7 @@ const PlannerScreen = ({
           setTopic(prev => prev + (prev ? '\n\n' : '') + text);
         } catch (error) {
           console.error("Error extracting text from file:", error);
-          alert(formatApiError(error, "Erro ao extrair texto do arquivo."));
+          toast.error(formatApiError(error, "Erro ao extrair texto do arquivo."));
         }
       };
       reader.readAsDataURL(file);
@@ -2212,17 +2310,33 @@ const PlannerScreen = ({
     setDocReady(null);
   }, [currentResult]);
 
+  const fetchImageAsBase64 = async (url: string): Promise<string | null> => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string>(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
   const exportPPTX = async () => {
     if (!presentationData) return;
     setIsExporting(true);
     try {
+      const { default: pptxgen } = await import('pptxgenjs');
       const pres = new pptxgen();
       pres.layout = 'LAYOUT_16x9';
       const theme = presentationData.theme;
       const pc = theme.primaryColor.replace('#', '');
       const ac = theme.accentColor.replace('#', '');
       const bg = theme.backgroundColor.replace('#', '');
-      const schoolLabel = profileSchoolName || '';
+      const schoolLabel = selectedClass?.school || profileSchoolName || '';
       const teacherLabel = profileName || '';
       const totalSlides = presentationData.slides.length;
 
@@ -2241,6 +2355,28 @@ const PlannerScreen = ({
         } else {
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
+        }
+      };
+
+      // Pre-fetch all images as base64 to avoid CORS failures when pptxgenjs
+      // requests Pixabay URLs directly from the user's browser.
+      const imageCache = new Map<string, string>();
+      await Promise.all(
+        presentationData.slides
+          .map(s => s.data.imageUrl)
+          .filter(Boolean)
+          .filter((url, i, a) => a.indexOf(url) === i)
+          .map(async url => {
+            const b64 = await fetchImageAsBase64(url);
+            if (b64) imageCache.set(url, b64);
+          })
+      );
+      const addSlideImage = (slide: any, url: string, opts: any) => {
+        const b64 = imageCache.get(url);
+        if (b64) {
+          slide.addImage({ data: `image/jpeg;base64,${b64}`, ...opts });
+        } else {
+          slide.addImage({ path: url, ...opts });
         }
       };
 
@@ -2266,7 +2402,7 @@ const PlannerScreen = ({
           slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.5, y: 4.6, w: 4.7, h: 0.35, fontSize: 9, fontFace: 'Calibri', color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
           }
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
@@ -2278,7 +2414,7 @@ const PlannerScreen = ({
           const contentX = isLeft ? 0.4 : 4.4;
 
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
             slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 75 } });
           }
 
@@ -2304,7 +2440,7 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.rect, { x: 4.94, y: 2.62, w: 0.12, h: 0.28, fill: { color: ac } });
           slide.addShape(pres.ShapeType.rect, { x: 4.7, y: 2.78, w: 0.6, h: 0.08, fill: { color: ac }, rotate: 0 });
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
           }
           addFooter(slide, si + 1);
 
@@ -2395,7 +2531,7 @@ const PlannerScreen = ({
         } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
           slide.background = { color: '111111' };
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
           }
           // Dark gradient overlay via semi-transparent rect
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.3, fill: { color: '000000', transparency: 25 } });
@@ -2466,7 +2602,7 @@ const PlannerScreen = ({
       await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
     } catch (e) {
       console.error(e);
-      alert('Erro ao gerar o arquivo PPTX. Verifique sua conexão e tente novamente.');
+      toast.error('Erro ao gerar o arquivo PPTX. Verifique sua conexão e tente novamente.');
     }
     setIsExporting(false);
   };
@@ -2758,13 +2894,12 @@ const PlannerScreen = ({
                       setPreparingDoc('main');
                       try {
                         const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
-                        const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
                         const blob = await buildDocx(currentResult as string, docType, {
-                          school: profileSchoolName || '',
+                          school: selectedClass?.school || profileSchoolName || '',
                           teacher: profileName || '',
-                          subject: profile.subject || '',
+                          subject: selectedClass?.subject || profile.subject || '',
                           topic,
-                          className: selectedClassForExport?.name || '',
+                          className: selectedClass?.name || '',
                           duration,
                           lessonTime,
                           turn,
@@ -2776,7 +2911,7 @@ const PlannerScreen = ({
                         setDocReady({ url: URL.createObjectURL(blob), filename, target: 'main' });
                       } catch (e) {
                         console.error('Erro ao exportar Word:', e);
-                        alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                        toast.error('Erro ao gerar o arquivo Word. Tente novamente.');
                       } finally {
                         setPreparingDoc(null);
                       }
@@ -2821,13 +2956,12 @@ const PlannerScreen = ({
                             setPreparingDoc(i);
                             try {
                               const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
-                              const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
                               const blob = await buildDocx(res.content, dt, {
-                                school: profileSchoolName || '',
+                                school: selectedClass?.school || profileSchoolName || '',
                                 teacher: profileName || '',
-                                subject: profile.subject || '',
+                                subject: selectedClass?.subject || profile.subject || '',
                                 topic,
-                                className: selectedClassForExport?.name || '',
+                                className: selectedClass?.name || '',
                                 duration,
                                 lessonTime,
                                 turn,
@@ -2839,7 +2973,7 @@ const PlannerScreen = ({
                               setDocReady({ url: URL.createObjectURL(blob), filename, target: i });
                             } catch (e) {
                               console.error('Erro ao exportar Word:', e);
-                              alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                              toast.error('Erro ao gerar o arquivo Word. Tente novamente.');
                             } finally {
                               setPreparingDoc(null);
                             }
@@ -3101,7 +3235,7 @@ const ChatScreen = ({
       Hoje é: ${today}.
 
       Contexto Atual:
-      - Professor: ${profile.name} (${profile.subject})
+      - Professor: ${profile.name}
       - Escola: ${profile.schoolName || 'Não informada'}
       - Turmas cadastradas: ${turmas}
       - Próximas aulas (máx. 10):
@@ -3141,7 +3275,7 @@ const ChatScreen = ({
       }
 
       const response = await generateContentWithRetry({
-        model: 'gemini-3-flash-preview',
+        model: AI_MODEL,
         contents: { parts },
         config: {
           tools: [{
@@ -3451,8 +3585,9 @@ const ChatScreen = ({
   );
 };
 
-const ProfileScreen = ({ 
-  schedules, 
+const ProfileScreen = ({
+  user,
+  schedules,
   setSchedules,
   profile,
   setProfile,
@@ -3464,8 +3599,9 @@ const ProfileScreen = ({
   notifications,
   setNotifications,
   onResetAccount
-}: { 
-  schedules: ClassSchedule[], 
+}: {
+  user: any,
+  schedules: ClassSchedule[],
   setSchedules: (s: ClassSchedule[]) => void,
   profile: UserProfile,
   setProfile: (p: UserProfile) => void,
@@ -3481,7 +3617,7 @@ const ProfileScreen = ({
   const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
   const [showScheduleConfig, setShowScheduleConfig] = useState(false);
   const [showAddClassModal, setShowAddClassModal] = useState(false);
-  const [newClassData, setNewClassData] = useState({ name: '', level: 'Ensino Fundamental II', profile: '', color: '#4F46E5' });
+  const [newClassData, setNewClassData] = useState({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
   const [classFormError, setClassFormError] = useState<string | null>(null);
   const classColors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
 
@@ -3495,6 +3631,7 @@ const ProfileScreen = ({
   const [importStatus, setImportStatus] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleRef = useRef<HTMLDivElement>(null);
   const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -3520,11 +3657,14 @@ const ProfileScreen = ({
       time: '08:00',
       color: newClassData.color,
       level: newClassData.level,
+      subject: newClassData.subject || undefined,
+      school: newClassData.school || undefined,
+      shift: newClassData.shift || undefined,
       classProfile: newClassData.profile
     };
     onAddClass(newClass);
     setShowAddClassModal(false);
-    setNewClassData({ name: '', level: 'Ensino Fundamental II', profile: '', color: '#4F46E5' });
+    setNewClassData({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
   };
 
   const deleteClass = (id: string) => {
@@ -3557,43 +3697,40 @@ const ProfileScreen = ({
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 400;
-          const MAX_HEIGHT = 400;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
+    if (!file || !user) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 400;
+        let { width, height } = img;
+        if (width > height) { if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; } }
+        else { if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; } }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+          setIsUploadingPhoto(true);
+          try {
+            const ref = storageRef(storage, `users/${user.uid}/photo.jpg`);
+            await uploadBytesResumable(ref, blob).then(snap => snap);
+            const url = await getDownloadURL(ref);
+            setProfile({ ...profile, photo: url });
+          } catch {
+            toast.error('Não foi possível salvar a foto. Tente novamente.');
+          } finally {
+            setIsUploadingPhoto(false);
           }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          setProfile({ ...profile, photo: compressedBase64 });
-        };
-        img.src = event.target?.result as string;
+        }, 'image/jpeg', 0.7);
       };
-      reader.readAsDataURL(file);
-    }
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const saveProfile = () => {
-    setProfile({ ...profile, name: profileName, subject: profileSubject, schoolName: profileSchoolName });
+    setProfile({ ...profile, name: profileName, subject: profileSubject || undefined, schoolName: profileSchoolName || undefined });
     setIsEditingProfile(false);
   };
 
@@ -3603,7 +3740,7 @@ const ProfileScreen = ({
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => fileInputRef.current?.click()}>
+          <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
               <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
@@ -3611,58 +3748,65 @@ const ProfileScreen = ({
                 <User size={48} />
               </div>
             )}
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <Camera size={24} className="text-white" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploadingPhoto ? <Loader2 size={24} className="text-white animate-spin" /> : <Camera size={24} className="text-white" />}
             </div>
+            {isUploadingPhoto && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={24} className="text-white animate-spin" /></div>}
           </div>
-          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} />
+          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
         </div>
         {isEditingProfile ? (
           <div className="w-full space-y-3 mt-4">
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome do Professor</label>
-              <input 
-                value={profileName} 
-                onChange={e => setProfileName(e.target.value)} 
-                className="w-full text-base font-bold text-gray-900 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Seu Nome</label>
+              <input
+                value={profileName}
+                onChange={e => setProfileName(e.target.value)}
+                className="w-full text-base font-bold text-gray-900 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1"
                 autoFocus
               />
             </div>
+            <p className="text-xs text-gray-400 text-left px-1 pt-1">
+              Disciplina e escola são configurados em cada turma. Os campos abaixo são usados como padrão quando você gerar material sem turma selecionada.
+            </p>
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina / Turmas</label>
-              <input 
-                value={profileSubject} 
-                onChange={e => setProfileSubject(e.target.value)} 
-                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
-              />
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina padrão</label>
+              <select
+                value={profileSubject}
+                onChange={e => setProfileSubject(e.target.value)}
+                className="w-full text-sm text-gray-700 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1 bg-transparent"
+              >
+                <option value="">Nenhuma</option>
+                {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Escola (Cabeçalho)</label>
-              <input 
-                value={profileSchoolName} 
-                onChange={e => setProfileSchoolName(e.target.value)} 
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escola padrão</label>
+              <input
+                value={profileSchoolName}
+                onChange={e => setProfileSchoolName(e.target.value)}
                 placeholder="Ex: Escola Estadual Padrão"
-                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
+                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1"
               />
             </div>
           </div>
         ) : (
           <>
-            <h2 className="text-xl font-bold text-gray-900 mt-2">{profile.name}</h2>
-            <p className="text-base text-gray-500 mt-1">{profile.subject}</p>
+            <h2 className="text-xl font-bold text-gray-900 mt-2">{profile.name || 'Professor'}</h2>
+            {profile.subject && <p className="text-sm text-gray-400 mt-0.5">{profile.subject}</p>}
             {profile.schoolName && (
-              <p className="text-sm text-indigo-600 font-medium mt-2 bg-indigo-50 px-3 py-1 rounded-full">
+              <p className="text-sm text-indigo-600 font-medium mt-1 bg-indigo-50 px-3 py-1 rounded-full">
                 {profile.schoolName}
               </p>
             )}
           </>
         )}
-        
-        <button 
+
+        <button
           onClick={() => isEditingProfile ? saveProfile() : setIsEditingProfile(true)}
           className="mt-6 bg-[#F8F9FE] text-indigo-600 px-6 py-2.5 rounded-full text-base font-bold w-full"
         >
-          {isEditingProfile ? 'Salvar Identidade Padrão' : 'Editar Identidade Padrão'}
+          {isEditingProfile ? 'Salvar' : 'Editar Perfil'}
         </button>
       </div>
 
@@ -3714,28 +3858,40 @@ const ProfileScreen = ({
                       </div>
                     )}
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma</label>
-                        <input 
-                          type="text" 
-                          placeholder="Ex: 8º Ano A" 
-                          value={newClassData.name} 
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma *</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 8º Ano A"
+                          value={newClassData.name}
                           onChange={(e) => setNewClassData({...newClassData, name: e.target.value})}
                           className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
                         />
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Ensino</label>
-                        <select 
-                          value={newClassData.level} 
-                          onChange={(e) => setNewClassData({...newClassData, level: e.target.value})}
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina *</label>
+                        <select
+                          value={newClassData.subject}
+                          onChange={(e) => setNewClassData({...newClassData, subject: e.target.value})}
                           className={`w-full p-3 mt-1 rounded-xl focus:outline-none transition-all ${
-                            newClassData.level 
-                              ? 'bg-indigo-600 text-white font-bold border-none shadow-sm' 
+                            newClassData.subject
+                              ? 'bg-indigo-600 text-white font-bold border-none shadow-sm'
                               : 'bg-white text-gray-700 border border-gray-200'
                           }`}
+                        >
+                          <option value="">Selecione a disciplina</option>
+                          {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Ensino</label>
+                        <select
+                          value={newClassData.level}
+                          onChange={(e) => setNewClassData({...newClassData, level: e.target.value})}
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 bg-white text-gray-700"
                         >
                           <option value="Ensino Fundamental I">Ensino Fundamental I</option>
                           <option value="Ensino Fundamental II">Ensino Fundamental II</option>
@@ -3745,12 +3901,38 @@ const ProfileScreen = ({
                       </div>
 
                       <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
+                        <div className="flex gap-2 mt-1">
+                          {['Manhã', 'Tarde', 'Noite'].map(s => (
+                            <button
+                              key={s}
+                              onClick={() => setNewClassData({...newClassData, shift: s})}
+                              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${newClassData.shift === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Escola</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Escola Estadual João Silva"
+                          value={newClassData.school}
+                          onChange={(e) => setNewClassData({...newClassData, school: e.target.value})}
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
                         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Perfil da Turma (Opcional)</label>
-                        <textarea 
-                          placeholder="Ex: Turma agitada, prefere aulas práticas. 2 alunos com TDAH." 
-                          value={newClassData.profile} 
+                        <textarea
+                          placeholder="Ex: Turma agitada, prefere aulas práticas. 2 alunos com TDAH."
+                          value={newClassData.profile}
                           onChange={(e) => setNewClassData({...newClassData, profile: e.target.value})}
-                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-20 text-sm"
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-16 text-sm"
                         />
                       </div>
 
@@ -3790,7 +3972,10 @@ const ProfileScreen = ({
                     >
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900">{s.name}</h4>
-                        {s.level && <p className="text-xs text-gray-400">{s.level}</p>}
+                        <p className="text-xs text-gray-400">
+                          {[s.subject, s.level, s.shift].filter(Boolean).join(' · ')}
+                        </p>
+                        {s.school && <p className="text-xs text-indigo-400 font-medium truncate">{s.school}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         <div 
@@ -4059,7 +4244,7 @@ const ProfileScreen = ({
                         }, 3000);
                       } catch (e) {
                         console.error('Error sending feedback:', e);
-                        alert('Não foi possível enviar o feedback. Tente novamente.');
+                        toast.error('Não foi possível enviar o feedback. Tente novamente.');
                       }
                     }}
                     disabled={!feedbackText.trim()}
@@ -4269,7 +4454,7 @@ const HolidaySuggestion = ({ holidayName }: { holidayName: string }) => {
       try {
         const prompt = `Dê uma dica CURTA e PRÁTICA (máximo 2 frases) para um professor aproveitar o feriado "${holidayName}" no seu planejamento pedagógico ou para atividades de descanso com alunos. Foque na objetividade.`;
         const response = await generateContentWithRetry({
-          model: "gemini-3-flash-preview",
+          model: AI_MODEL,
           contents: prompt,
         });
         
@@ -4826,7 +5011,7 @@ const EstudioScreen = ({
         const MAX_CHAR_LIMIT = 100000;
         const updated = prev + (prev ? '\n\n' : '') + `--- Arquivo: ${file.name} ---\n` + newText;
         if (updated.length > MAX_CHAR_LIMIT) {
-          alert('Base de Conhecimento cheia. O texto foi truncado para evitar excesso de memória e custos.');
+          toast.info('Base de Conhecimento cheia. O texto foi truncado para evitar excesso de memória e custos.');
           return updated.substring(0, MAX_CHAR_LIMIT);
         }
         return updated;
@@ -4843,7 +5028,7 @@ const EstudioScreen = ({
           try {
             const base64 = (event.target?.result as string).split(',')[1];
             const response = await generateContentWithRetry({
-              model: 'gemini-3-flash-preview',
+              model: AI_MODEL,
               contents: [
                 { role: 'user', parts: [
                     { inlineData: { data: base64, mimeType: file.type } },
@@ -4854,7 +5039,7 @@ const EstudioScreen = ({
             applyContextSafety(response.text || '');
           } catch (err) {
             console.error(err);
-            alert(formatApiError(err, 'Erro ao processar o arquivo com a IA.'));
+            toast.error(formatApiError(err, 'Erro ao processar o arquivo com a IA.'));
           } finally {
             setIsUploading(false);
           }
@@ -4864,7 +5049,7 @@ const EstudioScreen = ({
       }
     } catch (err) {
       console.error(err);
-      alert('Erro ao ler o arquivo.');
+      toast.error('Erro ao ler o arquivo.');
     }
     setIsUploading(false);
   };
@@ -4872,7 +5057,7 @@ const EstudioScreen = ({
   const sendChatMessage = async () => {
     if (!chatInput.trim()) return;
     if (!estudioContext) {
-      alert('Ops! Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
+      toast.error('Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
       return;
     }
 
@@ -4895,7 +5080,7 @@ const EstudioScreen = ({
       Assistente:`;
 
       const response = await generateContentWithRetry({
-        model: 'gemini-3-flash-preview',
+        model: AI_MODEL,
         contents: prompt,
       });
 
@@ -5278,11 +5463,16 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
 // --- Main App ---
 
+const USERS_PAGE_SIZE = 20;
+
 const AdminScreen = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
   const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca'>('users');
+  const [userSearch, setUserSearch] = useState('');
+  const [usersPage, setUsersPage] = useState(0);
 
   // ── Biblioteca state ──────────────────────────────────────────────────────
   const [libItems, setLibItems] = useState<LibraryItem[]>([]);
@@ -5291,22 +5481,28 @@ const AdminScreen = () => {
   const [uploadForm, setUploadForm] = useState({ title: '', type: 'activities' as LibraryItem['type'], subject: '', grade: '', description: '' });
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadErr, setUploadErr] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const reloadStorage = async () => {
-    const snap = await getDoc(doc(db, 'config', 'storage'));
-    setStorageUsed(snap.exists() ? (snap.data().totalBytes || 0) : 0);
+    try {
+      const snap = await getDoc(doc(db, 'config', 'storage'));
+      setStorageUsed(snap.exists() ? (snap.data().totalBytes || 0) : 0);
+    } catch { /* ignore — storage meter is non-critical */ }
   };
 
   useEffect(() => {
+    if (activeTab !== 'biblioteca') return;
     const unsubLib = onSnapshot(collection(db, 'library'), snap => {
       setLibItems(snap.docs.map(d => d.data() as LibraryItem).sort((a, b) => b.uploadDate - a.uploadDate));
     });
     reloadStorage();
     return unsubLib;
-  }, []);
+  }, [activeTab]);
 
   const handleUpload = async () => {
     if (!uploadFile || !uploadForm.title.trim()) { setUploadErr('Preencha o título e selecione um arquivo.'); return; }
+    if (uploadFile.type !== 'application/pdf') { setUploadErr('Apenas arquivos PDF são permitidos.'); return; }
+    if (uploadFile.size > 50 * 1024 * 1024) { setUploadErr('Arquivo muito grande. O limite é 50 MB por arquivo.'); return; }
     setUploadErr('');
     if (storageUsed + uploadFile.size > LIBRARY_LIMIT_BYTES) {
       setUploadErr(`Limite de 4.9 GB atingido. Apague materiais para liberar espaço.`); return;
@@ -5332,13 +5528,14 @@ const AdminScreen = () => {
   };
 
   const handleDeleteLib = async (item: LibraryItem) => {
-    if (!confirm(`Apagar "${item.title}"?`)) return;
+    if (confirmDeleteId !== item.id) { setConfirmDeleteId(item.id); return; }
+    setConfirmDeleteId(null);
     try {
       await deleteObject(storageRef(storage, `library/${item.id}/${item.fileName}`));
       await deleteDoc(doc(db, 'library', item.id));
       await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(-item.fileSizeBytes) }, { merge: true });
       setStorageUsed(p => Math.max(0, p - item.fileSizeBytes));
-    } catch (e: any) { alert(`Erro: ${e.message}`); }
+    } catch (e: any) { toast.error(`Erro: ${e.message}`); }
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -5355,8 +5552,10 @@ const AdminScreen = () => {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSysUsers(items.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || '')));
+      setUsersError('');
     }, (error) => {
       console.error("Error fetching users:", error);
+      setUsersError('Sem permissão para listar usuários. Verifique as regras do Firestore.');
     });
 
     return () => {
@@ -5394,6 +5593,14 @@ const AdminScreen = () => {
   const totalUsers = sysUsers.length;
   const proUsers = sysUsers.filter(u => u.isPro).length;
   const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && (u.generationsUsed ?? 0) >= FREE_LIMIT).length;
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return sysUsers;
+    return sysUsers.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
+  }, [sysUsers, userSearch]);
+  const usersPageCount = Math.ceil(filteredUsers.length / USERS_PAGE_SIZE);
+  const pagedUsers = filteredUsers.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
@@ -5547,8 +5754,12 @@ const AdminScreen = () => {
                   <p className="font-bold text-sm text-gray-900 truncate">{item.title}</p>
                   <p className="text-xs text-gray-400">{item.subject} · {item.grade} · {fmtBytes(item.fileSizeBytes)} · {item.downloadCount} downloads</p>
                 </div>
-                <button onClick={() => handleDeleteLib(item)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors shrink-0">
-                  <Trash2 size={16} />
+                <button
+                  onClick={() => handleDeleteLib(item)}
+                  onBlur={() => setConfirmDeleteId(null)}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 ${confirmDeleteId === item.id ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`}
+                >
+                  {confirmDeleteId === item.id ? 'Confirmar?' : <Trash2 size={16} />}
                 </button>
               </div>
             ))}
@@ -5563,8 +5774,24 @@ const AdminScreen = () => {
             Gerenciamento de Usuários
           </h2>
 
+          {usersError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
+              {usersError}
+            </div>
+          )}
+
+          <div className="relative mb-4">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              value={userSearch}
+              onChange={e => { setUserSearch(e.target.value); setUsersPage(0); }}
+              placeholder="Buscar por nome ou e-mail…"
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400"
+            />
+          </div>
+
           <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
-            {sysUsers.map(u => {
+            {pagedUsers.map(u => {
               const trialStatus = getUsageStatus(u);
               const isAdmin = u.role === 'admin';
               return (
@@ -5600,13 +5827,35 @@ const AdminScreen = () => {
               );
             })}
           </div>
+
+          {usersPageCount > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setUsersPage(p => Math.max(0, p - 1))}
+                disabled={usersPage === 0}
+                className="px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ← Anterior
+              </button>
+              <span className="text-xs text-gray-500 font-medium">
+                {usersPage + 1} / {usersPageCount} ({filteredUsers.length} usuários)
+              </span>
+              <button
+                onClick={() => setUsersPage(p => Math.min(usersPageCount - 1, p + 1))}
+                disabled={usersPage >= usersPageCount - 1}
+                className="px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Próxima →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </motion.div>
   );
 };
 
-export default function App() {
+function AppInner() {
   const [user, setUser] = useState<any>(null);
   const [isAuthLoaded, setIsAuthLoaded] = useState(false);
   const [email, setEmail] = useState('');
@@ -5712,6 +5961,34 @@ export default function App() {
   ]);
   
   const [estudioContext, setEstudioContext] = useState<string>('');
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2>(0);
+  const [onboardingName, setOnboardingName] = useState('');
+  const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
+
+  // Show onboarding only for genuinely new users: no onboarded flag AND still has the default name
+  const showOnboarding = !!user && !profile.onboarded && profile.name === 'Prof. Silva';
+
+  const finishOnboarding = async (skipClass = false) => {
+    const newName = onboardingName.trim() || 'Professor';
+    const updates: Partial<UserProfile> = { name: newName, onboarded: true };
+    setProfile({ ...profile, ...updates } as UserProfile);
+    if (!skipClass && onboardingClass.name.trim()) {
+      const newClass: ClassSchedule = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: onboardingClass.name,
+        days: [1, 2, 3, 4, 5],
+        time: '08:00',
+        subject: onboardingClass.subject || undefined,
+        school: onboardingClass.school || undefined,
+        shift: onboardingClass.shift || undefined,
+        level: onboardingClass.level,
+      };
+      setSchedules([...schedules, newClass]);
+    }
+    setOnboardingStep(0);
+  };
   const [studioMessages, setStudioMessages] = useFirestoreSync<{ id: string; role: 'user' | 'model'; text: string; date: number }>('studioMessages', user, [
     { id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }
   ]);
@@ -6099,7 +6376,7 @@ export default function App() {
       Sugira quantas aulas (de ${plannerLessonTime}min cada) são necessárias para cobrir esse conteúdo de forma eficaz. 
       Responda apenas o número bruto.`;
       
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const match = response.text?.match(/\d+/);
       const suggested = match ? parseInt(match[0], 10) : 1;
       const finalDuration = isNaN(suggested) || suggested < 1 ? 1 : Math.min(suggested, 20);
@@ -6161,9 +6438,10 @@ export default function App() {
   const generatePlan = async (optTopic?: string, optClassId?: string) => {
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
-    
+
     if (!targetTopic.trim()) return;
-    
+    if (isLimitReached) return;
+
     const taskId = addTask({ type: 'plan', title: `Plano: ${targetTopic}` });
     try {
       const selectedClass = schedules.find(s => s.id === targetClassId);
@@ -6177,7 +6455,7 @@ export default function App() {
       const fechamento = plannerLessonTime - abertura - desenvolvimento;
 
       // ── Solução 2: selecionar habilidades BNCC do banco local ──────────────
-      const bnccSkills = selectBnccSkills(profile.subject || '', className, targetTopic, 4);
+      const bnccSkills = selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4);
       const bnccBlock  = bnccSkills.length > 0
         ? bnccSkills.map(s => `- ${s.code} — ${s.desc}`).join('\n')
         : '- [escolha habilidades BNCC reais para a disciplina e série]';
@@ -6224,7 +6502,7 @@ ${bnccBlock}
 ## REFERÊNCIAS
 [2 ou 3 referências bibliográficas em formato ABNT]`;
 
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const planDraft = response.text || '';
 
       // ── Validação local determinística das habilidades BNCC ──────────────
@@ -6257,6 +6535,7 @@ ${bnccBlock}
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
     if (!targetTopic.trim()) return;
+    if (isLimitReached) return;
 
     const taskId = addTask({ type, title: `${type === 'slides' ? 'Slides' : 'Atividades'}: ${targetTopic}` });
     try {
@@ -6265,7 +6544,7 @@ ${bnccBlock}
 
       if (type === 'slides') {
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount);
-        const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
         const firstBrace = text.indexOf('{');
@@ -6304,9 +6583,9 @@ ${bnccBlock}
         updateTask(taskId, { status: 'completed', result: sanitized });
         recordGeneration();
       } else {
-        const escolaStr = profile.schoolName || '_________________';
+        const escolaStr = selectedClass?.school || profile.schoolName || '_________________';
         const professorStr = profile.name || '_________________';
-        const disciplinaStr = profile.subject || '_________________';
+        const disciplinaStr = selectedClass?.subject || profile.subject || '_________________';
         
         const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
         const mcPts  = parseFloat((plannerExamValue / 10).toFixed(1));
@@ -6425,7 +6704,7 @@ _______________________________________________________________________________
 
 REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`;
           
-        const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const result = response.text || '';
         if (type === 'exam') setPlannerExam(result);
         else setPlannerActivity(result);
@@ -6439,6 +6718,122 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
 
   return (
     <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+      <ToastContainer />
+
+      {/* ── Onboarding Modal ───────────────────────────────────────────── */}
+      {showOnboarding && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-end justify-center p-0">
+          <div className="bg-white w-full max-w-md rounded-t-[2.5rem] p-6 pb-10 shadow-2xl">
+            {onboardingStep === 0 && (
+              <>
+                <div className="flex flex-col items-center text-center mb-6">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
+                    <span className="text-3xl">🦉</span>
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
+                  <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em 2 passos rápidos.</p>
+                </div>
+                <div className="mb-5">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Qual é o seu nome?</label>
+                  <input
+                    autoFocus
+                    value={onboardingName}
+                    onChange={e => setOnboardingName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && onboardingName.trim() && setOnboardingStep(2)}
+                    placeholder="Ex: Maria Souza"
+                    className="w-full mt-2 p-4 border-2 border-gray-200 rounded-2xl text-lg font-bold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <button
+                  onClick={() => onboardingName.trim() && setOnboardingStep(2)}
+                  disabled={!onboardingName.trim()}
+                  className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold disabled:opacity-40"
+                >
+                  Continuar →
+                </button>
+              </>
+            )}
+
+            {onboardingStep === 2 && (
+              <>
+                <div className="mb-4">
+                  <h2 className="text-xl font-black text-gray-900">Cadastre sua primeira turma</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">Você pode adicionar mais turmas depois no Perfil.</p>
+                </div>
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma *</label>
+                    <input
+                      value={onboardingClass.name}
+                      onChange={e => setOnboardingClass(c => ({...c, name: e.target.value}))}
+                      placeholder="Ex: 6º Ano A"
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina *</label>
+                    <select
+                      value={onboardingClass.subject}
+                      onChange={e => setOnboardingClass(c => ({...c, subject: e.target.value}))}
+                      className={`w-full mt-1 p-3 rounded-xl focus:outline-none transition-all ${onboardingClass.subject ? 'bg-indigo-600 text-white font-bold border-none' : 'border border-gray-200 bg-white text-gray-700'}`}
+                    >
+                      <option value="">Selecione</option>
+                      {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível</label>
+                    <select
+                      value={onboardingClass.level}
+                      onChange={e => setOnboardingClass(c => ({...c, level: e.target.value}))}
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 bg-white text-gray-700"
+                    >
+                      <option value="Ensino Fundamental I">Ensino Fundamental I</option>
+                      <option value="Ensino Fundamental II">Ensino Fundamental II</option>
+                      <option value="Ensino Médio">Ensino Médio</option>
+                      <option value="EJA">EJA</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
+                    <div className="flex gap-2 mt-1">
+                      {['Manhã', 'Tarde', 'Noite'].map(s => (
+                        <button key={s} onClick={() => setOnboardingClass(c => ({...c, shift: s}))}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${onboardingClass.shift === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escola</label>
+                    <input
+                      value={onboardingClass.school}
+                      onChange={e => setOnboardingClass(c => ({...c, school: e.target.value}))}
+                      placeholder="Nome da escola"
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-5">
+                  <button onClick={() => finishOnboarding(true)}
+                    className="flex-1 bg-gray-100 text-gray-600 rounded-2xl py-3.5 text-sm font-bold">
+                    Pular
+                  </button>
+                  <button
+                    onClick={() => finishOnboarding(false)}
+                    disabled={!onboardingClass.name.trim() || !onboardingClass.subject}
+                    className="flex-[2] bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold disabled:opacity-40"
+                  >
+                    Começar →
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
           {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={notifications} setNotifications={setNotifications} setSelectedDate={(d: Date) => {
@@ -6558,7 +6953,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setCustomEvents={setCustomEvents}
             setClasses={setClasses}
           />}
-          {screen === 'profile' && <ProfileScreen key="profile" schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={notifications} setNotifications={setNotifications} onResetAccount={() => {
+          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={notifications} setNotifications={setNotifications} onResetAccount={() => {
             setSchedules([]);
             setClasses([]);
             setCustomEvents([]);
@@ -6593,5 +6988,13 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-100/30 blur-[120px] rounded-full" />
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
