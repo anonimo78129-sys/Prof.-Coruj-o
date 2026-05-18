@@ -594,24 +594,25 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
             
             <div className="space-y-3 mb-4 max-h-[60vh] overflow-y-auto no-scrollbar">
               {notifications.length > 0 ? (
-                notifications.map(notification => (
-                  <div key={notification.id} className={`cursor-pointer p-3 rounded-xl border ${notification.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100/50'}`} onClick={() => {
-                    if (setScreen) setScreen('calendar');
-                    if (setNotifications) {
-                      setNotifications(notifications.map(n => n.id === notification.id ? {...n, read: true} : n));
-                    }
-                    setShowNotifications(false);
-                  }}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Sparkles size={14} className={notification.read ? 'text-gray-500' : 'text-indigo-600'} />
-                      <p className={`text-sm font-bold ${notification.read ? 'text-gray-700' : 'text-indigo-900'}`}>{notification.title}</p>
+                notifications.map(notification => {
+                  const iconMap: Record<string, string> = { class: '📚', holiday: '🎉', prep: '📝', admin: '📋', commemorative: '🎊' };
+                  const emoji = notification.auto ? (iconMap[notification.icon] || '📌') : '✨';
+                  return (
+                    <div key={notification.id} className={`cursor-pointer p-3 rounded-xl border ${notification.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100/50'}`} onClick={() => {
+                      if (setScreen) setScreen('calendar');
+                      if (setNotifications) {
+                        setNotifications(notifications.map(n => n.id === notification.id ? {...n, read: true} : n));
+                      }
+                      setShowNotifications(false);
+                    }}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base leading-none">{emoji}</span>
+                        <p className={`text-sm font-bold ${notification.read ? 'text-gray-700' : 'text-indigo-900'}`}>{notification.title}</p>
+                      </div>
+                      <p className={`text-xs leading-relaxed ${notification.read ? 'text-gray-600' : 'text-indigo-700'}`}>{notification.message}</p>
                     </div>
-                    <p className={`text-xs leading-relaxed ${notification.read ? 'text-gray-600' : 'text-indigo-700'}`}>{notification.message}</p>
-                    <span className={`text-[10px] mt-2 block ${notification.read ? 'text-gray-400' : 'text-indigo-400'}`}>
-                      {new Date(notification.date).toLocaleDateString()} às {new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <Bell size={32} className="text-gray-300 mb-3" />
@@ -739,7 +740,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title={`${firstName}!`} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
+      <Header setScreen={setScreen} title={`${firstName}!`} subtitle={greeting} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
       
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2rem] p-6 text-white shadow-lg mb-8 relative overflow-hidden">
         <div className="relative z-10">
@@ -3465,7 +3466,7 @@ const ChatScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-28 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
+      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
       
       <div className="mb-2">
         <div className="relative">
@@ -3736,7 +3737,7 @@ const ProfileScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
+      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative">
@@ -4774,8 +4775,8 @@ const CalendarScreen = ({
         title="Cronograma" 
         subtitle="Visão Semestral" 
         profile={profile} 
-        notifications={notifications} 
-        setNotifications={setNotifications}
+        notifications={allNotifications} 
+        setNotifications={handleSetNotifications}
         bannerImage="https://i.ibb.co/x8t6Wmp7/20260419-204249-0002.png"
       >
         <button 
@@ -5094,7 +5095,7 @@ const EstudioScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
+      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
       
       <div className="flex gap-2 mb-6 pb-2 shrink-0">
         <button onClick={() => setActiveTab('context')} className={`flex-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === 'context' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}>Base Conhecimento</button>
@@ -5211,7 +5212,7 @@ const EstudioScreen = ({
 const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, notifications, setNotifications }: { savedResources: SavedResource[], setSavedResources: (r: SavedResource[]) => void, profile: UserProfile, setScreen: (s: Screen) => void, notifications?: any[], setNotifications?: (n: any[]) => void }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+      <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />
       {savedResources.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Archive size={44} className="mx-auto mb-3 opacity-20" />
@@ -5370,7 +5371,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
@@ -5956,6 +5957,66 @@ function AppInner() {
   const [customEvents, setCustomEvents] = useFirestoreSync<{id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative'}>('events', user, []);
   const [savedResources, setSavedResources] = useFirestoreSync<SavedResource>('resources', user, []);
   const [notifications, setNotifications] = useFirestoreSync<any>('notifications', user, []);
+
+  // ── Auto-notifications from schedule ─────────────────────────────────────
+  const [readAutoIds, setReadAutoIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('readAutoNotifs') || '[]')); } catch { return new Set(); }
+  });
+
+  const autoNotifications = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayDow = today.getDay();
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    const tomorrowDow = tomorrow.getDay();
+    const todayStr = today.toISOString().slice(0, 10);
+    const notifs: any[] = [];
+
+    // Today's classes
+    schedules.forEach(s => {
+      if (s.days.includes(todayDow)) {
+        const id = `auto-class-today-${s.id}-${todayStr}`;
+        notifs.push({ id, title: `Aula hoje: ${s.name}`, message: `${[s.subject, s.time, s.school].filter(Boolean).join(' · ')}`, date: today.getTime(), read: readAutoIds.has(id), auto: true, icon: 'class' });
+      }
+    });
+
+    // Tomorrow's classes
+    schedules.forEach(s => {
+      if (s.days.includes(tomorrowDow)) {
+        const id = `auto-class-tomorrow-${s.id}-${todayStr}`;
+        notifs.push({ id, title: `Aula amanhã: ${s.name}`, message: `${[s.subject, s.time, s.school].filter(Boolean).join(' · ')}`, date: today.getTime() - 1, read: readAutoIds.has(id), auto: true, icon: 'class' });
+      }
+    });
+
+    // Upcoming events (holidays, prep, admin) within 7 days
+    customEvents.forEach(e => {
+      const eventDate = new Date(e.date + 'T00:00:00');
+      const diff = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff < 0 || diff > 7) return;
+      const id = `auto-event-${e.id}-${todayStr}`;
+      const when = diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : `Em ${diff} dias`;
+      const typeLabel: Record<string, string> = { holiday: 'Feriado', prep: 'Preparação de aula', admin: 'Tarefa administrativa', commemorative: 'Data comemorativa' };
+      notifs.push({ id, title: `${typeLabel[e.type] || 'Evento'}: ${e.title}`, message: `${when} — ${eventDate.toLocaleDateString('pt-BR')}`, date: today.getTime() - 2, read: readAutoIds.has(id), auto: true, icon: e.type });
+    });
+
+    return notifs;
+  }, [schedules, customEvents, readAutoIds]);
+
+  const allNotifications = useMemo(() =>
+    [...autoNotifications, ...notifications].sort((a, b) => b.date - a.date),
+    [autoNotifications, notifications]
+  );
+
+  const handleSetNotifications = (updater: any[] | ((prev: any[]) => any[])) => {
+    const updated = typeof updater === 'function' ? updater(allNotifications) : updater;
+    const newReadIds = new Set(readAutoIds);
+    updated.filter(n => n.auto && n.read).forEach(n => newReadIds.add(n.id));
+    // Clear all: mark all auto as read
+    if (updated.length === 0) autoNotifications.forEach(n => newReadIds.add(n.id));
+    setReadAutoIds(newReadIds);
+    try { localStorage.setItem('readAutoNotifs', JSON.stringify([...newReadIds])); } catch {}
+    setNotifications(updated.filter(n => !n.auto));
+  };
   const [inboxMessages, setInboxMessages] = useFirestoreSync<{id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}>('messages', user, [
     { id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }
   ]);
@@ -6836,7 +6897,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
 
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
-          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={notifications} setNotifications={setNotifications} setSelectedDate={(d: Date) => {
+          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} setSelectedDate={(d: Date) => {
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
@@ -6882,8 +6943,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                 }]);
               }
             }} 
-            notifications={notifications} 
-            setNotifications={setNotifications}
+            notifications={allNotifications} 
+            setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
             plannerDuration={plannerDuration}
@@ -6931,8 +6992,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             addClassItems={addClassItems} 
             customEvents={customEvents} 
             setCustomEvents={setCustomEvents} 
-            notifications={notifications} 
-            setNotifications={setNotifications}
+            notifications={allNotifications} 
+            setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
             plannerTopic={plannerTopic}
@@ -6942,7 +7003,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerMode={setPlannerMode}
             getScheduleBuffer={getScheduleBuffer}
           />}
-          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail" 
             schedules={schedules} 
             selectedDate={selectedDate} 
@@ -6953,7 +7014,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setCustomEvents={setCustomEvents}
             setClasses={setClasses}
           />}
-          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={notifications} setNotifications={setNotifications} onResetAccount={() => {
+          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={allNotifications} setNotifications={handleSetNotifications} onResetAccount={() => {
             setSchedules([]);
             setClasses([]);
             setCustomEvents([]);
@@ -6963,8 +7024,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
             setEstudioContext('');
           }} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
-          {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} />}
+          {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
 
