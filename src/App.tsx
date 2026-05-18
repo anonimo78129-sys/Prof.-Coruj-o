@@ -51,6 +51,7 @@ const formatApiError = (error: any, defaultMsg: string): string => {
 
 const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs = 2000): Promise<T> => {
   let attempt = 0;
+  let rateLimit429Attempts = 0;
   while (attempt < maxRetries) {
     try {
       return await fn();
@@ -67,9 +68,17 @@ const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs =
       const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
       const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
 
-      if ((is503 || is429) && attempt < maxRetries) {
+      if (is429) {
+        rateLimit429Attempts++;
+        if (rateLimit429Attempts <= 1) {
+          // Wait 30s for per-minute quota window to reset, then try once more
+          await new Promise(resolve => setTimeout(resolve, 30000 + Math.random() * 5000));
+          continue;
+        }
+        throw error; // Second 429: quota is exhausted, give up
+      } else if (is503 && attempt < maxRetries) {
         const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + (Math.random() * 1000);
-        console.warn(`API overloaded (${is503 ? '503' : '429'}). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
+        console.warn(`API overloaded (503). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         throw error;
