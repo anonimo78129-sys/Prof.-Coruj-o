@@ -5282,6 +5282,7 @@ const AdminScreen = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
   const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca'>('users');
 
   // ── Biblioteca state ──────────────────────────────────────────────────────
@@ -5355,8 +5356,10 @@ const AdminScreen = () => {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSysUsers(items.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || '')));
+      setUsersError('');
     }, (error) => {
       console.error("Error fetching users:", error);
+      setUsersError('Sem permissão para listar usuários. Verifique as regras do Firestore.');
     });
 
     return () => {
@@ -5563,6 +5566,11 @@ const AdminScreen = () => {
             Gerenciamento de Usuários
           </h2>
 
+          {usersError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
+              {usersError}
+            </div>
+          )}
           <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
             {sysUsers.map(u => {
               const trialStatus = getUsageStatus(u);
