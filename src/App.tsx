@@ -170,7 +170,7 @@ function useFirestoreSync<T extends { id: string }>(
     } catch (err) {
       console.error(`Error in useFirestoreSync for ${collectionName}:`, err);
       setData(previousData);
-      alert("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("Falha de conexão: As alterações não foram salvas na nuvem.");
     }
   };
 
@@ -209,12 +209,49 @@ function useFirestoreDoc<T>(
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
-      alert("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("Falha de conexão: As alterações não foram salvas na nuvem.");
     }
   };
 
   return [data, updateData];
 }
+
+// --- Toast System ---
+type ToastType = 'error' | 'success' | 'info';
+interface Toast { id: string; message: string; type: ToastType; }
+
+let _toastSetter: ((t: Toast[]) => void) | null = null;
+
+const toast = {
+  show(message: string, type: ToastType = 'info') {
+    if (!_toastSetter) { console.warn('[toast]', message); return; }
+    const id = Math.random().toString(36).slice(2);
+    _toastSetter(prev => [...prev.slice(-3), { id, message, type }]);
+    setTimeout(() => _toastSetter!(prev => prev.filter(t => t.id !== id)), 4500);
+  },
+  error(msg: string) { this.show(msg, 'error'); },
+  success(msg: string) { this.show(msg, 'success'); },
+  info(msg: string) { this.show(msg, 'info'); },
+};
+
+const ToastContainer = () => {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  useEffect(() => { _toastSetter = setToasts; return () => { _toastSetter = null; }; }, []);
+  if (!toasts.length) return null;
+  return createPortal(
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
+      {toasts.map(t => (
+        <div key={t.id} className={`rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-lg pointer-events-auto flex items-start gap-2 ${
+          t.type === 'error' ? 'bg-red-500' : t.type === 'success' ? 'bg-emerald-500' : 'bg-gray-800'
+        }`}>
+          <span className="flex-1">{t.message}</span>
+          <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="opacity-70 hover:opacity-100 shrink-0 mt-0.5">✕</button>
+        </div>
+      ))}
+    </div>,
+    document.body
+  );
+};
 
 // --- Helper Components ---
 const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', style }: { name: string, size?: number, color?: string, className?: string, style?: React.CSSProperties }) => {
@@ -2134,7 +2171,7 @@ const PlannerScreen = ({
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Arquivo muito grande. O limite é 10 MB.');
+      toast.error('Arquivo muito grande. O limite é 10 MB.');
       e.target.value = '';
       return;
     }
@@ -2162,7 +2199,7 @@ const PlannerScreen = ({
           setTopic(prev => prev + (prev ? '\n\n' : '') + text);
         } catch (error) {
           console.error("Error extracting text from file:", error);
-          alert(formatApiError(error, "Erro ao extrair texto do arquivo."));
+          toast.error(formatApiError(error, "Erro ao extrair texto do arquivo."));
         }
       };
       reader.readAsDataURL(file);
@@ -2478,7 +2515,7 @@ const PlannerScreen = ({
       await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
     } catch (e) {
       console.error(e);
-      alert('Erro ao gerar o arquivo PPTX. Verifique sua conexão e tente novamente.');
+      toast.error('Erro ao gerar o arquivo PPTX. Verifique sua conexão e tente novamente.');
     }
     setIsExporting(false);
   };
@@ -2787,7 +2824,7 @@ const PlannerScreen = ({
                         setDocReady({ url: URL.createObjectURL(blob), filename, target: 'main' });
                       } catch (e) {
                         console.error('Erro ao exportar Word:', e);
-                        alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                        toast.error('Erro ao gerar o arquivo Word. Tente novamente.');
                       } finally {
                         setPreparingDoc(null);
                       }
@@ -2849,7 +2886,7 @@ const PlannerScreen = ({
                               setDocReady({ url: URL.createObjectURL(blob), filename, target: i });
                             } catch (e) {
                               console.error('Erro ao exportar Word:', e);
-                              alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                              toast.error('Erro ao gerar o arquivo Word. Tente novamente.');
                             } finally {
                               setPreparingDoc(null);
                             }
@@ -4119,7 +4156,7 @@ const ProfileScreen = ({
                         }, 3000);
                       } catch (e) {
                         console.error('Error sending feedback:', e);
-                        alert('Não foi possível enviar o feedback. Tente novamente.');
+                        toast.error('Não foi possível enviar o feedback. Tente novamente.');
                       }
                     }}
                     disabled={!feedbackText.trim()}
@@ -4886,7 +4923,7 @@ const EstudioScreen = ({
         const MAX_CHAR_LIMIT = 100000;
         const updated = prev + (prev ? '\n\n' : '') + `--- Arquivo: ${file.name} ---\n` + newText;
         if (updated.length > MAX_CHAR_LIMIT) {
-          alert('Base de Conhecimento cheia. O texto foi truncado para evitar excesso de memória e custos.');
+          toast.info('Base de Conhecimento cheia. O texto foi truncado para evitar excesso de memória e custos.');
           return updated.substring(0, MAX_CHAR_LIMIT);
         }
         return updated;
@@ -4914,7 +4951,7 @@ const EstudioScreen = ({
             applyContextSafety(response.text || '');
           } catch (err) {
             console.error(err);
-            alert(formatApiError(err, 'Erro ao processar o arquivo com a IA.'));
+            toast.error(formatApiError(err, 'Erro ao processar o arquivo com a IA.'));
           } finally {
             setIsUploading(false);
           }
@@ -4924,7 +4961,7 @@ const EstudioScreen = ({
       }
     } catch (err) {
       console.error(err);
-      alert('Erro ao ler o arquivo.');
+      toast.error('Erro ao ler o arquivo.');
     }
     setIsUploading(false);
   };
@@ -4932,7 +4969,7 @@ const EstudioScreen = ({
   const sendChatMessage = async () => {
     if (!chatInput.trim()) return;
     if (!estudioContext) {
-      alert('Ops! Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
+      toast.error('Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
       return;
     }
 
@@ -5352,6 +5389,7 @@ const AdminScreen = () => {
   const [uploadForm, setUploadForm] = useState({ title: '', type: 'activities' as LibraryItem['type'], subject: '', grade: '', description: '' });
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadErr, setUploadErr] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const reloadStorage = async () => {
     const snap = await getDoc(doc(db, 'config', 'storage'));
@@ -5393,13 +5431,14 @@ const AdminScreen = () => {
   };
 
   const handleDeleteLib = async (item: LibraryItem) => {
-    if (!confirm(`Apagar "${item.title}"?`)) return;
+    if (confirmDeleteId !== item.id) { setConfirmDeleteId(item.id); return; }
+    setConfirmDeleteId(null);
     try {
       await deleteObject(storageRef(storage, `library/${item.id}/${item.fileName}`));
       await deleteDoc(doc(db, 'library', item.id));
       await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(-item.fileSizeBytes) }, { merge: true });
       setStorageUsed(p => Math.max(0, p - item.fileSizeBytes));
-    } catch (e: any) { alert(`Erro: ${e.message}`); }
+    } catch (e: any) { toast.error(`Erro: ${e.message}`); }
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -5610,8 +5649,12 @@ const AdminScreen = () => {
                   <p className="font-bold text-sm text-gray-900 truncate">{item.title}</p>
                   <p className="text-xs text-gray-400">{item.subject} · {item.grade} · {fmtBytes(item.fileSizeBytes)} · {item.downloadCount} downloads</p>
                 </div>
-                <button onClick={() => handleDeleteLib(item)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors shrink-0">
-                  <Trash2 size={16} />
+                <button
+                  onClick={() => handleDeleteLib(item)}
+                  onBlur={() => setConfirmDeleteId(null)}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 ${confirmDeleteId === item.id ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`}
+                >
+                  {confirmDeleteId === item.id ? 'Confirmar?' : <Trash2 size={16} />}
                 </button>
               </div>
             ))}
@@ -6257,9 +6300,10 @@ export default function App() {
   const generatePlan = async (optTopic?: string, optClassId?: string) => {
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
-    
+
     if (!targetTopic.trim()) return;
-    
+    if (isLimitReached) return;
+
     const taskId = addTask({ type: 'plan', title: `Plano: ${targetTopic}` });
     try {
       const selectedClass = schedules.find(s => s.id === targetClassId);
@@ -6353,6 +6397,7 @@ ${bnccBlock}
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
     if (!targetTopic.trim()) return;
+    if (isLimitReached) return;
 
     const taskId = addTask({ type, title: `${type === 'slides' ? 'Slides' : 'Atividades'}: ${targetTopic}` });
     try {
@@ -6535,6 +6580,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
 
   return (
     <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+      <ToastContainer />
 
       {/* ── Onboarding Modal ───────────────────────────────────────────── */}
       {showOnboarding && (
