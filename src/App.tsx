@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import DOMPurify from 'dompurify';
@@ -27,6 +27,8 @@ if (!apiKey) {
   console.error("CRITICAL: GEMINI_API_KEY está ausente no ambiente!");
 }
 const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
+
+const AI_MODEL = 'gemini-2.0-flash';
 
 const formatApiError = (error: any, defaultMsg: string): string => {
   let msg = '';
@@ -95,9 +97,7 @@ const generateContentWithRetry = async (params: Parameters<typeof ai.models.gene
   if (!apiKey) {
     throw new Error('Chave da IA não configurada. Contate o suporte.');
   }
-  if (params.model === 'gemini-2.5-flash') {
-    params.model = 'gemini-3-flash-preview';
-  }
+  if (!params.model) params.model = AI_MODEL;
   return withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
 };
 
@@ -214,6 +214,42 @@ function useFirestoreDoc<T>(
   };
 
   return [data, updateData];
+}
+
+// --- Error Boundary ---
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">🦉</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Algo deu errado</h2>
+            <p className="text-sm text-gray-500 mb-6">O Corujão encontrou um problema inesperado. Seus dados estão salvos na nuvem.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-indigo-600 text-white rounded-2xl py-3 font-bold text-sm"
+            >
+              Recarregar o app
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 // --- Toast System ---
@@ -1394,7 +1430,7 @@ const SlidePreviewList = ({
 Layout atual: ${targetSlide.layoutID}. Nova instrução: ${newPrompt}.
 Mantenha o estilo: ${JSON.stringify(presentationData.theme)}.
 SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illustrationQuery": "..." }`;
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const newData = JSON.parse(response.text || '{}');
       const newImgUrl = newData.illustrationQuery ? await fetchPixabayImage(newData.illustrationQuery, 1200, 800) : targetSlide.data.imageUrl;
       updateSlide(idx, { title: newData.title || targetSlide.data.title, text: newData.text || targetSlide.data.text, imagePrompt: newData.illustrationQuery || targetSlide.data.imagePrompt, imageUrl: newImgUrl });
@@ -2187,7 +2223,7 @@ const PlannerScreen = ({
         try {
           const base64 = (event.target?.result as string).split(',')[1];
           const response = await generateContentWithRetry({
-            model: 'gemini-3-flash-preview',
+            model: AI_MODEL,
             contents: [
               { role: 'user', parts: [
                 { inlineData: { data: base64, mimeType: file.type } },
@@ -2261,6 +2297,21 @@ const PlannerScreen = ({
     setDocReady(null);
   }, [currentResult]);
 
+  const fetchImageAsBase64 = async (url: string): Promise<string | null> => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string>(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
   const exportPPTX = async () => {
     if (!presentationData) return;
     setIsExporting(true);
@@ -2293,6 +2344,28 @@ const PlannerScreen = ({
         }
       };
 
+      // Pre-fetch all images as base64 to avoid CORS failures when pptxgenjs
+      // requests Pixabay URLs directly from the user's browser.
+      const imageCache = new Map<string, string>();
+      await Promise.all(
+        presentationData.slides
+          .map(s => s.data.imageUrl)
+          .filter(Boolean)
+          .filter((url, i, a) => a.indexOf(url) === i)
+          .map(async url => {
+            const b64 = await fetchImageAsBase64(url);
+            if (b64) imageCache.set(url, b64);
+          })
+      );
+      const addSlideImage = (slide: any, url: string, opts: any) => {
+        const b64 = imageCache.get(url);
+        if (b64) {
+          slide.addImage({ data: `image/jpeg;base64,${b64}`, ...opts });
+        } else {
+          slide.addImage({ path: url, ...opts });
+        }
+      };
+
       for (let si = 0; si < presentationData.slides.length; si++) {
         const slideData = presentationData.slides[si];
         const slide = pres.addSlide();
@@ -2315,7 +2388,7 @@ const PlannerScreen = ({
           slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.5, y: 4.6, w: 4.7, h: 0.35, fontSize: 9, fontFace: 'Calibri', color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
           }
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
@@ -2327,7 +2400,7 @@ const PlannerScreen = ({
           const contentX = isLeft ? 0.4 : 4.4;
 
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
             slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 75 } });
           }
 
@@ -2353,7 +2426,7 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.rect, { x: 4.94, y: 2.62, w: 0.12, h: 0.28, fill: { color: ac } });
           slide.addShape(pres.ShapeType.rect, { x: 4.7, y: 2.78, w: 0.6, h: 0.08, fill: { color: ac }, rotate: 0 });
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
           }
           addFooter(slide, si + 1);
 
@@ -2444,7 +2517,7 @@ const PlannerScreen = ({
         } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
           slide.background = { color: '111111' };
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
           }
           // Dark gradient overlay via semi-transparent rect
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.3, fill: { color: '000000', transparency: 25 } });
@@ -3188,7 +3261,7 @@ const ChatScreen = ({
       }
 
       const response = await generateContentWithRetry({
-        model: 'gemini-3-flash-preview',
+        model: AI_MODEL,
         contents: { parts },
         config: {
           tools: [{
@@ -4366,7 +4439,7 @@ const HolidaySuggestion = ({ holidayName }: { holidayName: string }) => {
       try {
         const prompt = `Dê uma dica CURTA e PRÁTICA (máximo 2 frases) para um professor aproveitar o feriado "${holidayName}" no seu planejamento pedagógico ou para atividades de descanso com alunos. Foque na objetividade.`;
         const response = await generateContentWithRetry({
-          model: "gemini-3-flash-preview",
+          model: AI_MODEL,
           contents: prompt,
         });
         
@@ -4940,7 +5013,7 @@ const EstudioScreen = ({
           try {
             const base64 = (event.target?.result as string).split(',')[1];
             const response = await generateContentWithRetry({
-              model: 'gemini-3-flash-preview',
+              model: AI_MODEL,
               contents: [
                 { role: 'user', parts: [
                     { inlineData: { data: base64, mimeType: file.type } },
@@ -4992,7 +5065,7 @@ const EstudioScreen = ({
       Assistente:`;
 
       const response = await generateContentWithRetry({
-        model: 'gemini-3-flash-preview',
+        model: AI_MODEL,
         contents: prompt,
       });
 
@@ -5717,7 +5790,7 @@ const AdminScreen = () => {
   );
 };
 
-export default function App() {
+function AppInner() {
   const [user, setUser] = useState<any>(null);
   const [isAuthLoaded, setIsAuthLoaded] = useState(false);
   const [email, setEmail] = useState('');
@@ -6238,7 +6311,7 @@ export default function App() {
       Sugira quantas aulas (de ${plannerLessonTime}min cada) são necessárias para cobrir esse conteúdo de forma eficaz. 
       Responda apenas o número bruto.`;
       
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const match = response.text?.match(/\d+/);
       const suggested = match ? parseInt(match[0], 10) : 1;
       const finalDuration = isNaN(suggested) || suggested < 1 ? 1 : Math.min(suggested, 20);
@@ -6364,7 +6437,7 @@ ${bnccBlock}
 ## REFERÊNCIAS
 [2 ou 3 referências bibliográficas em formato ABNT]`;
 
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const planDraft = response.text || '';
 
       // ── Validação local determinística das habilidades BNCC ──────────────
@@ -6406,7 +6479,7 @@ ${bnccBlock}
 
       if (type === 'slides') {
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount);
-        const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
         const firstBrace = text.indexOf('{');
@@ -6566,7 +6639,7 @@ _______________________________________________________________________________
 
 REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`;
           
-        const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const result = response.text || '';
         if (type === 'exam') setPlannerExam(result);
         else setPlannerActivity(result);
@@ -6850,5 +6923,13 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-100/30 blur-[120px] rounded-full" />
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
