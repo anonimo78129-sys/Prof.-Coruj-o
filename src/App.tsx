@@ -2583,9 +2583,19 @@ const PlannerScreen = ({
               </div>
             )}
             {isLimitReached ? (
-              <div className="w-full bg-indigo-50 border border-indigo-200 rounded-2xl py-4 px-4 text-center">
-                <p className="text-indigo-700 font-bold text-sm mb-1">Limite do plano gratuito atingido</p>
-                <p className="text-indigo-500 text-xs">Fale com o administrador para ativar o plano Pro e gerar conteúdo ilimitado.</p>
+              <div className="w-full bg-indigo-50 border border-indigo-200 rounded-2xl py-4 px-4 text-center flex flex-col gap-3">
+                <div>
+                  <p className="text-indigo-700 font-bold text-sm mb-0.5">Limite do plano gratuito atingido</p>
+                  <p className="text-indigo-400 text-xs">Ative o Pro para gerações ilimitadas de planos, slides, atividades e provas.</p>
+                </div>
+                <a
+                  href="https://wa.me/5598981796309?text=Olá! Quero ativar o plano Pro do Prof. Corujão."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-green-500 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={16} /> Ativar Pro via WhatsApp
+                </a>
               </div>
             ) : (
               <button
@@ -5973,9 +5983,17 @@ export default function App() {
             Você usou todas as <strong>{FREE_GENERATION_LIMIT} gerações gratuitas</strong>. Ative o plano Pro para continuar gerando planos, atividades e slides ilimitados.
           </p>
           <p className="text-sm text-gray-400 mb-6">Seu histórico e materiais já gerados continuam disponíveis.</p>
-          <div className="p-4 bg-indigo-50 text-indigo-800 rounded-xl mb-6 text-sm">
-            Fale com o administrador informando seu e-mail: <strong>{user.email}</strong> para ativar o acesso Pro.
+          <div className="p-4 bg-indigo-50 text-indigo-800 rounded-xl mb-4 text-sm">
+            Ative o plano Pro e gere conteúdo ilimitado — planos de aula, slides, atividades e provas.
           </div>
+          <a
+            href="https://wa.me/5598981796309?text=Olá! Quero ativar o plano Pro do Prof. Corujão."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-green-500 hover:bg-green-600 text-white rounded-2xl py-3.5 text-base font-bold flex items-center justify-center gap-2 mb-4 transition-colors"
+          >
+            <MessageCircle size={20} /> Ativar Pro via WhatsApp
+          </a>
           <button onClick={() => setScreen('profile')} className="text-indigo-600 font-bold mb-3">Ver meu perfil</button>
           <button onClick={() => logOut()} className="text-gray-500 hover:text-gray-700 font-medium text-sm">Sair da conta</button>
         </div>
