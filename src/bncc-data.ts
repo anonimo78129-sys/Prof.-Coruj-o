@@ -286,6 +286,101 @@ export const bnccData: BnccSubject[] = [
     ],
   },
 
+  // ─── FÍSICA ──────────────────────────────────────────────────────────────
+  {
+    names: ['física', 'fisica', 'fis'],
+    blocks: [
+      {
+        label: 'Ensino Médio',
+        gradeKeys: ['médio', 'medio', 'em', '1ª série', '2ª série', '3ª série', 'ensino médio'],
+        skills: [
+          { code: 'EM13CNT101', desc: 'Analisar e representar transformações e conservações de energia, quantidade de matéria e movimento para prever efeitos técnicos, sociais e ambientais', tags: ['energia', 'conservação', 'transformação', 'mecânica', 'termodinâmica'] },
+          { code: 'EM13CNT102', desc: 'Realizar previsões e planejar experimentos com base em análise crítica de fontes diversas: experimentos, simulações e modelos', tags: ['experimento', 'previsão', 'modelo', 'laboratório', 'método científico'] },
+          { code: 'EM13CNT103', desc: 'Utilizar o conhecimento sobre radiações e suas origens para avaliar potencialidades e riscos em equipamentos cotidianos e medicina', tags: ['radiação', 'ondas eletromagnéticas', 'óptica', 'física moderna', 'radioatividade'] },
+          { code: 'EM13CNT204', desc: 'Elaborar previsões e cálculos sobre movimentos de objetos no espaço, incluindo o Sistema Solar, com base em interações gravitacionais', tags: ['cinemática', 'dinâmica', 'gravitação', 'movimentos', 'astrofísica'] },
+          { code: 'EM13CNT301', desc: 'Construir questões, elaborar hipóteses e empregar instrumentos de medição para construir e justificar conclusões experimentais', tags: ['hipótese', 'medição', 'experimento', 'grandezas físicas', 'laboratório'] },
+          { code: 'EM13CNT303', desc: 'Interpretar textos de divulgação científica sobre Ciências da Natureza, avaliando dados, evidências e possíveis interesses envolvidos', tags: ['eletromagnetismo', 'física quântica', 'divulgação científica', 'análise'] },
+        ],
+      },
+    ],
+  },
+
+  // ─── QUÍMICA ─────────────────────────────────────────────────────────────
+  {
+    names: ['química', 'quimica', 'qui'],
+    blocks: [
+      {
+        label: 'Ensino Médio',
+        gradeKeys: ['médio', 'medio', 'em', '1ª série', '2ª série', '3ª série', 'ensino médio'],
+        skills: [
+          { code: 'EM13CNT101', desc: 'Analisar transformações e conservações de quantidade de matéria e energia em reações químicas, avaliando efeitos sociais e ambientais', tags: ['reação química', 'transformação da matéria', 'equações', 'estequiometria', 'energia'] },
+          { code: 'EM13CNT104', desc: 'Avaliar benefícios e riscos à saúde e ao ambiente do uso de agrotóxicos e outros recursos tecnológicos na produção de alimentos', tags: ['agrotóxico', 'química orgânica', 'alimentos', 'saúde', 'sustentabilidade'] },
+          { code: 'EM13CNT105', desc: 'Analisar os ciclos biogeoquímicos e interpretar efeitos da interferência humana sobre esses ciclos para promover ações sustentáveis', tags: ['ciclos biogeoquímicos', 'carbono', 'nitrogênio', 'química ambiental', 'poluição'] },
+          { code: 'EM13CNT202', desc: 'Comunicar resultados de análises e experimentos, elaborando e interpretando gráficos, tabelas, equações e sistemas de classificação', tags: ['tabela periódica', 'nomenclatura', 'classificação', 'gráficos', 'comunicação científica'] },
+          { code: 'EM13CNT301', desc: 'Elaborar hipóteses, empregar instrumentos de medição e interpretar modelos explicativos para resolver situações-problema', tags: ['laboratório', 'hipótese', 'experimento', 'segurança química', 'propriedades'] },
+          { code: 'EM13CNT304', desc: 'Analisar situações controversas sobre a aplicação de conhecimentos químicos como agrotóxicos, manipulação e exploração de recursos', tags: ['química orgânica', 'polímeros', 'petroquímica', 'ética', 'controvérsia'] },
+        ],
+      },
+    ],
+  },
+
+  // ─── BIOLOGIA ────────────────────────────────────────────────────────────
+  {
+    names: ['biologia', 'bio'],
+    blocks: [
+      {
+        label: 'Ensino Médio',
+        gradeKeys: ['médio', 'medio', 'em', '1ª série', '2ª série', '3ª série', 'ensino médio'],
+        skills: [
+          { code: 'EM13CNT105', desc: 'Analisar os ciclos biogeoquímicos e interpretar efeitos da interferência humana sobre esses ciclos para promover ações sustentáveis', tags: ['ecologia', 'ciclos da natureza', 'cadeia alimentar', 'biomas', 'sustentabilidade'] },
+          { code: 'EM13CNT106', desc: 'Avaliar a viabilidade de intervenções humanas no ambiente, considerando benefícios e riscos para populações e demais seres vivos', tags: ['genética', 'biotecnologia', 'OGM', 'biodiversidade', 'impacto ambiental'] },
+          { code: 'EM13CNT203', desc: 'Avaliar e prever efeitos de intervenções nos ecossistemas e nos organismos, tendo em vista a conservação ambiental e qualidade de vida', tags: ['ecossistema', 'saúde', 'organismos', 'evolução', 'adaptação'] },
+          { code: 'EM13CNT206', desc: 'Discutir a importância da preservação das culturas indígenas e comunidades tradicionais e sua relação com a conservação da sociobiodiversidade', tags: ['biodiversidade', 'etnobiologia', 'preservação', 'povos indígenas', 'botânica'] },
+          { code: 'EM13CNT207', desc: 'Identificar vulnerabilidades contemporâneas das juventudes nos aspectos físico, psicoemocional e social, desenvolvendo ações de saúde coletiva', tags: ['saúde', 'corpo humano', 'sistema imune', 'doenças', 'bem-estar'] },
+          { code: 'EM13CNT305', desc: 'Investigar o uso indevido de conhecimentos das Ciências Naturais em justificativas de discriminação para promover respeito à diversidade', tags: ['genética humana', 'evolução', 'racismo científico', 'diversidade', 'ética'] },
+        ],
+      },
+    ],
+  },
+
+  // ─── SOCIOLOGIA ──────────────────────────────────────────────────────────
+  {
+    names: ['sociologia', 'socio'],
+    blocks: [
+      {
+        label: 'Ensino Médio',
+        gradeKeys: ['médio', 'medio', 'em', '1ª série', '2ª série', '3ª série', 'ensino médio'],
+        skills: [
+          { code: 'EM13CHS102', desc: 'Identificar e analisar matrizes conceituais como etnocentrismo, racismo, modernidade e coletivismo, explicitando seu papel na transformação das sociedades', tags: ['cultura', 'etnocentrismo', 'modernidade', 'capitalismo', 'ideologia'] },
+          { code: 'EM13CHS201', desc: 'Analisar as dinâmicas das populações e do capital nos processos de industrialização e urbanização, identificando contradições e formas de resistência', tags: ['industrialização', 'classes sociais', 'urbanização', 'desigualdade', 'trabalho'] },
+          { code: 'EM13CHS203', desc: 'Comparar os significados de cidadania e democracia em diferentes contextos históricos, identificando possibilidades de exercício no contexto atual', tags: ['cidadania', 'democracia', 'política', 'direitos', 'participação'] },
+          { code: 'EM13CHS401', desc: 'Identificar e analisar as relações entre sujeitos, grupos, classes e sociedades que integram a dinâmica social, incluindo discussões sobre desigualdades', tags: ['classes sociais', 'movimentos sociais', 'desigualdade', 'grupos sociais', 'conflito'] },
+          { code: 'EM13CHS404', desc: 'Analisar as formas de exercício dos direitos humanos, refletindo sobre mecanismos de garantia e proteção', tags: ['direitos humanos', 'cidadania', 'democracia', 'legislação', 'proteção social'] },
+          { code: 'EM13CHS604', desc: 'Analisar os impactos das transformações tecnológicas nas relações de produção e de trabalho, nas estruturas familiares e nas formas de sociabilidade', tags: ['tecnologia', 'trabalho', 'família', 'sociabilidade', 'redes sociais'] },
+        ],
+      },
+    ],
+  },
+
+  // ─── FILOSOFIA ───────────────────────────────────────────────────────────
+  {
+    names: ['filosofia', 'filo'],
+    blocks: [
+      {
+        label: 'Ensino Médio',
+        gradeKeys: ['médio', 'medio', 'em', '1ª série', '2ª série', '3ª série', 'ensino médio'],
+        skills: [
+          { code: 'EM13CHS101', desc: 'Analisar e comparar diferentes fontes e narrativas para a compreensão de ideias filosóficas e processos históricos, políticos e culturais', tags: ['filosofia', 'epistemologia', 'pensamento crítico', 'análise', 'narrativa'] },
+          { code: 'EM13CHS103', desc: 'Elaborar hipóteses, selecionar evidências e compor argumentos relativos a processos culturais e epistemológicos com base em textos filosóficos', tags: ['argumentação', 'lógica', 'epistemologia', 'texto filosófico', 'raciocínio'] },
+          { code: 'EM13CHS104', desc: 'Analisar objetos da cultura material e imaterial como suporte de conhecimentos, valores, crenças e práticas de diferentes sociedades', tags: ['cultura', 'valores', 'ética', 'estética', 'ontologia'] },
+          { code: 'EM13CHS501', desc: 'Analisar os fundamentos da ética em diferentes tradições filosóficas e culturais, com vistas ao desenvolvimento da autonomia intelectual e pensamento crítico', tags: ['ética', 'moral', 'filosofia moral', 'autonomia', 'virtude'] },
+          { code: 'EM13CHS502', desc: 'Analisar situações da vida cotidiana que envolvam discriminação ou violação de direitos, promovendo uma cultura de paz', tags: ['ética aplicada', 'direitos humanos', 'justiça', 'política', 'cidadania'] },
+          { code: 'EM13CHS105', desc: 'Identificar, contextualizar e criticar tipologias evolutivas e qualquer forma de discriminação das sociedades humanas e de seus saberes e valores', tags: ['filosofia política', 'crítica', 'discriminação', 'diversidade', 'alteridade'] },
+        ],
+      },
+    ],
+  },
+
   // ─── LÍNGUA INGLESA ──────────────────────────────────────────────────────
   {
     names: ['inglês', 'ingles', 'língua inglesa', 'lingua inglesa', 'english', 'li'],

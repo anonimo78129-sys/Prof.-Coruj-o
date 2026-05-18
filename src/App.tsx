@@ -2607,7 +2607,20 @@ const PlannerScreen = ({
                 Cancelar
               </button>
             )}
-            {(error || recentTaskError) && <p className="text-red-500 text-sm mt-3 text-center font-medium">{error || recentTaskError}</p>}
+            {(error || recentTaskError) && (
+              <div className="mt-3 flex flex-col gap-2">
+                <p className="text-red-500 text-sm text-center font-medium">{error || recentTaskError}</p>
+                {recentTaskError && (
+                  <button
+                    onClick={() => { setError(''); handleMainAction(); }}
+                    disabled={loading}
+                    className="w-full border border-indigo-400 text-indigo-600 rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={15} /> Tentar novamente
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -6173,29 +6186,21 @@ ${bnccBlock}
       const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
       const planDraft = response.text || '';
 
-      // ── Solução 3: validação pós-geração das habilidades BNCC ──────────
+      // ── Validação local determinística das habilidades BNCC ──────────────
+      // Substitui a chamada de IA por verificação contra o banco local.
       let planResult = planDraft;
       if (bnccSkills.length > 0) {
-        try {
-          const validationPrompt = `Você é especialista em BNCC. No plano de aula abaixo, verifique SOMENTE a seção "## Habilidade (BNCC)":
-1. Os códigos citados batem com os do banco abaixo?
-2. Se houver código inexistente ou errado, substitua pelo correto do banco.
-3. Não altere NENHUMA outra parte do plano.
-
-BANCO DE HABILIDADES VÁLIDAS (use apenas estes):
-${bnccBlock}
-
-Retorne o plano COMPLETO com a seção corrigida. Sem introduções.
-
-PLANO:
-${planDraft}`;
-          const validated = await withTimeout(
-            generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: validationPrompt }),
-            30000, 'validação BNCC'
+        const validCodes = new Set(bnccSkills.map(s => s.code.toUpperCase()));
+        const allCodesInPlan = (planDraft.match(/\b(EF\d{2}[A-Z]{2}\d{2}|EM13[A-Z]{3}\d{3})\b/g) || [])
+          .map(c => c.toUpperCase());
+        const hasInvalidCode = allCodesInPlan.some(c => !validCodes.has(c));
+        const hasMissingCode = bnccSkills.some(s => !allCodesInPlan.includes(s.code.toUpperCase()));
+        if (hasInvalidCode || hasMissingCode || allCodesInPlan.length === 0) {
+          const correctSection = `## Habilidade (BNCC)\n${bnccBlock}`;
+          planResult = planDraft.replace(
+            /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/,
+            correctSection + '\n'
           );
-          if (validated.text) planResult = validated.text;
-        } catch {
-          // validação falhou — usar o rascunho original (melhor do que nada)
         }
       }
 
