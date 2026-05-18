@@ -14,8 +14,6 @@ import {
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import pptxgen from 'pptxgenjs';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation } from 'docx';
 import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
@@ -1512,6 +1510,7 @@ const buildDocx = async (
   docType: 'plan' | 'exam' | 'activities',
   opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): Promise<Blob> => {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation } = await import('docx');
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
@@ -2316,6 +2315,7 @@ const PlannerScreen = ({
     if (!presentationData) return;
     setIsExporting(true);
     try {
+      const { default: pptxgen } = await import('pptxgenjs');
       const pres = new pptxgen();
       pres.layout = 'LAYOUT_16x9';
       const theme = presentationData.theme;
