@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
+import DOMPurify from 'dompurify';
 import * as LucideIcons from 'lucide-react';
 import { 
   Search, Bell, Home, Calendar as CalendarIcon, User,
@@ -1020,7 +1021,7 @@ const RichBody = ({ value, onChange, style, rows = 6, primaryColor, accentColor 
   return (
     <div
       onClick={() => setEditing(true)}
-      dangerouslySetInnerHTML={{ __html: parseRichHtml(value, primaryColor, accentColor) || '<span style="color:#aaa;font-style:italic">Clique para editar...</span>' }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseRichHtml(value, primaryColor, accentColor) || '<span style="color:#aaa;font-style:italic">Clique para editar...</span>') }}
       style={{ cursor: 'text', fontSize: 14, lineHeight: 1.65, color: '#374151', width: '100%', minHeight: 60, ...style }}
     />
   );
@@ -1043,7 +1044,7 @@ const RichBodyWithIcons = ({ value, onChange, style, primaryColor, accentColor }
       {parts.map((p, i) => {
         const iconMatch = p.match(/^\{([A-Za-z0-9]+)\}$/);
         if (iconMatch) return <DynamicIcon key={i} name={iconMatch[1]} size={15} color={primaryColor} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />;
-        return <span key={i} dangerouslySetInnerHTML={{ __html: parseRichHtml(p, primaryColor, accentColor) }} />;
+        return <span key={i} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseRichHtml(p, primaryColor, accentColor)) }} />;
       })}
     </div>
   );
@@ -2131,7 +2132,13 @@ const PlannerScreen = ({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Arquivo muito grande. O limite é 10 MB.');
+      e.target.value = '';
+      return;
+    }
+
     // If it's a text file, read it directly
     if (file.type.startsWith('text/') || file.name.endsWith('.md') || file.name.endsWith('.csv')) {
       const text = await file.text();
@@ -5779,7 +5786,8 @@ export default function App() {
   const [onboardingName, setOnboardingName] = useState('');
   const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
 
-  const showOnboarding = !!user && !profile.onboarded;
+  // Show onboarding only for genuinely new users: no onboarded flag AND still has the default name
+  const showOnboarding = !!user && !profile.onboarded && profile.name === 'Prof. Silva';
 
   const finishOnboarding = async (skipClass = false) => {
     const newName = onboardingName.trim() || 'Professor';
