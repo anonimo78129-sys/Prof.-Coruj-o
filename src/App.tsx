@@ -320,6 +320,7 @@ interface UserProfile {
   email?: string;
   isPro?: boolean;
   createdAt?: string;
+  generationsUsed?: number;
 }
 
 interface ClassSchedule {
@@ -1924,7 +1925,10 @@ const PlannerScreen = ({
   setPlannerExamDuration: setExamDuration,
   getSuggestion,
   getScheduleBuffer,
-  setPlannerMode
+  setPlannerMode,
+  generationsUsed,
+  isLimitReached,
+  freeGenerationLimit,
 }: {
   schedules: ClassSchedule[], 
   setSchedules: (s: ClassSchedule[]) => void,
@@ -1984,7 +1988,10 @@ const PlannerScreen = ({
   setPlannerExamDuration: (n: number) => void,
   getSuggestion: (topic?: string, classId?: string) => Promise<void>,
   getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
-  setPlannerMode: (m: PlannerMode) => void
+  setPlannerMode: (m: PlannerMode) => void,
+  generationsUsed: number,
+  isLimitReached: boolean,
+  freeGenerationLimit: number,
 }) => {
   const currentResult = mode === 'plan' ? plan : 
                         mode === 'slides' ? presentationData :
@@ -2567,20 +2574,35 @@ const PlannerScreen = ({
                 </motion.div>
               )}
             </AnimatePresence>
-            <button
-              onClick={() => {
-                if (mode === 'plan' && duration === 0) {
-                  getSuggestion();
-                } else {
-                  setShowGenModal(true);
-                }
-              }}
-              disabled={loading || !topic || !selectedClassId}
-              className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
-            >
-              {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}
-              {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
-            </button>
+            {!profile?.isPro && profile?.role !== 'admin' && (
+              <div className="flex items-center justify-between mb-1 px-1">
+                <span className="text-xs text-gray-400">Gerações usadas</span>
+                <span className={`text-xs font-bold ${isLimitReached ? 'text-red-500' : generationsUsed >= freeGenerationLimit - 2 ? 'text-amber-500' : 'text-gray-500'}`}>
+                  {generationsUsed}/{freeGenerationLimit}
+                </span>
+              </div>
+            )}
+            {isLimitReached ? (
+              <div className="w-full bg-indigo-50 border border-indigo-200 rounded-2xl py-4 px-4 text-center">
+                <p className="text-indigo-700 font-bold text-sm mb-1">Limite do plano gratuito atingido</p>
+                <p className="text-indigo-500 text-xs">Fale com o administrador para ativar o plano Pro e gerar conteúdo ilimitado.</p>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (mode === 'plan' && duration === 0) {
+                    getSuggestion();
+                  } else {
+                    setShowGenModal(true);
+                  }
+                }}
+                disabled={loading || !topic || !selectedClassId}
+                className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+              >
+                {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}
+                {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
+              </button>
+            )}
             <GenerateModal
               show={showGenModal}
               onClose={() => setShowGenModal(false)}
@@ -5350,18 +5372,18 @@ const AdminScreen = () => {
     }
   };
 
-  const getTrialStatus = (u: any) => {
+  const FREE_LIMIT = 10;
+
+  const getUsageStatus = (u: any) => {
     if (u.isPro || u.role === 'admin') return null;
-    if (!u.createdAt) return null;
-    const hours = (Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60);
-    if (hours > 24) return 'expired';
-    const remaining = Math.max(0, 24 - hours);
-    return `${Math.floor(remaining)}h restantes`;
+    const used = u.generationsUsed ?? 0;
+    if (used >= FREE_LIMIT) return 'limite';
+    return `${used}/${FREE_LIMIT} gerações`;
   };
 
   const totalUsers = sysUsers.length;
   const proUsers = sysUsers.filter(u => u.isPro).length;
-  const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && u.createdAt && (Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60) > 24).length;
+  const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && (u.generationsUsed ?? 0) >= FREE_LIMIT).length;
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
@@ -5533,7 +5555,7 @@ const AdminScreen = () => {
 
           <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
             {sysUsers.map(u => {
-              const trialStatus = getTrialStatus(u);
+              const trialStatus = getUsageStatus(u);
               const isAdmin = u.role === 'admin';
               return (
                 <div key={u.id} className="p-3 border border-gray-100 rounded-xl bg-gray-50">
@@ -5543,8 +5565,8 @@ const AdminScreen = () => {
                         <p className="font-bold text-sm text-gray-900 truncate">{u.name || 'Sem nome'}</p>
                         {isAdmin && <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-md">ADMIN</span>}
                         {u.isPro && <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md">PRO</span>}
-                        {trialStatus === 'expired' && <span className="text-[10px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md">EXPIRADO</span>}
-                        {trialStatus && trialStatus !== 'expired' && <span className="text-[10px] font-medium bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md">{trialStatus}</span>}
+                        {trialStatus === 'limite' && <span className="text-[10px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md">LIMITE</span>}
+                        {trialStatus && trialStatus !== 'limite' && <span className="text-[10px] font-medium bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md">{trialStatus}</span>}
                       </div>
                       <p className="text-xs text-gray-500 truncate mt-0.5">{u.email || u.id}</p>
                       {u.createdAt && <p className="text-[10px] text-gray-400 mt-0.5">Desde {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
@@ -5833,20 +5855,24 @@ export default function App() {
     }
   };
 
-  const isTrialExpired = useMemo(() => {
+  const FREE_GENERATION_LIMIT = 10;
+
+  const isLimitReached = useMemo(() => {
     if (!user) return false;
     if (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') return false;
     if (profile?.isPro) return false;
-    
-      const creationTime = user.metadata?.creationTime || profile?.createdAt;
-      if (creationTime) {
-        const creationDate = new Date(creationTime).getTime();
-        if (isNaN(creationDate)) return false;
-        const hoursPassed = (Date.now() - creationDate) / (1000 * 60 * 60);
-        return hoursPassed > 24;
-      }
-      return false;
+    return (profile?.generationsUsed ?? 0) >= FREE_GENERATION_LIMIT;
   }, [user, profile]);
+
+  const recordGeneration = async () => {
+    if (!user) return;
+    if (profile?.isPro || profile?.role === 'admin') return;
+    try {
+      await setDoc(doc(db, 'users', user.uid), { generationsUsed: increment(1) }, { merge: true });
+    } catch {
+      // silently ignore — counter is best-effort
+    }
+  };
 
   if (!isAuthLoaded) {
     return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FE]"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -5935,26 +5961,23 @@ export default function App() {
     );
   }
 
-  if (isTrialExpired && screen !== 'admin' && screen !== 'profile') {
+  if (isLimitReached && screen !== 'admin' && screen !== 'profile') {
     return (
       <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6 relative">
-        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100 flex flex-col items-center">
-          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
-            <Shield size={32} />
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-indigo-100 flex flex-col items-center">
+          <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6">
+            <Sparkles size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Tempo Expirado</h2>
-          <p className="text-gray-500 mb-6">
-            Seu período de teste grátis de 24 horas chegou ao fim. Para continuar usando o aplicativo, ative a versão Pro.
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Limite do plano gratuito</h2>
+          <p className="text-gray-500 mb-2">
+            Você usou todas as <strong>{FREE_GENERATION_LIMIT} gerações gratuitas</strong>. Ative o plano Pro para continuar gerando planos, atividades e slides ilimitados.
           </p>
+          <p className="text-sm text-gray-400 mb-6">Seu histórico e materiais já gerados continuam disponíveis.</p>
           <div className="p-4 bg-indigo-50 text-indigo-800 rounded-xl mb-6 text-sm">
-            Fale com o administrador do sistema informando seu e-mail: <strong>{user.email}</strong> para liberação do acesso Permanente.
+            Fale com o administrador informando seu e-mail: <strong>{user.email}</strong> para ativar o acesso Pro.
           </div>
-          <button
-            onClick={() => logOut()}
-            className="text-gray-500 hover:text-gray-700 font-medium"
-          >
-            Sair da conta
-          </button>
+          <button onClick={() => setScreen('profile')} className="text-indigo-600 font-bold mb-3">Ver meu perfil</button>
+          <button onClick={() => logOut()} className="text-gray-500 hover:text-gray-700 font-medium text-sm">Sair da conta</button>
         </div>
       </div>
     );
@@ -6206,6 +6229,7 @@ ${bnccBlock}
 
       setPlannerPlan(planResult);
       updateTask(taskId, { status: 'completed', result: planResult });
+      recordGeneration();
     } catch (error) {
       updateTask(taskId, { status: 'error', error: formatApiError(error, 'Erro ao gerar plano.') });
     }
@@ -6260,6 +6284,7 @@ ${bnccBlock}
         const sanitized = sanitizeSlideData(parsed);
         setPlannerPresentationData(sanitized);
         updateTask(taskId, { status: 'completed', result: sanitized });
+        recordGeneration();
       } else {
         const escolaStr = profile.schoolName || '_________________';
         const professorStr = profile.name || '_________________';
@@ -6387,6 +6412,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         if (type === 'exam') setPlannerExam(result);
         else setPlannerActivity(result);
         updateTask(taskId, { status: 'completed', result });
+        recordGeneration();
       }
     } catch (error) {
       updateTask(taskId, { status: 'error', error: formatApiError(error, 'Erro ao gerar material.') });
@@ -6474,6 +6500,9 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             getSuggestion={getSuggestion}
             getScheduleBuffer={getScheduleBuffer}
             setPlannerMode={setPlannerMode}
+            generationsUsed={profile?.generationsUsed ?? 0}
+            isLimitReached={isLimitReached}
+            freeGenerationLimit={FREE_GENERATION_LIMIT}
           />}
           {screen === 'chat' && <ChatScreen 
             key="chat" 
