@@ -300,7 +300,16 @@ const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', 
   return <IconComponent size={size} color={color} className={className} style={style} />;
 };
 
-const pixabayCache = new Map<string, string>();
+const PIXABAY_CACHE_KEY = '__pxcache__';
+const pixabayCache = {
+  get(k: string): string | undefined {
+    try { const s = sessionStorage.getItem(PIXABAY_CACHE_KEY); if (!s) return undefined; return JSON.parse(s)[k]; } catch { return undefined; }
+  },
+  set(k: string, v: string) {
+    try { const s = sessionStorage.getItem(PIXABAY_CACHE_KEY); const obj = s ? JSON.parse(s) : {}; obj[k] = v; sessionStorage.setItem(PIXABAY_CACHE_KEY, JSON.stringify(obj)); } catch { /* quota full — ignore */ }
+  },
+  has(k: string): boolean { return this.get(k) !== undefined; },
+};
 
 const getImageUrl = (query: string | undefined, width: number, height: number) => {
   if (!query || query.trim().length === 0) {
@@ -3576,8 +3585,9 @@ const ChatScreen = ({
   );
 };
 
-const ProfileScreen = ({ 
-  schedules, 
+const ProfileScreen = ({
+  user,
+  schedules,
   setSchedules,
   profile,
   setProfile,
@@ -3589,8 +3599,9 @@ const ProfileScreen = ({
   notifications,
   setNotifications,
   onResetAccount
-}: { 
-  schedules: ClassSchedule[], 
+}: {
+  user: any,
+  schedules: ClassSchedule[],
   setSchedules: (s: ClassSchedule[]) => void,
   profile: UserProfile,
   setProfile: (p: UserProfile) => void,
@@ -3620,6 +3631,7 @@ const ProfileScreen = ({
   const [importStatus, setImportStatus] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleRef = useRef<HTMLDivElement>(null);
   const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -3685,39 +3697,36 @@ const ProfileScreen = ({
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 400;
-          const MAX_HEIGHT = 400;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
+    if (!file || !user) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 400;
+        let { width, height } = img;
+        if (width > height) { if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; } }
+        else { if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; } }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+          setIsUploadingPhoto(true);
+          try {
+            const ref = storageRef(storage, `users/${user.uid}/photo.jpg`);
+            await uploadBytesResumable(ref, blob).then(snap => snap);
+            const url = await getDownloadURL(ref);
+            setProfile({ ...profile, photo: url });
+          } catch {
+            toast.error('Não foi possível salvar a foto. Tente novamente.');
+          } finally {
+            setIsUploadingPhoto(false);
           }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          setProfile({ ...profile, photo: compressedBase64 });
-        };
-        img.src = event.target?.result as string;
+        }, 'image/jpeg', 0.7);
       };
-      reader.readAsDataURL(file);
-    }
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const saveProfile = () => {
@@ -3731,7 +3740,7 @@ const ProfileScreen = ({
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => fileInputRef.current?.click()}>
+          <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
               <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
@@ -3739,11 +3748,12 @@ const ProfileScreen = ({
                 <User size={48} />
               </div>
             )}
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <Camera size={24} className="text-white" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploadingPhoto ? <Loader2 size={24} className="text-white animate-spin" /> : <Camera size={24} className="text-white" />}
             </div>
+            {isUploadingPhoto && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={24} className="text-white animate-spin" /></div>}
           </div>
-          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} />
+          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
         </div>
         {isEditingProfile ? (
           <div className="w-full space-y-3 mt-4">
@@ -5453,12 +5463,16 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
 // --- Main App ---
 
+const USERS_PAGE_SIZE = 20;
+
 const AdminScreen = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
   const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca'>('users');
+  const [userSearch, setUserSearch] = useState('');
+  const [usersPage, setUsersPage] = useState(0);
 
   // ── Biblioteca state ──────────────────────────────────────────────────────
   const [libItems, setLibItems] = useState<LibraryItem[]>([]);
@@ -5579,6 +5593,14 @@ const AdminScreen = () => {
   const totalUsers = sysUsers.length;
   const proUsers = sysUsers.filter(u => u.isPro).length;
   const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && (u.generationsUsed ?? 0) >= FREE_LIMIT).length;
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return sysUsers;
+    return sysUsers.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
+  }, [sysUsers, userSearch]);
+  const usersPageCount = Math.ceil(filteredUsers.length / USERS_PAGE_SIZE);
+  const pagedUsers = filteredUsers.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
@@ -5757,8 +5779,19 @@ const AdminScreen = () => {
               {usersError}
             </div>
           )}
+
+          <div className="relative mb-4">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              value={userSearch}
+              onChange={e => { setUserSearch(e.target.value); setUsersPage(0); }}
+              placeholder="Buscar por nome ou e-mail…"
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400"
+            />
+          </div>
+
           <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
-            {sysUsers.map(u => {
+            {pagedUsers.map(u => {
               const trialStatus = getUsageStatus(u);
               const isAdmin = u.role === 'admin';
               return (
@@ -5794,6 +5827,28 @@ const AdminScreen = () => {
               );
             })}
           </div>
+
+          {usersPageCount > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setUsersPage(p => Math.max(0, p - 1))}
+                disabled={usersPage === 0}
+                className="px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ← Anterior
+              </button>
+              <span className="text-xs text-gray-500 font-medium">
+                {usersPage + 1} / {usersPageCount} ({filteredUsers.length} usuários)
+              </span>
+              <button
+                onClick={() => setUsersPage(p => Math.min(usersPageCount - 1, p + 1))}
+                disabled={usersPage >= usersPageCount - 1}
+                className="px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Próxima →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </motion.div>
@@ -6898,7 +6953,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setCustomEvents={setCustomEvents}
             setClasses={setClasses}
           />}
-          {screen === 'profile' && <ProfileScreen key="profile" schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={notifications} setNotifications={setNotifications} onResetAccount={() => {
+          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={notifications} setNotifications={setNotifications} onResetAccount={() => {
             setSchedules([]);
             setClasses([]);
             setCustomEvents([]);
