@@ -99,10 +99,6 @@ const generateContentWithRetry = async (params: Parameters<typeof ai.models.gene
   return withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
 };
 
-const generateImagesWithRetry = async (params: Parameters<typeof ai.models.generateImages>[0]) => {
-  return withRetry(() => ai.models.generateImages(params));
-};
-
 function useFirestoreSync<T extends { id: string }>(
   collectionName: string,
   user: any,
@@ -5465,20 +5461,25 @@ const AdminScreen = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const reloadStorage = async () => {
-    const snap = await getDoc(doc(db, 'config', 'storage'));
-    setStorageUsed(snap.exists() ? (snap.data().totalBytes || 0) : 0);
+    try {
+      const snap = await getDoc(doc(db, 'config', 'storage'));
+      setStorageUsed(snap.exists() ? (snap.data().totalBytes || 0) : 0);
+    } catch { /* ignore — storage meter is non-critical */ }
   };
 
   useEffect(() => {
+    if (activeTab !== 'biblioteca') return;
     const unsubLib = onSnapshot(collection(db, 'library'), snap => {
       setLibItems(snap.docs.map(d => d.data() as LibraryItem).sort((a, b) => b.uploadDate - a.uploadDate));
     });
     reloadStorage();
     return unsubLib;
-  }, []);
+  }, [activeTab]);
 
   const handleUpload = async () => {
     if (!uploadFile || !uploadForm.title.trim()) { setUploadErr('Preencha o título e selecione um arquivo.'); return; }
+    if (uploadFile.type !== 'application/pdf') { setUploadErr('Apenas arquivos PDF são permitidos.'); return; }
+    if (uploadFile.size > 50 * 1024 * 1024) { setUploadErr('Arquivo muito grande. O limite é 50 MB por arquivo.'); return; }
     setUploadErr('');
     if (storageUsed + uploadFile.size > LIBRARY_LIMIT_BYTES) {
       setUploadErr(`Limite de 4.9 GB atingido. Apague materiais para liberar espaço.`); return;
