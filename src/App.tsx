@@ -5153,7 +5153,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .answer-key-item { font-size: 11px; margin-bottom: 4px; padding: 3px 6px; background: #fef2f2; border-radius: 3px; }
 
     /* FOOTER */
-    .page-footer { position: fixed; bottom: 0.5cm; left: 1.4cm; right: 1.4cm; font-size: 8px; color: #9ca3af; text-align: center; letter-spacing: 1px; border-top: 1px solid #e5e7eb; padding-top: 4px; }
+    .page-footer { position: fixed; bottom: 0.5cm; right: 1.4cm; font-size: 8px; color: #9ca3af; letter-spacing: 1px; opacity: 0.8; }
 
     /* PRINT-ONLY ADJUSTMENTS */
     .hide-on-screen { display: block; }
