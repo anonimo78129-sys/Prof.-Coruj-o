@@ -5047,122 +5047,507 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) return;
   const todayStr = new Date().toLocaleDateString('pt-BR');
+  const owlSvg = `<svg width="84" height="84" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:0.88;flex-shrink:0">
+    <ellipse cx="30" cy="43" rx="19" ry="16" fill="rgba(255,255,255,0.18)"/>
+    <circle cx="30" cy="20" r="17" fill="rgba(255,255,255,0.18)"/>
+    <polygon points="17,4 22,17 13,17" fill="rgba(255,255,255,0.28)"/>
+    <polygon points="43,4 47,17 38,17" fill="rgba(255,255,255,0.28)"/>
+    <circle cx="22" cy="20" r="8" fill="white"/><circle cx="38" cy="20" r="8" fill="white"/>
+    <circle cx="23" cy="21" r="5" fill="#1e293b"/><circle cx="39" cy="21" r="5" fill="#1e293b"/>
+    <circle cx="25" cy="19" r="2" fill="white"/><circle cx="41" cy="19" r="2" fill="white"/>
+    <polygon points="30,27 25,33 35,33" fill="#fbbf24"/>
+    <ellipse cx="10" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(-15,10,43)"/>
+    <ellipse cx="50" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(15,50,43)"/>
+    <text x="30" y="57" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.65)" font-family="Arial" font-weight="bold" letter-spacing="1">CORUJAO</text>
+  </svg>`;
   const headerHtml = `
     <div class="page-header">
-      <div class="brand-strip"></div>
-      <div class="school-row">
-        <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
-        <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
-      </div>
-      <div class="activity-tag">${opts.activityLabel}</div>
-      <h1 class="doc-title">${opts.title}</h1>
-      <div class="fields-grid">
-        <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
-        <div class="field"><span class="field-label">DATA</span><div class="field-line short">${todayStr}</div></div>
-        <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
-        <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
-        <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
+      <div class="header-inner">
+        <div class="header-top-row">
+          <div class="header-text">
+            <div class="school-row">
+              <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
+              <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
+            </div>
+            <div class="activity-tag">${opts.activityLabel}</div>
+            <h1 class="doc-title">${opts.title}</h1>
+          </div>
+          <div class="header-owl">${owlSvg}</div>
+        </div>
+        <div class="fields-grid">
+          <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
+          <div class="field"><span class="field-label">DATA</span><div class="field-line short">${todayStr}</div></div>
+          <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
+          <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
+          <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
+        </div>
       </div>
     </div>
   `;
-  w.document.write(`<!DOCTYPE html><html><head><title>${opts.title}</title><style>
-    @page { size: A4; margin: 1.6cm 1.4cm 1.8cm; }
-    * { box-sizing: border-box; }
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.55; margin: 0; font-size: 12px; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
+    @page { size: A4; margin: 1.4cm 1.4cm 2cm; }
+    * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
 
-    /* HEADER */
-    .page-header { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid #4338ca; }
-    .brand-strip { height: 6px; background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%); border-radius: 3px; margin-bottom: 12px; }
-    .school-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 10px; letter-spacing: 1.5px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
-    .school-name { font-weight: 800; color: #1f2937; letter-spacing: 1.8px; }
-    .activity-tag { display: inline-block; background: #4338ca; color: white; padding: 3px 10px; border-radius: 10px; font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
-    .doc-title { font-size: 22px; font-weight: 900; color: #111827; margin: 0 0 14px; line-height: 1.2; letter-spacing: -0.3px; }
-    .fields-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 0.5fr; gap: 10px 14px; }
-    .field { display: flex; flex-direction: column; gap: 2px; }
-    .field.full { grid-column: 1 / -1; }
-    .field-label { font-size: 8px; font-weight: 800; color: #4338ca; letter-spacing: 1.5px; }
-    .field-line { border-bottom: 1.5px solid #1f2937; min-height: 16px; padding: 2px 4px; font-size: 11px; color: #111; font-weight: 600; }
-    .field-line.short { min-height: 16px; }
-    .field-line.tiny { min-width: 30px; }
+    /* ── HEADER ───────────────────────────────────────────── */
+    .page-header { background: var(--ac,#4338ca); border-radius: 16px; padding: 14px 16px 16px; color: white; position: relative; overflow: hidden; margin-bottom: 18px; }
+    .page-header::before { content:''; position:absolute; inset:0; background-image:radial-gradient(circle, rgba(255,255,255,0.14) 1.5px, transparent 1.5px); background-size:16px 16px; border-radius:16px; pointer-events:none; }
+    .header-inner { position:relative; z-index:1; }
+    .header-top-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .header-text { flex:1; min-width:0; }
+    .header-owl { flex-shrink:0; margin-top:-4px; }
+    .school-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:8.5px; letter-spacing:1.5px; color:rgba(255,255,255,0.75); text-transform:uppercase; font-weight:700; }
+    .school-name { font-weight:900; color:white; }
+    .activity-tag { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.22); color:white; padding:4px 12px; border-radius:20px; font-size:10px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; border:1.5px solid rgba(255,255,255,0.45); }
+    .doc-title { font-size:24px; font-weight:900; color:white; margin:0 0 14px; line-height:1.2; text-shadow:0 1px 6px rgba(0,0,0,0.22); letter-spacing:-0.3px; }
+    .fields-grid { display:grid; grid-template-columns:2fr 1fr 1fr 0.5fr; gap:7px 12px; margin-top:4px; }
+    .field { display:flex; flex-direction:column; gap:2px; }
+    .field.full { grid-column:1/-1; }
+    .field-label { font-size:7px; font-weight:900; color:rgba(255,255,255,0.65); letter-spacing:1.5px; text-transform:uppercase; }
+    .field-line { border-bottom:1.5px solid rgba(255,255,255,0.55); min-height:17px; padding:2px 4px; font-size:10.5px; color:white; font-weight:700; }
 
-    /* CONTENT */
-    h2 { font-size: 15px; margin: 16px 0 6px; color: #4338ca; font-weight: 800; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb; }
-    h3 { font-size: 12px; margin: 10px 0 4px; color: #1f2937; font-weight: 700; }
-    p { margin: 6px 0; }
-    .instructions { background: #eef2ff; border-left: 4px solid #4338ca; padding: 8px 12px; margin: 10px 0 16px; border-radius: 0 6px 6px 0; font-size: 11px; color: #312e81; }
-    .instructions b { color: #4338ca; }
+    /* ── HOW TO PLAY card ─────────────────────────────────── */
+    .instructions { display:flex; gap:12px; align-items:center; background:white; border:2.5px dashed var(--ac,#4338ca); padding:10px 14px; margin:10px 0 18px; border-radius:10px; font-size:11px; color:#1f2937; }
+    .instructions-icon { width:52px; height:52px; flex-shrink:0; image-rendering:pixelated; image-rendering:crisp-edges; }
+    .instructions-icon svg { width:100%; height:100%; display:block; }
+    .instructions-body { flex:1; }
+    .instructions-title { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
 
-    /* WORD SEARCH */
-    .ws-wrapper { display: flex; justify-content: center; margin: 16px 0; page-break-inside: avoid; break-inside: avoid; }
-    .ws-grid { display: grid; gap: 0; border: 2px solid #1f2937; background: #1f2937; page-break-inside: avoid; break-inside: avoid; padding: 1px; border-radius: 4px; }
-    .ws-cell { background: white; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: 700; font-size: 12px; font-family: 'Courier New', monospace; }
+    /* pixel decorations */
+    .px-deco { position:absolute; image-rendering:pixelated; image-rendering:crisp-edges; opacity:0.85; z-index:0; }
+    .px-deco svg { width:100%; height:100%; display:block; }
 
-    /* BINGO */
-    .bingo-card { border: 3px solid #1f2937; padding: 0; margin: 0 0 22px; page-break-inside: avoid; break-inside: avoid; border-radius: 6px; overflow: hidden; }
-    .bingo-card-title { text-align: center; font-weight: 900; font-size: 24px; color: white; background: linear-gradient(90deg, #6366f1, #ec4899); padding: 6px; letter-spacing: 4px; }
-    .bingo-sub { text-align: center; font-size: 9px; color: #6b7280; padding: 3px 0; background: #f9fafb; border-bottom: 1px solid #e5e7eb; letter-spacing: 1px; }
-    .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; }
-    .bingo-cell { border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; padding: 10px 4px; min-height: 50px; text-align: center; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-    .bingo-cell:nth-child(5n) { border-right: none; }
-    .bingo-cell.free { background: #fef3c7; font-weight: 900; color: #92400e; }
+    /* ── GENERAL CONTENT ──────────────────────────────────── */
+    h2 { font-size:13px; margin:18px 0 8px; color:white; font-weight:900; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
+    h3 { font-size:12px; margin:10px 0 4px; color:#1f2937; font-weight:700; }
+    p { margin:6px 0; }
 
-    /* QUIZ */
-    .quiz-q { border: 1px solid #e5e7eb; border-left: 3px solid #4338ca; border-radius: 4px; padding: 10px 14px; margin-bottom: 12px; page-break-inside: avoid; break-inside: avoid; background: #fafbff; }
-    .quiz-q b { color: #4338ca; font-weight: 800; }
-    .quiz-opt { margin: 4px 0 4px 18px; padding: 2px 0; }
-    .quiz-opt b { display: inline-block; width: 18px; color: #4338ca; }
-    .quiz-answer { display: none; }
+    /* ── WORD SEARCH ──────────────────────────────────────── */
+    .ws-wrapper { display:flex; justify-content:center; margin:14px 0 10px; page-break-inside:avoid; break-inside:avoid; }
+    .ws-grid { display:grid; gap:0; border:3px solid var(--ac,#4338ca); background:var(--ac,#4338ca); page-break-inside:avoid; break-inside:avoid; padding:2px; border-radius:8px; box-shadow:0 3px 12px rgba(0,0,0,0.15); }
+    .ws-cell { background:white; width:24px; height:24px; text-align:center; line-height:24px; font-weight:800; font-size:12px; font-family:'Courier New',monospace; color:#111; }
+    /* word chips (injected by JS) */
+    .word-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 18px; }
+    .word-chip { display:inline-flex; align-items:center; gap:6px; border:2px solid var(--ac,#4338ca); border-radius:20px; padding:4px 10px 4px 6px; font-size:10px; font-weight:700; color:var(--ac,#4338ca); background:var(--ac-light,#eef2ff); page-break-inside:avoid; }
+    .word-chip-box { width:14px; height:14px; border:1.5px solid var(--ac,#4338ca); border-radius:3px; flex-shrink:0; background:white; }
 
-    /* MEMORY */
-    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; page-break-inside: avoid; break-inside: avoid; }
-    .memory-pair { border: 1.5px dashed #6b7280; padding: 14px 8px; margin: -1px 0 0 -1px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10px; page-break-inside: avoid; break-inside: avoid; background: white; }
-    .memory-pair.concept { background: #eef2ff; font-weight: 700; }
+    /* ── BINGO ────────────────────────────────────────────── */
+    .bingo-card { border:3px solid var(--ac,#4338ca); margin:0 0 22px; page-break-inside:avoid; break-inside:avoid; border-radius:14px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+    .bingo-card-title { display:flex; justify-content:center; gap:0; background:#1e293b; padding:8px 10px; }
+    .bingo-letter { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; font-size:28px; font-weight:900; color:white; border-radius:8px; margin:0 2px; }
+    .bingo-sub { text-align:center; font-size:9px; color:#6b7280; padding:4px 0; background:#f8f7ff; border-bottom:1px solid #ddd6fe; letter-spacing:1px; font-weight:700; }
+    .bingo-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:0; }
+    .bingo-cell { border-right:1px solid #e0d9ff; border-bottom:1px solid #e0d9ff; padding:10px 4px; min-height:54px; text-align:center; font-size:9.5px; font-weight:700; display:flex; align-items:center; justify-content:center; background:white; }
+    .bingo-cell:nth-child(odd) { background:#faf8ff; }
+    .bingo-cell:nth-child(5n) { border-right:none; }
+    .bingo-cell.free { background:#fbbf24; font-weight:900; color:#78350f; font-size:14px; border-color:#f59e0b; }
+    /* calling circles (injected) */
+    .bingo-calling { padding:10px 12px; background:#f8f7ff; border-top:2px dashed var(--ac,#4338ca); }
+    .bingo-calling-label { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+    .bingo-calling-circles { display:flex; flex-wrap:wrap; gap:5px; }
+    .bingo-circle { display:inline-block; width:22px; height:22px; border-radius:50%; border:1.5px solid var(--ac,#4338ca); background:white; }
 
-    /* TRAIL */
-    .trail-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 14px 0; page-break-inside: avoid; break-inside: avoid; padding: 12px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
-    .trail-cell { border: 2px solid #4338ca; border-radius: 50%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; background: white; color: #4338ca; }
-    .trail-cell.special { background: #fbbf24; color: white; border-color: #d97706; }
-    .trail-cell.end { background: #10b981; color: white; border-color: #047857; }
-    .trail-cell.start { background: #6366f1; color: white; border-color: #4338ca; }
+    /* ── QUIZ ─────────────────────────────────────────────── */
+    .quiz-progress { display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; }
+    .quiz-dot { width:18px; height:8px; border-radius:4px; background:#e5e7eb; }
+    .quiz-q { border:2px solid #e5e7eb; border-radius:12px; padding:12px 14px 12px 54px; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.07); position:relative; }
+    .quiz-num { position:absolute; left:12px; top:12px; width:30px; height:30px; background:var(--ac,#4338ca); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; }
+    .quiz-q p, .quiz-q b { color:#1f2937; font-weight:700; margin:0 0 8px; }
+    .quiz-opts { display:flex; flex-direction:column; gap:5px; margin-top:8px; }
+    .quiz-opt { display:flex; align-items:center; gap:8px; padding:5px 10px; border-radius:8px; background:#f9fafb; border:1.5px solid #e5e7eb; font-size:11px; }
+    .quiz-opt-letter { width:22px; height:22px; border-radius:50%; background:var(--ac-light,#eef2ff); color:var(--ac,#4338ca); font-weight:900; font-size:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1.5px solid var(--ac,#4338ca); }
+    .quiz-answer { display:none; }
 
-    /* CROSSWORD */
-    .cw-item { margin-bottom: 14px; page-break-inside: avoid; break-inside: avoid; }
-    .cw-clue { font-weight: 600; margin-bottom: 4px; color: #1f2937; }
-    .cw-boxes { display: flex; gap: 2px; }
-    .cw-box { border: 1.5px solid #111; width: 24px; height: 24px; }
-    .cw-answer { display: none; }
+    /* ── MEMORY ───────────────────────────────────────────── */
+    .cut-hint { font-size:10px; color:#6b7280; font-style:italic; margin:0 0 10px; display:flex; align-items:center; gap:5px; padding:6px 10px; background:#fef3c7; border-radius:6px; border:1.5px dashed #f59e0b; }
+    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; page-break-inside:avoid; break-inside:avoid; padding:10px; background:#f9fafb; border-radius:12px; border:2px dashed #d1d5db; }
+    .memory-pair { border:2px dashed #9ca3af; padding:14px 8px; min-height:88px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:8px; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+    .memory-pair::after { content:'✂'; position:absolute; top:-10px; right:6px; font-size:12px; color:#6b7280; background:#f9fafb; padding:0 3px; border-radius:4px; }
+    .memory-pair.concept { background:var(--ac,#4338ca); color:white; font-weight:900; border-color:var(--ac,#4338ca); font-size:11px; border-style:solid; }
+    .memory-pair.concept::after { background:var(--ac,#4338ca); color:rgba(255,255,255,0.7); }
 
-    /* LISTS */
-    .clue-list { list-style: decimal; padding-left: 20px; columns: 2; column-gap: 24px; }
-    .clue-list li { margin-bottom: 5px; break-inside: avoid; page-break-inside: avoid; }
+    /* ── TRAIL ────────────────────────────────────────────── */
+    .trail-wrapper { margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
+    .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; padding:16px; background:var(--ac-light,#eef2ff); border-radius:14px; border:3px solid var(--ac,#4338ca); position:relative; background-image:radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size:8px 8px; }
+    .trail-cell { border:3px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); box-shadow:0 2px 4px rgba(0,0,0,0.08); position:relative; }
+    .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
+    .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:18px; box-shadow:0 0 0 3px #fee2e2, 0 2px 6px rgba(0,0,0,0.15); }
+    .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:18px; box-shadow:0 0 0 3px #dcfce7, 0 2px 6px rgba(0,0,0,0.15); }
+    /* legend (injected) */
+    .trail-legend { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:8px 12px; background:white; border-radius:8px; border:1.5px solid #e5e7eb; }
+    .trail-legend-title { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+    .trail-legend-items { display:flex; gap:12px; flex-wrap:wrap; font-size:9.5px; font-weight:600; color:#374151; flex:1; }
+    .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
-    /* STORY (markdown) */
-    .markdown-body h2 { color: #4338ca; font-size: 16px; margin-top: 18px; padding-bottom: 4px; border-bottom: 1.5px solid #e5e7eb; }
-    .markdown-body h3 { color: #1f2937; font-size: 13px; }
-    .markdown-body ul, .markdown-body ol { padding-left: 22px; }
-    .markdown-body li { margin-bottom: 4px; }
-    .markdown-body blockquote { border-left: 4px solid #6366f1; padding: 6px 12px; margin: 8px 0; background: #eef2ff; color: #312e81; border-radius: 0 4px 4px 0; }
-    .markdown-body table { border-collapse: collapse; width: 100%; margin: 8px 0; }
-    .markdown-body th, .markdown-body td { border: 1px solid #d1d5db; padding: 4px 8px; text-align: left; font-size: 11px; }
-    .markdown-body th { background: #4338ca; color: white; font-weight: 700; }
+    /* ── CROSSWORD ────────────────────────────────────────── */
+    .cw-item { margin-bottom:16px; page-break-inside:avoid; break-inside:avoid; }
+    .cw-clue { font-weight:700; margin-bottom:5px; color:#1f2937; display:flex; align-items:center; gap:7px; }
+    .cw-num-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--ac,#4338ca); color:white; border-radius:50%; font-size:10px; font-weight:900; flex-shrink:0; }
+    .cw-boxes { display:flex; gap:3px; }
+    .cw-box { border:2px solid #374151; width:27px; height:27px; border-radius:4px; }
+    .cw-answer { display:none; }
+    .clue-list { list-style:none; padding-left:0; columns:2; column-gap:20px; counter-reset:list-item; }
+    .clue-list li { margin-bottom:5px; break-inside:avoid; page-break-inside:avoid; padding-left:24px; position:relative; counter-increment:list-item; }
+    .clue-list li::before { content:counter(list-item)'.'; position:absolute; left:0; font-weight:800; color:var(--ac,#4338ca); }
 
-    /* GABARITO / ANSWER KEY page (only in print) */
-    .answer-key-page { display: none; page-break-before: always; padding-top: 8px; }
-    @media print { .answer-key-page { display: block; } .quiz-answer, .cw-answer { display: none !important; } }
-    .answer-key-title { font-size: 16px; color: #dc2626; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid #dc2626; padding-bottom: 4px; margin-bottom: 12px; }
-    .answer-key-item { font-size: 11px; margin-bottom: 4px; padding: 3px 6px; background: #fef2f2; border-radius: 3px; }
+    /* ── STORY ────────────────────────────────────────────── */
+    .markdown-body h2 { color:white; font-size:14px; margin-top:18px; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
+    .markdown-body h3 { color:#1f2937; font-size:13px; font-weight:800; border-bottom:1.5px solid #e5e7eb; padding-bottom:3px; }
+    .markdown-body ul, .markdown-body ol { padding-left:22px; }
+    .markdown-body li { margin-bottom:4px; }
+    .markdown-body blockquote { border-left:4px solid var(--ac,#4338ca); padding:6px 12px; margin:8px 0; background:var(--ac-light,#eef2ff); color:#1f2937; border-radius:0 8px 8px 0; }
+    .markdown-body table { border-collapse:collapse; width:100%; margin:8px 0; }
+    .markdown-body th, .markdown-body td { border:1px solid #d1d5db; padding:5px 8px; text-align:left; font-size:11px; }
+    .markdown-body th { background:var(--ac,#4338ca); color:white; font-weight:800; }
 
-    /* FOOTER */
-    .page-footer { position: fixed; bottom: 0.5cm; left: 1.4cm; right: 1.4cm; font-size: 8px; color: #9ca3af; text-align: center; letter-spacing: 1px; border-top: 1px solid #e5e7eb; padding-top: 4px; }
+    /* ── SECTION DIVIDER ──────────────────────────────────── */
+    .section-divider { display:flex; align-items:center; gap:10px; margin:18px 0 14px; opacity:0.7; }
+    .section-divider-line { flex:1; height:2px; background:repeating-linear-gradient(90deg, var(--ac,#4338ca) 0, var(--ac,#4338ca) 3px, transparent 3px, transparent 6px); }
+    .section-divider-icon { width:18px; height:18px; flex-shrink:0; image-rendering:pixelated; }
+    .section-divider-icon svg { width:100%; height:100%; display:block; }
 
-    /* PRINT-ONLY ADJUSTMENTS */
-    .hide-on-screen { display: block; }
-    button { display: none; }
+    /* ── BOA SORTE LINE ───────────────────────────────────── */
+    .boa-sorte { display:flex; align-items:center; justify-content:center; gap:8px; margin:20px 0 10px; font-size:11px; font-style:italic; color:var(--ac,#4338ca); font-weight:700; letter-spacing:0.5px; }
+    .boa-sorte-px { width:14px; height:14px; image-rendering:pixelated; }
+    .boa-sorte-px svg { width:100%; height:100%; display:block; }
+
+    /* ── SCORE TRACKER (injected) ─────────────────────────── */
+    .score-tracker { margin:8px 0 12px; padding:16px 18px; border:3px solid var(--ac,#4338ca); border-radius:14px; background:var(--ac-light,#eef2ff); page-break-inside:avoid; break-inside:avoid; position:relative; }
+    .score-tracker::before, .score-tracker::after { content:''; position:absolute; width:18px; height:18px; border:2.5px solid var(--ac,#4338ca); background:#fbbf24; }
+    .score-tracker::before { top:-10px; left:14px; border-radius:50%; }
+    .score-tracker::after { bottom:-10px; right:14px; border-radius:50%; }
+    .score-header { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:10px; }
+    .score-px-star { width:26px; height:26px; flex-shrink:0; image-rendering:pixelated; }
+    .score-px-star svg { width:100%; height:100%; display:block; }
+    .score-title { font-size:12px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:2.5px; text-transform:uppercase; }
+    .score-stars { font-size:22px; letter-spacing:4px; text-align:center; margin-bottom:12px; }
+    .score-row { display:flex; align-items:center; justify-content:center; gap:24px; flex-wrap:wrap; }
+    .score-label { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; }
+    .score-field { border-bottom:2.5px solid var(--ac,#4338ca); min-width:90px; text-align:center; font-size:14px; font-weight:900; color:#1f2937; padding:2px 8px; }
+
+    /* ── ANSWER KEY ───────────────────────────────────────── */
+    .answer-key-page { display:none; page-break-before:always; padding-top:12px; }
+    @media print { .answer-key-page { display:block; } .quiz-answer, .cw-answer { display:none !important; } }
+    .answer-key-header { display:flex; align-items:center; gap:14px; margin-bottom:16px; padding:14px 16px; background:#fef2f2; border-radius:12px; border:2.5px dashed #dc2626; }
+    .answer-key-trophy { width:60px; height:60px; flex-shrink:0; image-rendering:pixelated; }
+    .answer-key-trophy svg { width:100%; height:100%; display:block; }
+    .answer-key-title { font-size:18px; color:#dc2626; font-weight:900; letter-spacing:3px; text-transform:uppercase; padding:0; background:none; border-radius:0; display:block; margin:0; line-height:1; }
+    .answer-key-subtitle { font-size:9px; color:#7f1d1d; font-weight:700; letter-spacing:1.5px; margin-top:4px; }
+    .answer-key-item { font-size:11px; margin-bottom:6px; padding:7px 12px; background:white; border-radius:8px; border-left:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+
+    /* ── FOOTER ───────────────────────────────────────────── */
+    .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
+
+    /* ── UTIL ─────────────────────────────────────────────── */
+    .hide-on-screen { display:block; }
+    button { display:none; }
   </style></head><body>
     ${headerHtml}
     ${node.innerHTML}
     <div class="page-footer">Gerado por Prof. Corujao • ${todayStr}</div>
-    <script>setTimeout(()=>{window.print();},400);</script>
+    <script>
+    (function(){
+      var label = "${opts.activityLabel}";
+      var themes = {
+        'Campanha Narrativa':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📖' },
+        'Quiz Avaliativo':       { ac:'#ea580c', light:'#fff7ed', emoji:'⚡' },
+        'Caca-Palavras':         { ac:'#2563eb', light:'#eff6ff', emoji:'🔍' },
+        'Palavras Cruzadas':     { ac:'#0d9488', light:'#f0fdfa', emoji:'✏️' },
+        'Bingo Educativo':       { ac:'#7c3aed', light:'#f5f3ff', emoji:'🎱' },
+        'Trilha do Conhecimento':{ ac:'#16a34a', light:'#f0fdf4', emoji:'🎲' },
+        'Jogo da Memoria':       { ac:'#db2777', light:'#fdf2f8', emoji:'🃏' }
+      };
+      var t = themes[label] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
+      document.documentElement.style.setProperty('--ac', t.ac);
+      document.documentElement.style.setProperty('--ac-light', t.light);
+
+      // emoji on activity tag
+      var tag = document.querySelector('.activity-tag');
+      if (tag) tag.innerHTML = t.emoji + '&nbsp;&nbsp;' + tag.textContent.trim();
+
+      // ── PIXEL ART per activity ───────────────────────────
+      var SR = ' shape-rendering="crispEdges"';
+      var pixelArts = {
+        'Caca-Palavras': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="9" y="9" width="2" height="2" fill="#78350f"/><rect x="10" y="10" width="2" height="2" fill="#92400e"/><rect x="11" y="11" width="2" height="2" fill="#92400e"/><rect x="12" y="12" width="2" height="2" fill="#78350f"/>'
+          + '<rect x="3" y="1" width="5" height="1" fill="#1e3a8a"/><rect x="2" y="2" width="1" height="1" fill="#1e3a8a"/><rect x="8" y="2" width="1" height="1" fill="#1e3a8a"/><rect x="1" y="3" width="1" height="5" fill="#1e3a8a"/><rect x="9" y="3" width="1" height="5" fill="#1e3a8a"/><rect x="2" y="8" width="1" height="1" fill="#1e3a8a"/><rect x="8" y="8" width="1" height="1" fill="#1e3a8a"/><rect x="3" y="9" width="5" height="1" fill="#1e3a8a"/>'
+          + '<rect x="3" y="2" width="5" height="1" fill="#bfdbfe"/><rect x="2" y="3" width="7" height="5" fill="#bfdbfe"/><rect x="3" y="8" width="5" height="1" fill="#bfdbfe"/>'
+          + '<rect x="3" y="3" width="2" height="1" fill="#ffffff"/><rect x="3" y="4" width="1" height="1" fill="#ffffff"/>'
+          + '</svg>',
+        'Quiz Avaliativo': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="8" y="1" width="3" height="1" fill="#9a3412"/><rect x="7" y="2" width="1" height="1" fill="#9a3412"/><rect x="11" y="2" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="6" y="3" width="1" height="1" fill="#9a3412"/><rect x="11" y="3" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="5" y="4" width="1" height="1" fill="#9a3412"/><rect x="11" y="4" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="4" y="5" width="1" height="1" fill="#9a3412"/><rect x="11" y="5" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="3" y="6" width="1" height="1" fill="#9a3412"/><rect x="12" y="6" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="3" y="7" width="10" height="1" fill="#9a3412"/>'
+          + '<rect x="8" y="8" width="1" height="1" fill="#9a3412"/><rect x="7" y="9" width="1" height="1" fill="#9a3412"/><rect x="6" y="10" width="1" height="1" fill="#9a3412"/><rect x="5" y="11" width="1" height="1" fill="#9a3412"/><rect x="4" y="12" width="1" height="1" fill="#9a3412"/><rect x="3" y="13" width="2" height="1" fill="#9a3412"/><rect x="3" y="14" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="8" y="2" width="3" height="1" fill="#facc15"/><rect x="7" y="3" width="4" height="1" fill="#facc15"/><rect x="6" y="4" width="5" height="1" fill="#facc15"/><rect x="5" y="5" width="6" height="1" fill="#facc15"/><rect x="4" y="6" width="8" height="1" fill="#facc15"/>'
+          + '<rect x="4" y="8" width="4" height="1" fill="#facc15"/><rect x="3" y="9" width="4" height="1" fill="#facc15"/><rect x="3" y="10" width="3" height="1" fill="#facc15"/><rect x="3" y="11" width="2" height="1" fill="#facc15"/><rect x="3" y="12" width="1" height="1" fill="#facc15"/>'
+          + '</svg>',
+        'Bingo Educativo': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="4" y="1" width="6" height="1" fill="#581c87"/><rect x="3" y="2" width="1" height="1" fill="#581c87"/><rect x="10" y="2" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="2" y="3" width="1" height="1" fill="#581c87"/><rect x="11" y="3" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="1" y="4" width="1" height="5" fill="#581c87"/><rect x="12" y="4" width="1" height="5" fill="#581c87"/>'
+          + '<rect x="2" y="9" width="1" height="1" fill="#581c87"/><rect x="11" y="9" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="3" y="10" width="1" height="1" fill="#581c87"/><rect x="10" y="10" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="4" y="11" width="6" height="1" fill="#581c87"/>'
+          + '<rect x="4" y="2" width="6" height="1" fill="#c084fc"/><rect x="3" y="3" width="8" height="1" fill="#c084fc"/>'
+          + '<rect x="2" y="4" width="10" height="5" fill="#c084fc"/><rect x="3" y="9" width="8" height="1" fill="#c084fc"/><rect x="4" y="10" width="6" height="1" fill="#c084fc"/>'
+          + '<rect x="4" y="3" width="2" height="1" fill="#f3e8ff"/><rect x="3" y="4" width="1" height="2" fill="#f3e8ff"/>'
+          + '<rect x="5" y="4" width="3" height="1" fill="#ffffff"/><rect x="5" y="5" width="1" height="1" fill="#ffffff"/><rect x="7" y="5" width="1" height="1" fill="#ffffff"/><rect x="5" y="6" width="3" height="1" fill="#ffffff"/><rect x="5" y="7" width="1" height="1" fill="#ffffff"/><rect x="7" y="7" width="1" height="1" fill="#ffffff"/><rect x="5" y="8" width="3" height="1" fill="#ffffff"/>'
+          + '</svg>',
+        'Jogo da Memoria': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="6" y="2" width="7" height="1" fill="#831843"/><rect x="6" y="3" width="1" height="9" fill="#831843"/><rect x="12" y="3" width="1" height="9" fill="#831843"/><rect x="6" y="12" width="7" height="1" fill="#831843"/>'
+          + '<rect x="7" y="3" width="5" height="9" fill="#fbcfe8"/>'
+          + '<rect x="8" y="4" width="3" height="1" fill="#ec4899"/><rect x="8" y="6" width="3" height="1" fill="#ec4899"/><rect x="8" y="8" width="3" height="1" fill="#ec4899"/><rect x="8" y="10" width="3" height="1" fill="#ec4899"/>'
+          + '<rect x="3" y="5" width="7" height="1" fill="#831843"/><rect x="3" y="6" width="1" height="8" fill="#831843"/><rect x="9" y="6" width="1" height="8" fill="#831843"/><rect x="3" y="14" width="7" height="1" fill="#831843"/>'
+          + '<rect x="4" y="6" width="5" height="8" fill="#ffffff"/>'
+          + '<rect x="5" y="8" width="3" height="1" fill="#ec4899"/><rect x="7" y="9" width="1" height="1" fill="#ec4899"/><rect x="6" y="10" width="1" height="1" fill="#ec4899"/><rect x="6" y="12" width="1" height="1" fill="#ec4899"/>'
+          + '</svg>',
+        'Trilha do Conhecimento': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="3" y="2" width="10" height="1" fill="#14532d"/><rect x="2" y="3" width="1" height="10" fill="#14532d"/><rect x="13" y="3" width="1" height="10" fill="#14532d"/><rect x="3" y="13" width="10" height="1" fill="#14532d"/>'
+          + '<rect x="3" y="3" width="10" height="10" fill="#ffffff"/>'
+          + '<rect x="3" y="3" width="10" height="1" fill="#bbf7d0"/><rect x="3" y="4" width="1" height="9" fill="#bbf7d0"/>'
+          + '<rect x="4" y="4" width="2" height="2" fill="#14532d"/><rect x="10" y="4" width="2" height="2" fill="#14532d"/><rect x="7" y="7" width="2" height="2" fill="#14532d"/><rect x="4" y="10" width="2" height="2" fill="#14532d"/><rect x="10" y="10" width="2" height="2" fill="#14532d"/>'
+          + '</svg>',
+        'Palavras Cruzadas': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="1" y="1" width="10" height="1" fill="#134e4a"/><rect x="1" y="2" width="1" height="9" fill="#134e4a"/><rect x="10" y="2" width="1" height="9" fill="#134e4a"/><rect x="1" y="10" width="10" height="1" fill="#134e4a"/>'
+          + '<rect x="1" y="4" width="10" height="1" fill="#134e4a"/><rect x="1" y="7" width="10" height="1" fill="#134e4a"/>'
+          + '<rect x="4" y="1" width="1" height="10" fill="#134e4a"/><rect x="7" y="1" width="1" height="10" fill="#134e4a"/>'
+          + '<rect x="2" y="2" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="5" y="2" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="8" y="2" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="2" y="5" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="5" y="5" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="8" y="5" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="2" y="8" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="5" y="8" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="8" y="8" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="11" y="10" width="2" height="1" fill="#f59e0b"/><rect x="12" y="11" width="2" height="1" fill="#f59e0b"/><rect x="13" y="12" width="2" height="1" fill="#f59e0b"/><rect x="14" y="13" width="1" height="2" fill="#451a03"/>'
+          + '</svg>',
+        'Campanha Narrativa': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="2" y="2" width="12" height="1" fill="#3730a3"/><rect x="2" y="3" width="1" height="10" fill="#3730a3"/><rect x="13" y="3" width="1" height="10" fill="#3730a3"/><rect x="2" y="13" width="12" height="1" fill="#3730a3"/>'
+          + '<rect x="3" y="3" width="10" height="10" fill="#fef3c7"/>'
+          + '<rect x="7" y="3" width="2" height="10" fill="#3730a3"/>'
+          + '<rect x="4" y="5" width="3" height="1" fill="#92400e"/><rect x="4" y="7" width="3" height="1" fill="#92400e"/><rect x="4" y="9" width="3" height="1" fill="#92400e"/><rect x="4" y="11" width="2" height="1" fill="#92400e"/>'
+          + '<rect x="9" y="5" width="3" height="1" fill="#92400e"/><rect x="9" y="7" width="3" height="1" fill="#92400e"/><rect x="9" y="9" width="3" height="1" fill="#92400e"/><rect x="9" y="11" width="2" height="1" fill="#92400e"/>'
+          + '<rect x="10" y="3" width="1" height="1" fill="#fbbf24"/><rect x="9" y="4" width="3" height="1" fill="#fbbf24"/><rect x="10" y="5" width="1" height="1" fill="#fbbf24"/>'
+          + '</svg>'
+      };
+      var pxArt = pixelArts[label] || '<div style="font-size:34px;text-align:center;line-height:52px">🎮</div>';
+
+      // ── Instructions box: pixel art + title ─────────────
+      var instr = document.querySelector('.instructions');
+      if (instr) {
+        var body = instr.innerHTML;
+        instr.innerHTML = '<div class="instructions-icon">' + pxArt + '</div><div class="instructions-body"><div class="instructions-title">Como Jogar</div>' + body + '</div>';
+      }
+
+      // ── WORD SEARCH: word chips ─────────────────────────
+      var clueList = document.querySelector('.clue-list');
+      if (clueList && document.querySelector('.ws-grid')) {
+        var items = Array.from(clueList.querySelectorAll('li'));
+        var chips = document.createElement('div');
+        chips.className = 'word-chips';
+        items.forEach(function(li) {
+          var chip = document.createElement('div');
+          chip.className = 'word-chip';
+          chip.innerHTML = '<span class="word-chip-box"></span><span>' + li.textContent.replace(/^\\d+\\.\\s*/, '').trim() + '</span>';
+          chips.appendChild(chip);
+        });
+        clueList.replaceWith(chips);
+      }
+
+      // ── BINGO: colored B-I-N-G-O tiles + calling circles ─
+      var bingoTitle = document.querySelector('.bingo-card-title');
+      if (bingoTitle) {
+        var cols = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+        bingoTitle.innerHTML = 'BINGO'.split('').map(function(l,i){
+          return '<span class="bingo-letter" style="background:' + cols[i] + '">' + l + '</span>';
+        }).join('');
+      }
+      var bingoFree = document.querySelector('.bingo-cell.free');
+      if (bingoFree) bingoFree.innerHTML = '&#11088;<br>FREE<br>&#11088;';
+      document.querySelectorAll('.bingo-card').forEach(function(card) {
+        var calling = document.createElement('div');
+        calling.className = 'bingo-calling';
+        calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados — marque abaixo:</div><div class="bingo-calling-circles">'
+          + Array(24).fill('<span class="bingo-circle"></span>').join('') + '</div>';
+        card.appendChild(calling);
+      });
+
+      // ── QUIZ: progress dots + numbered badges + option pills ─
+      var quizQs = document.querySelectorAll('.quiz-q');
+      if (quizQs.length) {
+        var prog = document.createElement('div');
+        prog.className = 'quiz-progress';
+        for (var d=0; d<quizQs.length; d++) { var dot=document.createElement('div'); dot.className='quiz-dot'; prog.appendChild(dot); }
+        quizQs[0].before(prog);
+        quizQs.forEach(function(q, i) {
+          var badge = document.createElement('div');
+          badge.className = 'quiz-num';
+          badge.textContent = i + 1;
+          q.insertBefore(badge, q.firstChild);
+          // restyle opts
+          q.querySelectorAll('.quiz-opt').forEach(function(opt) {
+            var b = opt.querySelector('b');
+            if (b) {
+              var letter = document.createElement('span');
+              letter.className = 'quiz-opt-letter';
+              letter.textContent = b.textContent.replace(/[^A-D]/g,'');
+              b.replaceWith(letter);
+            }
+          });
+        });
+      }
+
+      // ── TRAIL: emoji cells + dice + legend ──────────────
+      var cells = document.querySelectorAll('.trail-cell');
+      if (cells.length) {
+        cells[0].textContent = '🚀';
+        cells[cells.length-1].textContent = '🏆';
+        cells.forEach(function(c) { if (c.classList.contains('special') && !c.classList.contains('start') && !c.classList.contains('end')) c.textContent = '⭐'; });
+        var board = document.querySelector('.trail-board');
+        if (board) {
+          var wrapper = document.createElement('div');
+          wrapper.className = 'trail-wrapper';
+          board.parentNode.insertBefore(wrapper, board);
+          wrapper.appendChild(board);
+          var diceSvg = '<svg class="trail-dice" width="38" height="38" viewBox="0 0 40 40"><rect x="2" y="2" width="36" height="36" rx="9" fill="white" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="28" cy="12" r="3.2" fill="currentColor"/><circle cx="20" cy="20" r="3.2" fill="currentColor"/><circle cx="12" cy="28" r="3.2" fill="currentColor"/><circle cx="28" cy="28" r="3.2" fill="currentColor"/></svg>';
+          var legend = document.createElement('div');
+          legend.className = 'trail-legend';
+          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>⭐ Bônus: avance 2</span><span>💤 Fique parado</span><span>🔄 Volte 2</span></div></div>' + diceSvg;
+          wrapper.appendChild(legend);
+        }
+      }
+
+      // ── MEMORY: cut hint + scissors on grid ─────────────
+      var memGrid = document.querySelector('.memory-grid');
+      if (memGrid) {
+        var hint = document.createElement('p');
+        hint.className = 'cut-hint';
+        hint.innerHTML = '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
+        memGrid.before(hint);
+      }
+
+      // ── CROSSWORD: num badges ────────────────────────────
+      document.querySelectorAll('.cw-clue').forEach(function(cl) {
+        var m = cl.textContent.match(/^(\\d+)[\\.\\)]/);
+        if (m) {
+          var badge = document.createElement('span');
+          badge.className = 'cw-num-badge';
+          badge.textContent = m[1];
+          cl.innerHTML = cl.innerHTML.replace(/^\\d+[\\.\\)]\\s*/, '');
+          cl.insertBefore(badge, cl.firstChild);
+        }
+      });
+
+      // ── PIXEL ART decorations ────────────────────────────
+      var pxStar = '<svg viewBox="0 0 16 16"' + SR + '>'
+        + '<rect x="7" y="1" width="2" height="2" fill="#fbbf24"/>'
+        + '<rect x="6" y="3" width="4" height="1" fill="#fbbf24"/>'
+        + '<rect x="1" y="5" width="14" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="7" width="12" height="2" fill="#fbbf24"/>'
+        + '<rect x="3" y="9" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="10" y="9" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="11" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="11" y="11" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="1" y="13" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="12" y="13" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="6" y="5" width="4" height="1" fill="#fef3c7"/>'
+        + '<rect x="7" y="6" width="2" height="1" fill="#fef3c7"/>'
+        + '</svg>';
+
+      var pxDiamond = '<svg viewBox="0 0 16 16"' + SR + ' style="color:var(--ac,#4338ca)">'
+        + '<rect x="7" y="2" width="2" height="1" fill="currentColor"/>'
+        + '<rect x="6" y="3" width="4" height="1" fill="currentColor"/>'
+        + '<rect x="5" y="4" width="6" height="1" fill="currentColor"/>'
+        + '<rect x="4" y="5" width="8" height="1" fill="currentColor"/>'
+        + '<rect x="3" y="6" width="10" height="2" fill="currentColor"/>'
+        + '<rect x="4" y="8" width="8" height="1" fill="currentColor"/>'
+        + '<rect x="5" y="9" width="6" height="1" fill="currentColor"/>'
+        + '<rect x="6" y="10" width="4" height="1" fill="currentColor"/>'
+        + '<rect x="7" y="11" width="2" height="2" fill="currentColor"/>'
+        + '</svg>';
+
+      var pxSparkle = '<svg viewBox="0 0 16 16"' + SR + ' style="color:var(--ac,#4338ca)">'
+        + '<rect x="7" y="0" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="6" y="3" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="0" y="7" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="3" y="6" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="11" y="6" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="12" y="7" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="7" y="11" width="2" height="5" fill="currentColor"/>'
+        + '<rect x="6" y="11" width="4" height="2" fill="currentColor"/>'
+        + '</svg>';
+
+      var pxTrophy = '<svg viewBox="0 0 16 16"' + SR + '>'
+        + '<rect x="0" y="2" width="2" height="1" fill="#92400e"/><rect x="14" y="2" width="2" height="1" fill="#92400e"/>'
+        + '<rect x="0" y="3" width="1" height="3" fill="#92400e"/><rect x="15" y="3" width="1" height="3" fill="#92400e"/>'
+        + '<rect x="0" y="6" width="2" height="1" fill="#92400e"/><rect x="14" y="6" width="2" height="1" fill="#92400e"/>'
+        + '<rect x="3" y="1" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="2" y="2" width="1" height="6" fill="#92400e"/><rect x="13" y="2" width="1" height="6" fill="#92400e"/>'
+        + '<rect x="3" y="2" width="10" height="6" fill="#fbbf24"/>'
+        + '<rect x="3" y="8" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="6" y="9" width="4" height="2" fill="#b45309"/>'
+        + '<rect x="3" y="11" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="2" y="12" width="12" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="14" width="12" height="1" fill="#78350f"/>'
+        + '<rect x="7" y="4" width="2" height="1" fill="#ffffff"/>'
+        + '<rect x="6" y="5" width="4" height="1" fill="#ffffff"/>'
+        + '<rect x="7" y="6" width="2" height="1" fill="#ffffff"/>'
+        + '<rect x="3" y="3" width="1" height="2" fill="#fde68a"/>'
+        + '</svg>';
+
+      // ── SECTION DIVIDER between instructions and content ─
+      if (instr && instr.nextElementSibling) {
+        var divider = document.createElement('div');
+        divider.className = 'section-divider';
+        divider.innerHTML = '<span class="section-divider-line"></span><span class="section-divider-icon">' + pxDiamond + '</span><span class="section-divider-line"></span>';
+        instr.after(divider);
+      }
+
+      // ── BOA SORTE line + SCORE TRACKER ───────────────────
+      var akPage = document.querySelector('.answer-key-page');
+      var boaSorte = document.createElement('div');
+      boaSorte.className = 'boa-sorte';
+      boaSorte.innerHTML = '<span class="boa-sorte-px">' + pxSparkle + '</span><span>Boa sorte, jogador(a)!</span><span class="boa-sorte-px">' + pxSparkle + '</span>';
+
+      var tracker = document.createElement('div');
+      tracker.className = 'score-tracker';
+      tracker.innerHTML = '<div class="score-header"><div class="score-px-star">' + pxStar + '</div><div class="score-title">Minha Pontuação</div><div class="score-px-star">' + pxStar + '</div></div>'
+        + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
+        + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
+
+      if (akPage) {
+        akPage.before(boaSorte);
+        akPage.before(tracker);
+      } else {
+        var footer = document.querySelector('.page-footer');
+        document.body.insertBefore(boaSorte, footer);
+        document.body.insertBefore(tracker, footer);
+      }
+
+      // ── ANSWER KEY header with pixel-art trophy ──────────
+      var akTitle = document.querySelector('.answer-key-title');
+      if (akTitle) {
+        var wrap = document.createElement('div');
+        wrap.className = 'answer-key-header';
+        wrap.innerHTML = '<div class="answer-key-trophy">' + pxTrophy + '</div>';
+        var titleBox = document.createElement('div');
+        titleBox.appendChild(akTitle.cloneNode(true));
+        var subtitle = document.createElement('div');
+        subtitle.className = 'answer-key-subtitle';
+        subtitle.textContent = 'Confira suas respostas e some os pontos';
+        titleBox.appendChild(subtitle);
+        wrap.appendChild(titleBox);
+        akTitle.replaceWith(wrap);
+      }
+
+      setTimeout(function(){ window.print(); }, 600);
+    })();
+    </script>
   </body></html>`);
   w.document.close();
 };
