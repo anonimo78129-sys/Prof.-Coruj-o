@@ -270,7 +270,7 @@ class ErrorBoundary extends React.Component<
 type ToastType = 'error' | 'success' | 'info';
 interface Toast { id: string; message: string; type: ToastType; }
 
-let _toastSetter: ((t: Toast[]) => void) | null = null;
+let _toastSetter: React.Dispatch<React.SetStateAction<Toast[]>> | null = null;
 
 const toast = {
   show(message: string, type: ToastType = 'info') {
@@ -1547,8 +1547,8 @@ const buildDocx = async (
   const ac = accentHex[docType];
   const dk = darkHex[docType];
 
-  const parseInline = (text: string): TextRun[] => {
-    const runs: TextRun[] = [];
+  const parseInline = (text: string) => {
+    const runs: InstanceType<typeof TextRun>[] = [];
     const rx = /(\*\*[^*]+?\*\*|\*[^*]+?\*)/g;
     let last = 0; let m: RegExpExecArray | null;
     while ((m = rx.exec(text)) !== null) {
@@ -1573,7 +1573,7 @@ const buildDocx = async (
     spacing: { before: 30, after: 30 },
   });
 
-  const mdParas = (md: string): Paragraph[] =>
+  const mdParas = (md: string) =>
     md.split('\n').map(line => {
       if (!line.trim()) return new Paragraph({ children: [new TextRun('')], spacing: { after: 60 } });
       if (line.startsWith('### '))
@@ -1589,7 +1589,7 @@ const buildDocx = async (
       return new Paragraph({ children: parseInline(line), spacing: { after: 60 } });
     });
 
-  const docChildren: Paragraph[] = [];
+  const docChildren: InstanceType<typeof Paragraph>[] = [];
 
   if (docType === 'plan') {
     const secs: Record<string, string> = {};
