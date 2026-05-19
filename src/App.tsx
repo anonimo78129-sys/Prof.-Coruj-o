@@ -5494,6 +5494,7 @@ const AdminScreen = () => {
   const [usersPage, setUsersPage] = useState(0);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [globalStats, setGlobalStats] = useState<any>(null);
+  const [monthlyStats, setMonthlyStats] = useState<{key: string, label: string, inp: number, out: number, gens: number}[]>([]);
   const [announcement, setAnnouncement] = useState('');
   const [announcementActive, setAnnouncementActive] = useState(false);
   const [announcementSaving, setAnnouncementSaving] = useState(false);
@@ -5540,6 +5541,24 @@ const AdminScreen = () => {
         setAnnouncement(snap.data().message || '');
         setAnnouncementActive(snap.data().active || false);
       }
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    const months: {key: string, label: string}[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      months.push({ key, label });
+    }
+    Promise.all(months.map(m => getDoc(doc(db, 'config', `stats_${m.key}`)))).then(snaps => {
+      setMonthlyStats(months.map((m, i) => {
+        const d = snaps[i].exists() ? snaps[i].data()! : {};
+        return { key: m.key, label: m.label, inp: d.totalInputTokens || 0, out: d.totalOutputTokens || 0, gens: d.totalGenerations || 0 };
+      }));
     }).catch(() => {});
   }, [activeTab]);
 
@@ -5996,6 +6015,50 @@ const AdminScreen = () => {
                 </div>
                 <div className="text-xs text-gray-400 bg-gray-50 rounded-xl p-2 text-center">
                   Entrada: {(globalStats.totalInputTokens || 0).toLocaleString()} tokens · Saída: {(globalStats.totalOutputTokens || 0).toLocaleString()} tokens
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Monthly consumption chart */}
+          {monthlyStats.length > 0 && (() => {
+            const now = new Date();
+            const currentKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const current = monthlyStats.find(m => m.key === currentKey);
+            const currentCost = current ? (current.inp * 0.075 + current.out * 0.30) / 1_000_000 : 0;
+            const maxCostMonth = Math.max(...monthlyStats.map(m => (m.inp * 0.075 + m.out * 0.30) / 1_000_000), 0.000001);
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><span>📅</span> Consumo Mensal</h3>
+                <p className="text-xs text-gray-400 mb-3">Últimos 6 meses · custo estimado em USD</p>
+                {current && (
+                  <div className="bg-indigo-50 rounded-2xl p-3 mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-indigo-500 font-medium">Mês atual</p>
+                      <p className="text-2xl font-black text-indigo-700">${currentCost.toFixed(5)}</p>
+                      <p className="text-xs text-indigo-400">{current.gens.toLocaleString()} gerações · {(current.inp + current.out).toLocaleString()} tokens</p>
+                    </div>
+                    <span className="text-3xl">🦉</span>
+                  </div>
+                )}
+                <div className="flex items-end gap-2 h-24">
+                  {monthlyStats.map((m, i) => {
+                    const cost = (m.inp * 0.075 + m.out * 0.30) / 1_000_000;
+                    const pct = (cost / maxCostMonth) * 100;
+                    const isCurrent = m.key === currentKey;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[9px] font-bold text-gray-600">${cost.toFixed(4)}</span>
+                        <div className="w-full flex items-end" style={{ height: '60px' }}>
+                          <div
+                            className={`w-full rounded-t-lg transition-all duration-700 ${isCurrent ? 'bg-indigo-500' : 'bg-indigo-200'}`}
+                            style={{ height: `${Math.max(pct, 2)}%` }}
+                          />
+                        </div>
+                        <span className={`text-[9px] font-semibold ${isCurrent ? 'text-indigo-600' : 'text-gray-400'}`}>{m.label}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -6563,12 +6626,12 @@ function AppInner() {
       const userUpdate: any = { generationsUsed: increment(1) };
       if (!isPrivileged) { userUpdate.inputTokens = increment(inputT); userUpdate.outputTokens = increment(outputT); }
       await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
-      // Global stats (always record, even for pro)
-      await setDoc(doc(db, 'config', 'stats'), {
-        totalGenerations: increment(1),
-        totalInputTokens: increment(inputT),
-        totalOutputTokens: increment(outputT),
-      }, { merge: true });
+      const monthKey = new Date().toISOString().slice(0, 7).replace('-', '_');
+      const statsPayload = { totalGenerations: increment(1), totalInputTokens: increment(inputT), totalOutputTokens: increment(outputT) };
+      await Promise.all([
+        setDoc(doc(db, 'config', 'stats'), statsPayload, { merge: true }),
+        setDoc(doc(db, 'config', `stats_${monthKey}`), statsPayload, { merge: true }),
+      ]);
     } catch { /* best-effort */ }
   };
 
