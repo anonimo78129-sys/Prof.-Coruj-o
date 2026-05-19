@@ -14,9 +14,9 @@ import {
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
+import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 
@@ -5866,6 +5866,13 @@ function AppInner() {
   const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
   const [authError, setAuthError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
+  const [phoneStep, setPhoneStep] = useState<'idle' | 'enter' | 'code'>('idle');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneVerifId, setPhoneVerifId] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneSending, setPhoneSending] = useState(false);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -6173,16 +6180,17 @@ function AppInner() {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Initialize profile in Firestore for new users
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
             name: email.split('@')[0],
             email: email.toLowerCase().trim(),
-            subject: 'Nova Disciplina',
             role: 'user',
             isPro: false,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            phoneVerified: false,
           });
+          // Trigger phone verification step
+          setPhoneStep('enter');
         }
       }
     } catch (error: any) {
@@ -6200,6 +6208,50 @@ function AppInner() {
       setAuthError(message);
     } finally {
       setIsAuthProcessing(false);
+    }
+  };
+
+  const sendPhoneSms = async () => {
+    setPhoneError('');
+    const raw = phoneNumber.replace(/\D/g, '');
+    if (raw.length < 10) { setPhoneError('Digite um número de celular válido.'); return; }
+    const formatted = '+55' + raw;
+    setPhoneSending(true);
+    try {
+      // Check if phone already used by another account
+      const snap = await getDocs(query(collection(db, 'users'), where('phone', '==', formatted)));
+      if (!snap.empty) { setPhoneError('Este número já está vinculado a outra conta.'); setPhoneSending(false); return; }
+
+      if (!recaptchaRef.current) {
+        recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+      }
+      const provider = new PhoneAuthProvider(auth);
+      const verifId = await provider.verifyPhoneNumber(formatted, recaptchaRef.current);
+      setPhoneVerifId(verifId);
+      setPhoneStep('code');
+    } catch (e: any) {
+      setPhoneError(e.code === 'auth/invalid-phone-number' ? 'Número inválido. Use o formato: (11) 91234-5678' : 'Erro ao enviar SMS. Tente novamente.');
+      recaptchaRef.current = null;
+    } finally {
+      setPhoneSending(false);
+    }
+  };
+
+  const verifyPhoneCode = async () => {
+    setPhoneError('');
+    if (phoneCode.length !== 6) { setPhoneError('O código tem 6 dígitos.'); return; }
+    setPhoneSending(true);
+    try {
+      const raw = phoneNumber.replace(/\D/g, '');
+      const formatted = '+55' + raw;
+      const credential = PhoneAuthProvider.credential(phoneVerifId, phoneCode);
+      await linkWithCredential(auth.currentUser!, credential);
+      await setDoc(doc(db, 'users', auth.currentUser!.uid), { phone: formatted, phoneVerified: true }, { merge: true });
+      setPhoneStep('idle');
+    } catch (e: any) {
+      setPhoneError(e.code === 'auth/invalid-verification-code' ? 'Código incorreto. Verifique o SMS.' : 'Erro ao verificar. Tente novamente.');
+    } finally {
+      setPhoneSending(false);
     }
   };
 
@@ -6304,6 +6356,81 @@ function AppInner() {
               {isResetMode ? 'Voltar para o login' : (isLoginMode ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre')}
             </button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Phone verification screen — shown to new users right after registration
+  if (user && phoneStep !== 'idle') {
+    return (
+      <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
+        <div id="recaptcha-container" />
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-xl border border-indigo-100 flex flex-col items-center gap-5">
+          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-3xl">📱</div>
+          <div className="text-center">
+            <h2 className="text-xl font-black text-gray-900">Verificação de celular</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {phoneStep === 'enter'
+                ? 'Digite seu celular para receber um código de confirmação via SMS.'
+                : `Código enviado para +55 ${phoneNumber}. Digite os 6 dígitos abaixo.`}
+            </p>
+          </div>
+
+          {phoneError && <p className="text-sm text-red-500 font-medium text-center bg-red-50 p-2 rounded-xl w-full">{phoneError}</p>}
+
+          {phoneStep === 'enter' && (
+            <>
+              <div className="w-full">
+                <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Número do celular</label>
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-indigo-400">
+                  <span className="px-3 py-3 bg-gray-50 text-sm font-bold text-gray-500 border-r border-gray-200">🇧🇷 +55</span>
+                  <input
+                    type="tel"
+                    placeholder="(11) 91234-5678"
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    className="flex-1 px-3 py-3 text-sm focus:outline-none"
+                    inputMode="tel"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={sendPhoneSms}
+                disabled={phoneSending}
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50"
+              >
+                {phoneSending ? 'Enviando SMS...' : 'Enviar código'}
+              </button>
+              <button onClick={() => setPhoneStep('idle')} className="text-xs text-gray-400 underline">
+                Pular por agora
+              </button>
+            </>
+          )}
+
+          {phoneStep === 'code' && (
+            <>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                value={phoneCode}
+                onChange={e => setPhoneCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full text-center text-2xl font-black tracking-widest border border-gray-200 rounded-2xl py-4 focus:outline-none focus:border-indigo-400"
+              />
+              <button
+                onClick={verifyPhoneCode}
+                disabled={phoneSending || phoneCode.length !== 6}
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50"
+              >
+                {phoneSending ? 'Verificando...' : 'Confirmar código'}
+              </button>
+              <button onClick={() => { setPhoneStep('enter'); setPhoneCode(''); setPhoneError(''); }} className="text-xs text-gray-400 underline">
+                Reenviar SMS
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
