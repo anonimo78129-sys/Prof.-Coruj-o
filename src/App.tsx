@@ -5184,9 +5184,10 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
           setResult(parsed);
         }
       }
-    } catch (err) {
-      console.error(err);
-      toast.error(formatApiError(err, 'Erro ao gerar atividade. Tente novamente.'));
+    } catch (err: any) {
+      console.error('[Gamification] error:', err);
+      const msg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      toast.error(msg || 'Erro ao gerar atividade. Tente novamente.');
     }
     setIsGenerating(false);
   };
