@@ -27,7 +27,7 @@ if (!apiKey) {
 }
 const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
 
-const AI_MODEL = 'gemini-2.0-flash-lite';
+const AI_MODEL = 'gemini-2.5-flash';
 
 const formatApiError = (error: any, defaultMsg: string): string => {
   let msg = '';
