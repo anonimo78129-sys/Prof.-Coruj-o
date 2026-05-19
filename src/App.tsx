@@ -9,7 +9,8 @@ import {
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
-  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X
+  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
+  Wand2, Grid3x3, Puzzle, Dice5, Map, Layers3, Trophy, ScrollText
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -524,7 +525,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
           className={`relative p-2 flex flex-col items-center gap-1 transition-all ${activeScreen === item.id ? 'text-white' : 'text-indigo-300 hover:text-indigo-200'}`}
         >
           <item.icon size={22} strokeWidth={activeScreen === item.id ? 2.5 : 2} className={activeScreen === item.id ? '-translate-y-1 transition-transform' : 'transition-transform'} />
-          <span className={`text-[9px] font-bold tracking-wider ${activeScreen === item.id ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>{item.label}</span>
+          <span className={`text-[9px] font-bold tracking-wider transition-opacity ${activeScreen === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
           {activeScreen === item.id && (
             <motion.div
               layoutId="nav-glow"
@@ -729,7 +730,7 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
 
 const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void }) => {
   const quickActions = [
-    { title: 'Studio', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => setScreen('estudio') },
+    { title: 'Gamificar', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
   ];
@@ -4980,6 +4981,93 @@ const CalendarScreen = ({
   );
 };
 
+type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'trail' | 'memory';
+
+const buildWordSearchGrid = (rawWords: string[], size = 15): { grid: string[][], placements: {word: string, row: number, col: number, dir: string}[] } => {
+  const words = rawWords.map(w => w.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÔÃÕÇÜ]/gi, '')).filter(w => w.length >= 3 && w.length <= size);
+  const grid: string[][] = Array.from({ length: size }, () => Array(size).fill(''));
+  const dirs = [ [0,1,'→'], [1,0,'↓'], [1,1,'↘'], [-1,1,'↗'] ] as const;
+  const placements: {word: string, row: number, col: number, dir: string}[] = [];
+  for (const word of words) {
+    let placed = false;
+    for (let attempt = 0; attempt < 80 && !placed; attempt++) {
+      const [dr, dc, dirLabel] = dirs[Math.floor(Math.random() * dirs.length)];
+      const r0 = Math.floor(Math.random() * size);
+      const c0 = Math.floor(Math.random() * size);
+      const rEnd = r0 + dr * (word.length - 1);
+      const cEnd = c0 + dc * (word.length - 1);
+      if (rEnd < 0 || rEnd >= size || cEnd < 0 || cEnd >= size) continue;
+      let ok = true;
+      for (let i = 0; i < word.length; i++) {
+        const cell = grid[r0 + dr * i][c0 + dc * i];
+        if (cell && cell !== word[i]) { ok = false; break; }
+      }
+      if (!ok) continue;
+      for (let i = 0; i < word.length; i++) grid[r0 + dr * i][c0 + dc * i] = word[i];
+      placements.push({ word, row: r0, col: c0, dir: dirLabel });
+      placed = true;
+    }
+  }
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (!grid[r][c]) grid[r][c] = letters[Math.floor(Math.random() * 26)];
+  return { grid, placements };
+};
+
+const buildBingoCards = (items: string[], count: number): string[][][] => {
+  const cards: string[][][] = [];
+  for (let n = 0; n < count; n++) {
+    const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, 24);
+    const card: string[][] = [];
+    let idx = 0;
+    for (let r = 0; r < 5; r++) {
+      const row: string[] = [];
+      for (let c = 0; c < 5; c++) {
+        if (r === 2 && c === 2) row.push('★ LIVRE');
+        else row.push(shuffled[idx++] || '');
+      }
+      card.push(row);
+    }
+    cards.push(card);
+  }
+  return cards;
+};
+
+const printGameResult = () => {
+  const node = document.getElementById('game-print-area');
+  if (!node) return;
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><title>Atividade</title><style>
+    @page { size: A4; margin: 1.5cm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111; line-height: 1.5; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 17px; margin: 18px 0 6px; color: #4338ca; }
+    h3 { font-size: 14px; margin: 12px 0 4px; }
+    .ws-grid { display: grid; gap: 2px; margin: 12px 0; }
+    .ws-cell { border: 1px solid #555; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: bold; font-size: 12px; }
+    .bingo-card { border: 2px solid #111; padding: 8px; margin: 0 0 20px; page-break-inside: avoid; }
+    .bingo-card-title { text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 8px; }
+    .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+    .bingo-cell { border: 1px solid #333; padding: 8px 4px; min-height: 44px; text-align: center; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+    .bingo-cell.free { background: #fde68a; font-weight: bold; }
+    .quiz-q { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; page-break-inside: avoid; }
+    .quiz-q b { color: #4338ca; }
+    .quiz-opt { margin: 3px 0 3px 16px; }
+    .memory-pair { border: 1.5px dashed #888; padding: 12px; margin: 0; min-height: 70px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; }
+    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .trail-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 12px 0; }
+    .trail-cell { border: 2px solid #4338ca; border-radius: 50%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; background: #eef2ff; }
+    .trail-cell.special { background: #fbbf24; }
+    .trail-cell.end { background: #10b981; color: white; }
+    .clue-list { list-style: decimal; padding-left: 24px; }
+    .clue-list li { margin-bottom: 6px; }
+    .answer-line { border-bottom: 1.5px solid #111; display: inline-block; min-width: 200px; height: 18px; vertical-align: bottom; }
+    .story-section { background: #f5f3ff; border-left: 4px solid #6366f1; padding: 10px 14px; margin: 10px 0; border-radius: 0 8px 8px 0; }
+    @media print { button { display: none; } }
+  </style></head><body>${node.innerHTML}<script>setTimeout(()=>{window.print();},300);</script></body></html>`);
+  w.document.close();
+};
+
 const EstudioScreen = ({
   estudioContext,
   setEstudioContext,
@@ -4989,7 +5077,8 @@ const EstudioScreen = ({
   setScreen,
   setPlannerMode,
   notifications,
-  setNotifications
+  setNotifications,
+  schedules
 }: {
   estudioContext: string,
   setEstudioContext: (c: string | ((prev: string) => string)) => void,
@@ -4999,230 +5088,398 @@ const EstudioScreen = ({
   setScreen: (s: Screen) => void,
   setPlannerMode: (m: PlannerMode) => void,
   notifications?: any[],
-  setNotifications?: (n: any[]) => void
+  setNotifications?: (n: any[]) => void,
+  schedules?: ClassSchedule[]
 }) => {
-  const [activeTab, setActiveTab] = useState<'context' | 'chat'>('context');
-  const [isUploading, setIsUploading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [activeMode, setActiveMode] = useState<GameMode | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [classId, setClassId] = useState<string>('');
+  const [topic, setTopic] = useState('');
+  const [difficulty, setDifficulty] = useState<'fácil' | 'média' | 'difícil'>('média');
+  const [genre, setGenre] = useState('aventura');
+  const [duration, setDuration] = useState('1 aula');
+  const [count, setCount] = useState(10);
 
-  useEffect(() => {
-    if (activeTab === 'chat') {
-      chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
-    }
-  }, [studioMessages, activeTab]);
+  const selectedClass = (schedules || []).find(s => s.id === classId);
+  const defaultSubject = selectedClass?.subject || profile.subject || '';
+  const defaultLevel = selectedClass?.level || 'Ensino Fundamental II';
 
-  const [chatInput, setChatInput] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const addStudioMessage = (msg: Omit<typeof studioMessages[0], 'id' | 'date'>) => {
-    const newMsg = { ...msg, id: Math.random().toString(36).substr(2, 9), date: Date.now() };
-    setStudioMessages(prev => [...prev, newMsg]);
-    return newMsg;
-  };
+  const closeModal = () => { setActiveMode(null); setResult(null); setTopic(''); };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setIsUploading(true);
-    
-    const applyContextSafety = (newText: string) => {
-      setEstudioContext(prev => {
-        const MAX_CHAR_LIMIT = 100000;
-        const updated = prev + (prev ? '\n\n' : '') + `--- Arquivo: ${file.name} ---\n` + newText;
-        if (updated.length > MAX_CHAR_LIMIT) {
-          toast.info('Base de Conhecimento cheia. O texto foi truncado para evitar excesso de memória e custos.');
-          return updated.substring(0, MAX_CHAR_LIMIT);
-        }
-        return updated;
-      });
-    };
-
+  const generate = async () => {
+    if (!topic.trim()) { toast.error('Informe o tema.'); return; }
+    setIsGenerating(true);
+    setResult(null);
     try {
-      if (file.type.startsWith('text/') || file.name.endsWith('.md') || file.name.endsWith('.csv')) {
-        const text = await file.text();
-        applyContextSafety(text);
+      const context = `Disciplina: ${defaultSubject || 'Geral'} | Nível: ${defaultLevel}${selectedClass ? ` | Turma: ${selectedClass.name}` : ''} | Tema: ${topic}`;
+      let prompt = '';
+      if (activeMode === 'story') {
+        prompt = `Você é um designer de jogos educacionais. Crie uma CAMPANHA narrativa gamificada completa para gamificar aulas.
+${context}
+Gênero: ${genre} | Duração: ${duration}
+
+Retorne em Markdown brasileiro com EXATAMENTE as seções abaixo:
+
+## 🌍 Cenário
+(2 parágrafos imersivos onde os alunos são protagonistas. Inclua ambientação, conflito central e papel dos alunos.)
+
+## 👥 Classes de Personagens
+(4 classes que os alunos podem escolher, com nome criativo, descrição curta e habilidade especial em 1 frase. Use lista.)
+
+## ⚔️ Missões
+(${duration === '1 aula' ? '3' : duration.includes('semana') ? '5' : '8'} missões em sequência, cada uma com: **Missão N — Nome**, narrativa de abertura curta (3-4 linhas), desafio (relacionado ao conteúdo "${topic}"), recompensa em XP/moedas.)
+
+## 🏆 Sistema de Pontos
+(Tabela: ação → XP/moedas ganhos. Inclua: participar, acertar resposta, completar missão, ajudar colega.)
+
+## 👑 Boss Final
+(Desafio épico de encerramento, narrativa de 2-3 linhas + descrição da prova/trabalho final tematizada.)
+
+## 📋 Roteiro do Professor
+(Lista numerada de 5 passos práticos para conduzir essa campanha em sala.)
+
+NÃO use código, NÃO use emojis fora dos títulos. Português brasileiro natural.`;
+      } else if (activeMode === 'quiz') {
+        prompt = `Gere um quiz de múltipla escolha sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
+Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
+{"title":"...","questions":[{"q":"pergunta","options":["a","b","c","d"],"correct":0,"explain":"justificativa breve"}]}
+Gere exatamente ${count} perguntas. As 4 opções devem ser plausíveis. "correct" é o índice 0-3.`;
+      } else if (activeMode === 'wordsearch') {
+        prompt = `Liste ${count} palavras-chave sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para caça-palavras.
+Cada palavra: substantivo, SEM espaços, SEM acentos, entre 4 e 12 letras, MAIÚSCULAS.
+Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","hint":"dica curta para o aluno"}]}`;
+      } else if (activeMode === 'crossword') {
+        prompt = `Crie uma lista de ${count} palavras sobre "${topic}" (${defaultSubject}, ${defaultLevel}) com definições no estilo "palavras cruzadas".
+Cada palavra entre 4 e 10 letras, SEM espaços, MAIÚSCULAS, sem acentos.
+Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","clue":"definição/pista clara, estilo dicionário"}]}`;
+      } else if (activeMode === 'bingo') {
+        prompt = `Liste 40 termos/conceitos importantes sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para bingo educativo.
+Cada termo: 1 a 3 palavras, claros e didáticos.
+Retorne APENAS JSON: {"title":"Bingo de ${topic}","items":["termo1","termo2",...]}`;
+      } else if (activeMode === 'trail') {
+        prompt = `Crie uma trilha do conhecimento (jogo de tabuleiro) de ${count} casas sobre "${topic}" (${defaultSubject}, ${defaultLevel}).
+Retorne APENAS JSON:
+{"title":"...","instructions":"regras curtas (até 3 linhas)","questions":[{"casa":N,"type":"pergunta"|"desafio"|"bonus"|"penalidade","text":"o que acontece nessa casa"}]}
+Gere ${Math.min(count, 12)} casas especiais (não precisa preencher todas). Use perguntas factuais sobre ${topic} para tipo "pergunta".`;
+      } else if (activeMode === 'memory') {
+        prompt = `Gere ${count} pares conceito↔definição sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para jogo da memória.
+Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras).
+Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."}]}`;
+      }
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+      const raw = response.text || '';
+      if (activeMode === 'story') {
+        setResult({ markdown: raw });
       } else {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          try {
-            const base64 = (event.target?.result as string).split(',')[1];
-            const response = await generateContentWithRetry({
-              model: AI_MODEL,
-              contents: [
-                { role: 'user', parts: [
-                    { inlineData: { data: base64, mimeType: file.type } },
-                    { text: "Extraia todo o texto útil e informações deste arquivo para servir de base de conhecimento. Formate de forma clara em Markdown." }
-                ]}
-              ]
-            });
-            applyContextSafety(response.text || '');
-          } catch (err) {
-            console.error(err);
-            toast.error(formatApiError(err, 'Erro ao processar o arquivo com a IA.'));
-          } finally {
-            setIsUploading(false);
-          }
-        };
-        reader.readAsDataURL(file);
-        return;
+        const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (activeMode === 'wordsearch') {
+          const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word));
+          setResult({ ...parsed, grid: built.grid });
+        } else if (activeMode === 'bingo') {
+          const cards = buildBingoCards(parsed.items, 10);
+          setResult({ ...parsed, cards });
+        } else {
+          setResult(parsed);
+        }
       }
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao ler o arquivo.');
+      toast.error(formatApiError(err, 'Erro ao gerar atividade. Tente novamente.'));
     }
-    setIsUploading(false);
+    setIsGenerating(false);
   };
 
-  const sendChatMessage = async () => {
-    if (!chatInput.trim()) return;
-    if (!estudioContext) {
-      toast.error('Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
-      return;
-    }
-
-    const userText = chatInput;
-    addStudioMessage({ role: 'user', text: userText });
-    setChatInput('');
-    setIsChatLoading(true);
-
-    try {
-      const historyForPrompt = [...studioMessages, { role: 'user' as const, text: userText }];
-      const prompt = `Você é um assistente especialista no material fornecido pelo professor.
-      Responda às perguntas baseando-se ESTRITAMENTE no seguinte conteúdo. NUNCA afirme ter gerado relatórios, aulas, ou ter agendado e executado ações. O seu único propósito nesta tela é analisar e responder sobre o texto fornecido.
-
-      Conteúdo Base:
-      ${estudioContext}
-
-      Histórico da conversa:
-      ${historyForPrompt.map(m => `${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
-
-      Assistente:`;
-
-      const response = await generateContentWithRetry({
-        model: AI_MODEL,
-        contents: prompt,
-      });
-
-      addStudioMessage({ role: 'model', text: response.text || '' });
-    } catch (error) {
-      console.error(error);
-      addStudioMessage({ role: 'model', text: formatApiError(error, 'Desculpe, ocorreu um erro ao analisar o material.') });
-    }
-    setIsChatLoading(false);
+  const modeMeta: Record<GameMode, { title: string, icon: any, color: string, bg: string }> = {
+    story: { title: 'Storytelling', icon: ScrollText, color: 'text-white', bg: 'from-indigo-600 to-purple-600' },
+    quiz: { title: 'Quiz', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
+    wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
+    crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
+    bingo: { title: 'Bingo Educativo', icon: Dice5, color: 'text-pink-600', bg: 'bg-pink-50 border-pink-200' },
+    trail: { title: 'Trilha', icon: Map, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200' },
+    memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' },
   };
+
+  const smallActivities: GameMode[] = ['quiz', 'wordsearch', 'crossword', 'bingo', 'trail', 'memory'];
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
-      
-      <div className="flex gap-2 mb-6 pb-2 shrink-0">
-        <button onClick={() => setActiveTab('context')} className={`flex-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === 'context' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}>Base Conhecimento</button>
-        <button onClick={() => setActiveTab('chat')} className={`flex-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}>Chat com IA</button>
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
+      <Header setScreen={setScreen} title="Estúdio" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
+
+      <div className="px-1 mb-6">
+        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {activeTab === 'context' && (
-        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-                <Database size={20} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900">Base de Conhecimento</h3>
-                <p className="text-xs text-gray-400">Cole conteúdo ou envie arquivos para a IA</p>
-              </div>
-            </div>
-            <label className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center cursor-pointer hover:bg-indigo-100 transition-colors">
-              {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
-              <input type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-            </label>
+      {/* STORYTELLING — destaque */}
+      <button
+        onClick={() => setActiveMode('story')}
+        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 active:scale-[0.98] transition-transform"
+      >
+        <div className="absolute -top-6 -right-6 opacity-20">
+          <ScrollText size={130} className="text-white" />
+        </div>
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] font-black tracking-widest uppercase text-yellow-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Principal</span>
           </div>
-          
-          <textarea
-            value={estudioContext}
-            onChange={(e) => setEstudioContext(e.target.value)}
-            placeholder="Cole aqui o conteúdo da BNCC, capítulos de livros, apostilas ou envie um arquivo no botão acima..."
-            className="w-full flex-1 bg-gray-50 border-none rounded-2xl p-4 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none mb-4"
-          />
-          
-          {estudioContext.length === 0 && (
-            <div className="text-center py-4 text-gray-400 text-xs italic mb-4">
-              A IA ainda não tem contexto. Adicione conteúdo para começar.
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-2 mt-auto shrink-0">
-            <button onClick={() => { setPlannerMode('exam'); setScreen('planner'); }} className="bg-indigo-50 text-indigo-600 py-3 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 border border-indigo-200">
-               <FileQuestion size={18} className="text-indigo-600" />
-               Prova
-            </button>
-            <button onClick={() => { setPlannerMode('activities'); setScreen('planner'); }} className="bg-amber-50 text-amber-600 py-3 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 border border-amber-200">
-               <FileText size={18} className="text-amber-600" />
-               Atividade
-            </button>
-            <button onClick={() => { setPlannerMode('slides'); setScreen('planner'); }} className="bg-emerald-50 text-emerald-600 py-3 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 border border-emerald-200">
-               <Presentation size={18} className="text-emerald-600" />
-               Slides
-            </button>
+          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Storytelling</h2>
+          <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
+            Crie uma campanha narrativa completa: cenário, personagens, missões e boss final para gamificar toda a aula.
+          </p>
+          <div className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-4 py-2 rounded-full text-sm">
+            <Wand2 size={16} /> Criar campanha
           </div>
         </div>
-      )}
+      </button>
 
-      {activeTab === 'chat' && (
-        <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col min-h-[400px]">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs text-gray-400 font-medium">Conversa salva automaticamente</span>
+      {/* Atividades menores */}
+      <div className="grid grid-cols-2 gap-3 mb-8">
+        {smallActivities.map(m => {
+          const meta = modeMeta[m];
+          const Icon = meta.icon;
+          return (
             <button
-              onClick={() => setStudioMessages([{ id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }])}
-              className="text-xs text-red-400 font-bold hover:text-red-600"
+              key={m}
+              onClick={() => setActiveMode(m)}
+              className={`relative rounded-3xl p-4 text-left shadow-sm border-2 ${meta.bg} active:scale-[0.97] transition-transform`}
             >
-              Limpar
+              <Icon size={28} className={`${meta.color} mb-2`} />
+              <h3 className={`font-bold text-sm ${meta.color}`}>{meta.title}</h3>
+              <p className="text-[11px] text-gray-500 mt-0.5">Gerar com IA</p>
             </button>
-          </div>
-          <div className="flex-1 overflow-y-auto no-scrollbar mb-4 space-y-4 p-2">
-            {!estudioContext && (
-              <div className="text-center py-8 text-gray-400 text-sm">Adicione conteúdo na Base de Conhecimento primeiro.</div>
-            )}
-            {estudioContext && studioMessages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
-                <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-50 text-gray-800 rounded-bl-none shadow-sm border border-gray-100'}`}>
-                  <div className="markdown-body text-sm">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+          );
+        })}
+      </div>
+
+      {/* MODAL */}
+      <AnimatePresence>
+        {activeMode && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={closeModal}
+          >
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="bg-white w-full sm:max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between z-10">
+                <div className="flex items-center gap-3">
+                  {(() => { const Icon = modeMeta[activeMode].icon; return <Icon size={22} className={activeMode === 'story' ? 'text-indigo-600' : modeMeta[activeMode].color} />; })()}
+                  <h3 className="font-bold text-lg text-gray-900">{modeMeta[activeMode].title}</h3>
+                </div>
+                <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"><X size={18} /></button>
+              </div>
+
+              {!result && (
+                <div className="p-5 space-y-4">
+                  {(schedules && schedules.length > 0) && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Turma (opcional)</label>
+                      <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400">
+                        <option value="">Sem turma específica</option>
+                        {schedules.map(s => <option key={s.id} value={s.id}>{s.name} {s.subject ? `· ${s.subject}` : ''}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tema / Conteúdo</label>
+                    <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Revolução Industrial, Frações..." className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400" />
+                  </div>
+
+                  {activeMode === 'story' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Gênero narrativo</label>
+                        <select value={genre} onChange={e => setGenre(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                          <option value="aventura">Aventura</option>
+                          <option value="mistério">Mistério / Detetive</option>
+                          <option value="ficção científica">Ficção Científica</option>
+                          <option value="fantasia medieval">Fantasia Medieval</option>
+                          <option value="exploração espacial">Exploração Espacial</option>
+                          <option value="época histórica">Época Histórica</option>
+                          <option value="apocalíptico">Pós-apocalíptico</option>
+                          <option value="terror leve">Terror leve / Suspense</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Duração</label>
+                        <select value={duration} onChange={e => setDuration(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                          <option value="1 aula">1 aula (3 missões)</option>
+                          <option value="1 semana">1 semana (5 missões)</option>
+                          <option value="1 bimestre">1 bimestre (8 missões)</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {activeMode === 'quiz' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de perguntas</label>
+                        <input type="number" min={5} max={30} value={count} onChange={e => setCount(Math.max(5, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dificuldade</label>
+                        <select value={difficulty} onChange={e => setDifficulty(e.target.value as any)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                          <option value="fácil">Fácil</option>
+                          <option value="média">Média</option>
+                          <option value="difícil">Difícil</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {(activeMode === 'wordsearch' || activeMode === 'crossword' || activeMode === 'memory') && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        {activeMode === 'memory' ? 'Quantidade de pares' : 'Quantidade de palavras'}
+                      </label>
+                      <input type="number" min={5} max={20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                    </div>
+                  )}
+
+                  {activeMode === 'trail' && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da trilha (casas)</label>
+                      <input type="number" min={20} max={48} value={count} onChange={e => setCount(Math.max(20, Math.min(48, parseInt(e.target.value) || 32)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                    </div>
+                  )}
+
+                  <button onClick={generate} disabled={isGenerating || !topic.trim()} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50">
+                    {isGenerating ? <><Loader2 size={18} className="animate-spin" /> Gerando…</> : <><Wand2 size={18} /> Gerar com IA</>}
+                  </button>
+                </div>
+              )}
+
+              {result && (
+                <div className="p-5">
+                  <div className="flex gap-2 mb-4">
+                    <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">↻ Refazer</button>
+                    <button onClick={printGameResult} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
+                  </div>
+
+                  <div id="game-print-area" className="bg-gray-50 rounded-2xl p-4 text-sm">
+                    <h1 className="text-xl font-black text-gray-900 mb-1">{result.title || topic}</h1>
+                    <p className="text-xs text-gray-500 mb-4">{defaultSubject} · {defaultLevel}{selectedClass ? ` · ${selectedClass.name}` : ''}</p>
+
+                    {activeMode === 'story' && result.markdown && (
+                      <div className="markdown-body prose prose-sm max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.markdown}</ReactMarkdown>
+                      </div>
+                    )}
+
+                    {activeMode === 'quiz' && result.questions && (
+                      <div className="space-y-3">
+                        {result.questions.map((q: any, i: number) => (
+                          <div key={i} className="quiz-q bg-white p-3 rounded-xl border border-gray-100">
+                            <p><b>{i + 1}.</b> {q.q}</p>
+                            <div className="mt-2">
+                              {q.options.map((opt: string, j: number) => (
+                                <p key={j} className="quiz-opt">{String.fromCharCode(65 + j)}) {opt}</p>
+                              ))}
+                            </div>
+                            <p className="text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {activeMode === 'wordsearch' && result.grid && (
+                      <div>
+                        <div className="ws-grid mx-auto" style={{ gridTemplateColumns: `repeat(${result.grid.length}, 24px)`, display: 'grid', gap: 2, justifyContent: 'center' }}>
+                          {result.grid.flatMap((row: string[], r: number) => row.map((cell: string, c: number) => (
+                            <div key={`${r}-${c}`} className="ws-cell" style={{ border: '1px solid #555', width: 24, height: 24, textAlign: 'center', lineHeight: '24px', fontWeight: 'bold', fontSize: 12 }}>{cell}</div>
+                          )))}
+                        </div>
+                        <h3 className="mt-4 font-bold">Encontre estas palavras:</h3>
+                        <ul className="clue-list grid grid-cols-2 gap-x-4">
+                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b> — {w.hint}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activeMode === 'crossword' && result.words && (
+                      <div>
+                        <p className="mb-3 text-gray-600">Complete os espaços com as palavras corretas segundo as definições:</p>
+                        <ol className="clue-list">
+                          {result.words.map((w: any, i: number) => (
+                            <li key={i}>
+                              <p className="mb-1">{w.clue}</p>
+                              <div style={{ display: 'flex', gap: 3 }}>
+                                {w.word.split('').map((_: string, j: number) => (
+                                  <div key={j} style={{ border: '1.5px solid #111', width: 22, height: 22 }}></div>
+                                ))}
+                              </div>
+                              <p style={{ fontSize: 10, color: '#888', marginTop: 4 }}>Resposta: {w.word}</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    {activeMode === 'bingo' && result.cards && (
+                      <div>
+                        <p className="mb-3 text-gray-600">{result.cards.length} cartelas únicas — imprima e distribua:</p>
+                        {result.cards.map((card: string[][], i: number) => (
+                          <div key={i} className="bingo-card">
+                            <div className="bingo-card-title">Cartela {i + 1}</div>
+                            <div className="bingo-grid">
+                              {card.flatMap((row, r) => row.map((cell, c) => (
+                                <div key={`${r}-${c}`} className={`bingo-cell ${cell.startsWith('★') ? 'free' : ''}`}>{cell}</div>
+                              )))}
+                            </div>
+                          </div>
+                        ))}
+                        <h3 className="mt-4 font-bold">Lista de termos para sortear:</h3>
+                        <ul className="clue-list grid grid-cols-2 gap-x-4">
+                          {result.items.slice(0, 30).map((it: string, i: number) => <li key={i}>{it}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activeMode === 'trail' && result.questions && (
+                      <div>
+                        <p className="mb-2 text-gray-700"><b>Regras:</b> {result.instructions}</p>
+                        <div className="trail-board">
+                          {Array.from({ length: count }, (_, i) => {
+                            const special = result.questions.find((q: any) => q.casa === i + 1);
+                            const isEnd = i + 1 === count;
+                            return (
+                              <div key={i} className={`trail-cell ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`}>{i + 1}</div>
+                            );
+                          })}
+                        </div>
+                        <h3 className="mt-4 font-bold">Casas Especiais:</h3>
+                        <ol className="clue-list">
+                          {result.questions.map((q: any, i: number) => (
+                            <li key={i}><b>Casa {q.casa}</b> ({q.type}): {q.text}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    {activeMode === 'memory' && result.pairs && (
+                      <div>
+                        <p className="mb-3 text-gray-600">Imprima, recorte e embaralhe as cartas:</p>
+                        <div className="memory-grid">
+                          {result.pairs.flatMap((p: any, i: number) => [
+                            <div key={`c-${i}`} className="memory-pair"><b>{p.concept}</b></div>,
+                            <div key={`d-${i}`} className="memory-pair">{p.definition}</div>
+                          ])}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-            {isChatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-50 p-4 rounded-2xl rounded-bl-none shadow-sm border border-gray-100 flex gap-2 items-center">
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-          <div className="bg-gray-50 p-2 rounded-full flex items-center gap-2 shrink-0">
-            <input 
-              type="text" 
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
-              placeholder="Pergunte sobre o material..." 
-              className="flex-1 bg-transparent border-none px-4 py-2 text-sm focus:outline-none"
-              disabled={!estudioContext}
-            />
-            <button 
-              onClick={sendChatMessage}
-              disabled={isChatLoading || !chatInput.trim() || !estudioContext}
-              className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center disabled:opacity-50"
-            >
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -7519,7 +7776,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
             setEstudioContext('');
           }} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
