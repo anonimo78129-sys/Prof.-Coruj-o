@@ -5032,39 +5032,129 @@ const buildBingoCards = (items: string[], count: number): string[][][] => {
   return cards;
 };
 
-const printGameResult = () => {
+const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string }) => {
   const node = document.getElementById('game-print-area');
   if (!node) return;
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><title>Atividade</title><style>
-    @page { size: A4; margin: 1.5cm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111; line-height: 1.5; }
-    h1 { font-size: 22px; margin: 0 0 8px; }
-    h2 { font-size: 17px; margin: 18px 0 6px; color: #4338ca; }
-    h3 { font-size: 14px; margin: 12px 0 4px; }
-    .ws-grid { display: grid; gap: 2px; margin: 12px 0; page-break-inside: avoid; break-inside: avoid; }
-    .ws-cell { border: 1px solid #555; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: bold; font-size: 12px; }
-    .bingo-card { border: 2px solid #111; padding: 8px; margin: 0 0 20px; page-break-inside: avoid; break-inside: avoid; }
-    .bingo-card-title { text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 8px; }
-    .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
-    .bingo-cell { border: 1px solid #333; padding: 8px 4px; min-height: 44px; text-align: center; font-size: 10px; display: flex; align-items: center; justify-content: center; }
-    .bingo-cell.free { background: #fde68a; font-weight: bold; }
-    .quiz-q { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
-    .quiz-q b { color: #4338ca; }
-    .quiz-opt { margin: 3px 0 3px 16px; }
-    .memory-pair { border: 1.5px dashed #888; padding: 12px; margin: 0; min-height: 70px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; page-break-inside: avoid; break-inside: avoid; }
-    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; page-break-inside: avoid; break-inside: avoid; }
-    .trail-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 12px 0; page-break-inside: avoid; break-inside: avoid; }
-    .trail-cell { border: 2px solid #4338ca; border-radius: 50%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; background: #eef2ff; }
-    .trail-cell.special { background: #fbbf24; }
-    .trail-cell.end { background: #10b981; color: white; }
-    .clue-list { list-style: decimal; padding-left: 24px; }
-    .clue-list li { margin-bottom: 6px; page-break-inside: avoid; break-inside: avoid; }
-    .answer-line { border-bottom: 1.5px solid #111; display: inline-block; min-width: 200px; height: 18px; vertical-align: bottom; }
-    .story-section { background: #f5f3ff; border-left: 4px solid #6366f1; padding: 10px 14px; margin: 10px 0; border-radius: 0 8px 8px 0; }
-    @media print { button { display: none; } }
-  </style></head><body>${node.innerHTML}<script>setTimeout(()=>{window.print();},300);</script></body></html>`);
+  const todayStr = new Date().toLocaleDateString('pt-BR');
+  const headerHtml = `
+    <div class="page-header">
+      <div class="brand-strip"></div>
+      <div class="school-row">
+        <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
+        <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
+      </div>
+      <div class="activity-tag">${opts.activityLabel}</div>
+      <h1 class="doc-title">${opts.title}</h1>
+      <div class="fields-grid">
+        <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
+        <div class="field"><span class="field-label">DATA</span><div class="field-line short">${todayStr}</div></div>
+        <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
+        <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
+        <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
+      </div>
+    </div>
+  `;
+  w.document.write(`<!DOCTYPE html><html><head><title>${opts.title}</title><style>
+    @page { size: A4; margin: 1.6cm 1.4cm 1.8cm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.55; margin: 0; font-size: 12px; }
+
+    /* HEADER */
+    .page-header { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid #4338ca; }
+    .brand-strip { height: 6px; background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%); border-radius: 3px; margin-bottom: 12px; }
+    .school-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 10px; letter-spacing: 1.5px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
+    .school-name { font-weight: 800; color: #1f2937; letter-spacing: 1.8px; }
+    .activity-tag { display: inline-block; background: #4338ca; color: white; padding: 3px 10px; border-radius: 10px; font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+    .doc-title { font-size: 22px; font-weight: 900; color: #111827; margin: 0 0 14px; line-height: 1.2; letter-spacing: -0.3px; }
+    .fields-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 0.5fr; gap: 10px 14px; }
+    .field { display: flex; flex-direction: column; gap: 2px; }
+    .field.full { grid-column: 1 / -1; }
+    .field-label { font-size: 8px; font-weight: 800; color: #4338ca; letter-spacing: 1.5px; }
+    .field-line { border-bottom: 1.5px solid #1f2937; min-height: 16px; padding: 2px 4px; font-size: 11px; color: #111; font-weight: 600; }
+    .field-line.short { min-height: 16px; }
+    .field-line.tiny { min-width: 30px; }
+
+    /* CONTENT */
+    h2 { font-size: 15px; margin: 16px 0 6px; color: #4338ca; font-weight: 800; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb; }
+    h3 { font-size: 12px; margin: 10px 0 4px; color: #1f2937; font-weight: 700; }
+    p { margin: 6px 0; }
+    .instructions { background: #eef2ff; border-left: 4px solid #4338ca; padding: 8px 12px; margin: 10px 0 16px; border-radius: 0 6px 6px 0; font-size: 11px; color: #312e81; }
+    .instructions b { color: #4338ca; }
+
+    /* WORD SEARCH */
+    .ws-wrapper { display: flex; justify-content: center; margin: 16px 0; page-break-inside: avoid; break-inside: avoid; }
+    .ws-grid { display: grid; gap: 0; border: 2px solid #1f2937; background: #1f2937; page-break-inside: avoid; break-inside: avoid; padding: 1px; border-radius: 4px; }
+    .ws-cell { background: white; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: 700; font-size: 12px; font-family: 'Courier New', monospace; }
+
+    /* BINGO */
+    .bingo-card { border: 3px solid #1f2937; padding: 0; margin: 0 0 22px; page-break-inside: avoid; break-inside: avoid; border-radius: 6px; overflow: hidden; }
+    .bingo-card-title { text-align: center; font-weight: 900; font-size: 24px; color: white; background: linear-gradient(90deg, #6366f1, #ec4899); padding: 6px; letter-spacing: 4px; }
+    .bingo-sub { text-align: center; font-size: 9px; color: #6b7280; padding: 3px 0; background: #f9fafb; border-bottom: 1px solid #e5e7eb; letter-spacing: 1px; }
+    .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; }
+    .bingo-cell { border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; padding: 10px 4px; min-height: 50px; text-align: center; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+    .bingo-cell:nth-child(5n) { border-right: none; }
+    .bingo-cell.free { background: #fef3c7; font-weight: 900; color: #92400e; }
+
+    /* QUIZ */
+    .quiz-q { border: 1px solid #e5e7eb; border-left: 3px solid #4338ca; border-radius: 4px; padding: 10px 14px; margin-bottom: 12px; page-break-inside: avoid; break-inside: avoid; background: #fafbff; }
+    .quiz-q b { color: #4338ca; font-weight: 800; }
+    .quiz-opt { margin: 4px 0 4px 18px; padding: 2px 0; }
+    .quiz-opt b { display: inline-block; width: 18px; color: #4338ca; }
+    .quiz-answer { display: none; }
+
+    /* MEMORY */
+    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; page-break-inside: avoid; break-inside: avoid; }
+    .memory-pair { border: 1.5px dashed #6b7280; padding: 14px 8px; margin: -1px 0 0 -1px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10px; page-break-inside: avoid; break-inside: avoid; background: white; }
+    .memory-pair.concept { background: #eef2ff; font-weight: 700; }
+
+    /* TRAIL */
+    .trail-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 14px 0; page-break-inside: avoid; break-inside: avoid; padding: 12px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .trail-cell { border: 2px solid #4338ca; border-radius: 50%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; background: white; color: #4338ca; }
+    .trail-cell.special { background: #fbbf24; color: white; border-color: #d97706; }
+    .trail-cell.end { background: #10b981; color: white; border-color: #047857; }
+    .trail-cell.start { background: #6366f1; color: white; border-color: #4338ca; }
+
+    /* CROSSWORD */
+    .cw-item { margin-bottom: 14px; page-break-inside: avoid; break-inside: avoid; }
+    .cw-clue { font-weight: 600; margin-bottom: 4px; color: #1f2937; }
+    .cw-boxes { display: flex; gap: 2px; }
+    .cw-box { border: 1.5px solid #111; width: 24px; height: 24px; }
+    .cw-answer { display: none; }
+
+    /* LISTS */
+    .clue-list { list-style: decimal; padding-left: 20px; columns: 2; column-gap: 24px; }
+    .clue-list li { margin-bottom: 5px; break-inside: avoid; page-break-inside: avoid; }
+
+    /* STORY (markdown) */
+    .markdown-body h2 { color: #4338ca; font-size: 16px; margin-top: 18px; padding-bottom: 4px; border-bottom: 1.5px solid #e5e7eb; }
+    .markdown-body h3 { color: #1f2937; font-size: 13px; }
+    .markdown-body ul, .markdown-body ol { padding-left: 22px; }
+    .markdown-body li { margin-bottom: 4px; }
+    .markdown-body blockquote { border-left: 4px solid #6366f1; padding: 6px 12px; margin: 8px 0; background: #eef2ff; color: #312e81; border-radius: 0 4px 4px 0; }
+    .markdown-body table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+    .markdown-body th, .markdown-body td { border: 1px solid #d1d5db; padding: 4px 8px; text-align: left; font-size: 11px; }
+    .markdown-body th { background: #4338ca; color: white; font-weight: 700; }
+
+    /* GABARITO / ANSWER KEY page (only in print) */
+    .answer-key-page { display: none; page-break-before: always; padding-top: 8px; }
+    @media print { .answer-key-page { display: block; } .quiz-answer, .cw-answer { display: none !important; } }
+    .answer-key-title { font-size: 16px; color: #dc2626; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid #dc2626; padding-bottom: 4px; margin-bottom: 12px; }
+    .answer-key-item { font-size: 11px; margin-bottom: 4px; padding: 3px 6px; background: #fef2f2; border-radius: 3px; }
+
+    /* FOOTER */
+    .page-footer { position: fixed; bottom: 0.5cm; left: 1.4cm; right: 1.4cm; font-size: 8px; color: #9ca3af; text-align: center; letter-spacing: 1px; border-top: 1px solid #e5e7eb; padding-top: 4px; }
+
+    /* PRINT-ONLY ADJUSTMENTS */
+    .hide-on-screen { display: block; }
+    button { display: none; }
+  </style></head><body>
+    ${headerHtml}
+    ${node.innerHTML}
+    <div class="page-footer">Gerado por Prof. Corujao • ${todayStr}</div>
+    <script>setTimeout(()=>{window.print();},400);</script>
+  </body></html>`);
   w.document.close();
 };
 
@@ -5356,17 +5446,34 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                 </div>
               )}
 
-              {result && (
+              {result && (() => {
+                const activityLabels: Record<GameMode, string> = {
+                  story: 'Campanha Narrativa', quiz: 'Quiz Avaliativo', wordsearch: 'Caca-Palavras',
+                  crossword: 'Palavras Cruzadas', bingo: 'Bingo Educativo', trail: 'Trilha do Conhecimento', memory: 'Jogo da Memoria'
+                };
+                const printOpts = {
+                  title: result.title || topic,
+                  subject: defaultSubject,
+                  level: defaultLevel,
+                  className: selectedClass?.name,
+                  teacherName: profile.name,
+                  schoolName: profile.schoolName || selectedClass?.school,
+                  activityLabel: activityLabels[activeMode!]
+                };
+                return (
                 <div className="p-5">
                   <div className="flex gap-2 mb-4">
                     <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">↻ Refazer</button>
-                    <button onClick={printGameResult} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
+                    <button onClick={() => printGameResult(printOpts)} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
+                  </div>
+
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 mb-3">
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">{printOpts.activityLabel}</p>
+                    <h1 className="text-base font-black text-indigo-900">{printOpts.title}</h1>
+                    <p className="text-[10px] text-indigo-400 mt-0.5">{printOpts.subject} · {printOpts.level}{printOpts.className ? ` · ${printOpts.className}` : ''}</p>
                   </div>
 
                   <div id="game-print-area" className="bg-gray-50 rounded-2xl p-4 text-sm">
-                    <h1 className="text-xl font-black text-gray-900 mb-1">{result.title || topic}</h1>
-                    <p className="text-xs text-gray-500 mb-4">{defaultSubject} · {defaultLevel}{selectedClass ? ` · ${selectedClass.name}` : ''}</p>
-
                     {activeMode === 'story' && result.markdown && (
                       <div className="markdown-body prose prose-sm max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.markdown}</ReactMarkdown>
@@ -5374,109 +5481,128 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                     )}
 
                     {activeMode === 'quiz' && result.questions && (
-                      <div className="space-y-3">
-                        {result.questions.map((q: any, i: number) => (
-                          <div key={i} className="quiz-q bg-white p-3 rounded-xl border border-gray-100">
-                            <p><b>{i + 1}.</b> {q.q}</p>
-                            <div className="mt-2">
-                              {q.options.map((opt: string, j: number) => (
-                                <p key={j} className="quiz-opt">{String.fromCharCode(65 + j)}) {opt}</p>
-                              ))}
+                      <>
+                        <div className="instructions"><b>Instrucoes:</b> Leia cada questao com atencao e marque a alternativa correta.</div>
+                        <div className="space-y-3">
+                          {result.questions.map((q: any, i: number) => (
+                            <div key={i} className="quiz-q">
+                              <p><b>{i + 1}.</b> {q.q}</p>
+                              <div className="mt-2">
+                                {q.options.map((opt: string, j: number) => (
+                                  <p key={j} className="quiz-opt"><b>{String.fromCharCode(65 + j)})</b> {opt}</p>
+                                ))}
+                              </div>
+                              <p className="quiz-answer text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</p>
                             </div>
-                            <p className="text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</p>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                        <div className="answer-key-page">
+                          <h2 className="answer-key-title">Gabarito</h2>
+                          {result.questions.map((q: any, i: number) => (
+                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</div>
+                          ))}
+                        </div>
+                      </>
                     )}
 
                     {activeMode === 'wordsearch' && result.grid && (
-                      <div>
-                        <div className="ws-grid mx-auto" style={{ gridTemplateColumns: `repeat(${result.grid.length}, 24px)`, display: 'grid', gap: 2, justifyContent: 'center' }}>
-                          {result.grid.flatMap((row: string[], r: number) => row.map((cell: string, c: number) => (
-                            <div key={`${r}-${c}`} className="ws-cell" style={{ border: '1px solid #555', width: 24, height: 24, textAlign: 'center', lineHeight: '24px', fontWeight: 'bold', fontSize: 12 }}>{cell}</div>
-                          )))}
+                      <>
+                        <div className="instructions"><b>Instrucoes:</b> Encontre todas as palavras da lista escondidas na grade. Elas podem aparecer na horizontal, vertical ou diagonal.</div>
+                        <div className="ws-wrapper">
+                          <div className="ws-grid" style={{ gridTemplateColumns: `repeat(${result.grid.length}, 24px)` }}>
+                            {result.grid.flatMap((row: string[], r: number) => row.map((cell: string, c: number) => (
+                              <div key={`${r}-${c}`} className="ws-cell">{cell}</div>
+                            )))}
+                          </div>
                         </div>
-                        <h3 className="mt-4 font-bold">Encontre estas palavras:</h3>
-                        <ul className="clue-list grid grid-cols-2 gap-x-4">
+                        <h2>Palavras para encontrar</h2>
+                        <ul className="clue-list">
                           {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b> — {w.hint}</li>)}
                         </ul>
-                      </div>
+                      </>
                     )}
 
                     {activeMode === 'crossword' && result.words && (
-                      <div>
-                        <p className="mb-3 text-gray-600">Complete os espaços com as palavras corretas segundo as definições:</p>
-                        <ol className="clue-list">
+                      <>
+                        <div className="instructions"><b>Instrucoes:</b> Leia cada definicao e escreva a palavra correta nos quadradinhos, uma letra em cada caixa.</div>
+                        <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
                           {result.words.map((w: any, i: number) => (
-                            <li key={i}>
-                              <p className="mb-1">{w.clue}</p>
-                              <div style={{ display: 'flex', gap: 3 }}>
-                                {w.word.split('').map((_: string, j: number) => (
-                                  <div key={j} style={{ border: '1.5px solid #111', width: 22, height: 22 }}></div>
-                                ))}
+                            <li key={i} className="cw-item">
+                              <p className="cw-clue">{w.clue}</p>
+                              <div className="cw-boxes">
+                                {w.word.split('').map((_: string, j: number) => (<div key={j} className="cw-box"></div>))}
                               </div>
-                              <p style={{ fontSize: 10, color: '#888', marginTop: 4 }}>Resposta: {w.word}</p>
+                              <p className="cw-answer" style={{ fontSize: 10, color: '#888', marginTop: 4 }}>Resposta: {w.word}</p>
                             </li>
                           ))}
                         </ol>
-                      </div>
+                        <div className="answer-key-page">
+                          <h2 className="answer-key-title">Gabarito</h2>
+                          {result.words.map((w: any, i: number) => (
+                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {w.word}</div>
+                          ))}
+                        </div>
+                      </>
                     )}
 
                     {activeMode === 'bingo' && result.cards && (
-                      <div>
-                        <p className="mb-3 text-gray-600">{result.cards.length} cartelas únicas — imprima e distribua:</p>
+                      <>
+                        <div className="instructions"><b>Como jogar:</b> Distribua uma cartela para cada aluno. O professor sorteia os termos da lista — quem marcar uma linha, coluna ou diagonal completa grita BINGO!</div>
                         {result.cards.map((card: string[][], i: number) => (
                           <div key={i} className="bingo-card">
-                            <div className="bingo-card-title">Cartela {i + 1}</div>
+                            <div className="bingo-card-title">BINGO</div>
+                            <div className="bingo-sub">Cartela {i + 1}</div>
                             <div className="bingo-grid">
                               {card.flatMap((row, r) => row.map((cell, c) => (
-                                <div key={`${r}-${c}`} className={`bingo-cell ${cell.startsWith('★') ? 'free' : ''}`}>{cell}</div>
+                                <div key={`${r}-${c}`} className={`bingo-cell ${cell.startsWith('★') ? 'free' : ''}`}>{cell.replace('★ ', '')}</div>
                               )))}
                             </div>
                           </div>
                         ))}
-                        <h3 className="mt-4 font-bold">Lista de termos para sortear:</h3>
-                        <ul className="clue-list grid grid-cols-2 gap-x-4">
-                          {result.items.slice(0, 30).map((it: string, i: number) => <li key={i}>{it}</li>)}
+                        <h2>Termos para sortear</h2>
+                        <ul className="clue-list">
+                          {result.items.slice(0, 40).map((it: string, i: number) => <li key={i}>{it}</li>)}
                         </ul>
-                      </div>
+                      </>
                     )}
 
                     {activeMode === 'trail' && result.questions && (
-                      <div>
-                        <p className="mb-2 text-gray-700"><b>Regras:</b> {result.instructions}</p>
+                      <>
+                        <div className="instructions"><b>Regras:</b> {result.instructions}</div>
                         <div className="trail-board">
                           {Array.from({ length: count }, (_, i) => {
                             const special = result.questions.find((q: any) => q.casa === i + 1);
                             const isEnd = i + 1 === count;
+                            const isStart = i === 0;
                             return (
-                              <div key={i} className={`trail-cell ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`}>{i + 1}</div>
+                              <div key={i} className={`trail-cell ${isStart ? 'start' : ''} ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`}>{i + 1}</div>
                             );
                           })}
                         </div>
-                        <h3 className="mt-4 font-bold">Casas Especiais:</h3>
-                        <ol className="clue-list">
+                        <h2>Casas especiais</h2>
+                        <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
                           {result.questions.map((q: any, i: number) => (
-                            <li key={i}><b>Casa {q.casa}</b> ({q.type}): {q.text}</li>
+                            <li key={i} style={{ marginBottom: 6, pageBreakInside: 'avoid' }}><b>Casa {q.casa}</b> ({q.type}): {q.text}</li>
                           ))}
                         </ol>
-                      </div>
+                      </>
                     )}
 
                     {activeMode === 'memory' && result.pairs && (
-                      <div>
-                        <p className="mb-3 text-gray-600">Imprima, recorte e embaralhe as cartas:</p>
+                      <>
+                        <div className="instructions"><b>Como jogar:</b> Imprima, recorte pelas linhas tracejadas e embaralhe as cartas. Cada aluno (ou dupla) tenta encontrar os pares conceito-definicao virando duas cartas por vez.</div>
                         <div className="memory-grid">
                           {result.pairs.flatMap((p: any, i: number) => [
-                            <div key={`c-${i}`} className="memory-pair"><b>{p.concept}</b></div>,
+                            <div key={`c-${i}`} className="memory-pair concept">{p.concept}</div>,
                             <div key={`d-${i}`} className="memory-pair">{p.definition}</div>
                           ])}
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
             </motion.div>
           </motion.div>
         )}
