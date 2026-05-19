@@ -5041,7 +5041,220 @@ const buildBingoCards = (items: string[], count: number): string[][][] => {
   return cards;
 };
 
-const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string }) => {
+const buildStoryIllustration = (genre?: string): string => {
+  const g = (genre || 'aventura').toLowerCase();
+  let scene: 'adventure' | 'mystery' | 'fantasy' | 'space' | 'ancient' = 'adventure';
+  if (g.includes('mist') || g.includes('terror') || g.includes('apocal')) scene = 'mystery';
+  else if (g.includes('fanta') || g.includes('medieval')) scene = 'fantasy';
+  else if (g.includes('cient') || g.includes('espac') || g.includes('sci')) scene = 'space';
+  else if (g.includes('hist') || g.includes('época') || g.includes('epoca')) scene = 'ancient';
+
+  const scenes: Record<string, string> = {
+    adventure: `<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="advSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf9a"/><stop offset="1" stop-color="#f4a07a"/></linearGradient></defs>
+      <rect width="1600" height="900" fill="url(#advSky)"/>
+      <circle cx="1280" cy="180" r="70" fill="#fff3e0" opacity="0.85"/>
+      <g fill="white" opacity="0.95">
+        <ellipse cx="240" cy="170" rx="110" ry="55"/><ellipse cx="330" cy="150" rx="85" ry="48"/><ellipse cx="160" cy="190" rx="72" ry="40"/>
+        <ellipse cx="860" cy="120" rx="135" ry="60"/><ellipse cx="980" cy="105" rx="100" ry="52"/><ellipse cx="750" cy="145" rx="78" ry="42"/>
+        <ellipse cx="1360" cy="200" rx="85" ry="48"/><ellipse cx="1440" cy="180" rx="65" ry="38"/>
+      </g>
+      <g fill="#6b5b8f" opacity="0.55"><polygon points="500,560 800,200 1100,560"/><polygon points="320,560 620,250 920,560"/><polygon points="900,560 1100,260 1300,560"/></g>
+      <g fill="#3b4f8c"><polygon points="700,580 980,230 1260,580"/><polygon points="980,580 1240,290 1500,580"/><polygon points="60,580 320,255 580,580"/><polygon points="-50,600 200,330 450,600"/></g>
+      <ellipse cx="800" cy="800" rx="900" ry="160" fill="#e8c49a" opacity="0.5"/>
+      <rect x="0" y="780" width="1600" height="160" fill="#e8c49a"/>
+      <ellipse cx="800" cy="820" rx="380" ry="60" fill="#d4a97a"/>
+      <g fill="#2d3a7a">
+        <polygon points="140,760 200,560 260,760"/><polygon points="124,718 200,538 276,718"/><polygon points="108,676 200,518 292,676"/>
+        <polygon points="260,760 320,580 380,760"/><polygon points="244,718 320,558 396,718"/>
+        <polygon points="60,780 110,610 160,780"/><polygon points="48,738 110,588 172,738"/>
+        <polygon points="1280,770 1340,605 1400,770"/><polygon points="1266,728 1340,583 1414,728"/><polygon points="1252,686 1340,563 1428,686"/>
+        <polygon points="1400,775 1456,623 1512,775"/><polygon points="1388,733 1456,601 1524,733"/>
+        <polygon points="1500,785 1548,648 1596,785"/>
+      </g>
+      <g><circle cx="110" cy="800" r="60" fill="#2d7a6b"/><circle cx="170" cy="816" r="45" fill="#3a9980"/><circle cx="70" cy="820" r="38" fill="#1f5c52"/><circle cx="340" cy="810" r="42" fill="#4ab89e"/><circle cx="300" cy="824" r="34" fill="#2d7a6b"/></g>
+      <g><circle cx="1480" cy="800" r="56" fill="#2d7a6b"/><circle cx="1430" cy="816" r="42" fill="#3a9980"/><circle cx="1520" cy="820" r="38" fill="#4ab89e"/><circle cx="1260" cy="814" r="46" fill="#2d7a6b"/><circle cx="1310" cy="826" r="34" fill="#1f5c52"/></g>
+      <g fill="#4ab89e"><polygon points="480,816 496,770 512,816"/><polygon points="504,820 520,780 536,820"/><polygon points="1060,816 1076,776 1092,816"/><polygon points="1036,824 1052,784 1068,824"/></g>
+      <rect x="756" y="636" width="36" height="120" rx="16" fill="#e88c5a"/><rect x="804" y="636" width="36" height="116" rx="16" fill="#e88c5a"/>
+      <ellipse cx="774" cy="756" rx="28" ry="16" fill="#2d3a7a"/><ellipse cx="822" cy="752" rx="28" ry="16" fill="#2d3a7a"/>
+      <rect x="744" y="600" width="112" height="64" rx="16" fill="#2d4ca0"/>
+      <rect x="752" y="480" width="100" height="136" rx="20" fill="#f4f4f4"/>
+      <rect x="728" y="496" width="30" height="96" rx="14" fill="#e88c5a" transform="rotate(-8 743 544)"/>
+      <rect x="842" y="504" width="28" height="80" rx="14" fill="#e88c5a" transform="rotate(10 856 544)"/>
+      <rect x="826" y="490" width="68" height="104" rx="16" fill="#4dc4b0"/><rect x="826" y="490" width="68" height="104" rx="16" fill="none" stroke="#39a898" stroke-width="3"/>
+      <rect x="836" y="544" width="44" height="36" rx="6" fill="#39a898"/>
+      <path d="M826 510 Q800 530 806 570" stroke="#39a898" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <rect x="782" y="456" width="36" height="36" rx="10" fill="#e88c5a"/>
+      <ellipse cx="800" cy="428" rx="52" ry="56" fill="#e88c5a"/>
+      <path d="M750 410 Q745 340 800 324 Q856 316 860 380 Q870 430 856 456 Q840 470 836 444 Q830 400 800 392 Q764 396 752 430 Z" fill="#1a1040"/>
+      <path d="M850 390 Q890 420 880 480 Q870 520 856 510 Q840 480 844 440 Z" fill="#1a1040"/>
+      <ellipse cx="820" cy="432" rx="6" ry="7" fill="#c4694a" opacity="0.6"/>
+      <ellipse cx="748" cy="432" rx="10" ry="14" fill="#d97a50"/>
+    </svg>`,
+    mystery: `<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="mysSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f0a2e"/><stop offset="0.7" stop-color="#1e1846"/><stop offset="1" stop-color="#2a1f5c"/></linearGradient></defs>
+      <rect width="1600" height="900" fill="url(#mysSky)"/>
+      <g fill="white"><circle cx="120" cy="100" r="2"/><circle cx="240" cy="180" r="1.5"/><circle cx="380" cy="80" r="2.5"/><circle cx="520" cy="160" r="1.5"/><circle cx="680" cy="60" r="2"/><circle cx="900" cy="140" r="1.8"/><circle cx="1100" cy="80" r="2.4"/><circle cx="1260" cy="200" r="1.6"/><circle cx="1420" cy="120" r="2"/><circle cx="1520" cy="220" r="1.7"/><circle cx="200" cy="280" r="1.4"/><circle cx="440" cy="300" r="1.8"/><circle cx="780" cy="240" r="2.2"/><circle cx="1180" cy="320" r="1.5"/><circle cx="1340" cy="260" r="2"/><circle cx="60" cy="240" r="1.8"/><circle cx="860" cy="340" r="1.5"/></g>
+      <circle cx="1280" cy="190" r="110" fill="#fef9c3" opacity="0.92"/>
+      <circle cx="1250" cy="170" r="22" fill="#e5d9a8" opacity="0.7"/><circle cx="1310" cy="210" r="14" fill="#e5d9a8" opacity="0.7"/><circle cx="1280" cy="230" r="10" fill="#e5d9a8" opacity="0.6"/>
+      <circle cx="1280" cy="190" r="160" fill="#fef9c3" opacity="0.08"/>
+      <g fill="#9b8bc7" opacity="0.35"><polygon points="0,640 200,440 400,640"/><polygon points="280,640 480,400 680,640"/><polygon points="600,640 820,420 1040,640"/><polygon points="960,640 1180,440 1400,640"/><polygon points="1300,640 1500,460 1700,640"/></g>
+      <g fill="#1a0f3c"><polygon points="40,800 140,520 200,560 260,460 340,800"/><polygon points="180,800 280,540 360,800"/><polygon points="320,800 440,500 480,560 560,800"/><polygon points="520,800 640,460 720,540 780,800"/><polygon points="740,800 880,520 960,800"/><polygon points="920,800 1040,480 1120,560 1180,800"/><polygon points="1140,800 1280,520 1360,560 1420,800"/><polygon points="1380,800 1500,500 1600,580 1600,800"/></g>
+      <g fill="white" opacity="0.06"><ellipse cx="400" cy="780" rx="320" ry="34"/><ellipse cx="1100" cy="800" rx="380" ry="40"/><ellipse cx="780" cy="820" rx="500" ry="46"/></g>
+      <rect x="0" y="820" width="1600" height="80" fill="#0a0820"/>
+      <ellipse cx="800" cy="830" rx="420" ry="22" fill="#1a1840" opacity="0.6"/>
+      <g transform="translate(770 540)">
+        <ellipse cx="40" cy="120" rx="46" ry="38" fill="#1a1845"/>
+        <circle cx="40" cy="60" r="42" fill="#1a1845"/>
+        <polygon points="14,28 22,52 34,42" fill="#2d2666"/><polygon points="66,28 58,52 46,42" fill="#2d2666"/>
+        <circle cx="26" cy="62" r="14" fill="#fbbf24"/><circle cx="54" cy="62" r="14" fill="#fbbf24"/>
+        <circle cx="26" cy="62" r="7" fill="#1a1040"/><circle cx="54" cy="62" r="7" fill="#1a1040"/>
+        <circle cx="28" cy="60" r="2" fill="white"/><circle cx="56" cy="60" r="2" fill="white"/>
+        <polygon points="40,76 34,86 46,86" fill="#f59e0b"/>
+        <path d="M2 110 Q-10 130 6 156" stroke="#1a1845" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <path d="M78 110 Q90 130 74 156" stroke="#1a1845" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <rect x="36" y="148" width="8" height="14" fill="#92400e"/>
+      </g>
+      <g fill="white" opacity="0.7"><ellipse cx="300" cy="700" rx="180" ry="22"/><ellipse cx="1200" cy="720" rx="220" ry="20"/></g>
+      <g fill="white" opacity="0.4"><ellipse cx="600" cy="760" rx="260" ry="14"/><ellipse cx="1000" cy="770" rx="220" ry="12"/></g>
+    </svg>`,
+    fantasy: `<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="fanSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c4585"/><stop offset="0.5" stop-color="#e07a5f"/><stop offset="1" stop-color="#f5b993"/></linearGradient></defs>
+      <rect width="1600" height="900" fill="url(#fanSky)"/>
+      <circle cx="1200" cy="260" r="100" fill="#fef3c7" opacity="0.95"/>
+      <circle cx="1200" cy="260" r="160" fill="#fef3c7" opacity="0.18"/>
+      <g fill="#ffffff" opacity="0.7"><ellipse cx="280" cy="180" rx="100" ry="22"/><ellipse cx="400" cy="220" rx="80" ry="16"/><ellipse cx="900" cy="160" rx="120" ry="22"/><ellipse cx="1450" cy="200" rx="90" ry="18"/></g>
+      <g fill="#1a1040" opacity="0.85"><path d="M1380 320 Q1410 310 1440 330 L1460 320 L1450 340 Q1430 348 1410 342 Q1395 350 1378 345 L1370 335 Z"/><path d="M1410 318 L1402 308 L1414 312 Z"/></g>
+      <g fill="#5a3a6e" opacity="0.7"><polygon points="0,640 240,420 480,640"/><polygon points="320,640 560,400 800,640"/><polygon points="700,640 940,420 1180,640"/><polygon points="1080,640 1340,440 1600,640"/></g>
+      <g fill="#3d2552"><polygon points="-100,720 180,480 460,720"/><polygon points="380,720 620,460 860,720"/><polygon points="1140,720 1380,460 1620,720"/></g>
+      <g transform="translate(620 380)">
+        <polygon points="200,420 200,140 360,140 360,420" fill="#3a2c4e"/>
+        <polygon points="200,140 200,420 80,420 80,180" fill="#3a2c4e"/>
+        <polygon points="360,140 360,420 480,420 480,180" fill="#3a2c4e"/>
+        <polygon points="180,180 180,140 380,140 380,180" fill="#251a35"/>
+        <rect x="160" y="60" width="40" height="120" fill="#4a3a62"/><rect x="360" y="60" width="40" height="120" fill="#4a3a62"/><rect x="260" y="0" width="40" height="160" fill="#5a4675"/>
+        <polygon points="160,60 200,20 240,60" fill="#7c3aed"/><polygon points="360,60 400,20 440,60" fill="#7c3aed"/><polygon points="260,0 280,-40 300,0" fill="#fbbf24"/>
+        <rect x="280" y="-40" width="2" height="-30" fill="#92400e"/>
+        <polygon points="280,-70 320,-60 280,-50" fill="#dc2626"/>
+        <polygon points="60,180 60,420 0,420 0,220" fill="#2d1f3d"/><polygon points="480,180 480,420 540,420 540,220" fill="#2d1f3d"/>
+        <polygon points="40,220 60,180 60,220" fill="#251830"/><polygon points="500,220 540,220 540,260" fill="#251830"/>
+        <rect x="270" y="280" width="60" height="100" fill="#1a1040"/><path d="M270 280 Q300 250 330 280 Z" fill="#1a1040"/>
+        <circle cx="300" cy="350" r="3" fill="#fbbf24"/>
+        <rect x="110" y="240" width="20" height="32" rx="10" fill="#fde047" opacity="0.9"/>
+        <rect x="190" y="240" width="20" height="32" rx="10" fill="#fde047" opacity="0.9"/>
+        <rect x="390" y="240" width="20" height="32" rx="10" fill="#fde047" opacity="0.9"/>
+        <rect x="450" y="240" width="20" height="32" rx="10" fill="#fde047" opacity="0.9"/>
+      </g>
+      <ellipse cx="800" cy="830" rx="900" ry="40" fill="#2d1a3d"/>
+      <rect x="0" y="820" width="1600" height="80" fill="#2d1a3d"/>
+      <g fill="#1a0f2e"><polygon points="80,820 140,640 200,820"/><polygon points="64,778 140,620 216,778"/>
+        <polygon points="1400,820 1460,640 1520,820"/><polygon points="1384,778 1460,620 1536,778"/>
+      </g>
+      <g fill="#fbbf24" opacity="0.9"><circle cx="200" cy="120" r="3"/><circle cx="1380" cy="140" r="2.5"/><circle cx="780" cy="80" r="2"/><circle cx="1080" cy="180" r="2.5"/></g>
+    </svg>`,
+    space: `<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><radialGradient id="spaceSky" cx="0.7" cy="0.3" r="1"><stop offset="0" stop-color="#1e1a4a"/><stop offset="0.5" stop-color="#0a0826"/><stop offset="1" stop-color="#050314"/></radialGradient></defs>
+      <rect width="1600" height="900" fill="url(#spaceSky)"/>
+      <g fill="white">
+        <circle cx="80" cy="120" r="1.5"/><circle cx="200" cy="80" r="2"/><circle cx="340" cy="160" r="1.5"/><circle cx="460" cy="60" r="2.5"/><circle cx="580" cy="180" r="1.5"/><circle cx="720" cy="100" r="2"/><circle cx="840" cy="220" r="1.5"/><circle cx="960" cy="80" r="2.5"/><circle cx="1080" cy="240" r="1.5"/><circle cx="1200" cy="120" r="2"/><circle cx="1340" cy="180" r="2.5"/><circle cx="1480" cy="80" r="2"/><circle cx="1540" cy="220" r="1.5"/>
+        <circle cx="160" cy="300" r="1.4"/><circle cx="300" cy="380" r="2"/><circle cx="440" cy="320" r="1.4"/><circle cx="620" cy="400" r="1.8"/><circle cx="780" cy="340" r="1.4"/><circle cx="960" cy="420" r="2"/><circle cx="1140" cy="360" r="1.5"/><circle cx="1300" cy="440" r="2"/><circle cx="1460" cy="380" r="1.5"/>
+        <circle cx="120" cy="480" r="1.5"/><circle cx="260" cy="540" r="1.5"/><circle cx="520" cy="500" r="2"/><circle cx="680" cy="580" r="1.5"/><circle cx="900" cy="540" r="1.5"/><circle cx="1080" cy="620" r="2"/><circle cx="1280" cy="560" r="1.5"/><circle cx="1440" cy="640" r="1.5"/>
+      </g>
+      <g fill="#fbbf24" opacity="0.85"><circle cx="380" cy="240" r="3"/><circle cx="900" cy="160" r="3.5"/><circle cx="1260" cy="300" r="3"/></g>
+      <g opacity="0.95">
+        <ellipse cx="280" cy="220" rx="90" ry="90" fill="#f59e0b"/>
+        <ellipse cx="260" cy="200" rx="34" ry="22" fill="#ea580c" opacity="0.55"/>
+        <ellipse cx="310" cy="244" rx="22" ry="14" fill="#fbbf24" opacity="0.6"/>
+      </g>
+      <g transform="translate(1200 380)">
+        <ellipse cx="0" cy="0" rx="150" ry="34" fill="none" stroke="#a78bfa" stroke-width="14" opacity="0.85" transform="rotate(-22)"/>
+        <circle cx="0" cy="0" r="110" fill="#7c3aed"/>
+        <ellipse cx="-30" cy="-20" rx="32" ry="20" fill="#9b6bf3" opacity="0.7"/>
+        <ellipse cx="40" cy="30" rx="44" ry="24" fill="#5b21b6" opacity="0.55"/>
+        <ellipse cx="0" cy="0" rx="150" ry="34" fill="none" stroke="#a78bfa" stroke-width="6" opacity="0.65" transform="rotate(-22)"/>
+      </g>
+      <g transform="translate(640 200) rotate(20)">
+        <path d="M0 0 L20 -90 L40 0 Z" fill="#e5e7eb"/>
+        <rect x="6" y="-44" width="28" height="74" rx="6" fill="#f3f4f6"/>
+        <circle cx="20" cy="-10" r="9" fill="#3b82f6"/><circle cx="20" cy="-10" r="5" fill="#1e40af"/><circle cx="22" cy="-12" r="2" fill="#dbeafe"/>
+        <polygon points="6,30 0,60 14,46" fill="#dc2626"/><polygon points="34,30 40,60 26,46" fill="#dc2626"/>
+        <polygon points="14,46 20,80 26,46" fill="#f59e0b"/>
+        <polygon points="14,46 20,68 26,46" fill="#fbbf24"/>
+      </g>
+      <g fill="none" stroke="#fef3c7" stroke-width="3" opacity="0.6"><path d="M620 180 Q400 280 80 380"/></g>
+      <g transform="translate(640 720)">
+        <ellipse cx="160" cy="100" rx="540" ry="80" fill="#1a1845"/>
+        <ellipse cx="100" cy="80" rx="40" ry="14" fill="#2d2666"/><ellipse cx="280" cy="100" rx="60" ry="16" fill="#2d2666"/><ellipse cx="-60" cy="116" rx="50" ry="14" fill="#2d2666"/>
+        <circle cx="200" cy="60" r="4" fill="#a78bfa"/><circle cx="320" cy="80" r="3" fill="#a78bfa"/><circle cx="60" cy="74" r="3.5" fill="#a78bfa"/>
+      </g>
+      <g transform="translate(700 540)">
+        <ellipse cx="50" cy="160" rx="60" ry="14" fill="black" opacity="0.35"/>
+        <rect x="22" y="100" width="20" height="50" fill="#e5e7eb"/><rect x="58" y="100" width="20" height="50" fill="#e5e7eb"/>
+        <rect x="20" y="146" width="24" height="14" rx="3" fill="white"/><rect x="56" y="146" width="24" height="14" rx="3" fill="white"/>
+        <rect x="14" y="50" width="72" height="60" rx="14" fill="white"/>
+        <rect x="10" y="60" width="14" height="32" rx="6" fill="white"/><rect x="76" y="60" width="14" height="32" rx="6" fill="white"/>
+        <circle cx="50" cy="40" r="36" fill="white"/>
+        <rect x="22" y="28" width="56" height="32" rx="14" fill="#1a1845"/>
+        <rect x="26" y="32" width="48" height="24" rx="10" fill="#7dd3fc"/>
+        <rect x="34" y="36" width="22" height="14" rx="4" fill="white" opacity="0.45"/>
+        <circle cx="86" cy="62" r="6" fill="#dc2626"/><circle cx="14" cy="62" r="6" fill="#22c55e"/>
+      </g>
+    </svg>`,
+    ancient: `<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="ancSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcd6a3"/><stop offset="0.6" stop-color="#f59e0b"/><stop offset="1" stop-color="#dc8a3e"/></linearGradient></defs>
+      <rect width="1600" height="900" fill="url(#ancSky)"/>
+      <circle cx="800" cy="260" r="130" fill="#fef3c7" opacity="0.95"/>
+      <circle cx="800" cy="260" r="190" fill="#fef3c7" opacity="0.18"/>
+      <g stroke="#fef3c7" stroke-width="2" opacity="0.4"><line x1="800" y1="40" x2="800" y2="480"/><line x1="580" y1="260" x2="1020" y2="260"/><line x1="640" y1="100" x2="960" y2="420"/><line x1="960" y1="100" x2="640" y2="420"/></g>
+      <g fill="#9b6f3a" opacity="0.55"><polygon points="0,580 320,300 640,580"/><polygon points="960,580 1280,320 1600,580"/></g>
+      <g fill="#7a5530"><polygon points="-100,640 220,360 540,640"/><polygon points="1060,640 1380,380 1700,640"/></g>
+      <ellipse cx="800" cy="820" rx="900" ry="60" fill="#e5b079"/>
+      <rect x="0" y="800" width="1600" height="100" fill="#e5b079"/>
+      <g fill="#c98a4b"><ellipse cx="200" cy="820" rx="160" ry="14"/><ellipse cx="700" cy="836" rx="240" ry="16"/><ellipse cx="1200" cy="824" rx="200" ry="14"/></g>
+      <g transform="translate(540 360)">
+        <polygon points="260,420 0,420 130,80" fill="#d4a374"/>
+        <polygon points="260,420 130,80 200,170" fill="#b88550" opacity="0.6"/>
+        <polygon points="130,80 130,180 90,260 170,260 130,180" fill="#a16939" opacity="0.4"/>
+        <rect x="116" y="340" width="28" height="80" fill="#7a5530"/>
+        <g stroke="#a16939" stroke-width="1.5" opacity="0.5" fill="none"><line x1="20" y1="380" x2="240" y2="380"/><line x1="40" y1="340" x2="220" y2="340"/><line x1="60" y1="300" x2="200" y2="300"/><line x1="80" y1="260" x2="180" y2="260"/><line x1="100" y1="220" x2="160" y2="220"/></g>
+      </g>
+      <g transform="translate(180 460)">
+        <polygon points="200,320 0,320 100,120" fill="#c89058"/>
+        <polygon points="200,320 100,120 145,180" fill="#a47542" opacity="0.55"/>
+        <g stroke="#8b5a2b" stroke-width="1.2" opacity="0.5" fill="none"><line x1="20" y1="280" x2="180" y2="280"/><line x1="40" y1="240" x2="160" y2="240"/><line x1="60" y1="200" x2="140" y2="200"/></g>
+      </g>
+      <g transform="translate(1080 480)">
+        <polygon points="220,300 0,300 110,110" fill="#c08348"/>
+        <polygon points="220,300 110,110 160,180" fill="#a06b30" opacity="0.55"/>
+        <g stroke="#8b5a2b" stroke-width="1.2" opacity="0.5" fill="none"><line x1="20" y1="260" x2="200" y2="260"/><line x1="40" y1="220" x2="180" y2="220"/></g>
+      </g>
+      <g transform="translate(60 520)">
+        <rect x="0" y="40" width="44" height="200" fill="#f3e6c4"/>
+        <rect x="-8" y="32" width="60" height="14" rx="4" fill="#e8d5a8"/>
+        <rect x="-8" y="234" width="60" height="14" rx="4" fill="#e8d5a8"/>
+        <g stroke="#9b6f3a" stroke-width="1.2" opacity="0.6" fill="#f3e6c4"><circle cx="22" cy="60" r="3"/><circle cx="22" cy="80" r="3"/><circle cx="22" cy="100" r="3"/></g>
+      </g>
+      <g transform="translate(1500 540)">
+        <rect x="0" y="40" width="44" height="180" fill="#f3e6c4"/>
+        <rect x="-8" y="32" width="60" height="14" rx="4" fill="#e8d5a8"/>
+        <rect x="-8" y="214" width="60" height="14" rx="4" fill="#e8d5a8"/>
+      </g>
+      <g transform="translate(740 660) scale(1.4)">
+        <path d="M0 60 Q-2 30 18 24 L80 24 Q98 30 100 60 L100 90 Q98 96 90 96 L10 96 Q2 96 0 90 Z" fill="#e8d5a8" stroke="#8b5a2b" stroke-width="2"/>
+        <circle cx="10" cy="60" r="14" fill="#e8d5a8" stroke="#8b5a2b" stroke-width="2"/>
+        <circle cx="90" cy="60" r="14" fill="#e8d5a8" stroke="#8b5a2b" stroke-width="2"/>
+        <circle cx="10" cy="60" r="6" fill="#c98a4b"/>
+        <circle cx="90" cy="60" r="6" fill="#c98a4b"/>
+        <g stroke="#8b5a2b" stroke-width="1.2" opacity="0.7"><line x1="28" y1="46" x2="76" y2="46"/><line x1="28" y1="58" x2="76" y2="58"/><line x1="28" y1="70" x2="76" y2="70"/><line x1="28" y1="82" x2="60" y2="82"/></g>
+      </g>
+      <g fill="#1a1040" opacity="0.7"><path d="M1400 200 Q1430 195 1450 210 L1465 205 L1460 220 Q1445 226 1430 222 Q1418 228 1404 222 L1398 215 Z"/></g>
+    </svg>`
+  };
+
+  return `<div class="story-illustration">${scenes[scene] || scenes.adventure}</div>`;
+};
+
+const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string }) => {
   const node = document.getElementById('game-print-area');
   if (!node) return;
   const w = window.open('', '_blank', 'width=900,height=700');
@@ -5235,6 +5448,10 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .answer-key-subtitle { font-size:9px; color:#7f1d1d; font-weight:700; letter-spacing:1.5px; margin-top:4px; }
     .answer-key-item { font-size:11px; margin-bottom:6px; padding:7px 12px; background:white; border-radius:8px; border-left:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
 
+    /* ── STORY ILLUSTRATION (Campanha Narrativa cover) ────── */
+    .story-illustration { margin:0 0 18px; line-height:0; page-break-inside:avoid; break-inside:avoid; }
+    .story-illustration svg { width:100%; height:auto; display:block; border-radius:14px; box-shadow:0 4px 18px rgba(0,0,0,0.18); }
+
     /* ── FOOTER ───────────────────────────────────────────── */
     .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
 
@@ -5243,6 +5460,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     button { display:none; }
   </style></head><body>
     ${headerHtml}
+    ${opts.activityLabel === 'Campanha Narrativa' ? buildStoryIllustration(opts.genre) : ''}
     ${node.innerHTML}
     <div class="page-footer">Gerado por Prof. Corujao • ${todayStr}</div>
     <script>
@@ -5852,7 +6070,8 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   className: selectedClass?.name,
                   teacherName: profile.name,
                   schoolName: profile.schoolName || selectedClass?.school,
-                  activityLabel: activityLabels[activeMode!]
+                  activityLabel: activityLabels[activeMode!],
+                  genre: activeMode === 'story' ? genre : undefined,
                 };
                 return (
                 <div className="p-5">
