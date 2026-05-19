@@ -1536,7 +1536,7 @@ const buildDocx = async (
   docType: 'plan' | 'exam' | 'activities',
   opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): Promise<Blob> => {
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation } = await import('docx');
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation, Footer } = await import('docx');
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
@@ -1749,9 +1749,17 @@ const buildDocx = async (
     }
   }
 
+  const brandFooter = new Footer({
+    children: [new Paragraph({
+      children: [new TextRun({ text: 'Prof. Corujão', size: 16, color: 'BBBBBB', italics: true })],
+      alignment: AlignmentType.RIGHT,
+    })],
+  });
+
   const wordDoc = new Document({
     sections: [{
       properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT }, margin: { top: 1134, bottom: 1417, left: 1417, right: 1417 } } },
+      footers: { default: brandFooter },
       children: docChildren,
     }],
   });
@@ -2355,8 +2363,9 @@ const PlannerScreen = ({
       const addFooter = (slide: any, slideNum: number, darkBg = false) => {
         const fg = darkBg ? 'FFFFFF' : '9CA3AF';
         slide.addShape(pres.ShapeType.rect, { x: 0, y: 5.15, w: 10, h: 0.35, fill: { color: pc, transparency: darkBg ? 40 : 85 }, line: { color: pc, transparency: 85, width: 0 } });
-        if (schoolLabel) slide.addText(schoolLabel, { x: 0.2, y: 5.17, w: 6, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false });
-        if (teacherLabel) slide.addText(`Prof. ${teacherLabel}`, { x: 0.2, y: 5.17, w: 6, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false, align: schoolLabel ? 'right' as const : 'left' as const });
+        if (schoolLabel) slide.addText(schoolLabel, { x: 0.2, y: 5.17, w: 5.5, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false });
+        if (teacherLabel) slide.addText(`Prof. ${teacherLabel}`, { x: 0.2, y: 5.17, w: 5.5, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false, align: schoolLabel ? 'right' as const : 'left' as const });
+        slide.addText('Prof. Corujão', { x: 5.9, y: 5.17, w: 3.0, h: 0.28, fontSize: 7, color: darkBg ? 'FFFFFF' : pc, transparency: 20, align: 'center' as const, italic: true, fontFace: 'Calibri' });
         slide.addText(`${slideNum} / ${totalSlides}`, { x: 9.3, y: 5.17, w: 0.6, h: 0.28, fontSize: 8, color: fg, align: 'right' });
       };
 
