@@ -5043,24 +5043,24 @@ const printGameResult = () => {
     h1 { font-size: 22px; margin: 0 0 8px; }
     h2 { font-size: 17px; margin: 18px 0 6px; color: #4338ca; }
     h3 { font-size: 14px; margin: 12px 0 4px; }
-    .ws-grid { display: grid; gap: 2px; margin: 12px 0; }
+    .ws-grid { display: grid; gap: 2px; margin: 12px 0; page-break-inside: avoid; break-inside: avoid; }
     .ws-cell { border: 1px solid #555; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: bold; font-size: 12px; }
-    .bingo-card { border: 2px solid #111; padding: 8px; margin: 0 0 20px; page-break-inside: avoid; }
+    .bingo-card { border: 2px solid #111; padding: 8px; margin: 0 0 20px; page-break-inside: avoid; break-inside: avoid; }
     .bingo-card-title { text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 8px; }
     .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
     .bingo-cell { border: 1px solid #333; padding: 8px 4px; min-height: 44px; text-align: center; font-size: 10px; display: flex; align-items: center; justify-content: center; }
     .bingo-cell.free { background: #fde68a; font-weight: bold; }
-    .quiz-q { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; page-break-inside: avoid; }
+    .quiz-q { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
     .quiz-q b { color: #4338ca; }
     .quiz-opt { margin: 3px 0 3px 16px; }
-    .memory-pair { border: 1.5px dashed #888; padding: 12px; margin: 0; min-height: 70px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; }
-    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-    .trail-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 12px 0; }
+    .memory-pair { border: 1.5px dashed #888; padding: 12px; margin: 0; min-height: 70px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; page-break-inside: avoid; break-inside: avoid; }
+    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; page-break-inside: avoid; break-inside: avoid; }
+    .trail-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 12px 0; page-break-inside: avoid; break-inside: avoid; }
     .trail-cell { border: 2px solid #4338ca; border-radius: 50%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; background: #eef2ff; }
     .trail-cell.special { background: #fbbf24; }
     .trail-cell.end { background: #10b981; color: white; }
     .clue-list { list-style: decimal; padding-left: 24px; }
-    .clue-list li { margin-bottom: 6px; }
+    .clue-list li { margin-bottom: 6px; page-break-inside: avoid; break-inside: avoid; }
     .answer-line { border-bottom: 1.5px solid #111; display: inline-block; min-width: 200px; height: 18px; vertical-align: bottom; }
     .story-section { background: #f5f3ff; border-left: 4px solid #6366f1; padding: 10px 14px; margin: 10px 0; border-radius: 0 8px 8px 0; }
     @media print { button { display: none; } }
