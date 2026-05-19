@@ -750,7 +750,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title={`${firstName}!`} subtitle={greeting} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
+      <Header setScreen={setScreen} title={`${firstName}!`} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
       
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2rem] p-6 text-white shadow-lg mb-8 relative overflow-hidden">
         <div className="relative z-10">
@@ -3476,7 +3476,7 @@ const ChatScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-28 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
+      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
       
       <div className="mb-2">
         <div className="relative">
@@ -3747,7 +3747,7 @@ const ProfileScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
+      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative">
@@ -4793,8 +4793,8 @@ const CalendarScreen = ({
         title="Cronograma" 
         subtitle="Visão Semestral" 
         profile={profile} 
-        notifications={allNotifications} 
-        setNotifications={handleSetNotifications}
+        notifications={notifications}
+        setNotifications={setNotifications}
         bannerImage="https://i.ibb.co/x8t6Wmp7/20260419-204249-0002.png"
       >
         <button 
@@ -5113,7 +5113,7 @@ const EstudioScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
+      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
       
       <div className="flex gap-2 mb-6 pb-2 shrink-0">
         <button onClick={() => setActiveTab('context')} className={`flex-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === 'context' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}>Base Conhecimento</button>
@@ -5230,7 +5230,7 @@ const EstudioScreen = ({
 const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, notifications, setNotifications }: { savedResources: SavedResource[], setSavedResources: (r: SavedResource[]) => void, profile: UserProfile, setScreen: (s: Screen) => void, notifications?: any[], setNotifications?: (n: any[]) => void }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />
+      <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={notifications} setNotifications={setNotifications} />
       {savedResources.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Archive size={44} className="mx-auto mb-3 opacity-20" />
@@ -5389,7 +5389,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} />
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
