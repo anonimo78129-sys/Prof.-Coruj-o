@@ -249,7 +249,8 @@ class ErrorBoundary extends React.Component<
               <span className="text-3xl">🦉</span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Algo deu errado</h2>
-            <p className="text-sm text-gray-500 mb-6">O Corujão encontrou um problema inesperado. Seus dados estão salvos na nuvem.</p>
+            <p className="text-sm text-gray-500 mb-2">O Corujão encontrou um problema inesperado. Seus dados estão salvos na nuvem.</p>
+            <p className="text-xs text-red-500 mb-6 bg-red-50 p-2 rounded-xl font-mono break-all">{this.state.error?.message}</p>
             <button
               onClick={() => window.location.reload()}
               className="w-full bg-indigo-600 text-white rounded-2xl py-3 font-bold text-sm"
