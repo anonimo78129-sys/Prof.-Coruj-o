@@ -43,7 +43,7 @@ service cloud.firestore {
     }
 
     match /config/{docId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || (isAuthenticated() && (docId == 'announcement' || docId == 'feriados'));
       allow write: if isAdmin();
     }
 

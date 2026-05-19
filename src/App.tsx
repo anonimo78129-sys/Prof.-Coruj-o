@@ -100,12 +100,21 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'):
   });
 };
 
+let _pendingInputTokens = 0;
+let _pendingOutputTokens = 0;
+
 const generateContentWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0]) => {
   if (!apiKey) {
     throw new Error('Chave da IA não configurada. Contate o suporte.');
   }
   if (!params.model) params.model = AI_MODEL;
-  return withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
+  const result = await withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
+  const usage = (result as any).usageMetadata;
+  if (usage) {
+    _pendingInputTokens += usage.promptTokenCount || 0;
+    _pendingOutputTokens += usage.candidatesTokenCount || 0;
+  }
+  return result;
 };
 
 function useFirestoreSync<T extends { id: string }>(
@@ -4611,6 +4620,12 @@ const CalendarScreen = ({
   const [newEventType, setNewEventType] = useState<'prep' | 'admin'>('prep');
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const monthAbbrNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const [globalHolidays, setGlobalHolidays] = useState<{id:string,name:string,date:string}[]>([]);
+  useEffect(() => {
+    getDoc(doc(db, 'config', 'feriados')).then(snap => {
+      if (snap.exists()) setGlobalHolidays(snap.data().list || []);
+    }).catch(() => {});
+  }, []);
 
   const EVENT_PRESETS = [
     { label: 'Prova',             icon: FileQuestion,  type: 'admin' as const, color: '#EF4444' },
@@ -4636,7 +4651,9 @@ const CalendarScreen = ({
 
   const defaultHolidays = getDefaultHolidays(currentYear).filter(h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0])));
 
-  const allEvents = [...filteredClasses.map(c => ({...c, type: 'class' as const})), ...customEvents, ...defaultHolidays];
+  const globalHolidayEvents = globalHolidays.map(h => ({ id: h.id, title: h.name, date: h.date, type: 'holiday' as const }));
+
+  const allEvents = [...filteredClasses.map(c => ({...c, type: 'class' as const})), ...customEvents, ...defaultHolidays, ...globalHolidayEvents];
   
   const getEventColorInternal = (e: any) => {
     if (e.type === 'class') {
@@ -5471,9 +5488,17 @@ const AdminScreen = () => {
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca' | 'metrics' | 'holidays'>('users');
   const [userSearch, setUserSearch] = useState('');
   const [usersPage, setUsersPage] = useState(0);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [globalStats, setGlobalStats] = useState<any>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const [announcementActive, setAnnouncementActive] = useState(false);
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+  const [holidays, setHolidays] = useState<{id: string, name: string, date: string}[]>([]);
+  const [newHoliday, setNewHoliday] = useState({ name: '', date: '' });
+  const [holidaySaving, setHolidaySaving] = useState(false);
 
   // ── Biblioteca state ──────────────────────────────────────────────────────
   const [libItems, setLibItems] = useState<LibraryItem[]>([]);
@@ -5498,6 +5523,30 @@ const AdminScreen = () => {
     });
     reloadStorage();
     return unsubLib;
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    getDoc(doc(db, 'config', 'stats')).then(snap => {
+      if (snap.exists()) setGlobalStats(snap.data());
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    getDoc(doc(db, 'config', 'announcement')).then(snap => {
+      if (snap.exists()) {
+        setAnnouncement(snap.data().message || '');
+        setAnnouncementActive(snap.data().active || false);
+      }
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'holidays') return;
+    getDoc(doc(db, 'config', 'feriados')).then(snap => {
+      if (snap.exists()) setHolidays(snap.data().list || []);
+    }).catch(() => {});
   }, [activeTab]);
 
   const handleUpload = async () => {
@@ -5582,6 +5631,50 @@ const AdminScreen = () => {
     }
   };
 
+  const resetGenerations = async (userId: string) => {
+    try {
+      await setDoc(doc(db, 'users', userId), { generationsUsed: 0 }, { merge: true });
+    } catch (e) { console.error(e); }
+  };
+
+  const saveAnnouncement = async () => {
+    setAnnouncementSaving(true);
+    try {
+      await setDoc(doc(db, 'config', 'announcement'), { message: announcement, active: announcementActive, updatedAt: Date.now() });
+    } catch (e) { console.error(e); } finally { setAnnouncementSaving(false); }
+  };
+
+  const saveHoliday = async () => {
+    if (!newHoliday.name.trim() || !newHoliday.date) return;
+    setHolidaySaving(true);
+    try {
+      const newList = [...holidays, { id: Math.random().toString(36).slice(2), ...newHoliday }];
+      await setDoc(doc(db, 'config', 'feriados'), { list: newList });
+      setHolidays(newList);
+      setNewHoliday({ name: '', date: '' });
+    } catch (e) { console.error(e); } finally { setHolidaySaving(false); }
+  };
+
+  const deleteHoliday = async (id: string) => {
+    const newList = holidays.filter(h => h.id !== id);
+    try {
+      await setDoc(doc(db, 'config', 'feriados'), { list: newList });
+      setHolidays(newList);
+    } catch (e) { console.error(e); }
+  };
+
+  const exportCsv = () => {
+    const rows = [['Nome', 'Email', 'Status', 'Gerações', 'Tokens Entrada', 'Tokens Saída', 'Cadastro']];
+    sysUsers.forEach(u => {
+      rows.push([u.name || '', u.email || '', u.isPro ? 'PRO' : u.role === 'admin' ? 'ADMIN' : 'FREE', u.generationsUsed ?? 0, u.inputTokens ?? 0, u.outputTokens ?? 0, u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '']);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `usuarios_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const FREE_LIMIT = 10;
 
   const getUsageStatus = (u: any) => {
@@ -5630,19 +5723,16 @@ const AdminScreen = () => {
         </div>
       </div>
 
-      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1">
-        <button onClick={() => setActiveTab('users')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'users' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Usuários
-        </button>
-        <button onClick={() => setActiveTab('feedbacks')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'feedbacks' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Feedbacks
-        </button>
-        <button onClick={() => setActiveTab('biblioteca')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'biblioteca' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Biblioteca
-        </button>
+      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1 overflow-x-auto no-scrollbar">
+        {(['users','feedbacks','biblioteca','metrics','holidays'] as const).map(tab => {
+          const labels: Record<string, string> = { users: 'Usuários', feedbacks: 'Feedbacks', biblioteca: 'Biblioteca', metrics: 'Métricas', holidays: 'Feriados' };
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`flex-none px-3 py-2 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
+              {labels[tab]}
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === 'feedbacks' && (
@@ -5810,7 +5900,7 @@ const AdminScreen = () => {
                       {u.createdAt && <p className="text-[10px] text-gray-400 mt-0.5">Desde {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-2">
                     <button
                       onClick={() => togglePro(u.id, u.isPro)}
                       className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${u.isPro ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400 hover:text-emerald-600'}`}
@@ -5824,6 +5914,27 @@ const AdminScreen = () => {
                       {isAdmin ? 'ADMIN ATIVO' : 'DAR ADMIN'}
                     </button>
                   </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => resetGenerations(u.id)} className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-gray-200 bg-white text-amber-600 hover:border-amber-400 transition-colors">
+                      Zerar gerações
+                    </button>
+                    <button onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)} className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                      {expandedUserId === u.id ? 'Fechar' : 'Ver detalhes'}
+                    </button>
+                  </div>
+                  {expandedUserId === u.id && (
+                    <div className="mt-2 p-3 bg-indigo-50 rounded-xl text-xs space-y-1 border border-indigo-100">
+                      <p><span className="font-bold text-indigo-700">Gerações usadas:</span> {u.generationsUsed ?? 0}</p>
+                      <p><span className="font-bold text-indigo-700">Tokens entrada:</span> {(u.inputTokens || 0).toLocaleString()}</p>
+                      <p><span className="font-bold text-indigo-700">Tokens saída:</span> {(u.outputTokens || 0).toLocaleString()}</p>
+                      {(() => {
+                        const cost = ((u.inputTokens || 0) * 0.075 / 1_000_000 + (u.outputTokens || 0) * 0.30 / 1_000_000) * 5.2;
+                        return <p><span className="font-bold text-indigo-700">Custo estimado:</span> R$ {cost.toFixed(5)}</p>;
+                      })()}
+                      <p><span className="font-bold text-indigo-700">Telefone:</span> {u.phone || 'Não verificado'}</p>
+                      {u.createdAt && <p><span className="font-bold text-indigo-700">Cadastro:</span> {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -5852,6 +5963,112 @@ const AdminScreen = () => {
           )}
         </div>
       )}
+
+      {activeTab === 'metrics' && (
+        <div className="space-y-4 mb-8">
+          {/* API Cost Dashboard */}
+          {globalStats && (() => {
+            const inputCost = (globalStats.totalInputTokens || 0) * 0.075 / 1_000_000;
+            const outputCost = (globalStats.totalOutputTokens || 0) * 0.30 / 1_000_000;
+            const totalCostUSD = inputCost + outputCost;
+            const totalCostBRL = totalCostUSD * 5.2;
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>💰</span> Custo Real da API</h3>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-indigo-50 rounded-2xl p-3 text-center">
+                    <p className="text-xl font-black text-indigo-600">R$ {totalCostBRL.toFixed(4)}</p>
+                    <p className="text-xs text-indigo-500 font-medium">Custo total (BRL)</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-2xl p-3 text-center">
+                    <p className="text-xl font-black text-emerald-600">$ {totalCostUSD.toFixed(5)}</p>
+                    <p className="text-xs text-emerald-500 font-medium">Custo total (USD)</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-3 text-center">
+                    <p className="text-lg font-black text-gray-700">{(globalStats.totalGenerations || 0).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 font-medium">Gerações totais</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-3 text-center">
+                    <p className="text-lg font-black text-gray-700">{((globalStats.totalInputTokens || 0) + (globalStats.totalOutputTokens || 0)).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 font-medium">Tokens totais</p>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-400 bg-gray-50 rounded-xl p-2 text-center">
+                  Entrada: {(globalStats.totalInputTokens || 0).toLocaleString()} tokens · Saída: {(globalStats.totalOutputTokens || 0).toLocaleString()} tokens
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Announcement */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>📢</span> Aviso Global</h3>
+            <textarea
+              value={announcement}
+              onChange={e => setAnnouncement(e.target.value)}
+              placeholder="Digite um aviso para todos os usuários..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 resize-none mb-3"
+            />
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={announcementActive} onChange={e => setAnnouncementActive(e.target.checked)} className="w-4 h-4 accent-indigo-600" />
+                Aviso ativo
+              </label>
+              <button onClick={saveAnnouncement} disabled={announcementSaving} className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-50">
+                {announcementSaving ? 'Salvando...' : 'Publicar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Export CSV */}
+          <button onClick={exportCsv} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+            <Download size={16} /> Exportar usuários (CSV)
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'holidays' && (
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>🎉</span> Feriados Globais</h3>
+          <p className="text-xs text-gray-400 mb-4">Aparecem no calendário de todos os professores automaticamente.</p>
+
+          <div className="space-y-2 mb-4">
+            {holidays.sort((a,b) => a.date.localeCompare(b.date)).map(h => (
+              <div key={h.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{h.name}</p>
+                  <p className="text-xs text-gray-500">{new Date(h.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                </div>
+                <button onClick={() => deleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-1">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {holidays.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhum feriado cadastrado.</p>}
+          </div>
+
+          <div className="space-y-2 border-t border-gray-100 pt-4">
+            <input
+              type="text"
+              placeholder="Nome do feriado"
+              value={newHoliday.name}
+              onChange={e => setNewHoliday(h => ({...h, name: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <input
+              type="date"
+              value={newHoliday.date}
+              onChange={e => setNewHoliday(h => ({...h, date: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <button onClick={saveHoliday} disabled={holidaySaving || !newHoliday.name.trim() || !newHoliday.date}
+              className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50">
+              {holidaySaving ? 'Salvando...' : '+ Adicionar feriado'}
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -5873,6 +6090,7 @@ function AppInner() {
   const [phoneError, setPhoneError] = useState('');
   const [phoneSending, setPhoneSending] = useState(false);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const [globalAnnouncement, setGlobalAnnouncement] = useState<{message:string,active:boolean}|null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -5881,6 +6099,13 @@ function AppInner() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, 'config', 'announcement')).then(snap => {
+      if (snap.exists() && snap.data().active) setGlobalAnnouncement(snap.data() as any);
+    }).catch(() => {});
+  }, [user]);
 
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
@@ -6266,12 +6491,20 @@ function AppInner() {
 
   const recordGeneration = async () => {
     if (!user) return;
-    if (profile?.isPro || profile?.role === 'admin') return;
+    const isPrivileged = profile?.isPro || profile?.role === 'admin';
+    const inputT = _pendingInputTokens; const outputT = _pendingOutputTokens;
+    _pendingInputTokens = 0; _pendingOutputTokens = 0;
     try {
-      await setDoc(doc(db, 'users', user.uid), { generationsUsed: increment(1) }, { merge: true });
-    } catch {
-      // silently ignore — counter is best-effort
-    }
+      const userUpdate: any = { generationsUsed: increment(1) };
+      if (!isPrivileged) { userUpdate.inputTokens = increment(inputT); userUpdate.outputTokens = increment(outputT); }
+      await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
+      // Global stats (always record, even for pro)
+      await setDoc(doc(db, 'config', 'stats'), {
+        totalGenerations: increment(1),
+        totalInputTokens: increment(inputT),
+        totalOutputTokens: increment(outputT),
+      }, { merge: true });
+    } catch { /* best-effort */ }
   };
 
   if (!isAuthLoaded) {
@@ -6907,6 +7140,13 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
   return (
     <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       <ToastContainer />
+
+      {globalAnnouncement?.active && globalAnnouncement.message && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-indigo-600 text-white text-sm font-medium px-4 py-2 flex items-center justify-between shadow-lg">
+          <span className="flex-1 text-center">{globalAnnouncement.message}</span>
+          <button onClick={() => setGlobalAnnouncement(null)} className="ml-2 text-white/70 hover:text-white"><X size={16} /></button>
+        </div>
+      )}
 
       {/* ── Onboarding Modal ───────────────────────────────────────────── */}
       {showOnboarding && (
