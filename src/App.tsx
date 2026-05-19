@@ -5099,7 +5099,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .school-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:8.5px; letter-spacing:1.5px; color:rgba(255,255,255,0.75); text-transform:uppercase; font-weight:700; }
     .school-name { font-weight:900; color:white; }
     .activity-tag { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.22); color:white; padding:4px 12px; border-radius:20px; font-size:10px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; border:1.5px solid rgba(255,255,255,0.45); }
-    .doc-title { font-size:21px; font-weight:900; color:white; margin:0 0 14px; line-height:1.2; text-shadow:0 1px 6px rgba(0,0,0,0.18); }
+    .doc-title { font-size:24px; font-weight:900; color:white; margin:0 0 14px; line-height:1.2; text-shadow:0 1px 6px rgba(0,0,0,0.22); letter-spacing:-0.3px; }
     .fields-grid { display:grid; grid-template-columns:2fr 1fr 1fr 0.5fr; gap:7px 12px; margin-top:4px; }
     .field { display:flex; flex-direction:column; gap:2px; }
     .field.full { grid-column:1/-1; }
@@ -5159,20 +5159,20 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .quiz-answer { display:none; }
 
     /* ── MEMORY ───────────────────────────────────────────── */
-    .cut-hint { font-size:10px; color:#6b7280; font-style:italic; margin:0 0 8px; display:flex; align-items:center; gap:5px; }
-    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; page-break-inside:avoid; break-inside:avoid; }
-    .memory-pair { border:2px dashed #d1d5db; padding:12px 6px; min-height:82px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:10px; position:relative; }
-    .memory-pair::after { content:'✂'; position:absolute; top:-9px; right:4px; font-size:11px; color:#9ca3af; background:white; padding:0 2px; }
+    .cut-hint { font-size:10px; color:#6b7280; font-style:italic; margin:0 0 10px; display:flex; align-items:center; gap:5px; padding:6px 10px; background:#fef3c7; border-radius:6px; border:1.5px dashed #f59e0b; }
+    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; page-break-inside:avoid; break-inside:avoid; padding:10px; background:#f9fafb; border-radius:12px; border:2px dashed #d1d5db; }
+    .memory-pair { border:2px dashed #9ca3af; padding:14px 8px; min-height:88px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:8px; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+    .memory-pair::after { content:'✂'; position:absolute; top:-10px; right:6px; font-size:12px; color:#6b7280; background:#f9fafb; padding:0 3px; border-radius:4px; }
     .memory-pair.concept { background:var(--ac,#4338ca); color:white; font-weight:900; border-color:var(--ac,#4338ca); font-size:11px; border-style:solid; }
-    .memory-pair.concept::after { display:none; }
+    .memory-pair.concept::after { background:var(--ac,#4338ca); color:rgba(255,255,255,0.7); }
 
     /* ── TRAIL ────────────────────────────────────────────── */
     .trail-wrapper { margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
-    .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:5px; padding:14px; background:var(--ac-light,#eef2ff); border-radius:12px; border:2.5px solid var(--ac,#4338ca); }
-    .trail-cell { border:2.5px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); }
+    .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; padding:16px; background:var(--ac-light,#eef2ff); border-radius:14px; border:3px solid var(--ac,#4338ca); position:relative; background-image:radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size:8px 8px; }
+    .trail-cell { border:3px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); box-shadow:0 2px 4px rgba(0,0,0,0.08); position:relative; }
     .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
-    .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:16px; }
-    .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:16px; }
+    .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:18px; box-shadow:0 0 0 3px #fee2e2, 0 2px 6px rgba(0,0,0,0.15); }
+    .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:18px; box-shadow:0 0 0 3px #dcfce7, 0 2px 6px rgba(0,0,0,0.15); }
     /* legend (injected) */
     .trail-legend { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:8px 12px; background:white; border-radius:8px; border:1.5px solid #e5e7eb; }
     .trail-legend-title { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
@@ -5200,22 +5200,40 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .markdown-body th, .markdown-body td { border:1px solid #d1d5db; padding:5px 8px; text-align:left; font-size:11px; }
     .markdown-body th { background:var(--ac,#4338ca); color:white; font-weight:800; }
 
+    /* ── SECTION DIVIDER ──────────────────────────────────── */
+    .section-divider { display:flex; align-items:center; gap:10px; margin:18px 0 14px; opacity:0.7; }
+    .section-divider-line { flex:1; height:2px; background:repeating-linear-gradient(90deg, var(--ac,#4338ca) 0, var(--ac,#4338ca) 3px, transparent 3px, transparent 6px); }
+    .section-divider-icon { width:18px; height:18px; flex-shrink:0; image-rendering:pixelated; }
+    .section-divider-icon svg { width:100%; height:100%; display:block; }
+
+    /* ── BOA SORTE LINE ───────────────────────────────────── */
+    .boa-sorte { display:flex; align-items:center; justify-content:center; gap:8px; margin:20px 0 10px; font-size:11px; font-style:italic; color:var(--ac,#4338ca); font-weight:700; letter-spacing:0.5px; }
+    .boa-sorte-px { width:14px; height:14px; image-rendering:pixelated; }
+    .boa-sorte-px svg { width:100%; height:100%; display:block; }
+
     /* ── SCORE TRACKER (injected) ─────────────────────────── */
-    .score-tracker { margin:24px 0 8px; padding:14px 16px; border:2.5px solid var(--ac,#4338ca); border-radius:12px; background:var(--ac-light,#eef2ff); page-break-inside:avoid; break-inside:avoid; position:relative; }
-    .score-header { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; }
-    .score-px-star { width:24px; height:24px; flex-shrink:0; }
+    .score-tracker { margin:8px 0 12px; padding:16px 18px; border:3px solid var(--ac,#4338ca); border-radius:14px; background:var(--ac-light,#eef2ff); page-break-inside:avoid; break-inside:avoid; position:relative; }
+    .score-tracker::before, .score-tracker::after { content:''; position:absolute; width:18px; height:18px; border:2.5px solid var(--ac,#4338ca); background:#fbbf24; }
+    .score-tracker::before { top:-10px; left:14px; border-radius:50%; }
+    .score-tracker::after { bottom:-10px; right:14px; border-radius:50%; }
+    .score-header { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:10px; }
+    .score-px-star { width:26px; height:26px; flex-shrink:0; image-rendering:pixelated; }
     .score-px-star svg { width:100%; height:100%; display:block; }
-    .score-title { font-size:11px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:2px; text-transform:uppercase; }
-    .score-stars { font-size:22px; letter-spacing:4px; text-align:center; margin-bottom:10px; }
-    .score-row { display:flex; align-items:center; justify-content:center; gap:20px; }
-    .score-label { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; }
-    .score-field { border-bottom:2px solid var(--ac,#4338ca); min-width:80px; text-align:center; font-size:14px; font-weight:900; color:#1f2937; padding:2px 8px; }
+    .score-title { font-size:12px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:2.5px; text-transform:uppercase; }
+    .score-stars { font-size:22px; letter-spacing:4px; text-align:center; margin-bottom:12px; }
+    .score-row { display:flex; align-items:center; justify-content:center; gap:24px; flex-wrap:wrap; }
+    .score-label { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; }
+    .score-field { border-bottom:2.5px solid var(--ac,#4338ca); min-width:90px; text-align:center; font-size:14px; font-weight:900; color:#1f2937; padding:2px 8px; }
 
     /* ── ANSWER KEY ───────────────────────────────────────── */
-    .answer-key-page { display:none; page-break-before:always; padding-top:8px; }
+    .answer-key-page { display:none; page-break-before:always; padding-top:12px; }
     @media print { .answer-key-page { display:block; } .quiz-answer, .cw-answer { display:none !important; } }
-    .answer-key-title { font-size:14px; color:white; font-weight:900; letter-spacing:2px; text-transform:uppercase; background:#dc2626; padding:6px 14px; border-radius:6px; display:inline-block; margin-bottom:12px; }
-    .answer-key-item { font-size:11px; margin-bottom:5px; padding:5px 10px; background:#fef2f2; border-radius:6px; border-left:3px solid #dc2626; }
+    .answer-key-header { display:flex; align-items:center; gap:14px; margin-bottom:16px; padding:14px 16px; background:#fef2f2; border-radius:12px; border:2.5px dashed #dc2626; }
+    .answer-key-trophy { width:60px; height:60px; flex-shrink:0; image-rendering:pixelated; }
+    .answer-key-trophy svg { width:100%; height:100%; display:block; }
+    .answer-key-title { font-size:18px; color:#dc2626; font-weight:900; letter-spacing:3px; text-transform:uppercase; padding:0; background:none; border-radius:0; display:block; margin:0; line-height:1; }
+    .answer-key-subtitle { font-size:9px; color:#7f1d1d; font-weight:700; letter-spacing:1.5px; margin-top:4px; }
+    .answer-key-item { font-size:11px; margin-bottom:6px; padding:7px 12px; background:white; border-radius:8px; border-left:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
 
     /* ── FOOTER ───────────────────────────────────────────── */
     .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
@@ -5425,7 +5443,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         }
       });
 
-      // ── SCORE TRACKER with pixel-art stars ───────────────
+      // ── PIXEL ART decorations ────────────────────────────
       var pxStar = '<svg viewBox="0 0 16 16"' + SR + '>'
         + '<rect x="7" y="1" width="2" height="2" fill="#fbbf24"/>'
         + '<rect x="6" y="3" width="4" height="1" fill="#fbbf24"/>'
@@ -5440,13 +5458,92 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         + '<rect x="6" y="5" width="4" height="1" fill="#fef3c7"/>'
         + '<rect x="7" y="6" width="2" height="1" fill="#fef3c7"/>'
         + '</svg>';
+
+      var pxDiamond = '<svg viewBox="0 0 16 16"' + SR + ' style="color:var(--ac,#4338ca)">'
+        + '<rect x="7" y="2" width="2" height="1" fill="currentColor"/>'
+        + '<rect x="6" y="3" width="4" height="1" fill="currentColor"/>'
+        + '<rect x="5" y="4" width="6" height="1" fill="currentColor"/>'
+        + '<rect x="4" y="5" width="8" height="1" fill="currentColor"/>'
+        + '<rect x="3" y="6" width="10" height="2" fill="currentColor"/>'
+        + '<rect x="4" y="8" width="8" height="1" fill="currentColor"/>'
+        + '<rect x="5" y="9" width="6" height="1" fill="currentColor"/>'
+        + '<rect x="6" y="10" width="4" height="1" fill="currentColor"/>'
+        + '<rect x="7" y="11" width="2" height="2" fill="currentColor"/>'
+        + '</svg>';
+
+      var pxSparkle = '<svg viewBox="0 0 16 16"' + SR + ' style="color:var(--ac,#4338ca)">'
+        + '<rect x="7" y="0" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="6" y="3" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="0" y="7" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="3" y="6" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="11" y="6" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="12" y="7" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="7" y="11" width="2" height="5" fill="currentColor"/>'
+        + '<rect x="6" y="11" width="4" height="2" fill="currentColor"/>'
+        + '</svg>';
+
+      var pxTrophy = '<svg viewBox="0 0 16 16"' + SR + '>'
+        + '<rect x="0" y="2" width="2" height="1" fill="#92400e"/><rect x="14" y="2" width="2" height="1" fill="#92400e"/>'
+        + '<rect x="0" y="3" width="1" height="3" fill="#92400e"/><rect x="15" y="3" width="1" height="3" fill="#92400e"/>'
+        + '<rect x="0" y="6" width="2" height="1" fill="#92400e"/><rect x="14" y="6" width="2" height="1" fill="#92400e"/>'
+        + '<rect x="3" y="1" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="2" y="2" width="1" height="6" fill="#92400e"/><rect x="13" y="2" width="1" height="6" fill="#92400e"/>'
+        + '<rect x="3" y="2" width="10" height="6" fill="#fbbf24"/>'
+        + '<rect x="3" y="8" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="6" y="9" width="4" height="2" fill="#b45309"/>'
+        + '<rect x="3" y="11" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="2" y="12" width="12" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="14" width="12" height="1" fill="#78350f"/>'
+        + '<rect x="7" y="4" width="2" height="1" fill="#ffffff"/>'
+        + '<rect x="6" y="5" width="4" height="1" fill="#ffffff"/>'
+        + '<rect x="7" y="6" width="2" height="1" fill="#ffffff"/>'
+        + '<rect x="3" y="3" width="1" height="2" fill="#fde68a"/>'
+        + '</svg>';
+
+      // ── SECTION DIVIDER between instructions and content ─
+      if (instr && instr.nextElementSibling) {
+        var divider = document.createElement('div');
+        divider.className = 'section-divider';
+        divider.innerHTML = '<span class="section-divider-line"></span><span class="section-divider-icon">' + pxDiamond + '</span><span class="section-divider-line"></span>';
+        instr.after(divider);
+      }
+
+      // ── BOA SORTE line + SCORE TRACKER ───────────────────
       var akPage = document.querySelector('.answer-key-page');
+      var boaSorte = document.createElement('div');
+      boaSorte.className = 'boa-sorte';
+      boaSorte.innerHTML = '<span class="boa-sorte-px">' + pxSparkle + '</span><span>Boa sorte, jogador(a)!</span><span class="boa-sorte-px">' + pxSparkle + '</span>';
+
       var tracker = document.createElement('div');
       tracker.className = 'score-tracker';
       tracker.innerHTML = '<div class="score-header"><div class="score-px-star">' + pxStar + '</div><div class="score-title">Minha Pontuação</div><div class="score-px-star">' + pxStar + '</div></div>'
         + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
         + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
-      if (akPage) akPage.before(tracker); else document.body.insertBefore(tracker, document.querySelector('.page-footer'));
+
+      if (akPage) {
+        akPage.before(boaSorte);
+        akPage.before(tracker);
+      } else {
+        var footer = document.querySelector('.page-footer');
+        document.body.insertBefore(boaSorte, footer);
+        document.body.insertBefore(tracker, footer);
+      }
+
+      // ── ANSWER KEY header with pixel-art trophy ──────────
+      var akTitle = document.querySelector('.answer-key-title');
+      if (akTitle) {
+        var wrap = document.createElement('div');
+        wrap.className = 'answer-key-header';
+        wrap.innerHTML = '<div class="answer-key-trophy">' + pxTrophy + '</div>';
+        var titleBox = document.createElement('div');
+        titleBox.appendChild(akTitle.cloneNode(true));
+        var subtitle = document.createElement('div');
+        subtitle.className = 'answer-key-subtitle';
+        subtitle.textContent = 'Confira suas respostas e some os pontos';
+        titleBox.appendChild(subtitle);
+        wrap.appendChild(titleBox);
+        akTitle.replaceWith(wrap);
+      }
 
       setTimeout(function(){ window.print(); }, 600);
     })();
