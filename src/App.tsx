@@ -6001,6 +6001,70 @@ const AdminScreen = () => {
             );
           })()}
 
+          {/* Per-user cost chart */}
+          {(() => {
+            const usersWithCost = sysUsers
+              .map(u => {
+                const inp = u.inputTokens || 0;
+                const out = u.outputTokens || 0;
+                const cost = (inp * 0.075 + out * 0.30) / 1_000_000;
+                return { name: u.displayName || u.email || u.id, cost, inp, out };
+              })
+              .filter(u => u.cost > 0)
+              .sort((a, b) => b.cost - a.cost)
+              .slice(0, 10);
+            if (usersWithCost.length === 0) return null;
+            const maxCost = usersWithCost[0].cost;
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><span>📊</span> Top Consumidores (API)</h3>
+                <p className="text-xs text-gray-400 mb-4">Custo estimado por usuário em USD</p>
+                <div className="space-y-3">
+                  {usersWithCost.map((u, i) => {
+                    const pct = maxCost > 0 ? (u.cost / maxCost) * 100 : 0;
+                    const colors = ['bg-indigo-500','bg-purple-500','bg-pink-500','bg-rose-500','bg-orange-500','bg-amber-500','bg-yellow-500','bg-lime-500','bg-emerald-500','bg-teal-500'];
+                    return (
+                      <div key={i}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-semibold text-gray-700 truncate max-w-[60%]">{u.name}</span>
+                          <span className="text-xs font-black text-gray-900">${u.cost.toFixed(5)}</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${colors[i % colors.length]}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{u.inp.toLocaleString()} in · {u.out.toLocaleString()} out tokens</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Input vs Output split bar */}
+          {globalStats && (() => {
+            const inp = globalStats.totalInputTokens || 0;
+            const out = globalStats.totalOutputTokens || 0;
+            const total = inp + out;
+            const inpPct = total > 0 ? (inp / total) * 100 : 50;
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>⚖️</span> Input vs Output</h3>
+                <div className="flex rounded-full overflow-hidden h-4 mb-2">
+                  <div className="bg-indigo-500 transition-all duration-700" style={{ width: `${inpPct}%` }} />
+                  <div className="bg-emerald-400 flex-1" />
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span><span className="inline-block w-2 h-2 rounded-full bg-indigo-500 mr-1" />Input {inpPct.toFixed(1)}%</span>
+                  <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1" />Output {(100 - inpPct).toFixed(1)}%</span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Announcement */}
           <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
             <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>📢</span> Aviso Global</h3>
