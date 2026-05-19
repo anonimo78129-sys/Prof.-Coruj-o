@@ -10,7 +10,7 @@ import {
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
-  Wand2, Grid3x3, Puzzle, Dice5, Map, Layers3, Trophy, ScrollText
+  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -5197,7 +5197,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
     wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
     crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
     bingo: { title: 'Bingo Educativo', icon: Dice5, color: 'text-pink-600', bg: 'bg-pink-50 border-pink-200' },
-    trail: { title: 'Trilha', icon: Map, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200' },
+    trail: { title: 'Trilha', icon: MapIcon, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200' },
     memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' },
   };
 
