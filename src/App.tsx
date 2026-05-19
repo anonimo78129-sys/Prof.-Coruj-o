@@ -5067,12 +5067,12 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
   `;
   w.document.write(`<!DOCTYPE html><html><head><title>${opts.title}</title><style>
     @page { size: A4; margin: 1.6cm 1.4cm 1.8cm; }
-    * { box-sizing: border-box; }
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.55; margin: 0; font-size: 12px; }
+    * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.55; margin: 0; font-size: 12px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
     /* HEADER */
     .page-header { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid #4338ca; }
-    .brand-strip { height: 6px; background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%); border-radius: 3px; margin-bottom: 12px; }
+    .brand-strip { height: 6px; background: #6366f1; border-radius: 3px; margin-bottom: 12px; }
     .school-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 10px; letter-spacing: 1.5px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
     .school-name { font-weight: 800; color: #1f2937; letter-spacing: 1.8px; }
     .activity-tag { display: inline-block; background: #4338ca; color: white; padding: 3px 10px; border-radius: 10px; font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
@@ -5099,7 +5099,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
 
     /* BINGO */
     .bingo-card { border: 3px solid #1f2937; padding: 0; margin: 0 0 22px; page-break-inside: avoid; break-inside: avoid; border-radius: 6px; overflow: hidden; }
-    .bingo-card-title { text-align: center; font-weight: 900; font-size: 24px; color: white; background: linear-gradient(90deg, #6366f1, #ec4899); padding: 6px; letter-spacing: 4px; }
+    .bingo-card-title { text-align: center; font-weight: 900; font-size: 24px; color: white; background: #6366f1; padding: 6px; letter-spacing: 4px; }
     .bingo-sub { text-align: center; font-size: 9px; color: #6b7280; padding: 3px 0; background: #f9fafb; border-bottom: 1px solid #e5e7eb; letter-spacing: 1px; }
     .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; }
     .bingo-cell { border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; padding: 10px 4px; min-height: 50px; text-align: center; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
