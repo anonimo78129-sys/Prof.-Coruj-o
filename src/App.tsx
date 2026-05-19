@@ -524,7 +524,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
           className={`relative p-2 flex flex-col items-center gap-1 transition-all ${activeScreen === item.id ? 'text-white' : 'text-indigo-300 hover:text-indigo-200'}`}
         >
           <item.icon size={22} strokeWidth={activeScreen === item.id ? 2.5 : 2} className={activeScreen === item.id ? '-translate-y-1 transition-transform' : 'transition-transform'} />
-          <span className={`text-[9px] font-bold tracking-wider ${activeScreen === item.id ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>{item.label}</span>
+          <span className={`text-[9px] font-bold tracking-wider transition-opacity ${activeScreen === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
           {activeScreen === item.id && (
             <motion.div
               layoutId="nav-glow"
