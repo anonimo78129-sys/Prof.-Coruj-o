@@ -5107,10 +5107,15 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .field-line { border-bottom:1.5px solid rgba(255,255,255,0.55); min-height:17px; padding:2px 4px; font-size:10.5px; color:white; font-weight:700; }
 
     /* ── HOW TO PLAY card ─────────────────────────────────── */
-    .instructions { display:flex; gap:10px; align-items:flex-start; background:white; border:2px dashed var(--ac,#4338ca); padding:10px 14px; margin:10px 0 18px; border-radius:10px; font-size:11px; color:#1f2937; }
-    .instructions-icon { font-size:22px; flex-shrink:0; line-height:1; }
+    .instructions { display:flex; gap:12px; align-items:center; background:white; border:2.5px dashed var(--ac,#4338ca); padding:10px 14px; margin:10px 0 18px; border-radius:10px; font-size:11px; color:#1f2937; }
+    .instructions-icon { width:52px; height:52px; flex-shrink:0; image-rendering:pixelated; image-rendering:crisp-edges; }
+    .instructions-icon svg { width:100%; height:100%; display:block; }
     .instructions-body { flex:1; }
     .instructions-title { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
+
+    /* pixel decorations */
+    .px-deco { position:absolute; image-rendering:pixelated; image-rendering:crisp-edges; opacity:0.85; z-index:0; }
+    .px-deco svg { width:100%; height:100%; display:block; }
 
     /* ── GENERAL CONTENT ──────────────────────────────────── */
     h2 { font-size:13px; margin:18px 0 8px; color:white; font-weight:900; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
@@ -5196,8 +5201,12 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .markdown-body th { background:var(--ac,#4338ca); color:white; font-weight:800; }
 
     /* ── SCORE TRACKER (injected) ─────────────────────────── */
-    .score-tracker { margin:24px 0 8px; padding:12px 16px; border:2.5px solid var(--ac,#4338ca); border-radius:12px; background:var(--ac-light,#eef2ff); page-break-inside:avoid; break-inside:avoid; }
-    .score-stars { font-size:22px; letter-spacing:4px; text-align:center; margin-bottom:8px; }
+    .score-tracker { margin:24px 0 8px; padding:14px 16px; border:2.5px solid var(--ac,#4338ca); border-radius:12px; background:var(--ac-light,#eef2ff); page-break-inside:avoid; break-inside:avoid; position:relative; }
+    .score-header { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; }
+    .score-px-star { width:24px; height:24px; flex-shrink:0; }
+    .score-px-star svg { width:100%; height:100%; display:block; }
+    .score-title { font-size:11px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:2px; text-transform:uppercase; }
+    .score-stars { font-size:22px; letter-spacing:4px; text-align:center; margin-bottom:10px; }
     .score-row { display:flex; align-items:center; justify-content:center; gap:20px; }
     .score-label { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; }
     .score-field { border-bottom:2px solid var(--ac,#4338ca); min-width:80px; text-align:center; font-size:14px; font-weight:900; color:#1f2937; padding:2px 8px; }
@@ -5238,11 +5247,83 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       var tag = document.querySelector('.activity-tag');
       if (tag) tag.innerHTML = t.emoji + '&nbsp;&nbsp;' + tag.textContent.trim();
 
-      // ── Instructions box: wrap with icon and title ──────
+      // ── PIXEL ART per activity ───────────────────────────
+      var SR = ' shape-rendering="crispEdges"';
+      var pixelArts = {
+        'Caca-Palavras': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="9" y="9" width="2" height="2" fill="#78350f"/><rect x="10" y="10" width="2" height="2" fill="#92400e"/><rect x="11" y="11" width="2" height="2" fill="#92400e"/><rect x="12" y="12" width="2" height="2" fill="#78350f"/>'
+          + '<rect x="3" y="1" width="5" height="1" fill="#1e3a8a"/><rect x="2" y="2" width="1" height="1" fill="#1e3a8a"/><rect x="8" y="2" width="1" height="1" fill="#1e3a8a"/><rect x="1" y="3" width="1" height="5" fill="#1e3a8a"/><rect x="9" y="3" width="1" height="5" fill="#1e3a8a"/><rect x="2" y="8" width="1" height="1" fill="#1e3a8a"/><rect x="8" y="8" width="1" height="1" fill="#1e3a8a"/><rect x="3" y="9" width="5" height="1" fill="#1e3a8a"/>'
+          + '<rect x="3" y="2" width="5" height="1" fill="#bfdbfe"/><rect x="2" y="3" width="7" height="5" fill="#bfdbfe"/><rect x="3" y="8" width="5" height="1" fill="#bfdbfe"/>'
+          + '<rect x="3" y="3" width="2" height="1" fill="#ffffff"/><rect x="3" y="4" width="1" height="1" fill="#ffffff"/>'
+          + '</svg>',
+        'Quiz Avaliativo': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="8" y="1" width="3" height="1" fill="#9a3412"/><rect x="7" y="2" width="1" height="1" fill="#9a3412"/><rect x="11" y="2" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="6" y="3" width="1" height="1" fill="#9a3412"/><rect x="11" y="3" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="5" y="4" width="1" height="1" fill="#9a3412"/><rect x="11" y="4" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="4" y="5" width="1" height="1" fill="#9a3412"/><rect x="11" y="5" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="3" y="6" width="1" height="1" fill="#9a3412"/><rect x="12" y="6" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="3" y="7" width="10" height="1" fill="#9a3412"/>'
+          + '<rect x="8" y="8" width="1" height="1" fill="#9a3412"/><rect x="7" y="9" width="1" height="1" fill="#9a3412"/><rect x="6" y="10" width="1" height="1" fill="#9a3412"/><rect x="5" y="11" width="1" height="1" fill="#9a3412"/><rect x="4" y="12" width="1" height="1" fill="#9a3412"/><rect x="3" y="13" width="2" height="1" fill="#9a3412"/><rect x="3" y="14" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="8" y="2" width="3" height="1" fill="#facc15"/><rect x="7" y="3" width="4" height="1" fill="#facc15"/><rect x="6" y="4" width="5" height="1" fill="#facc15"/><rect x="5" y="5" width="6" height="1" fill="#facc15"/><rect x="4" y="6" width="8" height="1" fill="#facc15"/>'
+          + '<rect x="4" y="8" width="4" height="1" fill="#facc15"/><rect x="3" y="9" width="4" height="1" fill="#facc15"/><rect x="3" y="10" width="3" height="1" fill="#facc15"/><rect x="3" y="11" width="2" height="1" fill="#facc15"/><rect x="3" y="12" width="1" height="1" fill="#facc15"/>'
+          + '</svg>',
+        'Bingo Educativo': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="4" y="1" width="6" height="1" fill="#581c87"/><rect x="3" y="2" width="1" height="1" fill="#581c87"/><rect x="10" y="2" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="2" y="3" width="1" height="1" fill="#581c87"/><rect x="11" y="3" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="1" y="4" width="1" height="5" fill="#581c87"/><rect x="12" y="4" width="1" height="5" fill="#581c87"/>'
+          + '<rect x="2" y="9" width="1" height="1" fill="#581c87"/><rect x="11" y="9" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="3" y="10" width="1" height="1" fill="#581c87"/><rect x="10" y="10" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="4" y="11" width="6" height="1" fill="#581c87"/>'
+          + '<rect x="4" y="2" width="6" height="1" fill="#c084fc"/><rect x="3" y="3" width="8" height="1" fill="#c084fc"/>'
+          + '<rect x="2" y="4" width="10" height="5" fill="#c084fc"/><rect x="3" y="9" width="8" height="1" fill="#c084fc"/><rect x="4" y="10" width="6" height="1" fill="#c084fc"/>'
+          + '<rect x="4" y="3" width="2" height="1" fill="#f3e8ff"/><rect x="3" y="4" width="1" height="2" fill="#f3e8ff"/>'
+          + '<rect x="5" y="4" width="3" height="1" fill="#ffffff"/><rect x="5" y="5" width="1" height="1" fill="#ffffff"/><rect x="7" y="5" width="1" height="1" fill="#ffffff"/><rect x="5" y="6" width="3" height="1" fill="#ffffff"/><rect x="5" y="7" width="1" height="1" fill="#ffffff"/><rect x="7" y="7" width="1" height="1" fill="#ffffff"/><rect x="5" y="8" width="3" height="1" fill="#ffffff"/>'
+          + '</svg>',
+        'Jogo da Memoria': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="6" y="2" width="7" height="1" fill="#831843"/><rect x="6" y="3" width="1" height="9" fill="#831843"/><rect x="12" y="3" width="1" height="9" fill="#831843"/><rect x="6" y="12" width="7" height="1" fill="#831843"/>'
+          + '<rect x="7" y="3" width="5" height="9" fill="#fbcfe8"/>'
+          + '<rect x="8" y="4" width="3" height="1" fill="#ec4899"/><rect x="8" y="6" width="3" height="1" fill="#ec4899"/><rect x="8" y="8" width="3" height="1" fill="#ec4899"/><rect x="8" y="10" width="3" height="1" fill="#ec4899"/>'
+          + '<rect x="3" y="5" width="7" height="1" fill="#831843"/><rect x="3" y="6" width="1" height="8" fill="#831843"/><rect x="9" y="6" width="1" height="8" fill="#831843"/><rect x="3" y="14" width="7" height="1" fill="#831843"/>'
+          + '<rect x="4" y="6" width="5" height="8" fill="#ffffff"/>'
+          + '<rect x="5" y="8" width="3" height="1" fill="#ec4899"/><rect x="7" y="9" width="1" height="1" fill="#ec4899"/><rect x="6" y="10" width="1" height="1" fill="#ec4899"/><rect x="6" y="12" width="1" height="1" fill="#ec4899"/>'
+          + '</svg>',
+        'Trilha do Conhecimento': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="3" y="2" width="10" height="1" fill="#14532d"/><rect x="2" y="3" width="1" height="10" fill="#14532d"/><rect x="13" y="3" width="1" height="10" fill="#14532d"/><rect x="3" y="13" width="10" height="1" fill="#14532d"/>'
+          + '<rect x="3" y="3" width="10" height="10" fill="#ffffff"/>'
+          + '<rect x="3" y="3" width="10" height="1" fill="#bbf7d0"/><rect x="3" y="4" width="1" height="9" fill="#bbf7d0"/>'
+          + '<rect x="4" y="4" width="2" height="2" fill="#14532d"/><rect x="10" y="4" width="2" height="2" fill="#14532d"/><rect x="7" y="7" width="2" height="2" fill="#14532d"/><rect x="4" y="10" width="2" height="2" fill="#14532d"/><rect x="10" y="10" width="2" height="2" fill="#14532d"/>'
+          + '</svg>',
+        'Palavras Cruzadas': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="1" y="1" width="10" height="1" fill="#134e4a"/><rect x="1" y="2" width="1" height="9" fill="#134e4a"/><rect x="10" y="2" width="1" height="9" fill="#134e4a"/><rect x="1" y="10" width="10" height="1" fill="#134e4a"/>'
+          + '<rect x="1" y="4" width="10" height="1" fill="#134e4a"/><rect x="1" y="7" width="10" height="1" fill="#134e4a"/>'
+          + '<rect x="4" y="1" width="1" height="10" fill="#134e4a"/><rect x="7" y="1" width="1" height="10" fill="#134e4a"/>'
+          + '<rect x="2" y="2" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="5" y="2" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="8" y="2" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="2" y="5" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="5" y="5" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="8" y="5" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="2" y="8" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="5" y="8" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="8" y="8" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="11" y="10" width="2" height="1" fill="#f59e0b"/><rect x="12" y="11" width="2" height="1" fill="#f59e0b"/><rect x="13" y="12" width="2" height="1" fill="#f59e0b"/><rect x="14" y="13" width="1" height="2" fill="#451a03"/>'
+          + '</svg>',
+        'Campanha Narrativa': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="2" y="2" width="12" height="1" fill="#3730a3"/><rect x="2" y="3" width="1" height="10" fill="#3730a3"/><rect x="13" y="3" width="1" height="10" fill="#3730a3"/><rect x="2" y="13" width="12" height="1" fill="#3730a3"/>'
+          + '<rect x="3" y="3" width="10" height="10" fill="#fef3c7"/>'
+          + '<rect x="7" y="3" width="2" height="10" fill="#3730a3"/>'
+          + '<rect x="4" y="5" width="3" height="1" fill="#92400e"/><rect x="4" y="7" width="3" height="1" fill="#92400e"/><rect x="4" y="9" width="3" height="1" fill="#92400e"/><rect x="4" y="11" width="2" height="1" fill="#92400e"/>'
+          + '<rect x="9" y="5" width="3" height="1" fill="#92400e"/><rect x="9" y="7" width="3" height="1" fill="#92400e"/><rect x="9" y="9" width="3" height="1" fill="#92400e"/><rect x="9" y="11" width="2" height="1" fill="#92400e"/>'
+          + '<rect x="10" y="3" width="1" height="1" fill="#fbbf24"/><rect x="9" y="4" width="3" height="1" fill="#fbbf24"/><rect x="10" y="5" width="1" height="1" fill="#fbbf24"/>'
+          + '</svg>'
+      };
+      var pxArt = pixelArts[label] || '<div style="font-size:34px;text-align:center;line-height:52px">🎮</div>';
+
+      // ── Instructions box: pixel art + title ─────────────
       var instr = document.querySelector('.instructions');
       if (instr) {
         var body = instr.innerHTML;
-        instr.innerHTML = '<div class="instructions-icon">🎮</div><div class="instructions-body"><div class="instructions-title">Como Jogar</div>' + body + '</div>';
+        instr.innerHTML = '<div class="instructions-icon">' + pxArt + '</div><div class="instructions-body"><div class="instructions-title">Como Jogar</div>' + body + '</div>';
       }
 
       // ── WORD SEARCH: word chips ─────────────────────────
@@ -5344,11 +5425,27 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         }
       });
 
-      // ── SCORE TRACKER ────────────────────────────────────
+      // ── SCORE TRACKER with pixel-art stars ───────────────
+      var pxStar = '<svg viewBox="0 0 16 16"' + SR + '>'
+        + '<rect x="7" y="1" width="2" height="2" fill="#fbbf24"/>'
+        + '<rect x="6" y="3" width="4" height="1" fill="#fbbf24"/>'
+        + '<rect x="1" y="5" width="14" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="7" width="12" height="2" fill="#fbbf24"/>'
+        + '<rect x="3" y="9" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="10" y="9" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="11" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="11" y="11" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="1" y="13" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="12" y="13" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="6" y="5" width="4" height="1" fill="#fef3c7"/>'
+        + '<rect x="7" y="6" width="2" height="1" fill="#fef3c7"/>'
+        + '</svg>';
       var akPage = document.querySelector('.answer-key-page');
       var tracker = document.createElement('div');
       tracker.className = 'score-tracker';
-      tracker.innerHTML = '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div><div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
+      tracker.innerHTML = '<div class="score-header"><div class="score-px-star">' + pxStar + '</div><div class="score-title">Minha Pontuação</div><div class="score-px-star">' + pxStar + '</div></div>'
+        + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
+        + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
       if (akPage) akPage.before(tracker); else document.body.insertBefore(tracker, document.querySelector('.page-footer'));
 
       setTimeout(function(){ window.print(); }, 600);
