@@ -40,12 +40,12 @@ const formatApiError = (error: any, defaultMsg: string): string => {
   } else {
     try { msg = JSON.stringify(error); } catch (e) {}
   }
-  
+
   if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
-    return 'Alta demanda nos servidores da IA. Estamos tentando novamente de forma automática... Se persistir, aguarde 1 minuto.';
+    return 'Muita gente usando a IA agora. Ja estou tentando de novo — se continuar, aguarde 1 minuto.';
   }
   if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
-    return 'Limite de requisições atingido. Por favor, aguarde alguns instantes antes de tentar novamente.';
+    return 'Calma, professor! Muitas perguntas de uma vez. Aguarde alguns segundos e tente de novo.';
   }
   return defaultMsg;
 };
@@ -183,7 +183,7 @@ function useFirestoreSync<T extends { id: string }>(
     } catch (err) {
       console.error(`Error in useFirestoreSync for ${collectionName}:`, err);
       setData(previousData);
-      toast.error("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("A internet cochilou. Suas mudancas nao foram salvas — tente de novo.");
     }
   };
 
@@ -222,7 +222,7 @@ function useFirestoreDoc<T>(
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
-      toast.error("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("A internet cochilou. Suas mudancas nao foram salvas — tente de novo.");
     }
   };
 
@@ -249,8 +249,8 @@ class ErrorBoundary extends React.Component<
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">🦉</span>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Algo deu errado</h2>
-            <p className="text-sm text-gray-500 mb-2">O Corujão encontrou um problema inesperado. Seus dados estão salvos na nuvem.</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
+            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estao salvos na nuvem — so recarregue a pagina.</p>
             <p className="text-xs text-red-500 mb-6 bg-red-50 p-2 rounded-xl font-mono break-all">{this.state.error?.message}</p>
             <button
               onClick={() => window.location.reload()}
@@ -2232,7 +2232,7 @@ const PlannerScreen = ({
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Arquivo muito grande. O limite é 10 MB.');
+      toast.error('Arquivo pesado demais! O limite e 10 MB.');
       e.target.value = '';
       return;
     }
@@ -2260,7 +2260,7 @@ const PlannerScreen = ({
           setTopic(prev => prev + (prev ? '\n\n' : '') + text);
         } catch (error) {
           console.error("Error extracting text from file:", error);
-          toast.error(formatApiError(error, "Erro ao extrair texto do arquivo."));
+          toast.error(formatApiError(error, "Nao consegui ler esse arquivo. Tente outro formato."));
         }
       };
       reader.readAsDataURL(file);
@@ -2614,7 +2614,7 @@ const PlannerScreen = ({
       await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
     } catch (e) {
       console.error(e);
-      toast.error('Erro ao gerar o arquivo PPTX. Verifique sua conexão e tente novamente.');
+      toast.error('A apresentacao nao saiu dessa vez. Confere a conexao e tenta de novo.');
     }
     setIsExporting(false);
   };
@@ -2923,7 +2923,7 @@ const PlannerScreen = ({
                         setDocReady({ url: URL.createObjectURL(blob), filename, target: 'main' });
                       } catch (e) {
                         console.error('Erro ao exportar Word:', e);
-                        toast.error('Erro ao gerar o arquivo Word. Tente novamente.');
+                        toast.error('O documento Word fugiu! Tenta gerar de novo.');
                       } finally {
                         setPreparingDoc(null);
                       }
@@ -2985,7 +2985,7 @@ const PlannerScreen = ({
                               setDocReady({ url: URL.createObjectURL(blob), filename, target: i });
                             } catch (e) {
                               console.error('Erro ao exportar Word:', e);
-                              toast.error('Erro ao gerar o arquivo Word. Tente novamente.');
+                              toast.error('O documento Word fugiu! Tenta gerar de novo.');
                             } finally {
                               setPreparingDoc(null);
                             }
@@ -3470,7 +3470,7 @@ const ChatScreen = ({
       }
     } catch (error) {
       console.error(error);
-      setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: '❌ ' + formatApiError(error, 'Desculpe, ocorreu um erro ao processar sua solicitação.'), date: Date.now() }]);
+      setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: '❌ ' + formatApiError(error, 'Tive um branco aqui, professor. Envia de novo que eu respondo.'), date: Date.now() }]);
     }
     setLoading(false);
   };
@@ -3730,7 +3730,7 @@ const ProfileScreen = ({
             const url = await getDownloadURL(ref);
             setProfile({ ...profile, photo: url });
           } catch {
-            toast.error('Não foi possível salvar a foto. Tente novamente.');
+            toast.error('Sua foto nao subiu dessa vez. Tente de novo!');
           } finally {
             setIsUploadingPhoto(false);
           }
@@ -4256,7 +4256,7 @@ const ProfileScreen = ({
                         }, 3000);
                       } catch (e) {
                         console.error('Error sending feedback:', e);
-                        toast.error('Não foi possível enviar o feedback. Tente novamente.');
+                        toast.error('Seu feedback ficou preso no caminho. Tente enviar de novo.');
                       }
                     }}
                     disabled={!feedbackText.trim()}
@@ -5108,7 +5108,7 @@ const EstudioScreen = ({
   const closeModal = () => { setActiveMode(null); setResult(null); setTopic(''); };
 
   const generate = async () => {
-    if (!topic.trim()) { toast.error('Informe o tema.'); return; }
+    if (!topic.trim()) { toast.error('Qual e o tema? O Corujao precisa saber para criar!'); return; }
     setIsGenerating(true);
     setResult(null);
     try {
@@ -5187,7 +5187,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
     } catch (err: any) {
       console.error('[Gamification] error:', err);
       const msg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
-      toast.error(msg || 'Erro ao gerar atividade. Tente novamente.');
+      toast.error(msg || 'A IA travou nessa. Aguarde um instante e tente de novo.');
     }
     setIsGenerating(false);
   };
@@ -5863,7 +5863,7 @@ const AdminScreen = () => {
       await deleteDoc(doc(db, 'library', item.id));
       await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(-item.fileSizeBytes) }, { merge: true });
       setStorageUsed(p => Math.max(0, p - item.fileSizeBytes));
-    } catch (e: any) { toast.error(`Erro: ${e.message}`); }
+    } catch (e: any) { toast.error(e?.message || 'Algo deu errado. Tente de novo.'); }
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -7334,7 +7334,7 @@ ${bnccBlock}
       updateTask(taskId, { status: 'completed', result: planResult });
       recordGeneration();
     } catch (error) {
-      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Erro ao gerar plano.') });
+      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Nao consegui montar o plano dessa vez. Tente novamente.') });
     }
   };
 
@@ -7519,7 +7519,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         recordGeneration();
       }
     } catch (error) {
-      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Erro ao gerar material.') });
+      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Esse material nao saiu como esperado. Tente novamente.') });
     }
   };
 
