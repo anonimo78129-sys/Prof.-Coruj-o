@@ -5047,192 +5047,312 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) return;
   const todayStr = new Date().toLocaleDateString('pt-BR');
+  const owlSvg = `<svg width="84" height="84" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:0.88;flex-shrink:0">
+    <ellipse cx="30" cy="43" rx="19" ry="16" fill="rgba(255,255,255,0.18)"/>
+    <circle cx="30" cy="20" r="17" fill="rgba(255,255,255,0.18)"/>
+    <polygon points="17,4 22,17 13,17" fill="rgba(255,255,255,0.28)"/>
+    <polygon points="43,4 47,17 38,17" fill="rgba(255,255,255,0.28)"/>
+    <circle cx="22" cy="20" r="8" fill="white"/><circle cx="38" cy="20" r="8" fill="white"/>
+    <circle cx="23" cy="21" r="5" fill="#1e293b"/><circle cx="39" cy="21" r="5" fill="#1e293b"/>
+    <circle cx="25" cy="19" r="2" fill="white"/><circle cx="41" cy="19" r="2" fill="white"/>
+    <polygon points="30,27 25,33 35,33" fill="#fbbf24"/>
+    <ellipse cx="10" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(-15,10,43)"/>
+    <ellipse cx="50" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(15,50,43)"/>
+    <text x="30" y="57" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.65)" font-family="Arial" font-weight="bold" letter-spacing="1">CORUJAO</text>
+  </svg>`;
   const headerHtml = `
     <div class="page-header">
-      <div class="brand-strip"></div>
-      <div class="school-row">
-        <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
-        <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
-      </div>
-      <div class="activity-tag">${opts.activityLabel}</div>
-      <h1 class="doc-title">${opts.title}</h1>
-      <div class="fields-grid">
-        <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
-        <div class="field"><span class="field-label">DATA</span><div class="field-line short">${todayStr}</div></div>
-        <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
-        <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
-        <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
+      <div class="header-inner">
+        <div class="header-top-row">
+          <div class="header-text">
+            <div class="school-row">
+              <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
+              <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
+            </div>
+            <div class="activity-tag">${opts.activityLabel}</div>
+            <h1 class="doc-title">${opts.title}</h1>
+          </div>
+          <div class="header-owl">${owlSvg}</div>
+        </div>
+        <div class="fields-grid">
+          <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
+          <div class="field"><span class="field-label">DATA</span><div class="field-line short">${todayStr}</div></div>
+          <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
+          <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
+          <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
+        </div>
       </div>
     </div>
   `;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
-    @page { size: A4; margin: 1.6cm 1.4cm 2cm; }
+    @page { size: A4; margin: 1.4cm 1.4cm 2cm; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.55; margin: 0; font-size: 12px; background: white; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
 
-    /* ── HEADER ─────────────────────────────────────────────── */
-    .page-header {
-      margin-bottom: 20px;
-      background: var(--ac, #4338ca);
-      border-radius: 14px;
-      padding: 14px 16px 16px;
-      color: white;
-      position: relative;
-      overflow: hidden;
-    }
-    /* polka-dot overlay using inline SVG background */
-    .page-header::before {
-      content: '';
-      position: absolute; inset: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.15) 1.5px, transparent 1.5px);
-      background-size: 18px 18px;
-      border-radius: 14px;
-    }
-    .header-inner { position: relative; z-index: 1; }
-    .school-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 9px; letter-spacing: 1.5px; color: rgba(255,255,255,0.8); text-transform: uppercase; font-weight: 700; }
-    .school-name { font-weight: 900; color: white; letter-spacing: 1.5px; }
-    .activity-tag {
-      display: inline-flex; align-items: center; gap: 5px;
-      background: rgba(255,255,255,0.25);
-      color: white; padding: 4px 12px;
-      border-radius: 20px; font-size: 10px; font-weight: 900;
-      letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px;
-      border: 1.5px solid rgba(255,255,255,0.5);
-    }
-    .doc-title { font-size: 22px; font-weight: 900; color: white; margin: 0 0 14px; line-height: 1.2; text-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-    .fields-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 0.5fr; gap: 8px 12px; }
-    .field { display: flex; flex-direction: column; gap: 2px; }
-    .field.full { grid-column: 1 / -1; }
-    .field-label { font-size: 7.5px; font-weight: 900; color: rgba(255,255,255,0.7); letter-spacing: 1.5px; text-transform: uppercase; }
-    .field-line { border-bottom: 1.5px solid rgba(255,255,255,0.6); min-height: 18px; padding: 2px 4px; font-size: 11px; color: white; font-weight: 700; }
+    /* ── HEADER ───────────────────────────────────────────── */
+    .page-header { background: var(--ac,#4338ca); border-radius: 16px; padding: 14px 16px 16px; color: white; position: relative; overflow: hidden; margin-bottom: 18px; }
+    .page-header::before { content:''; position:absolute; inset:0; background-image:radial-gradient(circle, rgba(255,255,255,0.14) 1.5px, transparent 1.5px); background-size:16px 16px; border-radius:16px; pointer-events:none; }
+    .header-inner { position:relative; z-index:1; }
+    .header-top-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .header-text { flex:1; min-width:0; }
+    .header-owl { flex-shrink:0; margin-top:-4px; }
+    .school-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:8.5px; letter-spacing:1.5px; color:rgba(255,255,255,0.75); text-transform:uppercase; font-weight:700; }
+    .school-name { font-weight:900; color:white; }
+    .activity-tag { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.22); color:white; padding:4px 12px; border-radius:20px; font-size:10px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; border:1.5px solid rgba(255,255,255,0.45); }
+    .doc-title { font-size:21px; font-weight:900; color:white; margin:0 0 14px; line-height:1.2; text-shadow:0 1px 6px rgba(0,0,0,0.18); }
+    .fields-grid { display:grid; grid-template-columns:2fr 1fr 1fr 0.5fr; gap:7px 12px; margin-top:4px; }
+    .field { display:flex; flex-direction:column; gap:2px; }
+    .field.full { grid-column:1/-1; }
+    .field-label { font-size:7px; font-weight:900; color:rgba(255,255,255,0.65); letter-spacing:1.5px; text-transform:uppercase; }
+    .field-line { border-bottom:1.5px solid rgba(255,255,255,0.55); min-height:17px; padding:2px 4px; font-size:10.5px; color:white; font-weight:700; }
 
-    /* ── CONTENT ─────────────────────────────────────────────── */
-    h2 { font-size: 14px; margin: 18px 0 6px; color: var(--ac,#4338ca); font-weight: 900; padding: 4px 10px; background: var(--ac-light,#eef2ff); border-left: 4px solid var(--ac,#4338ca); border-radius: 0 6px 6px 0; }
-    h3 { font-size: 12px; margin: 10px 0 4px; color: #1f2937; font-weight: 700; }
-    p { margin: 6px 0; }
-    .instructions { background: var(--ac-light,#eef2ff); border-left: 4px solid var(--ac,#4338ca); padding: 8px 12px; margin: 10px 0 16px; border-radius: 0 8px 8px 0; font-size: 11px; color: #1f2937; }
+    /* ── HOW TO PLAY card ─────────────────────────────────── */
+    .instructions { display:flex; gap:10px; align-items:flex-start; background:white; border:2px dashed var(--ac,#4338ca); padding:10px 14px; margin:10px 0 18px; border-radius:10px; font-size:11px; color:#1f2937; }
+    .instructions-icon { font-size:22px; flex-shrink:0; line-height:1; }
+    .instructions-body { flex:1; }
+    .instructions-title { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
 
-    /* ── WORD SEARCH ────────────────────────────────────────── */
-    .ws-wrapper { display: flex; justify-content: center; margin: 16px 0; page-break-inside: avoid; break-inside: avoid; }
-    .ws-grid { display: grid; gap: 0; border: 3px solid var(--ac,#4338ca); background: var(--ac,#4338ca); page-break-inside: avoid; break-inside: avoid; padding: 2px; border-radius: 8px; }
-    .ws-cell { background: white; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: 800; font-size: 12px; font-family: 'Courier New', monospace; color: #111; }
+    /* ── GENERAL CONTENT ──────────────────────────────────── */
+    h2 { font-size:13px; margin:18px 0 8px; color:white; font-weight:900; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
+    h3 { font-size:12px; margin:10px 0 4px; color:#1f2937; font-weight:700; }
+    p { margin:6px 0; }
 
-    /* ── BINGO ──────────────────────────────────────────────── */
-    .bingo-card { border: 3px solid var(--ac,#4338ca); padding: 0; margin: 0 0 22px; page-break-inside: avoid; break-inside: avoid; border-radius: 12px; overflow: hidden; }
-    .bingo-card-title { text-align: center; font-weight: 900; font-size: 26px; color: white; background: var(--ac,#4338ca); padding: 8px; letter-spacing: 6px; }
-    .bingo-sub { text-align: center; font-size: 9px; color: #6b7280; padding: 4px 0; background: #f5f3ff; border-bottom: 1px solid #ddd6fe; letter-spacing: 1px; font-weight: 700; }
-    .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; }
-    .bingo-cell { border-right: 1px solid #ddd6fe; border-bottom: 1px solid #ddd6fe; padding: 10px 4px; min-height: 52px; text-align: center; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; background: white; }
-    .bingo-cell:nth-child(even) { background: #f5f3ff; }
-    .bingo-cell:nth-child(5n) { border-right: none; }
-    .bingo-cell.free { background: #fbbf24; font-weight: 900; color: #78350f; font-size: 13px; border-color: #f59e0b; }
+    /* ── WORD SEARCH ──────────────────────────────────────── */
+    .ws-wrapper { display:flex; justify-content:center; margin:14px 0 10px; page-break-inside:avoid; break-inside:avoid; }
+    .ws-grid { display:grid; gap:0; border:3px solid var(--ac,#4338ca); background:var(--ac,#4338ca); page-break-inside:avoid; break-inside:avoid; padding:2px; border-radius:8px; box-shadow:0 3px 12px rgba(0,0,0,0.15); }
+    .ws-cell { background:white; width:24px; height:24px; text-align:center; line-height:24px; font-weight:800; font-size:12px; font-family:'Courier New',monospace; color:#111; }
+    /* word chips (injected by JS) */
+    .word-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 18px; }
+    .word-chip { display:inline-flex; align-items:center; gap:6px; border:2px solid var(--ac,#4338ca); border-radius:20px; padding:4px 10px 4px 6px; font-size:10px; font-weight:700; color:var(--ac,#4338ca); background:var(--ac-light,#eef2ff); page-break-inside:avoid; }
+    .word-chip-box { width:14px; height:14px; border:1.5px solid var(--ac,#4338ca); border-radius:3px; flex-shrink:0; background:white; }
 
-    /* ── QUIZ ───────────────────────────────────────────────── */
-    .quiz-q { border: 2px solid #e5e7eb; border-radius: 10px; padding: 12px 14px 12px 52px; margin-bottom: 14px; page-break-inside: avoid; break-inside: avoid; background: #fafbff; position: relative; }
-    .quiz-num { position: absolute; left: 12px; top: 10px; width: 28px; height: 28px; background: var(--ac,#4338ca); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; }
-    .quiz-q b { color: #1f2937; font-weight: 800; }
-    .quiz-opts { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
-    .quiz-opt { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 6px; background: white; border: 1px solid #e5e7eb; }
-    .quiz-opt-letter { width: 20px; height: 20px; border-radius: 50%; background: var(--ac-light,#eef2ff); color: var(--ac,#4338ca); font-weight: 900; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .quiz-answer { display: none; }
+    /* ── BINGO ────────────────────────────────────────────── */
+    .bingo-card { border:3px solid var(--ac,#4338ca); margin:0 0 22px; page-break-inside:avoid; break-inside:avoid; border-radius:14px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+    .bingo-card-title { display:flex; justify-content:center; gap:0; background:#1e293b; padding:8px 10px; }
+    .bingo-letter { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; font-size:28px; font-weight:900; color:white; border-radius:8px; margin:0 2px; }
+    .bingo-sub { text-align:center; font-size:9px; color:#6b7280; padding:4px 0; background:#f8f7ff; border-bottom:1px solid #ddd6fe; letter-spacing:1px; font-weight:700; }
+    .bingo-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:0; }
+    .bingo-cell { border-right:1px solid #e0d9ff; border-bottom:1px solid #e0d9ff; padding:10px 4px; min-height:54px; text-align:center; font-size:9.5px; font-weight:700; display:flex; align-items:center; justify-content:center; background:white; }
+    .bingo-cell:nth-child(odd) { background:#faf8ff; }
+    .bingo-cell:nth-child(5n) { border-right:none; }
+    .bingo-cell.free { background:#fbbf24; font-weight:900; color:#78350f; font-size:14px; border-color:#f59e0b; }
+    /* calling circles (injected) */
+    .bingo-calling { padding:10px 12px; background:#f8f7ff; border-top:2px dashed var(--ac,#4338ca); }
+    .bingo-calling-label { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+    .bingo-calling-circles { display:flex; flex-wrap:wrap; gap:5px; }
+    .bingo-circle { display:inline-block; width:22px; height:22px; border-radius:50%; border:1.5px solid var(--ac,#4338ca); background:white; }
 
-    /* ── MEMORY ─────────────────────────────────────────────── */
-    .memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; page-break-inside: avoid; break-inside: avoid; }
-    .memory-pair { border: 2px dashed #d1d5db; padding: 12px 6px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10px; page-break-inside: avoid; break-inside: avoid; background: white; border-radius: 8px; }
-    .memory-pair.concept { background: var(--ac,#4338ca); color: white; font-weight: 800; border-color: var(--ac,#4338ca); font-size: 11px; }
+    /* ── QUIZ ─────────────────────────────────────────────── */
+    .quiz-progress { display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; }
+    .quiz-dot { width:18px; height:8px; border-radius:4px; background:#e5e7eb; }
+    .quiz-q { border:2px solid #e5e7eb; border-radius:12px; padding:12px 14px 12px 54px; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.07); position:relative; }
+    .quiz-num { position:absolute; left:12px; top:12px; width:30px; height:30px; background:var(--ac,#4338ca); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; }
+    .quiz-q p, .quiz-q b { color:#1f2937; font-weight:700; margin:0 0 8px; }
+    .quiz-opts { display:flex; flex-direction:column; gap:5px; margin-top:8px; }
+    .quiz-opt { display:flex; align-items:center; gap:8px; padding:5px 10px; border-radius:8px; background:#f9fafb; border:1.5px solid #e5e7eb; font-size:11px; }
+    .quiz-opt-letter { width:22px; height:22px; border-radius:50%; background:var(--ac-light,#eef2ff); color:var(--ac,#4338ca); font-weight:900; font-size:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1.5px solid var(--ac,#4338ca); }
+    .quiz-answer { display:none; }
 
-    /* ── TRAIL ──────────────────────────────────────────────── */
-    .trail-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin: 14px 0; page-break-inside: avoid; break-inside: avoid; padding: 14px; background: var(--ac-light,#eef2ff); border-radius: 12px; border: 2px solid var(--ac,#4338ca); }
-    .trail-cell { border: 2.5px solid var(--ac,#4338ca); border-radius: 50%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 11px; background: white; color: var(--ac,#4338ca); }
-    .trail-cell.special { background: #fbbf24; color: #78350f; border-color: #d97706; }
-    .trail-cell.end { background: #dc2626; color: white; border-color: #991b1b; font-size: 14px; }
-    .trail-cell.start { background: #16a34a; color: white; border-color: #14532d; font-size: 14px; }
+    /* ── MEMORY ───────────────────────────────────────────── */
+    .cut-hint { font-size:10px; color:#6b7280; font-style:italic; margin:0 0 8px; display:flex; align-items:center; gap:5px; }
+    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; page-break-inside:avoid; break-inside:avoid; }
+    .memory-pair { border:2px dashed #d1d5db; padding:12px 6px; min-height:82px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:10px; position:relative; }
+    .memory-pair::after { content:'✂'; position:absolute; top:-9px; right:4px; font-size:11px; color:#9ca3af; background:white; padding:0 2px; }
+    .memory-pair.concept { background:var(--ac,#4338ca); color:white; font-weight:900; border-color:var(--ac,#4338ca); font-size:11px; border-style:solid; }
+    .memory-pair.concept::after { display:none; }
 
-    /* ── CROSSWORD ──────────────────────────────────────────── */
-    .cw-item { margin-bottom: 16px; page-break-inside: avoid; break-inside: avoid; }
-    .cw-clue { font-weight: 700; margin-bottom: 5px; color: #1f2937; display: flex; align-items: center; gap: 6px; }
-    .cw-num-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: var(--ac,#4338ca); color: white; border-radius: 50%; font-size: 10px; font-weight: 900; flex-shrink: 0; }
-    .cw-boxes { display: flex; gap: 3px; }
-    .cw-box { border: 2px solid #374151; width: 26px; height: 26px; border-radius: 3px; }
-    .cw-answer { display: none; }
+    /* ── TRAIL ────────────────────────────────────────────── */
+    .trail-wrapper { margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
+    .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:5px; padding:14px; background:var(--ac-light,#eef2ff); border-radius:12px; border:2.5px solid var(--ac,#4338ca); }
+    .trail-cell { border:2.5px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); }
+    .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
+    .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:16px; }
+    .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:16px; }
+    /* legend (injected) */
+    .trail-legend { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:8px 12px; background:white; border-radius:8px; border:1.5px solid #e5e7eb; }
+    .trail-legend-title { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+    .trail-legend-items { display:flex; gap:12px; flex-wrap:wrap; font-size:9.5px; font-weight:600; color:#374151; flex:1; }
+    .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
-    /* ── LISTS ──────────────────────────────────────────────── */
-    .clue-list { list-style: none; padding-left: 0; columns: 2; column-gap: 20px; }
-    .clue-list li { margin-bottom: 5px; break-inside: avoid; page-break-inside: avoid; padding-left: 22px; position: relative; }
-    .clue-list li::before { content: counter(list-item) '.'; position: absolute; left: 0; font-weight: 800; color: var(--ac,#4338ca); counter-increment: list-item; }
+    /* ── CROSSWORD ────────────────────────────────────────── */
+    .cw-item { margin-bottom:16px; page-break-inside:avoid; break-inside:avoid; }
+    .cw-clue { font-weight:700; margin-bottom:5px; color:#1f2937; display:flex; align-items:center; gap:7px; }
+    .cw-num-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--ac,#4338ca); color:white; border-radius:50%; font-size:10px; font-weight:900; flex-shrink:0; }
+    .cw-boxes { display:flex; gap:3px; }
+    .cw-box { border:2px solid #374151; width:27px; height:27px; border-radius:4px; }
+    .cw-answer { display:none; }
+    .clue-list { list-style:none; padding-left:0; columns:2; column-gap:20px; counter-reset:list-item; }
+    .clue-list li { margin-bottom:5px; break-inside:avoid; page-break-inside:avoid; padding-left:24px; position:relative; counter-increment:list-item; }
+    .clue-list li::before { content:counter(list-item)'.'; position:absolute; left:0; font-weight:800; color:var(--ac,#4338ca); }
 
-    /* ── STORY ──────────────────────────────────────────────── */
-    .markdown-body h2 { color: var(--ac,#4338ca); font-size: 15px; margin-top: 18px; padding: 4px 10px; background: var(--ac-light,#eef2ff); border-left: 4px solid var(--ac,#4338ca); border-radius: 0 6px 6px 0; }
-    .markdown-body h3 { color: #1f2937; font-size: 13px; font-weight: 800; }
-    .markdown-body ul, .markdown-body ol { padding-left: 22px; }
-    .markdown-body li { margin-bottom: 4px; }
-    .markdown-body blockquote { border-left: 4px solid var(--ac,#4338ca); padding: 6px 12px; margin: 8px 0; background: var(--ac-light,#eef2ff); color: #1f2937; border-radius: 0 6px 6px 0; }
-    .markdown-body table { border-collapse: collapse; width: 100%; margin: 8px 0; }
-    .markdown-body th, .markdown-body td { border: 1px solid #d1d5db; padding: 5px 8px; text-align: left; font-size: 11px; }
-    .markdown-body th { background: var(--ac,#4338ca); color: white; font-weight: 800; }
+    /* ── STORY ────────────────────────────────────────────── */
+    .markdown-body h2 { color:white; font-size:14px; margin-top:18px; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
+    .markdown-body h3 { color:#1f2937; font-size:13px; font-weight:800; border-bottom:1.5px solid #e5e7eb; padding-bottom:3px; }
+    .markdown-body ul, .markdown-body ol { padding-left:22px; }
+    .markdown-body li { margin-bottom:4px; }
+    .markdown-body blockquote { border-left:4px solid var(--ac,#4338ca); padding:6px 12px; margin:8px 0; background:var(--ac-light,#eef2ff); color:#1f2937; border-radius:0 8px 8px 0; }
+    .markdown-body table { border-collapse:collapse; width:100%; margin:8px 0; }
+    .markdown-body th, .markdown-body td { border:1px solid #d1d5db; padding:5px 8px; text-align:left; font-size:11px; }
+    .markdown-body th { background:var(--ac,#4338ca); color:white; font-weight:800; }
 
-    /* ── ANSWER KEY ─────────────────────────────────────────── */
-    .answer-key-page { display: none; page-break-before: always; padding-top: 8px; }
-    @media print { .answer-key-page { display: block; } .quiz-answer, .cw-answer { display: none !important; } }
-    .answer-key-title { font-size: 15px; color: #dc2626; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; background: #fef2f2; border-left: 4px solid #dc2626; padding: 6px 12px; border-radius: 0 8px 8px 0; margin-bottom: 12px; }
-    .answer-key-item { font-size: 11px; margin-bottom: 5px; padding: 4px 8px; background: #fef2f2; border-radius: 5px; display: flex; gap: 8px; }
+    /* ── SCORE TRACKER (injected) ─────────────────────────── */
+    .score-tracker { margin:24px 0 8px; padding:12px 16px; border:2.5px solid var(--ac,#4338ca); border-radius:12px; background:var(--ac-light,#eef2ff); page-break-inside:avoid; break-inside:avoid; }
+    .score-stars { font-size:22px; letter-spacing:4px; text-align:center; margin-bottom:8px; }
+    .score-row { display:flex; align-items:center; justify-content:center; gap:20px; }
+    .score-label { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; }
+    .score-field { border-bottom:2px solid var(--ac,#4338ca); min-width:80px; text-align:center; font-size:14px; font-weight:900; color:#1f2937; padding:2px 8px; }
 
-    /* ── FOOTER ─────────────────────────────────────────────── */
-    .page-footer { position: fixed; bottom: 0.5cm; right: 1.4cm; font-size: 8px; color: #9ca3af; letter-spacing: 1px; opacity: 0.8; }
+    /* ── ANSWER KEY ───────────────────────────────────────── */
+    .answer-key-page { display:none; page-break-before:always; padding-top:8px; }
+    @media print { .answer-key-page { display:block; } .quiz-answer, .cw-answer { display:none !important; } }
+    .answer-key-title { font-size:14px; color:white; font-weight:900; letter-spacing:2px; text-transform:uppercase; background:#dc2626; padding:6px 14px; border-radius:6px; display:inline-block; margin-bottom:12px; }
+    .answer-key-item { font-size:11px; margin-bottom:5px; padding:5px 10px; background:#fef2f2; border-radius:6px; border-left:3px solid #dc2626; }
 
-    /* ── PRINT / SCREEN UTIL ───────────────────────────────── */
-    .hide-on-screen { display: block; }
-    button { display: none; }
+    /* ── FOOTER ───────────────────────────────────────────── */
+    .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
+
+    /* ── UTIL ─────────────────────────────────────────────── */
+    .hide-on-screen { display:block; }
+    button { display:none; }
   </style></head><body>
     ${headerHtml}
     ${node.innerHTML}
     <div class="page-footer">Gerado por Prof. Corujao • ${todayStr}</div>
     <script>
-      // inject activity-specific CSS vars and emoji into tag
+    (function(){
       var label = "${opts.activityLabel}";
-      var map = {
+      var themes = {
         'Campanha Narrativa':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📖' },
         'Quiz Avaliativo':       { ac:'#ea580c', light:'#fff7ed', emoji:'⚡' },
         'Caca-Palavras':         { ac:'#2563eb', light:'#eff6ff', emoji:'🔍' },
         'Palavras Cruzadas':     { ac:'#0d9488', light:'#f0fdfa', emoji:'✏️' },
         'Bingo Educativo':       { ac:'#7c3aed', light:'#f5f3ff', emoji:'🎱' },
         'Trilha do Conhecimento':{ ac:'#16a34a', light:'#f0fdf4', emoji:'🎲' },
-        'Jogo da Memoria':       { ac:'#db2777', light:'#fdf2f8', emoji:'🃏' },
+        'Jogo da Memoria':       { ac:'#db2777', light:'#fdf2f8', emoji:'🃏' }
       };
-      var theme = map[label] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
-      document.documentElement.style.setProperty('--ac', theme.ac);
-      document.documentElement.style.setProperty('--ac-light', theme.light);
-      // prepend emoji to activity tag
+      var t = themes[label] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
+      document.documentElement.style.setProperty('--ac', t.ac);
+      document.documentElement.style.setProperty('--ac-light', t.light);
+
+      // emoji on activity tag
       var tag = document.querySelector('.activity-tag');
-      if (tag) tag.textContent = theme.emoji + '  ' + tag.textContent;
-      // patch trail start/end to emoji
+      if (tag) tag.innerHTML = t.emoji + '&nbsp;&nbsp;' + tag.textContent.trim();
+
+      // ── Instructions box: wrap with icon and title ──────
+      var instr = document.querySelector('.instructions');
+      if (instr) {
+        var body = instr.innerHTML;
+        instr.innerHTML = '<div class="instructions-icon">🎮</div><div class="instructions-body"><div class="instructions-title">Como Jogar</div>' + body + '</div>';
+      }
+
+      // ── WORD SEARCH: word chips ─────────────────────────
+      var clueList = document.querySelector('.clue-list');
+      if (clueList && document.querySelector('.ws-grid')) {
+        var items = Array.from(clueList.querySelectorAll('li'));
+        var chips = document.createElement('div');
+        chips.className = 'word-chips';
+        items.forEach(function(li) {
+          var chip = document.createElement('div');
+          chip.className = 'word-chip';
+          chip.innerHTML = '<span class="word-chip-box"></span><span>' + li.textContent.replace(/^\\d+\\.\\s*/, '').trim() + '</span>';
+          chips.appendChild(chip);
+        });
+        clueList.replaceWith(chips);
+      }
+
+      // ── BINGO: colored B-I-N-G-O tiles + calling circles ─
+      var bingoTitle = document.querySelector('.bingo-card-title');
+      if (bingoTitle) {
+        var cols = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+        bingoTitle.innerHTML = 'BINGO'.split('').map(function(l,i){
+          return '<span class="bingo-letter" style="background:' + cols[i] + '">' + l + '</span>';
+        }).join('');
+      }
+      var bingoFree = document.querySelector('.bingo-cell.free');
+      if (bingoFree) bingoFree.innerHTML = '&#11088;<br>FREE<br>&#11088;';
+      document.querySelectorAll('.bingo-card').forEach(function(card) {
+        var calling = document.createElement('div');
+        calling.className = 'bingo-calling';
+        calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados — marque abaixo:</div><div class="bingo-calling-circles">'
+          + Array(24).fill('<span class="bingo-circle"></span>').join('') + '</div>';
+        card.appendChild(calling);
+      });
+
+      // ── QUIZ: progress dots + numbered badges + option pills ─
+      var quizQs = document.querySelectorAll('.quiz-q');
+      if (quizQs.length) {
+        var prog = document.createElement('div');
+        prog.className = 'quiz-progress';
+        for (var d=0; d<quizQs.length; d++) { var dot=document.createElement('div'); dot.className='quiz-dot'; prog.appendChild(dot); }
+        quizQs[0].before(prog);
+        quizQs.forEach(function(q, i) {
+          var badge = document.createElement('div');
+          badge.className = 'quiz-num';
+          badge.textContent = i + 1;
+          q.insertBefore(badge, q.firstChild);
+          // restyle opts
+          q.querySelectorAll('.quiz-opt').forEach(function(opt) {
+            var b = opt.querySelector('b');
+            if (b) {
+              var letter = document.createElement('span');
+              letter.className = 'quiz-opt-letter';
+              letter.textContent = b.textContent.replace(/[^A-D]/g,'');
+              b.replaceWith(letter);
+            }
+          });
+        });
+      }
+
+      // ── TRAIL: emoji cells + dice + legend ──────────────
       var cells = document.querySelectorAll('.trail-cell');
       if (cells.length) {
         cells[0].textContent = '🚀';
         cells[cells.length-1].textContent = '🏆';
+        cells.forEach(function(c) { if (c.classList.contains('special') && !c.classList.contains('start') && !c.classList.contains('end')) c.textContent = '⭐'; });
+        var board = document.querySelector('.trail-board');
+        if (board) {
+          var wrapper = document.createElement('div');
+          wrapper.className = 'trail-wrapper';
+          board.parentNode.insertBefore(wrapper, board);
+          wrapper.appendChild(board);
+          var diceSvg = '<svg class="trail-dice" width="38" height="38" viewBox="0 0 40 40"><rect x="2" y="2" width="36" height="36" rx="9" fill="white" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="28" cy="12" r="3.2" fill="currentColor"/><circle cx="20" cy="20" r="3.2" fill="currentColor"/><circle cx="12" cy="28" r="3.2" fill="currentColor"/><circle cx="28" cy="28" r="3.2" fill="currentColor"/></svg>';
+          var legend = document.createElement('div');
+          legend.className = 'trail-legend';
+          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>⭐ Bônus: avance 2</span><span>💤 Fique parado</span><span>🔄 Volte 2</span></div></div>' + diceSvg;
+          wrapper.appendChild(legend);
+        }
       }
-      // patch bingo FREE cell
-      var free = document.querySelector('.bingo-cell.free');
-      if (free) free.textContent = '⭐ FREE ⭐';
-      // wrap quiz question numbers in badge spans
-      document.querySelectorAll('.quiz-q').forEach(function(q, i) {
-        var badge = document.createElement('div');
-        badge.className = 'quiz-num';
-        badge.textContent = i + 1;
-        q.insertBefore(badge, q.firstChild);
-      });
-      // wrap crossword number badges
+
+      // ── MEMORY: cut hint + scissors on grid ─────────────
+      var memGrid = document.querySelector('.memory-grid');
+      if (memGrid) {
+        var hint = document.createElement('p');
+        hint.className = 'cut-hint';
+        hint.innerHTML = '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
+        memGrid.before(hint);
+      }
+
+      // ── CROSSWORD: num badges ────────────────────────────
       document.querySelectorAll('.cw-clue').forEach(function(cl) {
-        var m = cl.textContent.match(/^(\\d+)\\./);
+        var m = cl.textContent.match(/^(\\d+)[\\.\\)]/);
         if (m) {
           var badge = document.createElement('span');
           badge.className = 'cw-num-badge';
           badge.textContent = m[1];
-          cl.innerHTML = cl.innerHTML.replace(/^\\d+\\.\\s*/, '');
+          cl.innerHTML = cl.innerHTML.replace(/^\\d+[\\.\\)]\\s*/, '');
           cl.insertBefore(badge, cl.firstChild);
         }
       });
-      setTimeout(function(){ window.print(); }, 500);
+
+      // ── SCORE TRACKER ────────────────────────────────────
+      var akPage = document.querySelector('.answer-key-page');
+      var tracker = document.createElement('div');
+      tracker.className = 'score-tracker';
+      tracker.innerHTML = '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div><div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
+      if (akPage) akPage.before(tracker); else document.body.insertBefore(tracker, document.querySelector('.page-footer'));
+
+      setTimeout(function(){ window.print(); }, 600);
+    })();
     </script>
   </body></html>`);
   w.document.close();
