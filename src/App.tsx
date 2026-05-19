@@ -14,9 +14,9 @@ import {
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
+import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 
@@ -100,12 +100,21 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'):
   });
 };
 
+let _pendingInputTokens = 0;
+let _pendingOutputTokens = 0;
+
 const generateContentWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0]) => {
   if (!apiKey) {
     throw new Error('Chave da IA não configurada. Contate o suporte.');
   }
   if (!params.model) params.model = AI_MODEL;
-  return withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
+  const result = await withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
+  const usage = (result as any).usageMetadata;
+  if (usage) {
+    _pendingInputTokens += usage.promptTokenCount || 0;
+    _pendingOutputTokens += usage.candidatesTokenCount || 0;
+  }
+  return result;
 };
 
 function useFirestoreSync<T extends { id: string }>(
@@ -594,24 +603,25 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
             
             <div className="space-y-3 mb-4 max-h-[60vh] overflow-y-auto no-scrollbar">
               {notifications.length > 0 ? (
-                notifications.map(notification => (
-                  <div key={notification.id} className={`cursor-pointer p-3 rounded-xl border ${notification.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100/50'}`} onClick={() => {
-                    if (setScreen) setScreen('calendar');
-                    if (setNotifications) {
-                      setNotifications(notifications.map(n => n.id === notification.id ? {...n, read: true} : n));
-                    }
-                    setShowNotifications(false);
-                  }}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Sparkles size={14} className={notification.read ? 'text-gray-500' : 'text-indigo-600'} />
-                      <p className={`text-sm font-bold ${notification.read ? 'text-gray-700' : 'text-indigo-900'}`}>{notification.title}</p>
+                notifications.map(notification => {
+                  const iconMap: Record<string, string> = { class: '📚', holiday: '🎉', prep: '📝', admin: '📋', commemorative: '🎊' };
+                  const emoji = notification.auto ? (iconMap[notification.icon] || '📌') : '✨';
+                  return (
+                    <div key={notification.id} className={`cursor-pointer p-3 rounded-xl border ${notification.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100/50'}`} onClick={() => {
+                      if (setScreen) setScreen('calendar');
+                      if (setNotifications) {
+                        setNotifications(notifications.map(n => n.id === notification.id ? {...n, read: true} : n));
+                      }
+                      setShowNotifications(false);
+                    }}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base leading-none">{emoji}</span>
+                        <p className={`text-sm font-bold ${notification.read ? 'text-gray-700' : 'text-indigo-900'}`}>{notification.title}</p>
+                      </div>
+                      <p className={`text-xs leading-relaxed ${notification.read ? 'text-gray-600' : 'text-indigo-700'}`}>{notification.message}</p>
                     </div>
-                    <p className={`text-xs leading-relaxed ${notification.read ? 'text-gray-600' : 'text-indigo-700'}`}>{notification.message}</p>
-                    <span className={`text-[10px] mt-2 block ${notification.read ? 'text-gray-400' : 'text-indigo-400'}`}>
-                      {new Date(notification.date).toLocaleDateString()} às {new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <Bell size={32} className="text-gray-300 mb-3" />
@@ -739,7 +749,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title={`${firstName}!`} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
+      <Header setScreen={setScreen} title={`${firstName}!`} subtitle={greeting} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
       
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2rem] p-6 text-white shadow-lg mb-8 relative overflow-hidden">
         <div className="relative z-10">
@@ -3465,7 +3475,7 @@ const ChatScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-28 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
+      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
       
       <div className="mb-2">
         <div className="relative">
@@ -3736,7 +3746,7 @@ const ProfileScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
+      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative">
@@ -4610,6 +4620,12 @@ const CalendarScreen = ({
   const [newEventType, setNewEventType] = useState<'prep' | 'admin'>('prep');
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const monthAbbrNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const [globalHolidays, setGlobalHolidays] = useState<{id:string,name:string,date:string}[]>([]);
+  useEffect(() => {
+    getDoc(doc(db, 'config', 'feriados')).then(snap => {
+      if (snap.exists()) setGlobalHolidays(snap.data().list || []);
+    }).catch(() => {});
+  }, []);
 
   const EVENT_PRESETS = [
     { label: 'Prova',             icon: FileQuestion,  type: 'admin' as const, color: '#EF4444' },
@@ -4635,7 +4651,9 @@ const CalendarScreen = ({
 
   const defaultHolidays = getDefaultHolidays(currentYear).filter(h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0])));
 
-  const allEvents = [...filteredClasses.map(c => ({...c, type: 'class' as const})), ...customEvents, ...defaultHolidays];
+  const globalHolidayEvents = globalHolidays.map(h => ({ id: h.id, title: h.name, date: h.date, type: 'holiday' as const }));
+
+  const allEvents = [...filteredClasses.map(c => ({...c, type: 'class' as const})), ...customEvents, ...defaultHolidays, ...globalHolidayEvents];
   
   const getEventColorInternal = (e: any) => {
     if (e.type === 'class') {
@@ -4774,8 +4792,8 @@ const CalendarScreen = ({
         title="Cronograma" 
         subtitle="Visão Semestral" 
         profile={profile} 
-        notifications={notifications} 
-        setNotifications={setNotifications}
+        notifications={allNotifications} 
+        setNotifications={handleSetNotifications}
         bannerImage="https://i.ibb.co/x8t6Wmp7/20260419-204249-0002.png"
       >
         <button 
@@ -5094,7 +5112,7 @@ const EstudioScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
+      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
       
       <div className="flex gap-2 mb-6 pb-2 shrink-0">
         <button onClick={() => setActiveTab('context')} className={`flex-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === 'context' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}>Base Conhecimento</button>
@@ -5211,7 +5229,7 @@ const EstudioScreen = ({
 const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, notifications, setNotifications }: { savedResources: SavedResource[], setSavedResources: (r: SavedResource[]) => void, profile: UserProfile, setScreen: (s: Screen) => void, notifications?: any[], setNotifications?: (n: any[]) => void }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+      <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />
       {savedResources.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Archive size={44} className="mx-auto mb-3 opacity-20" />
@@ -5370,7 +5388,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
@@ -5470,9 +5488,17 @@ const AdminScreen = () => {
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca' | 'metrics' | 'holidays'>('users');
   const [userSearch, setUserSearch] = useState('');
   const [usersPage, setUsersPage] = useState(0);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [globalStats, setGlobalStats] = useState<any>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const [announcementActive, setAnnouncementActive] = useState(false);
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+  const [holidays, setHolidays] = useState<{id: string, name: string, date: string}[]>([]);
+  const [newHoliday, setNewHoliday] = useState({ name: '', date: '' });
+  const [holidaySaving, setHolidaySaving] = useState(false);
 
   // ── Biblioteca state ──────────────────────────────────────────────────────
   const [libItems, setLibItems] = useState<LibraryItem[]>([]);
@@ -5497,6 +5523,30 @@ const AdminScreen = () => {
     });
     reloadStorage();
     return unsubLib;
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    getDoc(doc(db, 'config', 'stats')).then(snap => {
+      if (snap.exists()) setGlobalStats(snap.data());
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    getDoc(doc(db, 'config', 'announcement')).then(snap => {
+      if (snap.exists()) {
+        setAnnouncement(snap.data().message || '');
+        setAnnouncementActive(snap.data().active || false);
+      }
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'holidays') return;
+    getDoc(doc(db, 'config', 'feriados')).then(snap => {
+      if (snap.exists()) setHolidays(snap.data().list || []);
+    }).catch(() => {});
   }, [activeTab]);
 
   const handleUpload = async () => {
@@ -5581,6 +5631,50 @@ const AdminScreen = () => {
     }
   };
 
+  const resetGenerations = async (userId: string) => {
+    try {
+      await setDoc(doc(db, 'users', userId), { generationsUsed: 0 }, { merge: true });
+    } catch (e) { console.error(e); }
+  };
+
+  const saveAnnouncement = async () => {
+    setAnnouncementSaving(true);
+    try {
+      await setDoc(doc(db, 'config', 'announcement'), { message: announcement, active: announcementActive, updatedAt: Date.now() });
+    } catch (e) { console.error(e); } finally { setAnnouncementSaving(false); }
+  };
+
+  const saveHoliday = async () => {
+    if (!newHoliday.name.trim() || !newHoliday.date) return;
+    setHolidaySaving(true);
+    try {
+      const newList = [...holidays, { id: Math.random().toString(36).slice(2), ...newHoliday }];
+      await setDoc(doc(db, 'config', 'feriados'), { list: newList });
+      setHolidays(newList);
+      setNewHoliday({ name: '', date: '' });
+    } catch (e) { console.error(e); } finally { setHolidaySaving(false); }
+  };
+
+  const deleteHoliday = async (id: string) => {
+    const newList = holidays.filter(h => h.id !== id);
+    try {
+      await setDoc(doc(db, 'config', 'feriados'), { list: newList });
+      setHolidays(newList);
+    } catch (e) { console.error(e); }
+  };
+
+  const exportCsv = () => {
+    const rows = [['Nome', 'Email', 'Status', 'Gerações', 'Tokens Entrada', 'Tokens Saída', 'Cadastro']];
+    sysUsers.forEach(u => {
+      rows.push([u.name || '', u.email || '', u.isPro ? 'PRO' : u.role === 'admin' ? 'ADMIN' : 'FREE', u.generationsUsed ?? 0, u.inputTokens ?? 0, u.outputTokens ?? 0, u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '']);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `usuarios_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const FREE_LIMIT = 10;
 
   const getUsageStatus = (u: any) => {
@@ -5629,19 +5723,16 @@ const AdminScreen = () => {
         </div>
       </div>
 
-      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1">
-        <button onClick={() => setActiveTab('users')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'users' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Usuários
-        </button>
-        <button onClick={() => setActiveTab('feedbacks')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'feedbacks' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Feedbacks
-        </button>
-        <button onClick={() => setActiveTab('biblioteca')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'biblioteca' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Biblioteca
-        </button>
+      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1 overflow-x-auto no-scrollbar">
+        {(['users','feedbacks','biblioteca','metrics','holidays'] as const).map(tab => {
+          const labels: Record<string, string> = { users: 'Usuários', feedbacks: 'Feedbacks', biblioteca: 'Biblioteca', metrics: 'Métricas', holidays: 'Feriados' };
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`flex-none px-3 py-2 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
+              {labels[tab]}
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === 'feedbacks' && (
@@ -5809,7 +5900,7 @@ const AdminScreen = () => {
                       {u.createdAt && <p className="text-[10px] text-gray-400 mt-0.5">Desde {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-2">
                     <button
                       onClick={() => togglePro(u.id, u.isPro)}
                       className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${u.isPro ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400 hover:text-emerald-600'}`}
@@ -5823,6 +5914,27 @@ const AdminScreen = () => {
                       {isAdmin ? 'ADMIN ATIVO' : 'DAR ADMIN'}
                     </button>
                   </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => resetGenerations(u.id)} className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-gray-200 bg-white text-amber-600 hover:border-amber-400 transition-colors">
+                      Zerar gerações
+                    </button>
+                    <button onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)} className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                      {expandedUserId === u.id ? 'Fechar' : 'Ver detalhes'}
+                    </button>
+                  </div>
+                  {expandedUserId === u.id && (
+                    <div className="mt-2 p-3 bg-indigo-50 rounded-xl text-xs space-y-1 border border-indigo-100">
+                      <p><span className="font-bold text-indigo-700">Gerações usadas:</span> {u.generationsUsed ?? 0}</p>
+                      <p><span className="font-bold text-indigo-700">Tokens entrada:</span> {(u.inputTokens || 0).toLocaleString()}</p>
+                      <p><span className="font-bold text-indigo-700">Tokens saída:</span> {(u.outputTokens || 0).toLocaleString()}</p>
+                      {(() => {
+                        const cost = ((u.inputTokens || 0) * 0.075 / 1_000_000 + (u.outputTokens || 0) * 0.30 / 1_000_000) * 5.2;
+                        return <p><span className="font-bold text-indigo-700">Custo estimado:</span> R$ {cost.toFixed(5)}</p>;
+                      })()}
+                      <p><span className="font-bold text-indigo-700">Telefone:</span> {u.phone || 'Não verificado'}</p>
+                      {u.createdAt && <p><span className="font-bold text-indigo-700">Cadastro:</span> {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -5851,6 +5963,112 @@ const AdminScreen = () => {
           )}
         </div>
       )}
+
+      {activeTab === 'metrics' && (
+        <div className="space-y-4 mb-8">
+          {/* API Cost Dashboard */}
+          {globalStats && (() => {
+            const inputCost = (globalStats.totalInputTokens || 0) * 0.075 / 1_000_000;
+            const outputCost = (globalStats.totalOutputTokens || 0) * 0.30 / 1_000_000;
+            const totalCostUSD = inputCost + outputCost;
+            const totalCostBRL = totalCostUSD * 5.2;
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>💰</span> Custo Real da API</h3>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-indigo-50 rounded-2xl p-3 text-center">
+                    <p className="text-xl font-black text-indigo-600">R$ {totalCostBRL.toFixed(4)}</p>
+                    <p className="text-xs text-indigo-500 font-medium">Custo total (BRL)</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-2xl p-3 text-center">
+                    <p className="text-xl font-black text-emerald-600">$ {totalCostUSD.toFixed(5)}</p>
+                    <p className="text-xs text-emerald-500 font-medium">Custo total (USD)</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-3 text-center">
+                    <p className="text-lg font-black text-gray-700">{(globalStats.totalGenerations || 0).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 font-medium">Gerações totais</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-3 text-center">
+                    <p className="text-lg font-black text-gray-700">{((globalStats.totalInputTokens || 0) + (globalStats.totalOutputTokens || 0)).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 font-medium">Tokens totais</p>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-400 bg-gray-50 rounded-xl p-2 text-center">
+                  Entrada: {(globalStats.totalInputTokens || 0).toLocaleString()} tokens · Saída: {(globalStats.totalOutputTokens || 0).toLocaleString()} tokens
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Announcement */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>📢</span> Aviso Global</h3>
+            <textarea
+              value={announcement}
+              onChange={e => setAnnouncement(e.target.value)}
+              placeholder="Digite um aviso para todos os usuários..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 resize-none mb-3"
+            />
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={announcementActive} onChange={e => setAnnouncementActive(e.target.checked)} className="w-4 h-4 accent-indigo-600" />
+                Aviso ativo
+              </label>
+              <button onClick={saveAnnouncement} disabled={announcementSaving} className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-50">
+                {announcementSaving ? 'Salvando...' : 'Publicar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Export CSV */}
+          <button onClick={exportCsv} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+            <Download size={16} /> Exportar usuários (CSV)
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'holidays' && (
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>🎉</span> Feriados Globais</h3>
+          <p className="text-xs text-gray-400 mb-4">Aparecem no calendário de todos os professores automaticamente.</p>
+
+          <div className="space-y-2 mb-4">
+            {holidays.sort((a,b) => a.date.localeCompare(b.date)).map(h => (
+              <div key={h.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{h.name}</p>
+                  <p className="text-xs text-gray-500">{new Date(h.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                </div>
+                <button onClick={() => deleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-1">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {holidays.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhum feriado cadastrado.</p>}
+          </div>
+
+          <div className="space-y-2 border-t border-gray-100 pt-4">
+            <input
+              type="text"
+              placeholder="Nome do feriado"
+              value={newHoliday.name}
+              onChange={e => setNewHoliday(h => ({...h, name: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <input
+              type="date"
+              value={newHoliday.date}
+              onChange={e => setNewHoliday(h => ({...h, date: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <button onClick={saveHoliday} disabled={holidaySaving || !newHoliday.name.trim() || !newHoliday.date}
+              className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50">
+              {holidaySaving ? 'Salvando...' : '+ Adicionar feriado'}
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -5865,6 +6083,14 @@ function AppInner() {
   const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
   const [authError, setAuthError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
+  const [phoneStep, setPhoneStep] = useState<'idle' | 'enter' | 'code'>('idle');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneVerifId, setPhoneVerifId] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneSending, setPhoneSending] = useState(false);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const [globalAnnouncement, setGlobalAnnouncement] = useState<{message:string,active:boolean}|null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -5873,6 +6099,13 @@ function AppInner() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, 'config', 'announcement')).then(snap => {
+      if (snap.exists() && snap.data().active) setGlobalAnnouncement(snap.data() as any);
+    }).catch(() => {});
+  }, [user]);
 
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
@@ -5956,6 +6189,66 @@ function AppInner() {
   const [customEvents, setCustomEvents] = useFirestoreSync<{id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative'}>('events', user, []);
   const [savedResources, setSavedResources] = useFirestoreSync<SavedResource>('resources', user, []);
   const [notifications, setNotifications] = useFirestoreSync<any>('notifications', user, []);
+
+  // ── Auto-notifications from schedule ─────────────────────────────────────
+  const [readAutoIds, setReadAutoIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('readAutoNotifs') || '[]')); } catch { return new Set(); }
+  });
+
+  const autoNotifications = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayDow = today.getDay();
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    const tomorrowDow = tomorrow.getDay();
+    const todayStr = today.toISOString().slice(0, 10);
+    const notifs: any[] = [];
+
+    // Today's classes
+    schedules.forEach(s => {
+      if (s.days.includes(todayDow)) {
+        const id = `auto-class-today-${s.id}-${todayStr}`;
+        notifs.push({ id, title: `Aula hoje: ${s.name}`, message: `${[s.subject, s.time, s.school].filter(Boolean).join(' · ')}`, date: today.getTime(), read: readAutoIds.has(id), auto: true, icon: 'class' });
+      }
+    });
+
+    // Tomorrow's classes
+    schedules.forEach(s => {
+      if (s.days.includes(tomorrowDow)) {
+        const id = `auto-class-tomorrow-${s.id}-${todayStr}`;
+        notifs.push({ id, title: `Aula amanhã: ${s.name}`, message: `${[s.subject, s.time, s.school].filter(Boolean).join(' · ')}`, date: today.getTime() - 1, read: readAutoIds.has(id), auto: true, icon: 'class' });
+      }
+    });
+
+    // Upcoming events (holidays, prep, admin) within 7 days
+    customEvents.forEach(e => {
+      const eventDate = new Date(e.date + 'T00:00:00');
+      const diff = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff < 0 || diff > 7) return;
+      const id = `auto-event-${e.id}-${todayStr}`;
+      const when = diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : `Em ${diff} dias`;
+      const typeLabel: Record<string, string> = { holiday: 'Feriado', prep: 'Preparação de aula', admin: 'Tarefa administrativa', commemorative: 'Data comemorativa' };
+      notifs.push({ id, title: `${typeLabel[e.type] || 'Evento'}: ${e.title}`, message: `${when} — ${eventDate.toLocaleDateString('pt-BR')}`, date: today.getTime() - 2, read: readAutoIds.has(id), auto: true, icon: e.type });
+    });
+
+    return notifs;
+  }, [schedules, customEvents, readAutoIds]);
+
+  const allNotifications = useMemo(() =>
+    [...autoNotifications, ...notifications].sort((a, b) => b.date - a.date),
+    [autoNotifications, notifications]
+  );
+
+  const handleSetNotifications = (updater: any[] | ((prev: any[]) => any[])) => {
+    const updated = typeof updater === 'function' ? updater(allNotifications) : updater;
+    const newReadIds = new Set(readAutoIds);
+    updated.filter(n => n.auto && n.read).forEach(n => newReadIds.add(n.id));
+    // Clear all: mark all auto as read
+    if (updated.length === 0) autoNotifications.forEach(n => newReadIds.add(n.id));
+    setReadAutoIds(newReadIds);
+    try { localStorage.setItem('readAutoNotifs', JSON.stringify([...newReadIds])); } catch {}
+    setNotifications(updated.filter(n => !n.auto));
+  };
   const [inboxMessages, setInboxMessages] = useFirestoreSync<{id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}>('messages', user, [
     { id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }
   ]);
@@ -6112,16 +6405,17 @@ function AppInner() {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Initialize profile in Firestore for new users
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
             name: email.split('@')[0],
             email: email.toLowerCase().trim(),
-            subject: 'Nova Disciplina',
             role: 'user',
             isPro: false,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            phoneVerified: false,
           });
+          // Trigger phone verification step
+          setPhoneStep('enter');
         }
       }
     } catch (error: any) {
@@ -6142,6 +6436,50 @@ function AppInner() {
     }
   };
 
+  const sendPhoneSms = async () => {
+    setPhoneError('');
+    const raw = phoneNumber.replace(/\D/g, '');
+    if (raw.length < 10) { setPhoneError('Digite um número de celular válido.'); return; }
+    const formatted = '+55' + raw;
+    setPhoneSending(true);
+    try {
+      // Check if phone already used by another account
+      const snap = await getDocs(query(collection(db, 'users'), where('phone', '==', formatted)));
+      if (!snap.empty) { setPhoneError('Este número já está vinculado a outra conta.'); setPhoneSending(false); return; }
+
+      if (!recaptchaRef.current) {
+        recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+      }
+      const provider = new PhoneAuthProvider(auth);
+      const verifId = await provider.verifyPhoneNumber(formatted, recaptchaRef.current);
+      setPhoneVerifId(verifId);
+      setPhoneStep('code');
+    } catch (e: any) {
+      setPhoneError(e.code === 'auth/invalid-phone-number' ? 'Número inválido. Use o formato: (11) 91234-5678' : 'Erro ao enviar SMS. Tente novamente.');
+      recaptchaRef.current = null;
+    } finally {
+      setPhoneSending(false);
+    }
+  };
+
+  const verifyPhoneCode = async () => {
+    setPhoneError('');
+    if (phoneCode.length !== 6) { setPhoneError('O código tem 6 dígitos.'); return; }
+    setPhoneSending(true);
+    try {
+      const raw = phoneNumber.replace(/\D/g, '');
+      const formatted = '+55' + raw;
+      const credential = PhoneAuthProvider.credential(phoneVerifId, phoneCode);
+      await linkWithCredential(auth.currentUser!, credential);
+      await setDoc(doc(db, 'users', auth.currentUser!.uid), { phone: formatted, phoneVerified: true }, { merge: true });
+      setPhoneStep('idle');
+    } catch (e: any) {
+      setPhoneError(e.code === 'auth/invalid-verification-code' ? 'Código incorreto. Verifique o SMS.' : 'Erro ao verificar. Tente novamente.');
+    } finally {
+      setPhoneSending(false);
+    }
+  };
+
   const FREE_GENERATION_LIMIT = 10;
 
   const isLimitReached = useMemo(() => {
@@ -6153,12 +6491,20 @@ function AppInner() {
 
   const recordGeneration = async () => {
     if (!user) return;
-    if (profile?.isPro || profile?.role === 'admin') return;
+    const isPrivileged = profile?.isPro || profile?.role === 'admin';
+    const inputT = _pendingInputTokens; const outputT = _pendingOutputTokens;
+    _pendingInputTokens = 0; _pendingOutputTokens = 0;
     try {
-      await setDoc(doc(db, 'users', user.uid), { generationsUsed: increment(1) }, { merge: true });
-    } catch {
-      // silently ignore — counter is best-effort
-    }
+      const userUpdate: any = { generationsUsed: increment(1) };
+      if (!isPrivileged) { userUpdate.inputTokens = increment(inputT); userUpdate.outputTokens = increment(outputT); }
+      await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
+      // Global stats (always record, even for pro)
+      await setDoc(doc(db, 'config', 'stats'), {
+        totalGenerations: increment(1),
+        totalInputTokens: increment(inputT),
+        totalOutputTokens: increment(outputT),
+      }, { merge: true });
+    } catch { /* best-effort */ }
   };
 
   if (!isAuthLoaded) {
@@ -6243,6 +6589,81 @@ function AppInner() {
               {isResetMode ? 'Voltar para o login' : (isLoginMode ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre')}
             </button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Phone verification screen — shown to new users right after registration
+  if (user && phoneStep !== 'idle') {
+    return (
+      <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
+        <div id="recaptcha-container" />
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-xl border border-indigo-100 flex flex-col items-center gap-5">
+          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-3xl">📱</div>
+          <div className="text-center">
+            <h2 className="text-xl font-black text-gray-900">Verificação de celular</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {phoneStep === 'enter'
+                ? 'Digite seu celular para receber um código de confirmação via SMS.'
+                : `Código enviado para +55 ${phoneNumber}. Digite os 6 dígitos abaixo.`}
+            </p>
+          </div>
+
+          {phoneError && <p className="text-sm text-red-500 font-medium text-center bg-red-50 p-2 rounded-xl w-full">{phoneError}</p>}
+
+          {phoneStep === 'enter' && (
+            <>
+              <div className="w-full">
+                <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Número do celular</label>
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-indigo-400">
+                  <span className="px-3 py-3 bg-gray-50 text-sm font-bold text-gray-500 border-r border-gray-200">🇧🇷 +55</span>
+                  <input
+                    type="tel"
+                    placeholder="(11) 91234-5678"
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    className="flex-1 px-3 py-3 text-sm focus:outline-none"
+                    inputMode="tel"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={sendPhoneSms}
+                disabled={phoneSending}
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50"
+              >
+                {phoneSending ? 'Enviando SMS...' : 'Enviar código'}
+              </button>
+              <button onClick={() => setPhoneStep('idle')} className="text-xs text-gray-400 underline">
+                Pular por agora
+              </button>
+            </>
+          )}
+
+          {phoneStep === 'code' && (
+            <>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                value={phoneCode}
+                onChange={e => setPhoneCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full text-center text-2xl font-black tracking-widest border border-gray-200 rounded-2xl py-4 focus:outline-none focus:border-indigo-400"
+              />
+              <button
+                onClick={verifyPhoneCode}
+                disabled={phoneSending || phoneCode.length !== 6}
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50"
+              >
+                {phoneSending ? 'Verificando...' : 'Confirmar código'}
+              </button>
+              <button onClick={() => { setPhoneStep('enter'); setPhoneCode(''); setPhoneError(''); }} className="text-xs text-gray-400 underline">
+                Reenviar SMS
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -6720,6 +7141,13 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
     <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       <ToastContainer />
 
+      {globalAnnouncement?.active && globalAnnouncement.message && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-indigo-600 text-white text-sm font-medium px-4 py-2 flex items-center justify-between shadow-lg">
+          <span className="flex-1 text-center">{globalAnnouncement.message}</span>
+          <button onClick={() => setGlobalAnnouncement(null)} className="ml-2 text-white/70 hover:text-white"><X size={16} /></button>
+        </div>
+      )}
+
       {/* ── Onboarding Modal ───────────────────────────────────────────── */}
       {showOnboarding && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-end justify-center p-0">
@@ -6836,7 +7264,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
 
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
-          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={notifications} setNotifications={setNotifications} setSelectedDate={(d: Date) => {
+          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} setSelectedDate={(d: Date) => {
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
@@ -6882,8 +7310,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                 }]);
               }
             }} 
-            notifications={notifications} 
-            setNotifications={setNotifications}
+            notifications={allNotifications} 
+            setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
             plannerDuration={plannerDuration}
@@ -6931,8 +7359,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             addClassItems={addClassItems} 
             customEvents={customEvents} 
             setCustomEvents={setCustomEvents} 
-            notifications={notifications} 
-            setNotifications={setNotifications}
+            notifications={allNotifications} 
+            setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
             plannerTopic={plannerTopic}
@@ -6942,7 +7370,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerMode={setPlannerMode}
             getScheduleBuffer={getScheduleBuffer}
           />}
-          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail" 
             schedules={schedules} 
             selectedDate={selectedDate} 
@@ -6953,7 +7381,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setCustomEvents={setCustomEvents}
             setClasses={setClasses}
           />}
-          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={notifications} setNotifications={setNotifications} onResetAccount={() => {
+          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={allNotifications} setNotifications={handleSetNotifications} onResetAccount={() => {
             setSchedules([]);
             setClasses([]);
             setCustomEvents([]);
@@ -6963,8 +7391,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
             setEstudioContext('');
           }} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
-          {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} />}
+          {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
 
