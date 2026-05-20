@@ -5702,7 +5702,7 @@ const buildStoryIllustration = (topic?: string, genre?: string): string => {
   return `<div class="story-illustration">${scenes[scene] || scenes.adventure}</div>`;
 };
 
-const printGameResult = async (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string }) => {
+const printGameResult = async (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string, bingoDim?: number }) => {
   const node = document.getElementById('game-print-area');
   if (!node) return;
   const iframe = document.createElement('iframe');
@@ -5740,7 +5740,7 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
         </div>
         <div class="fields-grid">
           <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
-          <div class="field"><span class="field-label">DATA</span><div class="field-line short">${todayStr}</div></div>
+          <div class="field"><span class="field-label">DATA</span><div class="field-line short"></div></div>
           <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
           <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
           <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
@@ -5800,7 +5800,7 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
     .bingo-card-title { display:flex; justify-content:center; gap:0; background:#1e293b; padding:8px 10px; }
     .bingo-letter { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; font-size:28px; font-weight:900; color:white; border-radius:8px; margin:0 2px; }
     .bingo-sub { text-align:center; font-size:9px; color:#6b7280; padding:4px 0; background:#f8f7ff; border-bottom:1px solid #ddd6fe; letter-spacing:1px; font-weight:700; }
-    .bingo-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:0; }
+    .bingo-grid { display:grid; grid-template-columns:repeat(var(--bingo-dim,5),1fr); gap:0; }
     .bingo-cell { border-right:1px solid #e0d9ff; border-bottom:1px solid #e0d9ff; padding:10px 4px; min-height:54px; text-align:center; font-size:9.5px; font-weight:700; display:flex; align-items:center; justify-content:center; background:white; }
     .bingo-cell:nth-child(odd) { background:#faf8ff; }
     .bingo-cell:nth-child(5n) { border-right:none; }
@@ -5835,6 +5835,10 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
     .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; padding:16px; background:var(--ac-light,#eef2ff); border-radius:14px; border:3px solid var(--ac,#4338ca); position:relative; background-image:radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size:8px 8px; }
     .trail-cell { border:3px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); box-shadow:0 2px 4px rgba(0,0,0,0.08); position:relative; }
     .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
+    .trail-cell.type-pergunta { background:#fbbf24 !important; color:#78350f !important; border-color:#d97706 !important; }
+    .trail-cell.type-bonus { background:#16a34a !important; color:white !important; border-color:#14532d !important; }
+    .trail-cell.type-penalidade { background:#dc2626 !important; color:white !important; border-color:#991b1b !important; }
+    .trail-cell.type-desafio { background:#3b82f6 !important; color:white !important; border-color:#1d4ed8 !important; }
     .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:18px; box-shadow:0 0 0 3px #fee2e2, 0 2px 6px rgba(0,0,0,0.15); }
     .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:18px; box-shadow:0 0 0 3px #dcfce7, 0 2px 6px rgba(0,0,0,0.15); }
     /* legend (injected) */
@@ -5844,6 +5848,14 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
     .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
     /* ── CROSSWORD ────────────────────────────────────────── */
+    .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; }
+    .cw-grid-table td { width:26px; height:26px; padding:0; }
+    .cw-grid-black { background:#1f2937; }
+    .cw-grid-white { border:2px solid #374151; border-radius:2px; position:relative; vertical-align:top; background:white; }
+    .cw-grid-num { position:absolute; top:1px; left:2px; font-size:7px; font-weight:900; color:var(--ac,#4338ca); line-height:1; }
+    .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:12px; }
+    .cw-clue-dir { font-size:9px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin:10px 0 5px; background:none; padding:0; border-radius:0; display:block; }
+    .cw-clue-item { font-size:10.5px; margin-bottom:4px; line-height:1.3; }
     .cw-item { margin-bottom:16px; page-break-inside:avoid; break-inside:avoid; }
     .cw-clue { font-weight:700; margin-bottom:5px; color:#1f2937; display:flex; align-items:center; gap:7px; }
     .cw-num-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--ac,#4338ca); color:white; border-radius:50%; font-size:10px; font-weight:900; flex-shrink:0; }
@@ -5931,6 +5943,7 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
       var t = themes[label] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
       document.documentElement.style.setProperty('--ac', t.ac);
       document.documentElement.style.setProperty('--ac-light', t.light);
+      document.documentElement.style.setProperty('--bingo-dim', '${opts.bingoDim || 5}');
 
       // emoji on activity tag
       var tag = document.querySelector('.activity-tag');
@@ -6039,12 +6052,16 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
         }).join('');
       }
       var bingoFree = document.querySelector('.bingo-cell.free');
-      if (bingoFree) bingoFree.innerHTML = '&#11088;<br>FREE<br>&#11088;';
+      if (bingoFree) {
+        var freeText = bingoFree.textContent.replace('★ ', '').trim();
+        bingoFree.innerHTML = '&#11088;<br>' + (freeText || 'FREE') + '<br>&#11088;';
+      }
       document.querySelectorAll('.bingo-card').forEach(function(card) {
+        var cellCount = card.querySelectorAll('.bingo-cell:not(.free)').length;
         var calling = document.createElement('div');
         calling.className = 'bingo-calling';
         calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados — marque abaixo:</div><div class="bingo-calling-circles">'
-          + Array(24).fill('<span class="bingo-circle"></span>').join('') + '</div>';
+          + Array(cellCount).fill('<span class="bingo-circle"></span>').join('') + '</div>';
         card.appendChild(calling);
       });
 
@@ -6078,7 +6095,16 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
       if (cells.length) {
         cells[0].textContent = '🚀';
         cells[cells.length-1].textContent = '🏆';
-        cells.forEach(function(c) { if (c.classList.contains('special') && !c.classList.contains('start') && !c.classList.contains('end')) c.textContent = '⭐'; });
+        cells.forEach(function(c) {
+          var type = c.dataset ? c.dataset.type : c.getAttribute('data-type');
+          if (c.classList.contains('start')) { c.textContent = '🚀'; }
+          else if (c.classList.contains('end')) { c.textContent = '🏆'; }
+          else if (type === 'pergunta') { c.classList.add('type-pergunta'); c.textContent = '❓'; }
+          else if (type === 'bonus') { c.classList.add('type-bonus'); c.textContent = '⭐'; }
+          else if (type === 'penalidade') { c.classList.add('type-penalidade'); c.textContent = '💀'; }
+          else if (type === 'desafio') { c.classList.add('type-desafio'); c.textContent = '⚡'; }
+          else if (c.classList.contains('special')) { c.textContent = '⭐'; }
+        });
         var board = document.querySelector('.trail-board');
         if (board) {
           var wrapper = document.createElement('div');
@@ -6088,7 +6114,7 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
           var diceSvg = '<svg class="trail-dice" width="38" height="38" viewBox="0 0 40 40"><rect x="2" y="2" width="36" height="36" rx="9" fill="white" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="28" cy="12" r="3.2" fill="currentColor"/><circle cx="20" cy="20" r="3.2" fill="currentColor"/><circle cx="12" cy="28" r="3.2" fill="currentColor"/><circle cx="28" cy="28" r="3.2" fill="currentColor"/></svg>';
           var legend = document.createElement('div');
           legend.className = 'trail-legend';
-          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>⭐ Bônus: avance 2</span><span>💤 Fique parado</span><span>🔄 Volte 2</span></div></div>' + diceSvg;
+          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>❓ Pergunta</span><span>⭐ Bônus</span><span>💀 Penalidade</span><span>⚡ Desafio</span></div></div>' + diceSvg;
           wrapper.appendChild(legend);
         }
       }
@@ -6102,17 +6128,21 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
         memGrid.before(hint);
       }
 
-      // ── CROSSWORD: num badges ────────────────────────────
-      document.querySelectorAll('.cw-clue').forEach(function(cl) {
-        var m = cl.textContent.match(/^(\\d+)[\\.\\)]/);
-        if (m) {
-          var badge = document.createElement('span');
-          badge.className = 'cw-num-badge';
-          badge.textContent = m[1];
-          cl.innerHTML = cl.innerHTML.replace(/^\\d+[\\.\\)]\\s*/, '');
-          cl.insertBefore(badge, cl.firstChild);
-        }
-      });
+      // ── CROSSWORD: restyle clue items ────────────────────
+      var cwClueCols = document.querySelector('.cw-clues-cols');
+      if (!cwClueCols) {
+        // Legacy list style: add num badges
+        document.querySelectorAll('.cw-clue').forEach(function(cl) {
+          var m = cl.textContent.match(/^(\\d+)[\\.\\)]/);
+          if (m) {
+            var badge = document.createElement('span');
+            badge.className = 'cw-num-badge';
+            badge.textContent = m[1];
+            cl.innerHTML = cl.innerHTML.replace(/^\\d+[\\.\\)]\\s*/, '');
+            cl.insertBefore(badge, cl.firstChild);
+          }
+        });
+      }
 
       // ── PIXEL ART decorations ────────────────────────────
       var pxStar = '<svg viewBox="0 0 16 16"' + SR + '>'
@@ -6214,6 +6244,29 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
         titleBox.appendChild(subtitle);
         wrap.appendChild(titleBox);
         akTitle.replaceWith(wrap);
+      }
+
+      // ── STORY: character card page ────────────────────────
+      if (label === 'Campanha Narrativa') {
+        var h2s = document.querySelectorAll('h2');
+        var classesH2 = null;
+        h2s.forEach(function(h) { if (h.textContent && h.textContent.indexOf('Classes') !== -1) classesH2 = h; });
+        if (classesH2) {
+          var cardPage = document.createElement('div');
+          cardPage.style.cssText = 'page-break-before:always;padding-top:12px;';
+          cardPage.innerHTML = '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;">🎭 Fichas dos Personagens</div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+            + ['🧙 Personagem 1', '⚔️ Personagem 2', '🏹 Personagem 3', '🛡️ Personagem 4'].map(function(name) {
+              return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;padding:12px;min-height:120px;">'
+                + '<div style="font-weight:900;font-size:12px;color:var(--ac,#4338ca);margin-bottom:8px;">' + name + '</div>'
+                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">NOME DO ALUNO: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
+                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">CLASSE: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
+                + '<div style="font-size:9px;font-weight:700;color:var(--ac,#4338ca);margin-top:8px;">XP</div>'
+                + '<div style="display:flex;gap:4px;margin-top:4px;">' + Array(10).fill('<div style="width:18px;height:14px;border:1.5px solid var(--ac,#4338ca);border-radius:3px;"></div>').join('') + '</div>'
+                + '</div>';
+            }).join('') + '</div>';
+          document.body.appendChild(cardPage);
+        }
       }
 
     })();
@@ -6560,6 +6613,30 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                     </div>
                   )}
 
+                  {activeMode === 'bingo' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Formato da cartela</label>
+                        <div className="flex gap-2 mt-1">
+                          {([5, 3] as const).map(sz => (
+                            <button key={sz} onClick={() => setBingoSize(sz)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${bingoSize === sz ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {sz}×{sz} {sz === 5 ? 'Clássico' : 'Mini'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Número de cartelas</label>
+                        <input type="number" min={1} max={30} value={bingoCardCount} onChange={e => setBingoCardCount(Math.max(1, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                      {bingoSize === 5 && (
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Texto da casa livre</label>
+                          <input value={bingoFreeText} onChange={e => setBingoFreeText(e.target.value || 'LIVRE')} placeholder="LIVRE" className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                        </div>
+                      )}
+                    </>
+                  )}
                   {activeMode === 'trail' && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da trilha (casas)</label>
@@ -6675,21 +6752,61 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
                     {activeMode === 'crossword' && result.words && (
                       <>
-                        <div className="instructions"><b>Instrucoes:</b> Leia cada definicao e escreva a palavra correta nos quadradinhos, uma letra em cada caixa.</div>
-                        <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
-                          {result.words.map((w: any, i: number) => (
-                            <li key={i} className="cw-item">
-                              <p className="cw-clue">{w.clue}</p>
-                              <div className="cw-boxes">
-                                {w.word.split('').map((_: string, j: number) => (<div key={j} className="cw-box"></div>))}
-                              </div>
-                              <p className="cw-answer" style={{ fontSize: 10, color: '#888', marginTop: 4 }}>Resposta: {w.word}</p>
-                            </li>
-                          ))}
-                        </ol>
+                        <div className="instructions"><b>Instrucoes:</b> Leia cada definição e preencha as palavras na grade — uma letra por quadrado.</div>
+                        {result.crossword ? (
+                          <>
+                            <div className="overflow-x-auto">
+                              <table style={{ borderCollapse: 'collapse', margin: '10px auto' }}>
+                                <tbody>
+                                  {result.crossword.grid.map((row: (string|null)[], r: number) => (
+                                    <tr key={r}>
+                                      {row.map((cell: string|null, c: number) => {
+                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: '#1f2937' }} />;
+                                        const num = result.crossword.cellNumbers[`${r},${c}`];
+                                        return (
+                                          <td key={c} style={{ width: 26, height: 26, border: '2px solid #374151', position: 'relative', verticalAlign: 'top', padding: 0, background: 'white' }}>
+                                            {num && <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 7, fontWeight: 900, color: '#4338ca', lineHeight: 1 }}>{num}</span>}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              {result.crossword.across.length > 0 && (
+                                <div>
+                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">→ Horizontal</p>
+                                  {result.crossword.across.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                </div>
+                              )}
+                              {result.crossword.down.length > 0 && (
+                                <div>
+                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">↓ Vertical</p>
+                                  {result.crossword.down.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
+                            {result.words.map((w: any, i: number) => (
+                              <li key={i} className="cw-item">
+                                <p className="cw-clue">{w.clue}</p>
+                                <div className="cw-boxes">{w.word.split('').map((_: string, j: number) => <div key={j} className="cw-box" />)}</div>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
                         <div className="answer-key-page">
                           <h2 className="answer-key-title">Gabarito</h2>
-                          {result.words.map((w: any, i: number) => (
+                          {result.crossword ? (
+                            <>
+                              {result.crossword.across.length > 0 && <><p style={{fontWeight:900,marginBottom:4}}>→ Horizontal</p>{result.crossword.across.map((c: any) => <div key={c.num} className="answer-key-item"><b>{c.num}.</b> {c.word}</div>)}</>}
+                              {result.crossword.down.length > 0 && <><p style={{fontWeight:900,margin:'8px 0 4px'}}>↓ Vertical</p>{result.crossword.down.map((c: any) => <div key={c.num} className="answer-key-item"><b>{c.num}.</b> {c.word}</div>)}</>}
+                            </>
+                          ) : result.words.map((w: any, i: number) => (
                             <div key={i} className="answer-key-item"><b>{i + 1}.</b> {w.word}</div>
                           ))}
                         </div>
@@ -6726,7 +6843,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                             const isEnd = i + 1 === count;
                             const isStart = i === 0;
                             return (
-                              <div key={i} className={`trail-cell ${isStart ? 'start' : ''} ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`}>{i + 1}</div>
+                              <div key={i} className={`trail-cell ${isStart ? 'start' : ''} ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`} data-type={special?.type}>{i + 1}</div>
                             );
                           })}
                         </div>
@@ -6744,7 +6861,10 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                         <div className="instructions"><b>Como jogar:</b> Imprima, recorte pelas linhas tracejadas e embaralhe as cartas. Cada aluno (ou dupla) tenta encontrar os pares conceito-definicao virando duas cartas por vez.</div>
                         <div className="memory-grid">
                           {result.pairs.flatMap((p: any, i: number) => [
-                            <div key={`c-${i}`} className="memory-pair concept">{p.concept}</div>,
+                            <div key={`c-${i}`} className="memory-pair concept">
+                              {p.emoji && <span style={{fontSize:18,display:'block',marginBottom:2}}>{p.emoji}</span>}
+                              {p.concept}
+                            </div>,
                             <div key={`d-${i}`} className="memory-pair">{p.definition}</div>
                           ])}
                         </div>
