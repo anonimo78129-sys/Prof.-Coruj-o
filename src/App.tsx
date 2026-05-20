@@ -5041,6 +5041,54 @@ const buildBingoCards = (items: string[], count: number): string[][][] => {
   return cards;
 };
 
+const STORY_SECTIONS = ['🌍 Cenário', '👥 Classes de Personagens', '⚔️ Missões', '🏆 Sistema de Pontos', '👑 Boss Final', '📋 Roteiro do Professor'];
+
+const generateStoryPixelArts = async (topic: string, genre: string): Promise<Record<string, string>> => {
+  try {
+    const prompt = `Gere 6 pixel art SVG cinematográficos (32x18) ÚNICOS e TEMÁTICOS para uma campanha gamificada.
+
+TEMA: "${topic}"
+GÊNERO: ${genre}
+
+Crie uma cena PIXEL ART diferente para cada seção, refletindo o tema "${topic}":
+- "🌍 Cenário" → paisagem ampla (céu, terreno, vegetação ou estrutura ambiental do tema)
+- "👥 Classes de Personagens" → 3-4 figuras humanoides lado a lado, cada uma com classe distinta (cores/chapéus/armas diferentes)
+- "⚔️ Missões" → mapa com X marcando local, ou ícone de quest (espada, pergaminho, bússola)
+- "🏆 Sistema de Pontos" → moedas douradas empilhadas + estrelas + troféu
+- "👑 Boss Final" → silhueta grande de inimigo intimidador com olhos brilhantes, ocupando centro
+- "📋 Roteiro do Professor" → figura de professor com livro/cajado em frente a quadro/atril
+
+REGRAS ESTRITAS:
+- viewBox="0 0 32 18" (cinema 16:9)
+- Use APENAS <rect> com width e height inteiros (geralmente "1")
+- Coordenadas integers: x 0–31, y 0–17
+- 6–10 cores hexadecimais por cena, com paleta apropriada ao tema "${topic}"
+- 40–120 rects por cena
+- Inclua shape-rendering="crispEdges" e xmlns
+- Composições centralizadas e LEGÍVEIS
+
+Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
+{
+  "🌍 Cenário": "<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 32 18\\" shape-rendering=\\"crispEdges\\">...</svg>",
+  "👥 Classes de Personagens": "<svg ...>...</svg>",
+  "⚔️ Missões": "<svg ...>...</svg>",
+  "🏆 Sistema de Pontos": "<svg ...>...</svg>",
+  "👑 Boss Final": "<svg ...>...</svg>",
+  "📋 Roteiro do Professor": "<svg ...>...</svg>"
+}
+
+Use as chaves EXATAMENTE como acima (com emojis).`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = response.text || '';
+    const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (err) {
+    console.warn('[StoryPixelArts] generation failed:', err);
+    return {};
+  }
+};
+
 type StoryScene = 'adventure' | 'mystery' | 'fantasy' | 'space' | 'ancient' | 'ocean' | 'science' | 'math' | 'nature' | 'prehistoric';
 
 const matchTopicToScene = (topic: string): StoryScene | null => {
@@ -5751,6 +5799,8 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
     /* ── STORY ILLUSTRATION (Campanha Narrativa cover) ────── */
     .story-illustration { margin:0 0 18px; line-height:0; page-break-inside:avoid; break-inside:avoid; }
     .story-illustration svg { width:100%; height:auto; display:block; border-radius:14px; box-shadow:0 4px 18px rgba(0,0,0,0.18); }
+    .story-section-art { margin:14px 0 6px; page-break-after:avoid; break-after:avoid; break-inside:avoid; line-height:0; }
+    .story-section-art svg { width:100%; height:auto; max-height:180px; display:block; image-rendering:pixelated; image-rendering:crisp-edges; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
 
     /* ── FOOTER ───────────────────────────────────────────── */
     .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
@@ -6181,11 +6231,15 @@ Gere ${Math.min(count, 12)} casas especiais (não precisa preencher todas). Use 
 Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras).
 Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."}]}`;
       }
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
-      const raw = response.text || '';
       if (activeMode === 'story') {
-        setResult({ markdown: raw });
+        const [response, pixelArts] = await Promise.all([
+          generateContentWithRetry({ model: AI_MODEL, contents: prompt }),
+          generateStoryPixelArts(topic, genre)
+        ]);
+        setResult({ markdown: response.text || '', pixelArts });
       } else {
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+        const raw = response.text || '';
         const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
         const parsed = JSON.parse(cleaned);
         if (activeMode === 'wordsearch') {
@@ -6402,7 +6456,28 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   <div id="game-print-area" className="bg-gray-50 rounded-2xl p-4 text-sm">
                     {activeMode === 'story' && result.markdown && (
                       <div className="markdown-body prose prose-sm max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.markdown}</ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h2: ({ children, ...props }) => {
+                              const extractText = (n: any): string => {
+                                if (typeof n === 'string') return n;
+                                if (typeof n === 'number') return String(n);
+                                if (Array.isArray(n)) return n.map(extractText).join('');
+                                if (n?.props?.children) return extractText(n.props.children);
+                                return '';
+                              };
+                              const title = extractText(children).trim();
+                              const svg = result.pixelArts?.[title];
+                              return (
+                                <>
+                                  {svg && <div className="story-section-art" dangerouslySetInnerHTML={{ __html: svg }} />}
+                                  <h2 {...props}>{children}</h2>
+                                </>
+                              );
+                            }
+                          }}
+                        >{result.markdown}</ReactMarkdown>
                       </div>
                     )}
 
