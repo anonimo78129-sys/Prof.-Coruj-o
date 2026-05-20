@@ -3822,6 +3822,7 @@ const ProfileScreen = ({
                 {profile.schoolName}
               </p>
             )}
+            {user?.email && <p className="text-xs text-gray-400 mt-2">{user.email}</p>}
           </>
         )}
 
@@ -3833,14 +3834,80 @@ const ProfileScreen = ({
         </button>
       </div>
 
+      {/* Pro Status Card */}
+      {profile.isPro || profile.role === 'admin' ? (
+        <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-5 shadow-lg mb-4 flex items-center gap-4">
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0 text-3xl">⭐</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="bg-white text-orange-600 text-xs font-black px-2 py-0.5 rounded-full tracking-wider uppercase">PRO</span>
+              {profile.role === 'admin' && <span className="bg-white/30 text-white text-xs font-black px-2 py-0.5 rounded-full">ADMIN</span>}
+            </div>
+            <p className="text-white font-bold text-sm">Acesso ilimitado ativo</p>
+            <p className="text-orange-100 text-xs mt-0.5">Gerações ilimitadas, todos os recursos desbloqueados.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-[2rem] p-5 shadow-sm border-2 border-gray-100 mb-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-xl">🔒</div>
+            <div>
+              <p className="font-bold text-gray-900 text-sm">Modo Gratuito</p>
+              <p className="text-xs text-gray-400">{profile.generationsUsed ?? 0} de 10 gerações usadas</p>
+            </div>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
+            <div
+              className="bg-indigo-500 h-2 rounded-full transition-all"
+              style={{ width: `${Math.min(100, ((profile.generationsUsed ?? 0) / 10) * 100)}%` }}
+            />
+          </div>
+          <a
+            href="https://wa.me/5598981796309?text=Olá! Quero ativar o plano Pro do Prof. Corujão."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-green-500 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm"
+          >
+            <MessageCircle size={18} /> Ativar Pro via WhatsApp
+          </a>
+        </div>
+      )}
 
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[
+          { label: 'Turmas', value: schedules.length, emoji: '👥' },
+          { label: 'Materiais', value: savedResources.length, emoji: '📄' },
+          { label: 'Gerações', value: profile.generationsUsed ?? 0, emoji: '✨' },
+        ].map(stat => (
+          <div key={stat.label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 text-center">
+            <div className="text-2xl mb-1">{stat.emoji}</div>
+            <div className="text-xl font-black text-gray-900">{stat.value}</div>
+            <div className="text-xs text-gray-400 font-medium">{stat.label}</div>
+          </div>
+        ))}
+      </div>
 
       <div className="space-y-3">
         <h3 className="text-lg font-bold text-gray-900 mb-4 px-2">Gestão de Turmas</h3>
         
-        <div className="w-full h-32 rounded-2xl overflow-hidden mb-2 shadow-sm relative">
-           <img src="https://i.ibb.co/N6j5Gwmy/20260419-204249-0004.png" alt="Painel de Turmas" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </div>
+        {schedules.length > 0 ? (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-2 flex items-center gap-4">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shrink-0">
+              <Users size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-indigo-900 text-sm">{schedules.length} turma{schedules.length !== 1 ? 's' : ''} ativa{schedules.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-indigo-400 mt-0.5">
+                {schedules.slice(0, 3).map(s => s.name).join(' · ')}{schedules.length > 3 ? ` +${schedules.length - 3}` : ''}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mb-2 text-center">
+            <p className="text-sm text-gray-400">Nenhuma turma cadastrada ainda.</p>
+          </div>
+        )}
 
         <button 
           onClick={() => setShowScheduleConfig(!showScheduleConfig)}
@@ -4188,22 +4255,27 @@ const ProfileScreen = ({
             <ChevronRight size={20} className="text-gray-400" />
           </button>
 
-          <button 
-            onClick={() => setShowResetConfirm(true)}
-            className="w-full flex items-center justify-between p-4 rounded-2xl bg-red-50 hover:bg-red-100 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-red-600 shadow-sm">
-                <Trash2 size={20} />
-              </div>
-              <div className="text-left">
-                <h3 className="font-bold text-red-700">Resetar Conta</h3>
-                <p className="text-xs text-red-500">Apagar todos os dados</p>
-              </div>
-            </div>
-            <ChevronRight size={20} className="text-red-400" />
-          </button>
         </div>
+      </div>
+
+      {/* Zona de Perigo */}
+      <div className="bg-red-50 border-2 border-red-100 rounded-[2rem] p-6 mb-8 mt-4">
+        <p className="text-xs font-black text-red-400 uppercase tracking-widest mb-4">⚠️ Zona de Perigo</p>
+        <button
+          onClick={() => setShowResetConfirm(true)}
+          className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-red-100 shadow-sm hover:bg-red-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+              <Trash2 size={20} />
+            </div>
+            <div className="text-left">
+              <h3 className="font-bold text-red-700">Resetar Conta</h3>
+              <p className="text-xs text-red-400">Apaga todos os seus dados permanentemente</p>
+            </div>
+          </div>
+          <ChevronRight size={20} className="text-red-300" />
+        </button>
       </div>
 
       <AnimatePresence>
@@ -4324,43 +4396,48 @@ const ProfileScreen = ({
         )}
 
         {showResetConfirm && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
             onClick={() => setShowResetConfirm(false)}
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl border-4 border-red-50"
+              className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl"
             >
-              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-xl flex items-center justify-center mb-4">
-                <Trash2 size={24} />
+              <div className="text-center mb-4">
+                <div className="text-6xl mb-3">🦉💥</div>
+                <h2 className="text-xl font-black text-gray-900 mb-1">Eita... tá certo disso?</h2>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Isso vai apagar <span className="font-bold text-gray-700">tudo</span> — turmas, materiais, notas...
+                  até aquela atividade incrível que você fez às 23h. 😬
+                </p>
+                <p className="text-xs text-red-400 font-bold mt-3 bg-red-50 rounded-xl py-2 px-3">
+                  Sem volta, viu? Sem recuperar depois!
+                </p>
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Resetar Conta (Ação Irreversível)</h2>
-              <p className="text-sm text-gray-600 font-medium mb-2">Tem certeza <span className="text-red-600 font-bold">ABSOLUTA</span> que deseja fazer isso?</p>
-              <p className="text-sm text-gray-500 mb-6">Todos os seus cronogramas, turmas, notas e acervo na nuvem serão brutalmente excluídos e não poderão ser recuperados de forma alguma.</p>
-              
-              <div className="flex gap-3">
-                <button 
+              <div className="flex gap-3 mt-6">
+                <button
                   onClick={() => setShowResetConfirm(false)}
-                  className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl text-sm font-bold border border-gray-200"
+                  className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-sm"
                 >
-                  Não, cancelar
+                  Não, me arrependi! 😅
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     if (onResetAccount) onResetAccount();
                     setShowResetConfirm(false);
-                    setScreen('home'); // Redireciona para o início após a deleção
+                    setScreen('home');
                   }}
-                  className="flex-1 bg-red-600 text-white rounded-xl py-3 text-sm font-bold hover:bg-red-700 transition-colors shadow-sm"
+                  className="flex-1 bg-gray-100 text-red-500 rounded-2xl py-3 text-sm font-bold"
                 >
-                  Sim, APAGAR TUDO
+                  Sim, manda bala 💥
                 </button>
               </div>
             </motion.div>
