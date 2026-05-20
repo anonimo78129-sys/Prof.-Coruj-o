@@ -5704,14 +5704,11 @@ const buildStoryIllustration = (topic?: string, genre?: string): string => {
   return `<div class="story-illustration">${scenes[scene] || scenes.adventure}</div>`;
 };
 
-const printGameResult = async (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string, bingoDim?: number }) => {
+const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string, bingoDim?: number }) => {
   const node = document.getElementById('game-print-area');
   if (!node) return;
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;height:1122px;border:none;background:white;';
-  document.body.appendChild(iframe);
-  const iDoc = iframe.contentDocument!;
-  iDoc.open();
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) return;
   const todayStr = new Date().toLocaleDateString('pt-BR');
   const owlSvg = `<svg width="84" height="84" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:0.88;flex-shrink:0">
     <ellipse cx="30" cy="43" rx="19" ry="16" fill="rgba(255,255,255,0.18)"/>
@@ -5750,7 +5747,7 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
       </div>
     </div>
   `;
-  iDoc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
     @page { size: A4; margin: 1.4cm 1.4cm 2cm; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
@@ -6271,22 +6268,11 @@ const printGameResult = async (opts: { title: string, subject?: string, level?: 
         }
       }
 
+      setTimeout(function(){ window.print(); }, 600);
     })();
     </script>
   </body></html>`);
-  iDoc.close();
-  await new Promise(r => setTimeout(r, 900));
-  const html2pdf = ((await import('html2pdf.js')) as any).default;
-  const safeTitle = (opts.title || 'atividade').replace(/[^\w\s-]/g, '').trim() || 'atividade';
-  await html2pdf().set({
-    margin: [14, 14, 20, 14],
-    filename: `${safeTitle}.pdf`,
-    image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['css', 'avoid-all', 'legacy'] }
-  }).from(iDoc.body).save();
-  document.body.removeChild(iframe);
+  w.document.close();
 };
 
 const EstudioScreen = ({
@@ -6314,7 +6300,6 @@ const EstudioScreen = ({
 }) => {
   const [activeMode, setActiveMode] = useState<GameMode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [classId, setClassId] = useState<string>('');
   const [topic, setTopic] = useState('');
@@ -6673,7 +6658,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                 <div className="p-5">
                   <div className="flex gap-2 mb-4">
                     <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">↻ Refazer</button>
-                    <button onClick={async () => { setIsPdfLoading(true); try { await printGameResult(printOpts); } finally { setIsPdfLoading(false); } }} disabled={isPdfLoading} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60">{isPdfLoading ? <><Loader2 size={16} className="animate-spin" /> Gerando PDF…</> : <><Download size={16} /> Baixar PDF</>}</button>
+                    <button onClick={() => printGameResult(printOpts)} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
                   </div>
 
                   <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 mb-3">
