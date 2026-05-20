@@ -730,7 +730,7 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
 
 const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void }) => {
   const quickActions = [
-    { title: 'Gamificar', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => setScreen('estudio') },
+    { title: 'Gamificar', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
   ];
@@ -3486,7 +3486,7 @@ const ChatScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-28 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
+      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Assistente" profile={profile} notifications={notifications} setNotifications={setNotifications} />
       
       <div className="mb-2">
         <div className="relative">
@@ -5022,16 +5022,19 @@ const buildWordSearchGrid = (rawWords: string[], size = 15): { grid: string[][],
   return { grid, placements };
 };
 
-const buildBingoCards = (items: string[], count: number): string[][][] => {
+const buildBingoCards = (items: string[], count: number, dim: 3 | 5 = 5, freeText = 'LIVRE'): string[][][] => {
+  const hasFree = dim === 5;
+  const needed = dim * dim - (hasFree ? 1 : 0);
+  const freeR = Math.floor(dim / 2), freeC = Math.floor(dim / 2);
   const cards: string[][][] = [];
   for (let n = 0; n < count; n++) {
-    const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, 24);
+    const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, needed);
     const card: string[][] = [];
     let idx = 0;
-    for (let r = 0; r < 5; r++) {
+    for (let r = 0; r < dim; r++) {
       const row: string[] = [];
-      for (let c = 0; c < 5; c++) {
-        if (r === 2 && c === 2) row.push('★ LIVRE');
+      for (let c = 0; c < dim; c++) {
+        if (hasFree && r === freeR && c === freeC) row.push(`★ ${freeText}`);
         else row.push(shuffled[idx++] || '');
       }
       card.push(row);
@@ -5039,6 +5042,154 @@ const buildBingoCards = (items: string[], count: number): string[][][] => {
     cards.push(card);
   }
   return cards;
+};
+
+const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
+  const SIZE = 21;
+  const CENTER = Math.floor(SIZE / 2);
+  type Cell = string | null;
+  const grid: Cell[][] = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+  type Placement = {word: string, clue: string, row: number, col: number, dir: 'H' | 'V'};
+  const placements: Placement[] = [];
+  const words = rawWords.slice(0, 15).map(w => ({...w, word: w.word.toUpperCase().replace(/[^A-Z]/g, '')})).filter(w => w.word.length >= 3);
+  if (words.length === 0) return null;
+
+  const canPlace = (word: string, row: number, col: number, dir: 'H' | 'V'): boolean => {
+    const len = word.length;
+    if (dir === 'H') {
+      if (col < 0 || col + len > SIZE || row < 0 || row >= SIZE) return false;
+      if (col > 0 && grid[row][col - 1] !== null) return false;
+      if (col + len < SIZE && grid[row][col + len] !== null) return false;
+      for (let i = 0; i < len; i++) {
+        const cell = grid[row][col + i];
+        if (cell !== null && cell !== word[i]) return false;
+        if (cell === null) {
+          if (row > 0 && grid[row - 1][col + i] !== null) return false;
+          if (row < SIZE - 1 && grid[row + 1][col + i] !== null) return false;
+        }
+      }
+    } else {
+      if (row < 0 || row + len > SIZE || col < 0 || col >= SIZE) return false;
+      if (row > 0 && grid[row - 1][col] !== null) return false;
+      if (row + len < SIZE && grid[row + len][col] !== null) return false;
+      for (let i = 0; i < len; i++) {
+        const cell = grid[row + i][col];
+        if (cell !== null && cell !== word[i]) return false;
+        if (cell === null) {
+          if (col > 0 && grid[row + i][col - 1] !== null) return false;
+          if (col < SIZE - 1 && grid[row + i][col + 1] !== null) return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const doPlace = (word: string, row: number, col: number, dir: 'H' | 'V') => {
+    for (let i = 0; i < word.length; i++) {
+      if (dir === 'H') grid[row][col + i] = word[i];
+      else grid[row + i][col] = word[i];
+    }
+  };
+
+  const first = words[0];
+  doPlace(first.word, CENTER, CENTER - Math.floor(first.word.length / 2), 'H');
+  placements.push({word: first.word, clue: first.clue, row: CENTER, col: CENTER - Math.floor(first.word.length / 2), dir: 'H'});
+
+  for (let wi = 1; wi < words.length; wi++) {
+    const {word, clue} = words[wi];
+    let placed = false;
+    for (const pw of [...placements].reverse()) {
+      if (placed) break;
+      const nd: 'H' | 'V' = pw.dir === 'H' ? 'V' : 'H';
+      for (let ni = 0; ni < word.length && !placed; ni++) {
+        for (let pi = 0; pi < pw.word.length && !placed; pi++) {
+          if (word[ni] !== pw.word[pi]) continue;
+          const row = nd === 'V' ? pw.row - ni : pw.row + pi;
+          const col = nd === 'V' ? pw.col + pi : pw.col - ni;
+          if (canPlace(word, row, col, nd)) {
+            doPlace(word, row, col, nd);
+            placements.push({word, clue, row, col, dir: nd});
+            placed = true;
+          }
+        }
+      }
+    }
+  }
+
+  let minR = SIZE, maxR = 0, minC = SIZE, maxC = 0;
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    if (grid[r][c] !== null) { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); }
+  }
+  if (minR > maxR) return null;
+  const pad = 1;
+  const r0 = Math.max(0, minR - pad), r1 = Math.min(SIZE - 1, maxR + pad);
+  const c0 = Math.max(0, minC - pad), c1 = Math.min(SIZE - 1, maxC + pad);
+  const trimmed: Cell[][] = [];
+  for (let r = r0; r <= r1; r++) trimmed.push(grid[r].slice(c0, c1 + 1));
+  const adjP = placements.map(p => ({...p, row: p.row - r0, col: p.col - c0}));
+  const cellNum = new Map<string, number>();
+  let counter = 1;
+  const sorted = [...adjP].sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
+  const across: {num: number, word: string, clue: string}[] = [];
+  const down: {num: number, word: string, clue: string}[] = [];
+  for (const p of sorted) {
+    const key = `${p.row},${p.col}`;
+    if (!cellNum.has(key)) cellNum.set(key, counter++);
+    const num = cellNum.get(key)!;
+    if (p.dir === 'H') across.push({num, word: p.word, clue: p.clue});
+    else down.push({num, word: p.word, clue: p.clue});
+  }
+  across.sort((a, b) => a.num - b.num);
+  down.sort((a, b) => a.num - b.num);
+  return {grid: trimmed, cellNumbers: Object.fromEntries(cellNum), across, down};
+};
+
+const STORY_SECTIONS = ['🌍 Cenário', '👥 Classes de Personagens', '⚔️ Missões', '🏆 Sistema de Pontos', '👑 Boss Final', '📋 Roteiro do Professor'];
+
+const generateStoryPixelArts = async (topic: string, genre: string): Promise<Record<string, string>> => {
+  try {
+    const prompt = `Gere 6 pixel art SVG cinematográficos (32x18) ÚNICOS e TEMÁTICOS para uma campanha gamificada.
+
+TEMA: "${topic}"
+GÊNERO: ${genre}
+
+Crie uma cena PIXEL ART diferente para cada seção, refletindo o tema "${topic}":
+- "🌍 Cenário" → paisagem ampla (céu, terreno, vegetação ou estrutura ambiental do tema)
+- "👥 Classes de Personagens" → 3-4 figuras humanoides lado a lado, cada uma com classe distinta (cores/chapéus/armas diferentes)
+- "⚔️ Missões" → mapa com X marcando local, ou ícone de quest (espada, pergaminho, bússola)
+- "🏆 Sistema de Pontos" → moedas douradas empilhadas + estrelas + troféu
+- "👑 Boss Final" → silhueta grande de inimigo intimidador com olhos brilhantes, ocupando centro
+- "📋 Roteiro do Professor" → figura de professor com livro/cajado em frente a quadro/atril
+
+REGRAS ESTRITAS:
+- viewBox="0 0 32 18" (cinema 16:9)
+- Use APENAS <rect> com width e height inteiros (geralmente "1")
+- Coordenadas integers: x 0–31, y 0–17
+- 6–10 cores hexadecimais por cena, com paleta apropriada ao tema "${topic}"
+- 40–120 rects por cena
+- Inclua shape-rendering="crispEdges" e xmlns
+- Composições centralizadas e LEGÍVEIS
+
+Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
+{
+  "🌍 Cenário": "<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 32 18\\" shape-rendering=\\"crispEdges\\">...</svg>",
+  "👥 Classes de Personagens": "<svg ...>...</svg>",
+  "⚔️ Missões": "<svg ...>...</svg>",
+  "🏆 Sistema de Pontos": "<svg ...>...</svg>",
+  "👑 Boss Final": "<svg ...>...</svg>",
+  "📋 Roteiro do Professor": "<svg ...>...</svg>"
+}
+
+Use as chaves EXATAMENTE como acima (com emojis).`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = response.text || '';
+    const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (err) {
+    console.warn('[StoryPixelArts] generation failed:', err);
+    return {};
+  }
 };
 
 type StoryScene = 'adventure' | 'mystery' | 'fantasy' | 'space' | 'ancient' | 'ocean' | 'science' | 'math' | 'nature' | 'prehistoric';
@@ -5551,11 +5702,14 @@ const buildStoryIllustration = (topic?: string, genre?: string): string => {
   return `<div class="story-illustration">${scenes[scene] || scenes.adventure}</div>`;
 };
 
-const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string }) => {
+const printGameResult = async (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string, bingoDim?: number }) => {
   const node = document.getElementById('game-print-area');
   if (!node) return;
-  const w = window.open('', '_blank', 'width=900,height=700');
-  if (!w) return;
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;height:1122px;border:none;background:white;';
+  document.body.appendChild(iframe);
+  const iDoc = iframe.contentDocument!;
+  iDoc.open();
   const todayStr = new Date().toLocaleDateString('pt-BR');
   const owlSvg = `<svg width="84" height="84" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:0.88;flex-shrink:0">
     <ellipse cx="30" cy="43" rx="19" ry="16" fill="rgba(255,255,255,0.18)"/>
@@ -5586,7 +5740,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         </div>
         <div class="fields-grid">
           <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
-          <div class="field"><span class="field-label">DATA</span><div class="field-line short">${todayStr}</div></div>
+          <div class="field"><span class="field-label">DATA</span><div class="field-line short"></div></div>
           <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
           <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
           <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
@@ -5594,7 +5748,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       </div>
     </div>
   `;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
+  iDoc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
     @page { size: A4; margin: 1.4cm 1.4cm 2cm; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
@@ -5646,7 +5800,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .bingo-card-title { display:flex; justify-content:center; gap:0; background:#1e293b; padding:8px 10px; }
     .bingo-letter { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; font-size:28px; font-weight:900; color:white; border-radius:8px; margin:0 2px; }
     .bingo-sub { text-align:center; font-size:9px; color:#6b7280; padding:4px 0; background:#f8f7ff; border-bottom:1px solid #ddd6fe; letter-spacing:1px; font-weight:700; }
-    .bingo-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:0; }
+    .bingo-grid { display:grid; grid-template-columns:repeat(var(--bingo-dim,5),1fr); gap:0; }
     .bingo-cell { border-right:1px solid #e0d9ff; border-bottom:1px solid #e0d9ff; padding:10px 4px; min-height:54px; text-align:center; font-size:9.5px; font-weight:700; display:flex; align-items:center; justify-content:center; background:white; }
     .bingo-cell:nth-child(odd) { background:#faf8ff; }
     .bingo-cell:nth-child(5n) { border-right:none; }
@@ -5681,6 +5835,10 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; padding:16px; background:var(--ac-light,#eef2ff); border-radius:14px; border:3px solid var(--ac,#4338ca); position:relative; background-image:radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size:8px 8px; }
     .trail-cell { border:3px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); box-shadow:0 2px 4px rgba(0,0,0,0.08); position:relative; }
     .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
+    .trail-cell.type-pergunta { background:#fbbf24 !important; color:#78350f !important; border-color:#d97706 !important; }
+    .trail-cell.type-bonus { background:#16a34a !important; color:white !important; border-color:#14532d !important; }
+    .trail-cell.type-penalidade { background:#dc2626 !important; color:white !important; border-color:#991b1b !important; }
+    .trail-cell.type-desafio { background:#3b82f6 !important; color:white !important; border-color:#1d4ed8 !important; }
     .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:18px; box-shadow:0 0 0 3px #fee2e2, 0 2px 6px rgba(0,0,0,0.15); }
     .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:18px; box-shadow:0 0 0 3px #dcfce7, 0 2px 6px rgba(0,0,0,0.15); }
     /* legend (injected) */
@@ -5690,6 +5848,14 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
     /* ── CROSSWORD ────────────────────────────────────────── */
+    .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; }
+    .cw-grid-table td { width:26px; height:26px; padding:0; }
+    .cw-grid-black { background:#1f2937; }
+    .cw-grid-white { border:2px solid #374151; border-radius:2px; position:relative; vertical-align:top; background:white; }
+    .cw-grid-num { position:absolute; top:1px; left:2px; font-size:7px; font-weight:900; color:var(--ac,#4338ca); line-height:1; }
+    .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:12px; }
+    .cw-clue-dir { font-size:9px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin:10px 0 5px; background:none; padding:0; border-radius:0; display:block; }
+    .cw-clue-item { font-size:10.5px; margin-bottom:4px; line-height:1.3; }
     .cw-item { margin-bottom:16px; page-break-inside:avoid; break-inside:avoid; }
     .cw-clue { font-weight:700; margin-bottom:5px; color:#1f2937; display:flex; align-items:center; gap:7px; }
     .cw-num-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--ac,#4338ca); color:white; border-radius:50%; font-size:10px; font-weight:900; flex-shrink:0; }
@@ -5748,6 +5914,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     /* ── STORY ILLUSTRATION (Campanha Narrativa cover) ────── */
     .story-illustration { margin:0 0 18px; line-height:0; page-break-inside:avoid; break-inside:avoid; }
     .story-illustration svg { width:100%; height:auto; display:block; border-radius:14px; box-shadow:0 4px 18px rgba(0,0,0,0.18); }
+    .story-section-art { margin:14px 0 6px; page-break-after:avoid; break-after:avoid; break-inside:avoid; line-height:0; }
+    .story-section-art svg { width:100%; height:auto; max-height:180px; display:block; image-rendering:pixelated; image-rendering:crisp-edges; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
 
     /* ── FOOTER ───────────────────────────────────────────── */
     .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
@@ -5775,6 +5943,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       var t = themes[label] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
       document.documentElement.style.setProperty('--ac', t.ac);
       document.documentElement.style.setProperty('--ac-light', t.light);
+      document.documentElement.style.setProperty('--bingo-dim', '${opts.bingoDim || 5}');
 
       // emoji on activity tag
       var tag = document.querySelector('.activity-tag');
@@ -5883,12 +6052,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         }).join('');
       }
       var bingoFree = document.querySelector('.bingo-cell.free');
-      if (bingoFree) bingoFree.innerHTML = '&#11088;<br>FREE<br>&#11088;';
+      if (bingoFree) {
+        var freeText = bingoFree.textContent.replace('★ ', '').trim();
+        bingoFree.innerHTML = '&#11088;<br>' + (freeText || 'FREE') + '<br>&#11088;';
+      }
       document.querySelectorAll('.bingo-card').forEach(function(card) {
+        var cellCount = card.querySelectorAll('.bingo-cell:not(.free)').length;
         var calling = document.createElement('div');
         calling.className = 'bingo-calling';
         calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados — marque abaixo:</div><div class="bingo-calling-circles">'
-          + Array(24).fill('<span class="bingo-circle"></span>').join('') + '</div>';
+          + Array(cellCount).fill('<span class="bingo-circle"></span>').join('') + '</div>';
         card.appendChild(calling);
       });
 
@@ -5922,7 +6095,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       if (cells.length) {
         cells[0].textContent = '🚀';
         cells[cells.length-1].textContent = '🏆';
-        cells.forEach(function(c) { if (c.classList.contains('special') && !c.classList.contains('start') && !c.classList.contains('end')) c.textContent = '⭐'; });
+        cells.forEach(function(c) {
+          var type = c.dataset ? c.dataset.type : c.getAttribute('data-type');
+          if (c.classList.contains('start')) { c.textContent = '🚀'; }
+          else if (c.classList.contains('end')) { c.textContent = '🏆'; }
+          else if (type === 'pergunta') { c.classList.add('type-pergunta'); c.textContent = '❓'; }
+          else if (type === 'bonus') { c.classList.add('type-bonus'); c.textContent = '⭐'; }
+          else if (type === 'penalidade') { c.classList.add('type-penalidade'); c.textContent = '💀'; }
+          else if (type === 'desafio') { c.classList.add('type-desafio'); c.textContent = '⚡'; }
+          else if (c.classList.contains('special')) { c.textContent = '⭐'; }
+        });
         var board = document.querySelector('.trail-board');
         if (board) {
           var wrapper = document.createElement('div');
@@ -5932,7 +6114,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
           var diceSvg = '<svg class="trail-dice" width="38" height="38" viewBox="0 0 40 40"><rect x="2" y="2" width="36" height="36" rx="9" fill="white" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="28" cy="12" r="3.2" fill="currentColor"/><circle cx="20" cy="20" r="3.2" fill="currentColor"/><circle cx="12" cy="28" r="3.2" fill="currentColor"/><circle cx="28" cy="28" r="3.2" fill="currentColor"/></svg>';
           var legend = document.createElement('div');
           legend.className = 'trail-legend';
-          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>⭐ Bônus: avance 2</span><span>💤 Fique parado</span><span>🔄 Volte 2</span></div></div>' + diceSvg;
+          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>❓ Pergunta</span><span>⭐ Bônus</span><span>💀 Penalidade</span><span>⚡ Desafio</span></div></div>' + diceSvg;
           wrapper.appendChild(legend);
         }
       }
@@ -5946,17 +6128,21 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         memGrid.before(hint);
       }
 
-      // ── CROSSWORD: num badges ────────────────────────────
-      document.querySelectorAll('.cw-clue').forEach(function(cl) {
-        var m = cl.textContent.match(/^(\\d+)[\\.\\)]/);
-        if (m) {
-          var badge = document.createElement('span');
-          badge.className = 'cw-num-badge';
-          badge.textContent = m[1];
-          cl.innerHTML = cl.innerHTML.replace(/^\\d+[\\.\\)]\\s*/, '');
-          cl.insertBefore(badge, cl.firstChild);
-        }
-      });
+      // ── CROSSWORD: restyle clue items ────────────────────
+      var cwClueCols = document.querySelector('.cw-clues-cols');
+      if (!cwClueCols) {
+        // Legacy list style: add num badges
+        document.querySelectorAll('.cw-clue').forEach(function(cl) {
+          var m = cl.textContent.match(/^(\\d+)[\\.\\)]/);
+          if (m) {
+            var badge = document.createElement('span');
+            badge.className = 'cw-num-badge';
+            badge.textContent = m[1];
+            cl.innerHTML = cl.innerHTML.replace(/^\\d+[\\.\\)]\\s*/, '');
+            cl.insertBefore(badge, cl.firstChild);
+          }
+        });
+      }
 
       // ── PIXEL ART decorations ────────────────────────────
       var pxStar = '<svg viewBox="0 0 16 16"' + SR + '>'
@@ -6060,11 +6246,45 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         akTitle.replaceWith(wrap);
       }
 
-      setTimeout(function(){ window.print(); }, 600);
+      // ── STORY: character card page ────────────────────────
+      if (label === 'Campanha Narrativa') {
+        var h2s = document.querySelectorAll('h2');
+        var classesH2 = null;
+        h2s.forEach(function(h) { if (h.textContent && h.textContent.indexOf('Classes') !== -1) classesH2 = h; });
+        if (classesH2) {
+          var cardPage = document.createElement('div');
+          cardPage.style.cssText = 'page-break-before:always;padding-top:12px;';
+          cardPage.innerHTML = '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;">🎭 Fichas dos Personagens</div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+            + ['🧙 Personagem 1', '⚔️ Personagem 2', '🏹 Personagem 3', '🛡️ Personagem 4'].map(function(name) {
+              return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;padding:12px;min-height:120px;">'
+                + '<div style="font-weight:900;font-size:12px;color:var(--ac,#4338ca);margin-bottom:8px;">' + name + '</div>'
+                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">NOME DO ALUNO: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
+                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">CLASSE: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
+                + '<div style="font-size:9px;font-weight:700;color:var(--ac,#4338ca);margin-top:8px;">XP</div>'
+                + '<div style="display:flex;gap:4px;margin-top:4px;">' + Array(10).fill('<div style="width:18px;height:14px;border:1.5px solid var(--ac,#4338ca);border-radius:3px;"></div>').join('') + '</div>'
+                + '</div>';
+            }).join('') + '</div>';
+          document.body.appendChild(cardPage);
+        }
+      }
+
     })();
     </script>
   </body></html>`);
-  w.document.close();
+  iDoc.close();
+  await new Promise(r => setTimeout(r, 900));
+  const html2pdf = ((await import('html2pdf.js')) as any).default;
+  const safeTitle = (opts.title || 'atividade').replace(/[^\w\s-]/g, '').trim() || 'atividade';
+  await html2pdf().set({
+    margin: [14, 14, 20, 14],
+    filename: `${safeTitle}.pdf`,
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'avoid-all', 'legacy'] }
+  }).from(iDoc.body).save();
+  document.body.removeChild(iframe);
 };
 
 const EstudioScreen = ({
@@ -6092,6 +6312,7 @@ const EstudioScreen = ({
 }) => {
   const [activeMode, setActiveMode] = useState<GameMode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [classId, setClassId] = useState<string>('');
   const [topic, setTopic] = useState('');
@@ -6099,6 +6320,11 @@ const EstudioScreen = ({
   const [genre, setGenre] = useState('aventura');
   const [duration, setDuration] = useState('1 aula');
   const [count, setCount] = useState(10);
+  const [quizType, setQuizType] = useState<'multipla' | 'misto'>('multipla');
+  const [bingoCardCount, setBingoCardCount] = useState(10);
+  const [bingoSize, setBingoSize] = useState<3 | 5>(5);
+  const [bingoFreeText, setBingoFreeText] = useState('LIVRE');
+  const [wsGridSize, setWsGridSize] = useState<10 | 15 | 20>(15);
 
   const selectedClass = (schedules || []).find(s => s.id === classId);
   const defaultSubject = selectedClass?.subject || profile.subject || '';
@@ -6140,17 +6366,27 @@ Retorne em Markdown brasileiro com EXATAMENTE as seções abaixo:
 
 NÃO use código, NÃO use emojis fora dos títulos. Português brasileiro natural.`;
       } else if (activeMode === 'quiz') {
-        prompt = `Gere um quiz de múltipla escolha sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
+        if (quizType === 'misto') {
+          const mc = Math.ceil(count * 0.65), vf = count - Math.ceil(count * 0.65);
+          prompt = `Gere um quiz MISTO sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
+${mc} questões de múltipla escolha (4 alternativas) e ${vf} questões de Verdadeiro/Falso.
+Retorne APENAS JSON válido:
+{"title":"...","questions":[{"type":"multipla"|"vf","q":"...","options":[...],"correct":0,"explain":"..."}]}
+Para questões "vf": options deve ser ["Verdadeiro","Falso"]. "correct" é 0 (Verdadeiro) ou 1 (Falso).`;
+        } else {
+          prompt = `Gere um quiz de múltipla escolha sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
 Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
 {"title":"...","questions":[{"q":"pergunta","options":["a","b","c","d"],"correct":0,"explain":"justificativa breve"}]}
 Gere exatamente ${count} perguntas. As 4 opções devem ser plausíveis. "correct" é o índice 0-3.`;
+        }
       } else if (activeMode === 'wordsearch') {
-        prompt = `Liste ${count} palavras-chave sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para caça-palavras.
-Cada palavra: substantivo, SEM espaços, SEM acentos, entre 4 e 12 letras, MAIÚSCULAS.
+        const wsMax = wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20;
+        prompt = `Liste ${Math.min(count, wsMax)} palavras-chave sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para caça-palavras.
+Cada palavra: substantivo, SEM espaços, SEM acentos, entre 4 e ${wsGridSize - 2} letras, MAIÚSCULAS.
 Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","hint":"dica curta para o aluno"}]}`;
       } else if (activeMode === 'crossword') {
-        prompt = `Crie uma lista de ${count} palavras sobre "${topic}" (${defaultSubject}, ${defaultLevel}) com definições no estilo "palavras cruzadas".
-Cada palavra entre 4 e 10 letras, SEM espaços, MAIÚSCULAS, sem acentos.
+        prompt = `Crie uma lista de ${Math.min(count, 15)} palavras sobre "${topic}" (${defaultSubject}, ${defaultLevel}) com definições no estilo "palavras cruzadas".
+Cada palavra: 4 a 10 letras, SEM espaços, MAIÚSCULAS, sem acentos. Escolha palavras que compartilhem letras para facilitar o cruzamento.
 Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","clue":"definição/pista clara, estilo dicionário"}]}`;
       } else if (activeMode === 'bingo') {
         prompt = `Liste 40 termos/conceitos importantes sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para bingo educativo.
@@ -6163,22 +6399,29 @@ Retorne APENAS JSON:
 Gere ${Math.min(count, 12)} casas especiais (não precisa preencher todas). Use perguntas factuais sobre ${topic} para tipo "pergunta".`;
       } else if (activeMode === 'memory') {
         prompt = `Gere ${count} pares conceito↔definição sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para jogo da memória.
-Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras).
-Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."}]}`;
+Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras). Inclua 1 emoji representando o conceito.
+Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"...","emoji":"🎯"}]}`;
       }
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
-      const raw = response.text || '';
       if (activeMode === 'story') {
-        setResult({ markdown: raw });
+        const [response, pixelArts] = await Promise.all([
+          generateContentWithRetry({ model: AI_MODEL, contents: prompt }),
+          generateStoryPixelArts(topic, genre)
+        ]);
+        setResult({ markdown: response.text || '', pixelArts });
       } else {
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+        const raw = response.text || '';
         const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
         const parsed = JSON.parse(cleaned);
         if (activeMode === 'wordsearch') {
-          const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word));
+          const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word), wsGridSize);
           setResult({ ...parsed, grid: built.grid });
         } else if (activeMode === 'bingo') {
-          const cards = buildBingoCards(parsed.items, 10);
-          setResult({ ...parsed, cards });
+          const cards = buildBingoCards(parsed.items, bingoCardCount, bingoSize, bingoFreeText);
+          setResult({ ...parsed, cards, bingoSize });
+        } else if (activeMode === 'crossword') {
+          const crossword = buildCrosswordGrid(parsed.words || []);
+          setResult({ ...parsed, crossword });
         } else {
           setResult(parsed);
         }
@@ -6191,21 +6434,21 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
     setIsGenerating(false);
   };
 
-  const modeMeta: Record<GameMode, { title: string, icon: any, color: string, bg: string }> = {
-    story: { title: 'Storytelling', icon: ScrollText, color: 'text-white', bg: 'from-indigo-600 to-purple-600' },
-    quiz: { title: 'Quiz', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
-    wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
-    crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
-    bingo: { title: 'Bingo Educativo', icon: Dice5, color: 'text-pink-600', bg: 'bg-pink-50 border-pink-200' },
-    trail: { title: 'Trilha', icon: MapIcon, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200' },
-    memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' },
+  const modeMeta: Record<GameMode, { title: string, icon: any, color: string, bg: string, desc: string }> = {
+    story: { title: 'Storytelling', icon: ScrollText, color: 'text-white', bg: 'from-indigo-600 to-purple-600', desc: 'Campanha narrativa com missões e personagens' },
+    quiz: { title: 'Quiz', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', desc: 'Perguntas de múltipla escolha ou V/F' },
+    wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', desc: 'Grade com palavras escondidas para achar' },
+    crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', desc: 'Grade cruzada com pistas e definições' },
+    bingo: { title: 'Bingo Educativo', icon: Dice5, color: 'text-pink-600', bg: 'bg-pink-50 border-pink-200', desc: 'Cartelas com termos do conteúdo da aula' },
+    trail: { title: 'Trilha', icon: MapIcon, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', desc: 'Tabuleiro com casas de perguntas e desafios' },
+    memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', desc: 'Pares de conceito e definição para combinar' },
   };
 
   const smallActivities: GameMode[] = ['quiz', 'wordsearch', 'crossword', 'bingo', 'trail', 'memory'];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Estúdio" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
+      <Header setScreen={setScreen} title="Estúdio" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
 
       <div className="px-1 mb-6">
         <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em atividades gamificadas que prendem a atenção da turma.</p>
@@ -6246,7 +6489,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
             >
               <Icon size={28} className={`${meta.color} mb-2`} />
               <h3 className={`font-bold text-sm ${meta.color}`}>{meta.title}</h3>
-              <p className="text-[11px] text-gray-500 mt-0.5">Gerar com IA</p>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{meta.desc}</p>
             </button>
           );
         })}
@@ -6319,6 +6562,16 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   {activeMode === 'quiz' && (
                     <>
                       <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo de questões</label>
+                        <div className="flex gap-2 mt-1">
+                          {(['multipla', 'misto'] as const).map(t => (
+                            <button key={t} onClick={() => setQuizType(t)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${quizType === t ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {t === 'multipla' ? '4 alternativas' : 'Misto V/F + MC'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de perguntas</label>
                         <input type="number" min={5} max={30} value={count} onChange={e => setCount(Math.max(5, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
                       </div>
@@ -6333,7 +6586,25 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                     </>
                   )}
 
-                  {(activeMode === 'wordsearch' || activeMode === 'crossword' || activeMode === 'memory') && (
+                  {activeMode === 'wordsearch' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da grade</label>
+                        <div className="flex gap-2 mt-1">
+                          {([10, 15, 20] as const).map(sz => (
+                            <button key={sz} onClick={() => setWsGridSize(sz)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${wsGridSize === sz ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {sz}×{sz}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de palavras</label>
+                        <input type="number" min={5} max={wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                    </>
+                  )}
+                  {(activeMode === 'crossword' || activeMode === 'memory') && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                         {activeMode === 'memory' ? 'Quantidade de pares' : 'Quantidade de palavras'}
@@ -6342,6 +6613,30 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                     </div>
                   )}
 
+                  {activeMode === 'bingo' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Formato da cartela</label>
+                        <div className="flex gap-2 mt-1">
+                          {([5, 3] as const).map(sz => (
+                            <button key={sz} onClick={() => setBingoSize(sz)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${bingoSize === sz ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {sz}×{sz} {sz === 5 ? 'Clássico' : 'Mini'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Número de cartelas</label>
+                        <input type="number" min={1} max={30} value={bingoCardCount} onChange={e => setBingoCardCount(Math.max(1, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                      {bingoSize === 5 && (
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Texto da casa livre</label>
+                          <input value={bingoFreeText} onChange={e => setBingoFreeText(e.target.value || 'LIVRE')} placeholder="LIVRE" className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                        </div>
+                      )}
+                    </>
+                  )}
                   {activeMode === 'trail' && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da trilha (casas)</label>
@@ -6370,12 +6665,13 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   activityLabel: activityLabels[activeMode!],
                   genre: activeMode === 'story' ? genre : undefined,
                   topic: activeMode === 'story' ? topic : undefined,
+                  bingoDim: result.bingoSize || 5,
                 };
                 return (
                 <div className="p-5">
                   <div className="flex gap-2 mb-4">
                     <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">↻ Refazer</button>
-                    <button onClick={() => printGameResult(printOpts)} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
+                    <button onClick={async () => { setIsPdfLoading(true); try { await printGameResult(printOpts); } finally { setIsPdfLoading(false); } }} disabled={isPdfLoading} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60">{isPdfLoading ? <><Loader2 size={16} className="animate-spin" /> Gerando PDF…</> : <><Download size={16} /> Baixar PDF</>}</button>
                   </div>
 
                   <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 mb-3">
@@ -6387,7 +6683,28 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   <div id="game-print-area" className="bg-gray-50 rounded-2xl p-4 text-sm">
                     {activeMode === 'story' && result.markdown && (
                       <div className="markdown-body prose prose-sm max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.markdown}</ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h2: ({ children, ...props }) => {
+                              const extractText = (n: any): string => {
+                                if (typeof n === 'string') return n;
+                                if (typeof n === 'number') return String(n);
+                                if (Array.isArray(n)) return n.map(extractText).join('');
+                                if (n?.props?.children) return extractText(n.props.children);
+                                return '';
+                              };
+                              const title = extractText(children).trim();
+                              const svg = result.pixelArts?.[title];
+                              return (
+                                <>
+                                  {svg && <div className="story-section-art" dangerouslySetInnerHTML={{ __html: svg }} />}
+                                  <h2 {...props}>{children}</h2>
+                                </>
+                              );
+                            }
+                          }}
+                        >{result.markdown}</ReactMarkdown>
                       </div>
                     )}
 
@@ -6435,21 +6752,61 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
                     {activeMode === 'crossword' && result.words && (
                       <>
-                        <div className="instructions"><b>Instrucoes:</b> Leia cada definicao e escreva a palavra correta nos quadradinhos, uma letra em cada caixa.</div>
-                        <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
-                          {result.words.map((w: any, i: number) => (
-                            <li key={i} className="cw-item">
-                              <p className="cw-clue">{w.clue}</p>
-                              <div className="cw-boxes">
-                                {w.word.split('').map((_: string, j: number) => (<div key={j} className="cw-box"></div>))}
-                              </div>
-                              <p className="cw-answer" style={{ fontSize: 10, color: '#888', marginTop: 4 }}>Resposta: {w.word}</p>
-                            </li>
-                          ))}
-                        </ol>
+                        <div className="instructions"><b>Instrucoes:</b> Leia cada definição e preencha as palavras na grade — uma letra por quadrado.</div>
+                        {result.crossword ? (
+                          <>
+                            <div className="overflow-x-auto">
+                              <table style={{ borderCollapse: 'collapse', margin: '10px auto' }}>
+                                <tbody>
+                                  {result.crossword.grid.map((row: (string|null)[], r: number) => (
+                                    <tr key={r}>
+                                      {row.map((cell: string|null, c: number) => {
+                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: '#1f2937' }} />;
+                                        const num = result.crossword.cellNumbers[`${r},${c}`];
+                                        return (
+                                          <td key={c} style={{ width: 26, height: 26, border: '2px solid #374151', position: 'relative', verticalAlign: 'top', padding: 0, background: 'white' }}>
+                                            {num && <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 7, fontWeight: 900, color: '#4338ca', lineHeight: 1 }}>{num}</span>}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              {result.crossword.across.length > 0 && (
+                                <div>
+                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">→ Horizontal</p>
+                                  {result.crossword.across.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                </div>
+                              )}
+                              {result.crossword.down.length > 0 && (
+                                <div>
+                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">↓ Vertical</p>
+                                  {result.crossword.down.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
+                            {result.words.map((w: any, i: number) => (
+                              <li key={i} className="cw-item">
+                                <p className="cw-clue">{w.clue}</p>
+                                <div className="cw-boxes">{w.word.split('').map((_: string, j: number) => <div key={j} className="cw-box" />)}</div>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
                         <div className="answer-key-page">
                           <h2 className="answer-key-title">Gabarito</h2>
-                          {result.words.map((w: any, i: number) => (
+                          {result.crossword ? (
+                            <>
+                              {result.crossword.across.length > 0 && <><p style={{fontWeight:900,marginBottom:4}}>→ Horizontal</p>{result.crossword.across.map((c: any) => <div key={c.num} className="answer-key-item"><b>{c.num}.</b> {c.word}</div>)}</>}
+                              {result.crossword.down.length > 0 && <><p style={{fontWeight:900,margin:'8px 0 4px'}}>↓ Vertical</p>{result.crossword.down.map((c: any) => <div key={c.num} className="answer-key-item"><b>{c.num}.</b> {c.word}</div>)}</>}
+                            </>
+                          ) : result.words.map((w: any, i: number) => (
                             <div key={i} className="answer-key-item"><b>{i + 1}.</b> {w.word}</div>
                           ))}
                         </div>
@@ -6486,7 +6843,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                             const isEnd = i + 1 === count;
                             const isStart = i === 0;
                             return (
-                              <div key={i} className={`trail-cell ${isStart ? 'start' : ''} ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`}>{i + 1}</div>
+                              <div key={i} className={`trail-cell ${isStart ? 'start' : ''} ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`} data-type={special?.type}>{i + 1}</div>
                             );
                           })}
                         </div>
@@ -6504,7 +6861,10 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                         <div className="instructions"><b>Como jogar:</b> Imprima, recorte pelas linhas tracejadas e embaralhe as cartas. Cada aluno (ou dupla) tenta encontrar os pares conceito-definicao virando duas cartas por vez.</div>
                         <div className="memory-grid">
                           {result.pairs.flatMap((p: any, i: number) => [
-                            <div key={`c-${i}`} className="memory-pair concept">{p.concept}</div>,
+                            <div key={`c-${i}`} className="memory-pair concept">
+                              {p.emoji && <span style={{fontSize:18,display:'block',marginBottom:2}}>{p.emoji}</span>}
+                              {p.concept}
+                            </div>,
                             <div key={`d-${i}`} className="memory-pair">{p.definition}</div>
                           ])}
                         </div>
