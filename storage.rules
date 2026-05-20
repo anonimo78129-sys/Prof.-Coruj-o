@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile photos: owner can read/write their own photo; others can read (for display)
+    match /users/{userId}/photo.jpg {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Library files: any authenticated user can read; only the email admin can write/delete
+    match /library/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write, delete: if request.auth != null
+        && request.auth.token.email == "lyelsonmf520@gmail.com"
+        && request.auth.token.email_verified == true;
+    }
+  }
+}

@@ -18,6 +18,20 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+  @keyframes modal-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes modal-slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .modal-fade-in {
+    animation: modal-fade-in 200ms ease-out;
+  }
+  .modal-slide-up {
+    animation: modal-slide-up 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
 
 /* Basic Markdown Styles */
@@ -41,3 +55,6 @@
 .markdown-body td { @apply px-4 py-3 border-b border-r border-gray-200 last:border-r-0 text-gray-700; }
 .markdown-body tbody tr:last-child td { @apply border-b-0; }
 .markdown-body tbody tr:nth-child(even) { @apply bg-gray-50/50; }
+
+.story-section-art { margin: 12px 0 4px; line-height: 0; }
+.story-section-art svg { width: 100%; height: auto; max-height: 160px; display: block; image-rendering: pixelated; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }

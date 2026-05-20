@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
+import DOMPurify from 'dompurify';
 import * as LucideIcons from 'lucide-react';
 import { 
   Search, Bell, Home, Calendar as CalendarIcon, User,
@@ -8,24 +9,25 @@ import {
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
-  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X
+  MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
+  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import pptxgen from 'pptxgenjs';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation } from 'docx';
-import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from './firebase';
+import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { selectBnccSkills } from './bncc-data';
+import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   console.error("CRITICAL: GEMINI_API_KEY está ausente no ambiente!");
 }
 const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
+
+const AI_MODEL = 'gemini-2.5-flash';
 
 const formatApiError = (error: any, defaultMsg: string): string => {
   let msg = '';
@@ -38,18 +40,19 @@ const formatApiError = (error: any, defaultMsg: string): string => {
   } else {
     try { msg = JSON.stringify(error); } catch (e) {}
   }
-  
+
   if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
-    return 'Alta demanda nos servidores da IA. Estamos tentando novamente de forma automática... Se persistir, aguarde 1 minuto.';
+    return 'Muita gente usando a IA agora. Ja estou tentando de novo — se continuar, aguarde 1 minuto.';
   }
   if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
-    return 'Limite de requisições atingido. Por favor, aguarde alguns instantes antes de tentar novamente.';
+    return 'Calma, professor! Muitas perguntas de uma vez. Aguarde alguns segundos e tente de novo.';
   }
   return defaultMsg;
 };
 
 const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs = 2000): Promise<T> => {
   let attempt = 0;
+  let rateLimit429Attempts = 0;
   while (attempt < maxRetries) {
     try {
       return await fn();
@@ -66,9 +69,17 @@ const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs =
       const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
       const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
 
-      if ((is503 || is429) && attempt < maxRetries) {
+      if (is429) {
+        rateLimit429Attempts++;
+        if (rateLimit429Attempts <= 1) {
+          // Wait 30s for per-minute quota window to reset, then try once more
+          await new Promise(resolve => setTimeout(resolve, 30000 + Math.random() * 5000));
+          continue;
+        }
+        throw error; // Second 429: quota is exhausted, give up
+      } else if (is503 && attempt < maxRetries) {
         const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + (Math.random() * 1000);
-        console.warn(`API overloaded (${is503 ? '503' : '429'}). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
+        console.warn(`API overloaded (503). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         throw error;
@@ -90,18 +101,21 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'):
   });
 };
 
+let _pendingInputTokens = 0;
+let _pendingOutputTokens = 0;
+
 const generateContentWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0]) => {
   if (!apiKey) {
     throw new Error('Chave da IA não configurada. Contate o suporte.');
   }
-  if (params.model === 'gemini-2.5-flash') {
-    params.model = 'gemini-3-flash-preview';
+  if (!params.model) params.model = AI_MODEL;
+  const result = await withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
+  const usage = (result as any).usageMetadata;
+  if (usage) {
+    _pendingInputTokens += usage.promptTokenCount || 0;
+    _pendingOutputTokens += usage.candidatesTokenCount || 0;
   }
-  return withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
-};
-
-const generateImagesWithRetry = async (params: Parameters<typeof ai.models.generateImages>[0]) => {
-  return withRetry(() => ai.models.generateImages(params));
+  return result;
 };
 
 function useFirestoreSync<T extends { id: string }>(
@@ -169,7 +183,7 @@ function useFirestoreSync<T extends { id: string }>(
     } catch (err) {
       console.error(`Error in useFirestoreSync for ${collectionName}:`, err);
       setData(previousData);
-      alert("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("A internet cochilou. Suas mudancas nao foram salvas — tente de novo.");
     }
   };
 
@@ -208,12 +222,86 @@ function useFirestoreDoc<T>(
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
-      alert("Falha de conexão: As alterações não foram salvas na nuvem.");
+      toast.error("A internet cochilou. Suas mudancas nao foram salvas — tente de novo.");
     }
   };
 
   return [data, updateData];
 }
+
+// --- Error Boundary ---
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">🦉</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
+            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estao salvos na nuvem — so recarregue a pagina.</p>
+            <p className="text-xs text-red-500 mb-6 bg-red-50 p-2 rounded-xl font-mono break-all">{this.state.error?.message}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-indigo-600 text-white rounded-2xl py-3 font-bold text-sm"
+            >
+              Recarregar o app
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// --- Toast System ---
+type ToastType = 'error' | 'success' | 'info';
+interface Toast { id: string; message: string; type: ToastType; }
+
+let _toastSetter: React.Dispatch<React.SetStateAction<Toast[]>> | null = null;
+
+const toast = {
+  show(message: string, type: ToastType = 'info') {
+    if (!_toastSetter) { console.warn('[toast]', message); return; }
+    const id = Math.random().toString(36).slice(2);
+    _toastSetter(prev => [...prev.slice(-3), { id, message, type }]);
+    setTimeout(() => _toastSetter!(prev => prev.filter(t => t.id !== id)), 4500);
+  },
+  error(msg: string) { this.show(msg, 'error'); },
+  success(msg: string) { this.show(msg, 'success'); },
+  info(msg: string) { this.show(msg, 'info'); },
+};
+
+const ToastContainer = () => {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  useEffect(() => { _toastSetter = setToasts; return () => { _toastSetter = null; }; }, []);
+  if (!toasts.length) return null;
+  return createPortal(
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
+      {toasts.map(t => (
+        <div key={t.id} className={`rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-lg pointer-events-auto flex items-start gap-2 ${
+          t.type === 'error' ? 'bg-red-500' : t.type === 'success' ? 'bg-emerald-500' : 'bg-gray-800'
+        }`}>
+          <span className="flex-1">{t.message}</span>
+          <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="opacity-70 hover:opacity-100 shrink-0 mt-0.5">✕</button>
+        </div>
+      ))}
+    </div>,
+    document.body
+  );
+};
 
 // --- Helper Components ---
 const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', style }: { name: string, size?: number, color?: string, className?: string, style?: React.CSSProperties }) => {
@@ -223,7 +311,16 @@ const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', 
   return <IconComponent size={size} color={color} className={className} style={style} />;
 };
 
-const pixabayCache = new Map<string, string>();
+const PIXABAY_CACHE_KEY = '__pxcache__';
+const pixabayCache = {
+  get(k: string): string | undefined {
+    try { const s = sessionStorage.getItem(PIXABAY_CACHE_KEY); if (!s) return undefined; return JSON.parse(s)[k]; } catch { return undefined; }
+  },
+  set(k: string, v: string) {
+    try { const s = sessionStorage.getItem(PIXABAY_CACHE_KEY); const obj = s ? JSON.parse(s) : {}; obj[k] = v; sessionStorage.setItem(PIXABAY_CACHE_KEY, JSON.stringify(obj)); } catch { /* quota full — ignore */ }
+  },
+  has(k: string): boolean { return this.get(k) !== undefined; },
+};
 
 const getImageUrl = (query: string | undefined, width: number, height: number) => {
   if (!query || query.trim().length === 0) {
@@ -313,13 +410,15 @@ interface BackgroundTask {
 
 interface UserProfile {
   name: string;
-  subject: string;
+  subject?: string;
   photo: string;
   schoolName?: string;
   role?: string;
   email?: string;
   isPro?: boolean;
   createdAt?: string;
+  generationsUsed?: number;
+  onboarded?: boolean;
 }
 
 interface ClassSchedule {
@@ -332,6 +431,9 @@ interface ClassSchedule {
   color?: string;
   level?: string;
   classProfile?: string;
+  subject?: string;
+  school?: string;
+  shift?: string;
 }
 
 interface SavedResource {
@@ -423,7 +525,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
           className={`relative p-2 flex flex-col items-center gap-1 transition-all ${activeScreen === item.id ? 'text-white' : 'text-indigo-300 hover:text-indigo-200'}`}
         >
           <item.icon size={22} strokeWidth={activeScreen === item.id ? 2.5 : 2} className={activeScreen === item.id ? '-translate-y-1 transition-transform' : 'transition-transform'} />
-          <span className={`text-[9px] font-bold tracking-wider ${activeScreen === item.id ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>{item.label}</span>
+          <span className={`text-[9px] font-bold tracking-wider transition-opacity ${activeScreen === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
           {activeScreen === item.id && (
             <motion.div
               layoutId="nav-glow"
@@ -436,7 +538,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
   );
 };
 
-const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, setScreen }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string; setScreen?: (s: Screen) => void }) => {
+const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, setScreen }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; setScreen?: (s: Screen) => void }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(
     'Notification' in window ? Notification.permission : 'denied'
@@ -459,11 +561,13 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
 
   return (
   <div className="mb-3 relative z-50">
-    <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
-      <img src={bannerImage || "https://i.ibb.co/TDZNvsJv/20260420-121247-0000.png"} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
-    </div>
-    
-    <div className="flex justify-between items-start pt-28">
+    {bannerImage !== null && (
+      <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
+        <img src={bannerImage || "https://i.ibb.co/TDZNvsJv/20260420-121247-0000.png"} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
+      </div>
+    )}
+
+    <div className={`flex justify-between items-start ${bannerImage !== null ? 'pt-28' : 'pt-4'}`}>
       <div className="px-2">
         <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
         <h1 className="text-2xl font-black text-gray-900 drop-shadow-sm">{title}</h1>
@@ -503,24 +607,25 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
             
             <div className="space-y-3 mb-4 max-h-[60vh] overflow-y-auto no-scrollbar">
               {notifications.length > 0 ? (
-                notifications.map(notification => (
-                  <div key={notification.id} className={`cursor-pointer p-3 rounded-xl border ${notification.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100/50'}`} onClick={() => {
-                    if (setScreen) setScreen('calendar');
-                    if (setNotifications) {
-                      setNotifications(notifications.map(n => n.id === notification.id ? {...n, read: true} : n));
-                    }
-                    setShowNotifications(false);
-                  }}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Sparkles size={14} className={notification.read ? 'text-gray-500' : 'text-indigo-600'} />
-                      <p className={`text-sm font-bold ${notification.read ? 'text-gray-700' : 'text-indigo-900'}`}>{notification.title}</p>
+                notifications.map(notification => {
+                  const iconMap: Record<string, string> = { class: '📚', holiday: '🎉', prep: '📝', admin: '📋', commemorative: '🎊' };
+                  const emoji = notification.auto ? (iconMap[notification.icon] || '📌') : '✨';
+                  return (
+                    <div key={notification.id} className={`cursor-pointer p-3 rounded-xl border ${notification.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100/50'}`} onClick={() => {
+                      if (setScreen) setScreen('calendar');
+                      if (setNotifications) {
+                        setNotifications(notifications.map(n => n.id === notification.id ? {...n, read: true} : n));
+                      }
+                      setShowNotifications(false);
+                    }}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base leading-none">{emoji}</span>
+                        <p className={`text-sm font-bold ${notification.read ? 'text-gray-700' : 'text-indigo-900'}`}>{notification.title}</p>
+                      </div>
+                      <p className={`text-xs leading-relaxed ${notification.read ? 'text-gray-600' : 'text-indigo-700'}`}>{notification.message}</p>
                     </div>
-                    <p className={`text-xs leading-relaxed ${notification.read ? 'text-gray-600' : 'text-indigo-700'}`}>{notification.message}</p>
-                    <span className={`text-[10px] mt-2 block ${notification.read ? 'text-gray-400' : 'text-indigo-400'}`}>
-                      {new Date(notification.date).toLocaleDateString()} às {new Date(notification.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <Bell size={32} className="text-gray-300 mb-3" />
@@ -627,7 +732,7 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
 
 const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void }) => {
   const quickActions = [
-    { title: 'Studio', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => setScreen('estudio') },
+    { title: 'Gamificar', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
   ];
@@ -897,64 +1002,49 @@ const GenerateModal = ({
   examDuration: number, setExamDuration: (v: number) => void,
 }) => {
   const label = mode === 'plan' ? 'Plano de Aula' : mode === 'activities' ? 'Atividades' : mode === 'exam' ? 'Prova' : 'Slides';
+  if (!show) return null;
   return createPortal(
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          key="generate-modal"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9999]"
-        >
-          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col max-h-[90vh]"
+    <div className="fixed inset-0 z-[9999] modal-fade-in">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col max-h-[90vh] modal-slide-up">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+          <h2 className="text-lg font-bold text-gray-900">Personalizar {label}</h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          <AdvancedSettings
+            mode={mode} tone={tone} setTone={setTone}
+            complexity={complexity} setComplexity={setComplexity}
+            duration={duration} setDuration={setDuration}
+            lessonTime={lessonTime} setLessonTime={setLessonTime}
+            questionCount={questionCount} setQuestionCount={setQuestionCount}
+            slideCount={slideCount} setSlideCount={setSlideCount}
+            focus={focus} setFocus={setFocus}
+            groundingContent={groundingContent} setGroundingContent={setGroundingContent}
+            turn={turn} setTurn={setTurn}
+            questionType={questionType} setQuestionType={setQuestionType}
+            examValue={examValue} setExamValue={setExamValue}
+            examDuration={examDuration} setExamDuration={setExamDuration}
+          />
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-2">
+          <button
+            onClick={onGenerate}
+            className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2"
           >
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
-              <h2 className="text-lg font-bold text-gray-900">Personalizar {label}</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-6 py-4">
-              <AdvancedSettings
-                mode={mode} tone={tone} setTone={setTone}
-                complexity={complexity} setComplexity={setComplexity}
-                duration={duration} setDuration={setDuration}
-                lessonTime={lessonTime} setLessonTime={setLessonTime}
-                questionCount={questionCount} setQuestionCount={setQuestionCount}
-                slideCount={slideCount} setSlideCount={setSlideCount}
-                focus={focus} setFocus={setFocus}
-                groundingContent={groundingContent} setGroundingContent={setGroundingContent}
-                turn={turn} setTurn={setTurn}
-                questionType={questionType} setQuestionType={setQuestionType}
-                examValue={examValue} setExamValue={setExamValue}
-                examDuration={examDuration} setExamDuration={setExamDuration}
-              />
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-2">
-              <button
-                onClick={onGenerate}
-                className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2"
-              >
-                <Sparkles size={18} /> Gerar {label}
-              </button>
-              <button
-                onClick={onGenerate}
-                className="w-full text-gray-400 text-sm py-2 font-medium"
-              >
-                Gerar assim mesmo
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
+            <Sparkles size={18} /> Gerar {label}
+          </button>
+          <button
+            onClick={onGenerate}
+            className="w-full text-gray-400 text-sm py-2 font-medium"
+          >
+            Gerar assim mesmo
+          </button>
+        </div>
+      </div>
+    </div>,
     document.body
   );
 };
@@ -1030,7 +1120,7 @@ const RichBody = ({ value, onChange, style, rows = 6, primaryColor, accentColor 
   return (
     <div
       onClick={() => setEditing(true)}
-      dangerouslySetInnerHTML={{ __html: parseRichHtml(value, primaryColor, accentColor) || '<span style="color:#aaa;font-style:italic">Clique para editar...</span>' }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseRichHtml(value, primaryColor, accentColor) || '<span style="color:#aaa;font-style:italic">Clique para editar...</span>') }}
       style={{ cursor: 'text', fontSize: 14, lineHeight: 1.65, color: '#374151', width: '100%', minHeight: 60, ...style }}
     />
   );
@@ -1053,7 +1143,7 @@ const RichBodyWithIcons = ({ value, onChange, style, primaryColor, accentColor }
       {parts.map((p, i) => {
         const iconMatch = p.match(/^\{([A-Za-z0-9]+)\}$/);
         if (iconMatch) return <DynamicIcon key={i} name={iconMatch[1]} size={15} color={primaryColor} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />;
-        return <span key={i} dangerouslySetInnerHTML={{ __html: parseRichHtml(p, primaryColor, accentColor) }} />;
+        return <span key={i} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseRichHtml(p, primaryColor, accentColor)) }} />;
       })}
     </div>
   );
@@ -1366,7 +1456,7 @@ const SlidePreviewList = ({
 Layout atual: ${targetSlide.layoutID}. Nova instrução: ${newPrompt}.
 Mantenha o estilo: ${JSON.stringify(presentationData.theme)}.
 SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illustrationQuery": "..." }`;
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const newData = JSON.parse(response.text || '{}');
       const newImgUrl = newData.illustrationQuery ? await fetchPixabayImage(newData.illustrationQuery, 1200, 800) : targetSlide.data.imageUrl;
       updateSlide(idx, { title: newData.title || targetSlide.data.title, text: newData.text || targetSlide.data.text, imagePrompt: newData.illustrationQuery || targetSlide.data.imagePrompt, imageUrl: newImgUrl });
@@ -1448,6 +1538,7 @@ const buildDocx = async (
   docType: 'plan' | 'exam' | 'activities',
   opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): Promise<Blob> => {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation, Footer } = await import('docx');
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
@@ -1458,8 +1549,8 @@ const buildDocx = async (
   const ac = accentHex[docType];
   const dk = darkHex[docType];
 
-  const parseInline = (text: string): TextRun[] => {
-    const runs: TextRun[] = [];
+  const parseInline = (text: string) => {
+    const runs: InstanceType<typeof TextRun>[] = [];
     const rx = /(\*\*[^*]+?\*\*|\*[^*]+?\*)/g;
     let last = 0; let m: RegExpExecArray | null;
     while ((m = rx.exec(text)) !== null) {
@@ -1484,7 +1575,7 @@ const buildDocx = async (
     spacing: { before: 30, after: 30 },
   });
 
-  const mdParas = (md: string): Paragraph[] =>
+  const mdParas = (md: string) =>
     md.split('\n').map(line => {
       if (!line.trim()) return new Paragraph({ children: [new TextRun('')], spacing: { after: 60 } });
       if (line.startsWith('### '))
@@ -1500,7 +1591,7 @@ const buildDocx = async (
       return new Paragraph({ children: parseInline(line), spacing: { after: 60 } });
     });
 
-  const docChildren: Paragraph[] = [];
+  const docChildren: InstanceType<typeof Paragraph>[] = [];
 
   if (docType === 'plan') {
     const secs: Record<string, string> = {};
@@ -1660,24 +1751,69 @@ const buildDocx = async (
     }
   }
 
+  const brandFooter = new Footer({
+    children: [new Paragraph({
+      children: [new TextRun({ text: 'Prof. Corujão', size: 16, color: 'BBBBBB', italics: true })],
+      alignment: AlignmentType.RIGHT,
+    })],
+  });
+
   const wordDoc = new Document({
     sections: [{
       properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT }, margin: { top: 1134, bottom: 1417, left: 1417, right: 1417 } } },
+      footers: { default: brandFooter },
       children: docChildren,
     }],
   });
   return Packer.toBlob(wordDoc);
 };
 
-const downloadDocx = async (blob: Blob, filename: string) => {
+const stripSlideMarkup = (s: any): string =>
+  typeof s === 'string' ? s.replace(/\[\[|\]\]/g, '') : (s ?? '');
+
+const sanitizeSlideData = (parsed: any): any => {
+  if (!parsed?.slides) return parsed;
+  return {
+    ...parsed,
+    slides: parsed.slides.map((slide: any) => {
+      const d = slide.data || {};
+      return {
+        ...slide,
+        data: {
+          ...d,
+          title: stripSlideMarkup(d.title),
+          subtitle: stripSlideMarkup(d.subtitle),
+          author: stripSlideMarkup(d.author),
+          quote: stripSlideMarkup(d.quote),
+          // text / column1 / column2 intentionally kept — parsed by parseRichHtml
+          topics: Array.isArray(d.topics)
+            ? d.topics.map((t: any) => ({ ...t, title: stripSlideMarkup(t.title), content: stripSlideMarkup(t.content) }))
+            : d.topics,
+          events: Array.isArray(d.events)
+            ? d.events.map((e: any) => ({ ...e, year: stripSlideMarkup(e.year), title: stripSlideMarkup(e.title), description: stripSlideMarkup(e.description) }))
+            : d.events,
+          stats: Array.isArray(d.stats)
+            ? d.stats.map((s: any) => ({ ...s, value: stripSlideMarkup(s.value), label: stripSlideMarkup(s.label) }))
+            : d.stats,
+          references: Array.isArray(d.references) ? d.references.map(stripSlideMarkup) : d.references,
+        },
+      };
+    }),
+  };
+};
+
+const downloadDocx = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    if (document.body.contains(a)) document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 1000);
 };
 
 const buildDocHtml = (
@@ -1902,7 +2038,10 @@ const PlannerScreen = ({
   setPlannerExamDuration: setExamDuration,
   getSuggestion,
   getScheduleBuffer,
-  setPlannerMode
+  setPlannerMode,
+  generationsUsed,
+  isLimitReached,
+  freeGenerationLimit,
 }: {
   schedules: ClassSchedule[], 
   setSchedules: (s: ClassSchedule[]) => void,
@@ -1962,7 +2101,10 @@ const PlannerScreen = ({
   setPlannerExamDuration: (n: number) => void,
   getSuggestion: (topic?: string, classId?: string) => Promise<void>,
   getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
-  setPlannerMode: (m: PlannerMode) => void
+  setPlannerMode: (m: PlannerMode) => void,
+  generationsUsed: number,
+  isLimitReached: boolean,
+  freeGenerationLimit: number,
 }) => {
   const currentResult = mode === 'plan' ? plan : 
                         mode === 'slides' ? presentationData :
@@ -2018,6 +2160,7 @@ const PlannerScreen = ({
   const [showGenModal, setShowGenModal] = useState(false);
   const profileName = profile.name;
   const profileSchoolName = profile.schoolName;
+  const selectedClass = schedules.find(s => s.id === selectedClassId);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -2097,7 +2240,13 @@ const PlannerScreen = ({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo pesado demais! O limite e 10 MB.');
+      e.target.value = '';
+      return;
+    }
+
     // If it's a text file, read it directly
     if (file.type.startsWith('text/') || file.name.endsWith('.md') || file.name.endsWith('.csv')) {
       const text = await file.text();
@@ -2109,7 +2258,7 @@ const PlannerScreen = ({
         try {
           const base64 = (event.target?.result as string).split(',')[1];
           const response = await generateContentWithRetry({
-            model: 'gemini-3-flash-preview',
+            model: AI_MODEL,
             contents: [
               { role: 'user', parts: [
                 { inlineData: { data: base64, mimeType: file.type } },
@@ -2121,7 +2270,7 @@ const PlannerScreen = ({
           setTopic(prev => prev + (prev ? '\n\n' : '') + text);
         } catch (error) {
           console.error("Error extracting text from file:", error);
-          alert(formatApiError(error, "Erro ao extrair texto do arquivo."));
+          toast.error(formatApiError(error, "Nao consegui ler esse arquivo. Tente outro formato."));
         }
       };
       reader.readAsDataURL(file);
@@ -2167,27 +2316,58 @@ const PlannerScreen = ({
   };
 
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingDoc, setIsExportingDoc] = useState(false);
+  const [preparingDoc, setPreparingDoc] = useState<'main' | number | null>(null);
+  const [docReady, setDocReady] = useState<{url: string; filename: string; target: 'main' | number} | null>(null);
+
+  // Clean up download URL and reset state on mode change
+  useEffect(() => {
+    if (docReady) URL.revokeObjectURL(docReady.url);
+    setDocReady(null);
+    setPreparingDoc(null);
+  }, [mode]);
+
+  // When content changes (new generation), reset download state
+  useEffect(() => {
+    if (docReady) URL.revokeObjectURL(docReady.url);
+    setDocReady(null);
+  }, [currentResult]);
+
+  const fetchImageAsBase64 = async (url: string): Promise<string | null> => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string>(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
 
   const exportPPTX = async () => {
     if (!presentationData) return;
     setIsExporting(true);
     try {
+      const { default: pptxgen } = await import('pptxgenjs');
       const pres = new pptxgen();
       pres.layout = 'LAYOUT_16x9';
       const theme = presentationData.theme;
       const pc = theme.primaryColor.replace('#', '');
       const ac = theme.accentColor.replace('#', '');
       const bg = theme.backgroundColor.replace('#', '');
-      const schoolLabel = profileSchoolName || '';
+      const schoolLabel = selectedClass?.school || profileSchoolName || '';
       const teacherLabel = profileName || '';
       const totalSlides = presentationData.slides.length;
 
       const addFooter = (slide: any, slideNum: number, darkBg = false) => {
         const fg = darkBg ? 'FFFFFF' : '9CA3AF';
         slide.addShape(pres.ShapeType.rect, { x: 0, y: 5.15, w: 10, h: 0.35, fill: { color: pc, transparency: darkBg ? 40 : 85 }, line: { color: pc, transparency: 85, width: 0 } });
-        if (schoolLabel) slide.addText(schoolLabel, { x: 0.2, y: 5.17, w: 6, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false });
-        if (teacherLabel) slide.addText(`Prof. ${teacherLabel}`, { x: 0.2, y: 5.17, w: 6, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false, align: schoolLabel ? 'right' as const : 'left' as const });
+        if (schoolLabel) slide.addText(schoolLabel, { x: 0.2, y: 5.17, w: 5.5, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false });
+        if (teacherLabel) slide.addText(`Prof. ${teacherLabel}`, { x: 0.2, y: 5.17, w: 5.5, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false, align: schoolLabel ? 'right' as const : 'left' as const });
+        slide.addText('Prof. Corujão', { x: 5.9, y: 5.17, w: 3.0, h: 0.28, fontSize: 7, color: darkBg ? 'FFFFFF' : pc, transparency: 20, align: 'center' as const, italic: true, fontFace: 'Calibri' });
         slide.addText(`${slideNum} / ${totalSlides}`, { x: 9.3, y: 5.17, w: 0.6, h: 0.28, fontSize: 8, color: fg, align: 'right' });
       };
 
@@ -2198,6 +2378,28 @@ const PlannerScreen = ({
         } else {
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
+        }
+      };
+
+      // Pre-fetch all images as base64 to avoid CORS failures when pptxgenjs
+      // requests Pixabay URLs directly from the user's browser.
+      const imageCache = new Map<string, string>();
+      await Promise.all(
+        presentationData.slides
+          .map(s => s.data.imageUrl)
+          .filter(Boolean)
+          .filter((url, i, a) => a.indexOf(url) === i)
+          .map(async url => {
+            const b64 = await fetchImageAsBase64(url);
+            if (b64) imageCache.set(url, b64);
+          })
+      );
+      const addSlideImage = (slide: any, url: string, opts: any) => {
+        const b64 = imageCache.get(url);
+        if (b64) {
+          slide.addImage({ data: `image/jpeg;base64,${b64}`, ...opts });
+        } else {
+          slide.addImage({ path: url, ...opts });
         }
       };
 
@@ -2223,7 +2425,7 @@ const PlannerScreen = ({
           slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.5, y: 4.6, w: 4.7, h: 0.35, fontSize: 9, fontFace: 'Calibri', color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
           }
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
@@ -2235,7 +2437,7 @@ const PlannerScreen = ({
           const contentX = isLeft ? 0.4 : 4.4;
 
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
             slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 75 } });
           }
 
@@ -2261,7 +2463,7 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.rect, { x: 4.94, y: 2.62, w: 0.12, h: 0.28, fill: { color: ac } });
           slide.addShape(pres.ShapeType.rect, { x: 4.7, y: 2.78, w: 0.6, h: 0.08, fill: { color: ac }, rotate: 0 });
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
           }
           addFooter(slide, si + 1);
 
@@ -2352,7 +2554,7 @@ const PlannerScreen = ({
         } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
           slide.background = { color: '111111' };
           if (slideData.data.imageUrl) {
-            slide.addImage({ path: slideData.data.imageUrl, x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
           }
           // Dark gradient overlay via semi-transparent rect
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.3, fill: { color: '000000', transparency: 25 } });
@@ -2423,7 +2625,7 @@ const PlannerScreen = ({
       await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
     } catch (e) {
       console.error(e);
-      alert('Erro ao gerar o arquivo PPTX. Verifique sua conexão e tente novamente.');
+      toast.error('A apresentacao nao saiu dessa vez. Confere a conexao e tenta de novo.');
     }
     setIsExporting(false);
   };
@@ -2531,20 +2733,45 @@ const PlannerScreen = ({
                 </motion.div>
               )}
             </AnimatePresence>
-            <button
-              onClick={() => {
-                if (mode === 'plan' && duration === 0) {
-                  getSuggestion();
-                } else {
-                  setShowGenModal(true);
-                }
-              }}
-              disabled={loading || !topic || !selectedClassId}
-              className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
-            >
-              {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}
-              {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
-            </button>
+            {!profile?.isPro && profile?.role !== 'admin' && (
+              <div className="flex items-center justify-between mb-1 px-1">
+                <span className="text-xs text-gray-400">Gerações usadas</span>
+                <span className={`text-xs font-bold ${isLimitReached ? 'text-red-500' : generationsUsed >= freeGenerationLimit - 2 ? 'text-amber-500' : 'text-gray-500'}`}>
+                  {generationsUsed}/{freeGenerationLimit}
+                </span>
+              </div>
+            )}
+            {isLimitReached ? (
+              <div className="w-full bg-indigo-50 border border-indigo-200 rounded-2xl py-4 px-4 text-center flex flex-col gap-3">
+                <div>
+                  <p className="text-indigo-700 font-bold text-sm mb-0.5">Limite do plano gratuito atingido</p>
+                  <p className="text-indigo-400 text-xs">Ative o Pro para gerações ilimitadas de planos, slides, atividades e provas.</p>
+                </div>
+                <a
+                  href="https://wa.me/5598981796309?text=Olá! Quero ativar o plano Pro do Prof. Corujão."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-green-500 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={16} /> Ativar Pro via WhatsApp
+                </a>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (mode === 'plan' && duration === 0) {
+                    getSuggestion();
+                  } else {
+                    setShowGenModal(true);
+                  }
+                }}
+                disabled={loading || !topic || !selectedClassId}
+                className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+              >
+                {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}
+                {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
+              </button>
+            )}
             <GenerateModal
               show={showGenModal}
               onClose={() => setShowGenModal(false)}
@@ -2571,7 +2798,20 @@ const PlannerScreen = ({
                 Cancelar
               </button>
             )}
-            {(error || recentTaskError) && <p className="text-red-500 text-sm mt-3 text-center font-medium">{error || recentTaskError}</p>}
+            {(error || recentTaskError) && (
+              <div className="mt-3 flex flex-col gap-2">
+                <p className="text-red-500 text-sm text-center font-medium">{error || recentTaskError}</p>
+                {recentTaskError && (
+                  <button
+                    onClick={() => { setError(''); handleMainAction(); }}
+                    disabled={loading}
+                    className="w-full border border-indigo-400 text-indigo-600 rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={15} /> Tentar novamente
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -2661,20 +2901,28 @@ const PlannerScreen = ({
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                {docReady?.target === 'main' ? (
+                  <a
+                    href={docReady.url}
+                    download={docReady.filename}
+                    onClick={() => setTimeout(() => { URL.revokeObjectURL(docReady!.url); setDocReady(null); }, 1000)}
+                    className="w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <Download size={16} /> Baixar Word
+                  </a>
+                ) : (
                   <button
                     onClick={async () => {
-                      if (isExportingDoc) return;
-                      setIsExportingDoc(true);
+                      if (preparingDoc !== null || docReady !== null) return;
+                      setPreparingDoc('main');
                       try {
                         const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
-                        const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
                         const blob = await buildDocx(currentResult as string, docType, {
-                          school: profileSchoolName || '',
+                          school: selectedClass?.school || profileSchoolName || '',
                           teacher: profileName || '',
-                          subject: profile.subject || '',
+                          subject: selectedClass?.subject || profile.subject || '',
                           topic,
-                          className: selectedClassForExport?.name || '',
+                          className: selectedClass?.name || '',
                           duration,
                           lessonTime,
                           turn,
@@ -2682,46 +2930,21 @@ const PlannerScreen = ({
                           examDuration,
                         });
                         const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
-                        await downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
+                        const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
+                        setDocReady({ url: URL.createObjectURL(blob), filename, target: 'main' });
                       } catch (e) {
                         console.error('Erro ao exportar Word:', e);
-                        alert('Erro ao gerar o arquivo Word. Tente novamente.');
+                        toast.error('O documento Word fugiu! Tenta gerar de novo.');
                       } finally {
-                        setIsExportingDoc(false);
+                        setPreparingDoc(null);
                       }
                     }}
-                    disabled={isExportingDoc}
-                    className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                    disabled={preparingDoc !== null || docReady !== null}
+                    className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                   >
-                    {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
+                    {preparingDoc === 'main' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                   </button>
-                  <button 
-                    onClick={() => {
-                      const newResourceId = Math.random().toString(36).substr(2, 9);
-                      setSavedResources([...savedResources, {
-                        id: newResourceId,
-                        type: mode === 'plan' ? 'plan' : mode === 'exam' ? 'exam' : 'activities',
-                        title: topic || 'Material Didático',
-                        date: Date.now(),
-                        content: currentResult
-                      }]);
-                      
-                      const selectedClass = schedules.find(c => c.id === selectedClassId);
-                      const className = selectedClass ? selectedClass.name : 'Geral';
-                      const classToUpdate = classes.find(c => c.className === className && c.title.includes(topic));
-                      if (classToUpdate) {
-                        setClasses(classes.map(c => c.id === classToUpdate.id ? { ...c, resourceIds: [...(c.resourceIds || []), newResourceId] } : c));
-                      }
-
-                      if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification('Material salvo!', { icon: '/favicon.ico' });
-                      }
-                    }}
-                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                  >
-                    <Archive size={16} /> Salvar
-                  </button>
-                </div>
+                )}
               </div>
             )}
 
@@ -2740,57 +2963,50 @@ const PlannerScreen = ({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          if (isExportingDoc) return;
-                          setIsExportingDoc(true);
-                          try {
-                            const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
-                            const selectedClassForExport = schedules.find(s => s.id === selectedClassId);
-                            const blob = await buildDocx(res.content, dt, {
-                              school: profileSchoolName || '',
-                              teacher: profileName || '',
-                              subject: profile.subject || '',
-                              topic,
-                              className: selectedClassForExport?.name || '',
-                              duration,
-                              lessonTime,
-                              turn,
-                              examValue,
-                              examDuration,
-                            });
-                            const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
-                            await downloadDocx(blob, `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`);
-                          } catch (e) {
-                            console.error('Erro ao exportar Word:', e);
-                            alert('Erro ao gerar o arquivo Word. Tente novamente.');
-                          } finally {
-                            setIsExportingDoc(false);
-                          }
-                        }}
-                        disabled={isExportingDoc}
-                        className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-                      >
-                        {isExportingDoc ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const newResourceId = Math.random().toString(36).substr(2, 9);
-                          setSavedResources([...savedResources, {
-                            id: newResourceId,
-                            type: res.type as any,
-                            title: `${topic} - ${res.type === 'activities' ? 'Atividades' : 'Roteiro'}`,
-                            date: Date.now(),
-                            content: res.content
-                          }]);
-                          if ('Notification' in window && Notification.permission === 'granted') {
-                            new Notification('Material salvo!', { icon: '/favicon.ico' });
-                          }
-                        }}
-                        className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                      >
-                        <Archive size={16} /> Salvar
-                      </button>
+                      {docReady?.target === i ? (
+                        <a
+                          href={docReady.url}
+                          download={docReady.filename}
+                          onClick={() => setTimeout(() => { URL.revokeObjectURL(docReady!.url); setDocReady(null); }, 1000)}
+                          className="w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
+                        >
+                          <Download size={16} /> Baixar Word
+                        </a>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (preparingDoc !== null || docReady !== null) return;
+                            setPreparingDoc(i);
+                            try {
+                              const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
+                              const blob = await buildDocx(res.content, dt, {
+                                school: selectedClass?.school || profileSchoolName || '',
+                                teacher: profileName || '',
+                                subject: selectedClass?.subject || profile.subject || '',
+                                topic,
+                                className: selectedClass?.name || '',
+                                duration,
+                                lessonTime,
+                                turn,
+                                examValue,
+                                examDuration,
+                              });
+                              const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
+                              const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
+                              setDocReady({ url: URL.createObjectURL(blob), filename, target: i });
+                            } catch (e) {
+                              console.error('Erro ao exportar Word:', e);
+                              toast.error('O documento Word fugiu! Tenta gerar de novo.');
+                            } finally {
+                              setPreparingDoc(null);
+                            }
+                          }}
+                          disabled={preparingDoc !== null || docReady !== null}
+                          className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                        >
+                          {preparingDoc === i ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -3042,7 +3258,7 @@ const ChatScreen = ({
       Hoje é: ${today}.
 
       Contexto Atual:
-      - Professor: ${profile.name} (${profile.subject})
+      - Professor: ${profile.name}
       - Escola: ${profile.schoolName || 'Não informada'}
       - Turmas cadastradas: ${turmas}
       - Próximas aulas (máx. 10):
@@ -3082,7 +3298,7 @@ const ChatScreen = ({
       }
 
       const response = await generateContentWithRetry({
-        model: 'gemini-3-flash-preview',
+        model: AI_MODEL,
         contents: { parts },
         config: {
           tools: [{
@@ -3265,14 +3481,14 @@ const ChatScreen = ({
       }
     } catch (error) {
       console.error(error);
-      setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: '❌ ' + formatApiError(error, 'Desculpe, ocorreu um erro ao processar sua solicitação.'), date: Date.now() }]);
+      setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: '❌ ' + formatApiError(error, 'Tive um branco aqui, professor. Envia de novo que eu respondo.'), date: Date.now() }]);
     }
     setLoading(false);
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-28 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Inbox" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/yBsc48YK/20260419-204249-0001.png" />
+      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Assistente" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage={null} />
       
       <div className="mb-2">
         <div className="relative">
@@ -3392,8 +3608,9 @@ const ChatScreen = ({
   );
 };
 
-const ProfileScreen = ({ 
-  schedules, 
+const ProfileScreen = ({
+  user,
+  schedules,
   setSchedules,
   profile,
   setProfile,
@@ -3405,8 +3622,9 @@ const ProfileScreen = ({
   notifications,
   setNotifications,
   onResetAccount
-}: { 
-  schedules: ClassSchedule[], 
+}: {
+  user: any,
+  schedules: ClassSchedule[],
   setSchedules: (s: ClassSchedule[]) => void,
   profile: UserProfile,
   setProfile: (p: UserProfile) => void,
@@ -3422,7 +3640,7 @@ const ProfileScreen = ({
   const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
   const [showScheduleConfig, setShowScheduleConfig] = useState(false);
   const [showAddClassModal, setShowAddClassModal] = useState(false);
-  const [newClassData, setNewClassData] = useState({ name: '', level: 'Ensino Fundamental II', profile: '', color: '#4F46E5' });
+  const [newClassData, setNewClassData] = useState({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
   const [classFormError, setClassFormError] = useState<string | null>(null);
   const classColors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
 
@@ -3436,6 +3654,7 @@ const ProfileScreen = ({
   const [importStatus, setImportStatus] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleRef = useRef<HTMLDivElement>(null);
   const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -3461,11 +3680,14 @@ const ProfileScreen = ({
       time: '08:00',
       color: newClassData.color,
       level: newClassData.level,
+      subject: newClassData.subject || undefined,
+      school: newClassData.school || undefined,
+      shift: newClassData.shift || undefined,
       classProfile: newClassData.profile
     };
     onAddClass(newClass);
     setShowAddClassModal(false);
-    setNewClassData({ name: '', level: 'Ensino Fundamental II', profile: '', color: '#4F46E5' });
+    setNewClassData({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
   };
 
   const deleteClass = (id: string) => {
@@ -3498,43 +3720,40 @@ const ProfileScreen = ({
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 400;
-          const MAX_HEIGHT = 400;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
+    if (!file || !user) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 400;
+        let { width, height } = img;
+        if (width > height) { if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; } }
+        else { if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; } }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+          setIsUploadingPhoto(true);
+          try {
+            const ref = storageRef(storage, `users/${user.uid}/photo.jpg`);
+            await uploadBytesResumable(ref, blob).then(snap => snap);
+            const url = await getDownloadURL(ref);
+            setProfile({ ...profile, photo: url });
+          } catch {
+            toast.error('Sua foto nao subiu dessa vez. Tente de novo!');
+          } finally {
+            setIsUploadingPhoto(false);
           }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          setProfile({ ...profile, photo: compressedBase64 });
-        };
-        img.src = event.target?.result as string;
+        }, 'image/jpeg', 0.7);
       };
-      reader.readAsDataURL(file);
-    }
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const saveProfile = () => {
-    setProfile({ ...profile, name: profileName, subject: profileSubject, schoolName: profileSchoolName });
+    setProfile({ ...profile, name: profileName, subject: profileSubject || undefined, schoolName: profileSchoolName || undefined });
     setIsEditingProfile(false);
   };
 
@@ -3544,7 +3763,7 @@ const ProfileScreen = ({
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => fileInputRef.current?.click()}>
+          <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
               <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
@@ -3552,69 +3771,143 @@ const ProfileScreen = ({
                 <User size={48} />
               </div>
             )}
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <Camera size={24} className="text-white" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploadingPhoto ? <Loader2 size={24} className="text-white animate-spin" /> : <Camera size={24} className="text-white" />}
             </div>
+            {isUploadingPhoto && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={24} className="text-white animate-spin" /></div>}
           </div>
-          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} />
+          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
         </div>
         {isEditingProfile ? (
           <div className="w-full space-y-3 mt-4">
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome do Professor</label>
-              <input 
-                value={profileName} 
-                onChange={e => setProfileName(e.target.value)} 
-                className="w-full text-base font-bold text-gray-900 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Seu Nome</label>
+              <input
+                value={profileName}
+                onChange={e => setProfileName(e.target.value)}
+                className="w-full text-base font-bold text-gray-900 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1"
                 autoFocus
               />
             </div>
+            <p className="text-xs text-gray-400 text-left px-1 pt-1">
+              Disciplina e escola são configurados em cada turma. Os campos abaixo são usados como padrão quando você gerar material sem turma selecionada.
+            </p>
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina / Turmas</label>
-              <input 
-                value={profileSubject} 
-                onChange={e => setProfileSubject(e.target.value)} 
-                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
-              />
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina padrão</label>
+              <select
+                value={profileSubject}
+                onChange={e => setProfileSubject(e.target.value)}
+                className="w-full text-sm text-gray-700 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1 bg-transparent"
+              >
+                <option value="">Nenhuma</option>
+                {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div className="text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Escola (Cabeçalho)</label>
-              <input 
-                value={profileSchoolName} 
-                onChange={e => setProfileSchoolName(e.target.value)} 
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escola padrão</label>
+              <input
+                value={profileSchoolName}
+                onChange={e => setProfileSchoolName(e.target.value)}
                 placeholder="Ex: Escola Estadual Padrão"
-                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1" 
+                className="w-full text-sm text-gray-600 border-b-2 border-indigo-500 focus:outline-none pb-1 mt-1"
               />
             </div>
           </div>
         ) : (
           <>
-            <h2 className="text-xl font-bold text-gray-900 mt-2">{profile.name}</h2>
-            <p className="text-base text-gray-500 mt-1">{profile.subject}</p>
+            <h2 className="text-xl font-bold text-gray-900 mt-2">{profile.name || 'Professor'}</h2>
+            {profile.subject && <p className="text-sm text-gray-400 mt-0.5">{profile.subject}</p>}
             {profile.schoolName && (
-              <p className="text-sm text-indigo-600 font-medium mt-2 bg-indigo-50 px-3 py-1 rounded-full">
+              <p className="text-sm text-indigo-600 font-medium mt-1 bg-indigo-50 px-3 py-1 rounded-full">
                 {profile.schoolName}
               </p>
             )}
+            {user?.email && <p className="text-xs text-gray-400 mt-2">{user.email}</p>}
           </>
         )}
-        
-        <button 
+
+        <button
           onClick={() => isEditingProfile ? saveProfile() : setIsEditingProfile(true)}
           className="mt-6 bg-[#F8F9FE] text-indigo-600 px-6 py-2.5 rounded-full text-base font-bold w-full"
         >
-          {isEditingProfile ? 'Salvar Identidade Padrão' : 'Editar Identidade Padrão'}
+          {isEditingProfile ? 'Salvar' : 'Editar Perfil'}
         </button>
       </div>
 
+      {/* Pro Status Card */}
+      {profile.isPro || profile.role === 'admin' ? (
+        <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-5 shadow-lg mb-4 flex items-center gap-4">
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0 text-3xl">⭐</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="bg-white text-orange-600 text-xs font-black px-2 py-0.5 rounded-full tracking-wider uppercase">PRO</span>
+              {profile.role === 'admin' && <span className="bg-white/30 text-white text-xs font-black px-2 py-0.5 rounded-full">ADMIN</span>}
+            </div>
+            <p className="text-white font-bold text-sm">Acesso ilimitado ativo</p>
+            <p className="text-orange-100 text-xs mt-0.5">Gerações ilimitadas, todos os recursos desbloqueados.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-[2rem] p-5 shadow-sm border-2 border-gray-100 mb-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-xl">🔒</div>
+            <div>
+              <p className="font-bold text-gray-900 text-sm">Modo Gratuito</p>
+              <p className="text-xs text-gray-400">{profile.generationsUsed ?? 0} de 10 gerações usadas</p>
+            </div>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
+            <div
+              className="bg-indigo-500 h-2 rounded-full transition-all"
+              style={{ width: `${Math.min(100, ((profile.generationsUsed ?? 0) / 10) * 100)}%` }}
+            />
+          </div>
+          <a
+            href="https://wa.me/5598981796309?text=Olá! Quero ativar o plano Pro do Prof. Corujão."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-green-500 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm"
+          >
+            <MessageCircle size={18} /> Ativar Pro via WhatsApp
+          </a>
+        </div>
+      )}
 
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[
+          { label: 'Turmas', value: schedules.length, emoji: '👥' },
+          { label: 'Materiais', value: savedResources.length, emoji: '📄' },
+          { label: 'Gerações', value: profile.generationsUsed ?? 0, emoji: '✨' },
+        ].map(stat => (
+          <div key={stat.label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 text-center">
+            <div className="text-2xl mb-1">{stat.emoji}</div>
+            <div className="text-xl font-black text-gray-900">{stat.value}</div>
+            <div className="text-xs text-gray-400 font-medium">{stat.label}</div>
+          </div>
+        ))}
+      </div>
 
       <div className="space-y-3">
         <h3 className="text-lg font-bold text-gray-900 mb-4 px-2">Gestão de Turmas</h3>
         
-        <div className="w-full h-32 rounded-2xl overflow-hidden mb-2 shadow-sm relative">
-           <img src="https://i.ibb.co/N6j5Gwmy/20260419-204249-0004.png" alt="Painel de Turmas" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </div>
+        {schedules.length > 0 ? (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-2 flex items-center gap-4">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shrink-0">
+              <Users size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-indigo-900 text-sm">{schedules.length} turma{schedules.length !== 1 ? 's' : ''} ativa{schedules.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-indigo-400 mt-0.5">
+                {schedules.slice(0, 3).map(s => s.name).join(' · ')}{schedules.length > 3 ? ` +${schedules.length - 3}` : ''}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mb-2 text-center">
+            <p className="text-sm text-gray-400">Nenhuma turma cadastrada ainda.</p>
+          </div>
+        )}
 
         <button 
           onClick={() => setShowScheduleConfig(!showScheduleConfig)}
@@ -3655,28 +3948,40 @@ const ProfileScreen = ({
                       </div>
                     )}
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma</label>
-                        <input 
-                          type="text" 
-                          placeholder="Ex: 8º Ano A" 
-                          value={newClassData.name} 
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma *</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 8º Ano A"
+                          value={newClassData.name}
                           onChange={(e) => setNewClassData({...newClassData, name: e.target.value})}
                           className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
                         />
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Ensino</label>
-                        <select 
-                          value={newClassData.level} 
-                          onChange={(e) => setNewClassData({...newClassData, level: e.target.value})}
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina *</label>
+                        <select
+                          value={newClassData.subject}
+                          onChange={(e) => setNewClassData({...newClassData, subject: e.target.value})}
                           className={`w-full p-3 mt-1 rounded-xl focus:outline-none transition-all ${
-                            newClassData.level 
-                              ? 'bg-indigo-600 text-white font-bold border-none shadow-sm' 
+                            newClassData.subject
+                              ? 'bg-indigo-600 text-white font-bold border-none shadow-sm'
                               : 'bg-white text-gray-700 border border-gray-200'
                           }`}
+                        >
+                          <option value="">Selecione a disciplina</option>
+                          {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Ensino</label>
+                        <select
+                          value={newClassData.level}
+                          onChange={(e) => setNewClassData({...newClassData, level: e.target.value})}
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 bg-white text-gray-700"
                         >
                           <option value="Ensino Fundamental I">Ensino Fundamental I</option>
                           <option value="Ensino Fundamental II">Ensino Fundamental II</option>
@@ -3686,12 +3991,38 @@ const ProfileScreen = ({
                       </div>
 
                       <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
+                        <div className="flex gap-2 mt-1">
+                          {['Manhã', 'Tarde', 'Noite'].map(s => (
+                            <button
+                              key={s}
+                              onClick={() => setNewClassData({...newClassData, shift: s})}
+                              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${newClassData.shift === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Escola</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Escola Estadual João Silva"
+                          value={newClassData.school}
+                          onChange={(e) => setNewClassData({...newClassData, school: e.target.value})}
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
                         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Perfil da Turma (Opcional)</label>
-                        <textarea 
-                          placeholder="Ex: Turma agitada, prefere aulas práticas. 2 alunos com TDAH." 
-                          value={newClassData.profile} 
+                        <textarea
+                          placeholder="Ex: Turma agitada, prefere aulas práticas. 2 alunos com TDAH."
+                          value={newClassData.profile}
                           onChange={(e) => setNewClassData({...newClassData, profile: e.target.value})}
-                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-20 text-sm"
+                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-16 text-sm"
                         />
                       </div>
 
@@ -3731,7 +4062,10 @@ const ProfileScreen = ({
                     >
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900">{s.name}</h4>
-                        {s.level && <p className="text-xs text-gray-400">{s.level}</p>}
+                        <p className="text-xs text-gray-400">
+                          {[s.subject, s.level, s.shift].filter(Boolean).join(' · ')}
+                        </p>
+                        {s.school && <p className="text-xs text-indigo-400 font-medium truncate">{s.school}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         <div 
@@ -3921,22 +4255,27 @@ const ProfileScreen = ({
             <ChevronRight size={20} className="text-gray-400" />
           </button>
 
-          <button 
-            onClick={() => setShowResetConfirm(true)}
-            className="w-full flex items-center justify-between p-4 rounded-2xl bg-red-50 hover:bg-red-100 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-red-600 shadow-sm">
-                <Trash2 size={20} />
-              </div>
-              <div className="text-left">
-                <h3 className="font-bold text-red-700">Resetar Conta</h3>
-                <p className="text-xs text-red-500">Apagar todos os dados</p>
-              </div>
-            </div>
-            <ChevronRight size={20} className="text-red-400" />
-          </button>
         </div>
+      </div>
+
+      {/* Zona de Perigo */}
+      <div className="bg-red-50 border-2 border-red-100 rounded-[2rem] p-6 mb-8 mt-4">
+        <p className="text-xs font-black text-red-400 uppercase tracking-widest mb-4">⚠️ Zona de Perigo</p>
+        <button
+          onClick={() => setShowResetConfirm(true)}
+          className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-red-100 shadow-sm hover:bg-red-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+              <Trash2 size={20} />
+            </div>
+            <div className="text-left">
+              <h3 className="font-bold text-red-700">Resetar Conta</h3>
+              <p className="text-xs text-red-400">Apaga todos os seus dados permanentemente</p>
+            </div>
+          </div>
+          <ChevronRight size={20} className="text-red-300" />
+        </button>
       </div>
 
       <AnimatePresence>
@@ -4000,7 +4339,7 @@ const ProfileScreen = ({
                         }, 3000);
                       } catch (e) {
                         console.error('Error sending feedback:', e);
-                        alert('Não foi possível enviar o feedback. Tente novamente.');
+                        toast.error('Seu feedback ficou preso no caminho. Tente enviar de novo.');
                       }
                     }}
                     disabled={!feedbackText.trim()}
@@ -4057,43 +4396,50 @@ const ProfileScreen = ({
         )}
 
         {showResetConfirm && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
             onClick={() => setShowResetConfirm(false)}
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl border-4 border-red-50"
+              className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl"
             >
-              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-xl flex items-center justify-center mb-4">
-                <Trash2 size={24} />
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Trash2 size={32} className="text-red-500" />
+                </div>
+                <h2 className="text-xl font-black text-gray-900 mb-1">Eita... tá certo disso?</h2>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Isso vai apagar <span className="font-bold text-gray-700">tudo</span> — turmas, materiais, notas...
+                  até aquela atividade incrível que você fez às 23h.
+                </p>
+                <p className="text-xs text-red-400 font-bold mt-3 bg-red-50 rounded-xl py-2 px-3">
+                  Sem volta, viu? Sem recuperar depois!
+                </p>
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Resetar Conta (Ação Irreversível)</h2>
-              <p className="text-sm text-gray-600 font-medium mb-2">Tem certeza <span className="text-red-600 font-bold">ABSOLUTA</span> que deseja fazer isso?</p>
-              <p className="text-sm text-gray-500 mb-6">Todos os seus cronogramas, turmas, notas e acervo na nuvem serão brutalmente excluídos e não poderão ser recuperados de forma alguma.</p>
-              
-              <div className="flex gap-3">
-                <button 
+              <div className="flex gap-3 mt-6">
+                <button
                   onClick={() => setShowResetConfirm(false)}
-                  className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl text-sm font-bold border border-gray-200"
+                  className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-sm"
                 >
-                  Não, cancelar
+                  Não, me arrependi!
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     if (onResetAccount) onResetAccount();
                     setShowResetConfirm(false);
-                    setScreen('home'); // Redireciona para o início após a deleção
+                    setScreen('home');
                   }}
-                  className="flex-1 bg-red-600 text-white rounded-xl py-3 text-sm font-bold hover:bg-red-700 transition-colors shadow-sm"
+                  className="flex-1 bg-gray-100 text-red-500 rounded-2xl py-3 text-sm font-bold"
                 >
-                  Sim, APAGAR TUDO
+                  Sim, pode apagar
                 </button>
               </div>
             </motion.div>
@@ -4210,7 +4556,7 @@ const HolidaySuggestion = ({ holidayName }: { holidayName: string }) => {
       try {
         const prompt = `Dê uma dica CURTA e PRÁTICA (máximo 2 frases) para um professor aproveitar o feriado "${holidayName}" no seu planejamento pedagógico ou para atividades de descanso com alunos. Foque na objetividade.`;
         const response = await generateContentWithRetry({
-          model: "gemini-3-flash-preview",
+          model: AI_MODEL,
           contents: prompt,
         });
         
@@ -4366,6 +4712,12 @@ const CalendarScreen = ({
   const [newEventType, setNewEventType] = useState<'prep' | 'admin'>('prep');
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const monthAbbrNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const [globalHolidays, setGlobalHolidays] = useState<{id:string,name:string,date:string}[]>([]);
+  useEffect(() => {
+    getDoc(doc(db, 'config', 'feriados')).then(snap => {
+      if (snap.exists()) setGlobalHolidays(snap.data().list || []);
+    }).catch(() => {});
+  }, []);
 
   const EVENT_PRESETS = [
     { label: 'Prova',             icon: FileQuestion,  type: 'admin' as const, color: '#EF4444' },
@@ -4391,7 +4743,9 @@ const CalendarScreen = ({
 
   const defaultHolidays = getDefaultHolidays(currentYear).filter(h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0])));
 
-  const allEvents = [...filteredClasses.map(c => ({...c, type: 'class' as const})), ...customEvents, ...defaultHolidays];
+  const globalHolidayEvents = globalHolidays.map(h => ({ id: h.id, title: h.name, date: h.date, type: 'holiday' as const }));
+
+  const allEvents = [...filteredClasses.map(c => ({...c, type: 'class' as const})), ...customEvents, ...defaultHolidays, ...globalHolidayEvents];
   
   const getEventColorInternal = (e: any) => {
     if (e.type === 'class') {
@@ -4530,7 +4884,7 @@ const CalendarScreen = ({
         title="Cronograma" 
         subtitle="Visão Semestral" 
         profile={profile} 
-        notifications={notifications} 
+        notifications={notifications}
         setNotifications={setNotifications}
         bannerImage="https://i.ibb.co/x8t6Wmp7/20260419-204249-0002.png"
       >
@@ -4717,6 +5071,1289 @@ const CalendarScreen = ({
   );
 };
 
+type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'trail' | 'memory';
+
+const buildWordSearchGrid = (rawWords: string[], size = 15): { grid: string[][], placements: {word: string, row: number, col: number, dir: string}[] } => {
+  const words = rawWords.map(w => w.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÔÃÕÇÜ]/gi, '')).filter(w => w.length >= 3 && w.length <= size);
+  const grid: string[][] = Array.from({ length: size }, () => Array(size).fill(''));
+  const dirs = [ [0,1,'→'], [1,0,'↓'], [1,1,'↘'], [-1,1,'↗'] ] as const;
+  const placements: {word: string, row: number, col: number, dir: string}[] = [];
+  for (const word of words) {
+    let placed = false;
+    for (let attempt = 0; attempt < 80 && !placed; attempt++) {
+      const [dr, dc, dirLabel] = dirs[Math.floor(Math.random() * dirs.length)];
+      const r0 = Math.floor(Math.random() * size);
+      const c0 = Math.floor(Math.random() * size);
+      const rEnd = r0 + dr * (word.length - 1);
+      const cEnd = c0 + dc * (word.length - 1);
+      if (rEnd < 0 || rEnd >= size || cEnd < 0 || cEnd >= size) continue;
+      let ok = true;
+      for (let i = 0; i < word.length; i++) {
+        const cell = grid[r0 + dr * i][c0 + dc * i];
+        if (cell && cell !== word[i]) { ok = false; break; }
+      }
+      if (!ok) continue;
+      for (let i = 0; i < word.length; i++) grid[r0 + dr * i][c0 + dc * i] = word[i];
+      placements.push({ word, row: r0, col: c0, dir: dirLabel });
+      placed = true;
+    }
+  }
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (!grid[r][c]) grid[r][c] = letters[Math.floor(Math.random() * 26)];
+  return { grid, placements };
+};
+
+const buildBingoCards = (items: string[], count: number, dim: 3 | 5 = 5, freeText = 'LIVRE'): string[][][] => {
+  const hasFree = dim === 5;
+  const needed = dim * dim - (hasFree ? 1 : 0);
+  const freeR = Math.floor(dim / 2), freeC = Math.floor(dim / 2);
+  const cards: string[][][] = [];
+  for (let n = 0; n < count; n++) {
+    const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, needed);
+    const card: string[][] = [];
+    let idx = 0;
+    for (let r = 0; r < dim; r++) {
+      const row: string[] = [];
+      for (let c = 0; c < dim; c++) {
+        if (hasFree && r === freeR && c === freeC) row.push(`★ ${freeText}`);
+        else row.push(shuffled[idx++] || '');
+      }
+      card.push(row);
+    }
+    cards.push(card);
+  }
+  return cards;
+};
+
+const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
+  const SIZE = 21;
+  const CENTER = Math.floor(SIZE / 2);
+  type Cell = string | null;
+  const grid: Cell[][] = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+  type Placement = {word: string, clue: string, row: number, col: number, dir: 'H' | 'V'};
+  const placements: Placement[] = [];
+  const words = rawWords.slice(0, 15).map(w => ({...w, word: w.word.toUpperCase().replace(/[^A-Z]/g, '')})).filter(w => w.word.length >= 3);
+  if (words.length === 0) return null;
+
+  const canPlace = (word: string, row: number, col: number, dir: 'H' | 'V'): boolean => {
+    const len = word.length;
+    if (dir === 'H') {
+      if (col < 0 || col + len > SIZE || row < 0 || row >= SIZE) return false;
+      if (col > 0 && grid[row][col - 1] !== null) return false;
+      if (col + len < SIZE && grid[row][col + len] !== null) return false;
+      for (let i = 0; i < len; i++) {
+        const cell = grid[row][col + i];
+        if (cell !== null && cell !== word[i]) return false;
+        if (cell === null) {
+          if (row > 0 && grid[row - 1][col + i] !== null) return false;
+          if (row < SIZE - 1 && grid[row + 1][col + i] !== null) return false;
+        }
+      }
+    } else {
+      if (row < 0 || row + len > SIZE || col < 0 || col >= SIZE) return false;
+      if (row > 0 && grid[row - 1][col] !== null) return false;
+      if (row + len < SIZE && grid[row + len][col] !== null) return false;
+      for (let i = 0; i < len; i++) {
+        const cell = grid[row + i][col];
+        if (cell !== null && cell !== word[i]) return false;
+        if (cell === null) {
+          if (col > 0 && grid[row + i][col - 1] !== null) return false;
+          if (col < SIZE - 1 && grid[row + i][col + 1] !== null) return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const doPlace = (word: string, row: number, col: number, dir: 'H' | 'V') => {
+    for (let i = 0; i < word.length; i++) {
+      if (dir === 'H') grid[row][col + i] = word[i];
+      else grid[row + i][col] = word[i];
+    }
+  };
+
+  const first = words[0];
+  doPlace(first.word, CENTER, CENTER - Math.floor(first.word.length / 2), 'H');
+  placements.push({word: first.word, clue: first.clue, row: CENTER, col: CENTER - Math.floor(first.word.length / 2), dir: 'H'});
+
+  for (let wi = 1; wi < words.length; wi++) {
+    const {word, clue} = words[wi];
+    let placed = false;
+    for (const pw of [...placements].reverse()) {
+      if (placed) break;
+      const nd: 'H' | 'V' = pw.dir === 'H' ? 'V' : 'H';
+      for (let ni = 0; ni < word.length && !placed; ni++) {
+        for (let pi = 0; pi < pw.word.length && !placed; pi++) {
+          if (word[ni] !== pw.word[pi]) continue;
+          const row = nd === 'V' ? pw.row - ni : pw.row + pi;
+          const col = nd === 'V' ? pw.col + pi : pw.col - ni;
+          if (canPlace(word, row, col, nd)) {
+            doPlace(word, row, col, nd);
+            placements.push({word, clue, row, col, dir: nd});
+            placed = true;
+          }
+        }
+      }
+    }
+  }
+
+  let minR = SIZE, maxR = 0, minC = SIZE, maxC = 0;
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    if (grid[r][c] !== null) { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); }
+  }
+  if (minR > maxR) return null;
+  const pad = 1;
+  const r0 = Math.max(0, minR - pad), r1 = Math.min(SIZE - 1, maxR + pad);
+  const c0 = Math.max(0, minC - pad), c1 = Math.min(SIZE - 1, maxC + pad);
+  const trimmed: Cell[][] = [];
+  for (let r = r0; r <= r1; r++) trimmed.push(grid[r].slice(c0, c1 + 1));
+  const adjP = placements.map(p => ({...p, row: p.row - r0, col: p.col - c0}));
+  const cellNum = new Map<string, number>();
+  let counter = 1;
+  const sorted = [...adjP].sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
+  const across: {num: number, word: string, clue: string}[] = [];
+  const down: {num: number, word: string, clue: string}[] = [];
+  for (const p of sorted) {
+    const key = `${p.row},${p.col}`;
+    if (!cellNum.has(key)) cellNum.set(key, counter++);
+    const num = cellNum.get(key)!;
+    if (p.dir === 'H') across.push({num, word: p.word, clue: p.clue});
+    else down.push({num, word: p.word, clue: p.clue});
+  }
+  across.sort((a, b) => a.num - b.num);
+  down.sort((a, b) => a.num - b.num);
+  return {grid: trimmed, cellNumbers: Object.fromEntries(cellNum), across, down};
+};
+
+const STORY_SECTIONS = ['🌍 Cenário', '👥 Classes de Personagens', '⚔️ Missões', '🏆 Sistema de Pontos', '👑 Boss Final', '📋 Roteiro do Professor'];
+
+const generateStoryPixelArts = async (topic: string, genre: string): Promise<Record<string, string>> => {
+  try {
+    const prompt = `Gere 6 pixel art SVG cinematográficos (32x18) ÚNICOS e TEMÁTICOS para uma campanha gamificada.
+
+TEMA: "${topic}"
+GÊNERO: ${genre}
+
+Crie uma cena PIXEL ART diferente para cada seção, refletindo o tema "${topic}":
+- "🌍 Cenário" → paisagem ampla (céu, terreno, vegetação ou estrutura ambiental do tema)
+- "👥 Classes de Personagens" → 3-4 figuras humanoides lado a lado, cada uma com classe distinta (cores/chapéus/armas diferentes)
+- "⚔️ Missões" → mapa com X marcando local, ou ícone de quest (espada, pergaminho, bússola)
+- "🏆 Sistema de Pontos" → moedas douradas empilhadas + estrelas + troféu
+- "👑 Boss Final" → silhueta grande de inimigo intimidador com olhos brilhantes, ocupando centro
+- "📋 Roteiro do Professor" → figura de professor com livro/cajado em frente a quadro/atril
+
+REGRAS ESTRITAS:
+- viewBox="0 0 32 18" (cinema 16:9)
+- Use APENAS <rect> com width e height inteiros (geralmente "1")
+- Coordenadas integers: x 0–31, y 0–17
+- 6–10 cores hexadecimais por cena, com paleta apropriada ao tema "${topic}"
+- 40–120 rects por cena
+- Inclua shape-rendering="crispEdges" e xmlns
+- Composições centralizadas e LEGÍVEIS
+
+Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
+{
+  "🌍 Cenário": "<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 32 18\\" shape-rendering=\\"crispEdges\\">...</svg>",
+  "👥 Classes de Personagens": "<svg ...>...</svg>",
+  "⚔️ Missões": "<svg ...>...</svg>",
+  "🏆 Sistema de Pontos": "<svg ...>...</svg>",
+  "👑 Boss Final": "<svg ...>...</svg>",
+  "📋 Roteiro do Professor": "<svg ...>...</svg>"
+}
+
+Use as chaves EXATAMENTE como acima (com emojis).`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = response.text || '';
+    const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (err) {
+    console.warn('[StoryPixelArts] generation failed:', err);
+    return {};
+  }
+};
+
+type StoryScene = 'adventure' | 'mystery' | 'fantasy' | 'space' | 'ancient' | 'ocean' | 'science' | 'math' | 'nature' | 'prehistoric';
+
+const matchTopicToScene = (topic: string): StoryScene | null => {
+  const t = topic.toLowerCase();
+  if (/sistema solar|astronomia|universo|planeta|gal[aá]xia|estrela|nasa|cosmo|espacial|astron|nebulo|c[oó]smic/.test(t)) return 'space';
+  if (/oceano|mar[ií]tim|mar |peixe|aqu[áa]tic|marinho|coral|tubar[ãa]o|baleia|golfinho|polvo|submari/.test(t)) return 'ocean';
+  if (/dinoss?aur|pr[eé]-?hist|f[oó]ssil|jur[aá]ssic|cret[aá]ceo|triceratops|tiranoss/.test(t)) return 'prehistoric';
+  if (/floresta|amaz[oô]n|selva|[áa]rvore|planta|fotoss[ií]ntese|ecolog|biolog|animal|fauna|flora|bioma|p[áa]ssaro/.test(t)) return 'nature';
+  if (/qu[ií]m|f[ií]sic|laborat|[áa]tomo|ci[eê]ncia|experim|elemento|mol[eé]cula|reac[ãa]o|el[eé]tric/.test(t)) return 'science';
+  if (/matem[aá]t|fra[cç][ãa]o|geometria|n[uú]mero|[aá]lgebra|equa[cç][ãa]o|aritm|c[aá]lcul/.test(t)) return 'math';
+  if (/egito|pir[aâ]mide|fara[oó]|gr[eé]cia|romano|civili[zs]a|antigu|antiga|hierogl|mesopot|maias?|astecas?|incas?/.test(t)) return 'ancient';
+  if (/castel|medieval|cavaleiro|reino|drag[ãa]o|fantasi|feudal|cruzad|rei |rainha/.test(t)) return 'fantasy';
+  if (/mist[eé]rio|terror|noite|detetive|crime|enigma|suspense|sombr|assombr/.test(t)) return 'mystery';
+  return null;
+};
+
+const buildStoryIllustration = (topic?: string, genre?: string): string => {
+  let scene: StoryScene | null = matchTopicToScene(topic || '');
+  if (!scene) {
+    const g = (genre || 'aventura').toLowerCase();
+    if (g.includes('mist') || g.includes('terror') || g.includes('apocal')) scene = 'mystery';
+    else if (g.includes('fanta') || g.includes('medieval')) scene = 'fantasy';
+    else if (g.includes('cient') || g.includes('espac') || g.includes('sci')) scene = 'space';
+    else if (g.includes('hist') || g.includes('época') || g.includes('epoca')) scene = 'ancient';
+    else scene = 'adventure';
+  }
+
+  const scenes: Record<StoryScene, string> = {
+    adventure: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="advSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf9a"/><stop offset="1" stop-color="#f4a07a"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#advSky)"/>
+      <circle cx="1320" cy="100" r="48" fill="#fff3e0" opacity="0.9"/>
+      <g fill="white" opacity="0.95">
+        <ellipse cx="240" cy="80" rx="80" ry="32"/><ellipse cx="310" cy="68" rx="60" ry="26"/>
+        <ellipse cx="860" cy="60" rx="100" ry="34"/><ellipse cx="960" cy="50" rx="72" ry="28"/>
+        <ellipse cx="1430" cy="130" rx="64" ry="24"/>
+      </g>
+      <g fill="#6b5b8f" opacity="0.55"><polygon points="320,400 620,150 920,400"/><polygon points="900,400 1100,180 1300,400"/></g>
+      <g fill="#3b4f8c"><polygon points="700,420 980,140 1260,420"/><polygon points="60,420 320,165 580,420"/><polygon points="980,420 1240,200 1500,420"/></g>
+      <rect x="0" y="430" width="1600" height="170" fill="#e8c49a"/>
+      <ellipse cx="800" cy="460" rx="380" ry="40" fill="#d4a97a"/>
+      <g fill="#2d3a7a">
+        <polygon points="120,440 180,300 240,440"/><polygon points="106,410 180,288 254,410"/><polygon points="92,380 180,272 268,380"/>
+        <polygon points="240,442 296,316 352,442"/><polygon points="226,414 296,300 366,414"/>
+        <polygon points="1300,440 1356,304 1412,440"/><polygon points="1286,410 1356,288 1426,410"/><polygon points="1272,380 1356,272 1440,380"/>
+        <polygon points="1420,442 1474,328 1528,442"/><polygon points="1408,414 1474,308 1540,414"/>
+      </g>
+      <g><circle cx="80" cy="468" r="44" fill="#2d7a6b"/><circle cx="130" cy="478" r="32" fill="#3a9980"/><circle cx="48" cy="482" r="28" fill="#1f5c52"/></g>
+      <g><circle cx="1530" cy="468" r="42" fill="#2d7a6b"/><circle cx="1480" cy="478" r="32" fill="#3a9980"/></g>
+      <g fill="#4ab89e"><polygon points="430,478 446,442 462,478"/><polygon points="1080,478 1096,440 1112,478"/></g>
+      <rect x="772" y="392" width="22" height="78" rx="10" fill="#e88c5a"/><rect x="802" y="392" width="22" height="76" rx="10" fill="#e88c5a"/>
+      <ellipse cx="782" cy="472" rx="18" ry="10" fill="#2d3a7a"/><ellipse cx="814" cy="468" rx="18" ry="10" fill="#2d3a7a"/>
+      <rect x="764" y="370" width="68" height="40" rx="10" fill="#2d4ca0"/>
+      <rect x="770" y="294" width="60" height="86" rx="14" fill="#f4f4f4"/>
+      <rect x="750" y="304" width="20" height="60" rx="9" fill="#e88c5a" transform="rotate(-8 760 334)"/>
+      <rect x="826" y="310" width="18" height="52" rx="9" fill="#e88c5a" transform="rotate(10 835 336)"/>
+      <rect x="816" y="300" width="44" height="66" rx="10" fill="#4dc4b0"/><rect x="816" y="300" width="44" height="66" rx="10" fill="none" stroke="#39a898" stroke-width="2"/>
+      <rect x="824" y="334" width="28" height="22" rx="4" fill="#39a898"/>
+      <path d="M816 314 Q800 326 804 350" stroke="#39a898" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <rect x="788" y="282" width="24" height="22" rx="6" fill="#e88c5a"/>
+      <ellipse cx="800" cy="266" rx="34" ry="36" fill="#e88c5a"/>
+      <path d="M768 254 Q764 210 800 200 Q838 196 840 240 Q846 272 836 286 Q826 296 822 278 Q818 250 800 244 Q776 248 770 264 Z" fill="#1a1040"/>
+      <path d="M834 240 Q860 260 854 300 Q846 322 836 316 Q826 296 830 270 Z" fill="#1a1040"/>
+      <ellipse cx="816" cy="270" rx="4" ry="5" fill="#c4694a" opacity="0.6"/>
+      <ellipse cx="766" cy="270" rx="7" ry="9" fill="#d97a50"/>
+    </svg>`,
+    mystery: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="mysSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f0a2e"/><stop offset="0.7" stop-color="#1e1846"/><stop offset="1" stop-color="#2a1f5c"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#mysSky)"/>
+      <g fill="white"><circle cx="120" cy="80" r="2"/><circle cx="240" cy="140" r="1.5"/><circle cx="380" cy="50" r="2.4"/><circle cx="520" cy="120" r="1.5"/><circle cx="680" cy="40" r="2"/><circle cx="900" cy="100" r="1.8"/><circle cx="1100" cy="50" r="2.4"/><circle cx="1260" cy="160" r="1.6"/><circle cx="1420" cy="80" r="2"/><circle cx="1520" cy="180" r="1.7"/><circle cx="200" cy="220" r="1.4"/><circle cx="440" cy="240" r="1.8"/><circle cx="780" cy="180" r="2"/><circle cx="1180" cy="240" r="1.5"/><circle cx="1340" cy="200" r="2"/><circle cx="60" cy="180" r="1.6"/></g>
+      <circle cx="1320" cy="130" r="78" fill="#fef9c3" opacity="0.92"/>
+      <circle cx="1300" cy="115" r="16" fill="#e5d9a8" opacity="0.7"/><circle cx="1340" cy="150" r="10" fill="#e5d9a8" opacity="0.6"/>
+      <circle cx="1320" cy="130" r="120" fill="#fef9c3" opacity="0.08"/>
+      <g fill="#9b8bc7" opacity="0.35"><polygon points="0,440 200,300 400,440"/><polygon points="280,440 480,260 680,440"/><polygon points="600,440 820,280 1040,440"/><polygon points="960,440 1180,300 1400,440"/><polygon points="1300,440 1500,320 1700,440"/></g>
+      <g fill="#1a0f3c"><polygon points="40,540 140,340 200,360 260,300 340,540"/><polygon points="180,540 280,360 360,540"/><polygon points="320,540 440,320 480,360 560,540"/><polygon points="520,540 640,300 720,360 780,540"/><polygon points="740,540 880,340 960,540"/><polygon points="920,540 1040,320 1120,360 1180,540"/><polygon points="1140,540 1280,340 1360,360 1420,540"/><polygon points="1380,540 1500,330 1600,380 1600,540"/></g>
+      <g fill="white" opacity="0.06"><ellipse cx="400" cy="500" rx="320" ry="22"/><ellipse cx="1100" cy="510" rx="380" ry="26"/></g>
+      <rect x="0" y="548" width="1600" height="52" fill="#0a0820"/>
+      <ellipse cx="800" cy="556" rx="420" ry="14" fill="#1a1840" opacity="0.6"/>
+      <g transform="translate(770 360)">
+        <ellipse cx="40" cy="120" rx="46" ry="38" fill="#1a1845"/>
+        <circle cx="40" cy="60" r="42" fill="#1a1845"/>
+        <polygon points="14,28 22,52 34,42" fill="#2d2666"/><polygon points="66,28 58,52 46,42" fill="#2d2666"/>
+        <circle cx="26" cy="62" r="14" fill="#fbbf24"/><circle cx="54" cy="62" r="14" fill="#fbbf24"/>
+        <circle cx="26" cy="62" r="7" fill="#1a1040"/><circle cx="54" cy="62" r="7" fill="#1a1040"/>
+        <circle cx="28" cy="60" r="2" fill="white"/><circle cx="56" cy="60" r="2" fill="white"/>
+        <polygon points="40,76 34,86 46,86" fill="#f59e0b"/>
+        <path d="M2 110 Q-10 130 6 156" stroke="#1a1845" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <path d="M78 110 Q90 130 74 156" stroke="#1a1845" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <rect x="36" y="148" width="8" height="14" fill="#92400e"/>
+      </g>
+      <g fill="white" opacity="0.7"><ellipse cx="300" cy="470" rx="180" ry="14"/><ellipse cx="1200" cy="480" rx="220" ry="14"/></g>
+      <g fill="white" opacity="0.4"><ellipse cx="600" cy="510" rx="260" ry="10"/><ellipse cx="1000" cy="520" rx="220" ry="9"/></g>
+    </svg>`,
+    fantasy: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="fanSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c4585"/><stop offset="0.5" stop-color="#e07a5f"/><stop offset="1" stop-color="#f5b993"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#fanSky)"/>
+      <circle cx="1240" cy="160" r="68" fill="#fef3c7" opacity="0.95"/>
+      <circle cx="1240" cy="160" r="106" fill="#fef3c7" opacity="0.18"/>
+      <g fill="#ffffff" opacity="0.6"><ellipse cx="280" cy="120" rx="80" ry="14"/><ellipse cx="900" cy="100" rx="100" ry="16"/><ellipse cx="1450" cy="140" rx="70" ry="12"/></g>
+      <g fill="#1a1040" opacity="0.85"><path d="M1380 230 Q1410 220 1440 240 L1460 230 L1450 250 Q1430 258 1410 252 Q1395 260 1378 255 L1370 245 Z"/><path d="M1410 228 L1402 218 L1414 222 Z"/></g>
+      <g fill="#5a3a6e" opacity="0.7"><polygon points="0,420 240,260 480,420"/><polygon points="320,420 560,240 800,420"/><polygon points="700,420 940,260 1180,420"/><polygon points="1080,420 1340,280 1600,420"/></g>
+      <g fill="#3d2552"><polygon points="-100,480 180,300 460,480"/><polygon points="380,480 620,280 860,480"/><polygon points="1140,480 1380,280 1620,480"/></g>
+      <g transform="translate(640 260)">
+        <polygon points="160,280 160,90 280,90 280,280" fill="#3a2c4e"/>
+        <polygon points="160,90 160,280 70,280 70,120" fill="#3a2c4e"/>
+        <polygon points="280,90 280,280 370,280 370,120" fill="#3a2c4e"/>
+        <polygon points="150,120 150,90 290,90 290,120" fill="#251a35"/>
+        <rect x="130" y="40" width="30" height="80" fill="#4a3a62"/><rect x="280" y="40" width="30" height="80" fill="#4a3a62"/><rect x="210" y="0" width="28" height="110" fill="#5a4675"/>
+        <polygon points="130,40 145,18 160,40" fill="#7c3aed"/><polygon points="280,40 295,18 310,40" fill="#7c3aed"/><polygon points="210,0 224,-26 238,0" fill="#fbbf24"/>
+        <polygon points="222,-30 246,-22 222,-14" fill="#dc2626"/>
+        <polygon points="50,120 70,90 70,140" fill="#2d1f3d"/><polygon points="370,120 390,140 390,90" fill="#2d1f3d"/>
+        <rect x="200" y="180" width="40" height="70" fill="#1a1040"/><path d="M200 180 Q220 158 240 180 Z" fill="#1a1040"/>
+        <circle cx="220" cy="220" r="2.5" fill="#fbbf24"/>
+        <rect x="88" y="160" width="14" height="22" rx="6" fill="#fde047" opacity="0.9"/>
+        <rect x="138" y="160" width="14" height="22" rx="6" fill="#fde047" opacity="0.9"/>
+        <rect x="290" y="160" width="14" height="22" rx="6" fill="#fde047" opacity="0.9"/>
+        <rect x="338" y="160" width="14" height="22" rx="6" fill="#fde047" opacity="0.9"/>
+      </g>
+      <rect x="0" y="546" width="1600" height="54" fill="#2d1a3d"/>
+      <ellipse cx="800" cy="552" rx="900" ry="22" fill="#2d1a3d"/>
+      <g fill="#1a0f2e"><polygon points="80,548 130,420 180,548"/><polygon points="1420,548 1470,420 1520,548"/></g>
+      <g fill="#fbbf24" opacity="0.9"><circle cx="200" cy="80" r="2"/><circle cx="1380" cy="100" r="2"/><circle cx="780" cy="50" r="1.6"/><circle cx="1080" cy="120" r="2"/></g>
+    </svg>`,
+    space: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><radialGradient id="spaceSky" cx="0.7" cy="0.3" r="1"><stop offset="0" stop-color="#1e1a4a"/><stop offset="0.5" stop-color="#0a0826"/><stop offset="1" stop-color="#050314"/></radialGradient></defs>
+      <rect width="1600" height="600" fill="url(#spaceSky)"/>
+      <g fill="white">
+        <circle cx="80" cy="80" r="1.5"/><circle cx="200" cy="50" r="2"/><circle cx="340" cy="120" r="1.5"/><circle cx="460" cy="40" r="2.4"/><circle cx="580" cy="140" r="1.5"/><circle cx="720" cy="70" r="2"/><circle cx="840" cy="180" r="1.5"/><circle cx="960" cy="50" r="2.4"/><circle cx="1080" cy="200" r="1.5"/><circle cx="1200" cy="80" r="2"/><circle cx="1340" cy="140" r="2.4"/><circle cx="1480" cy="50" r="2"/><circle cx="1540" cy="180" r="1.5"/>
+        <circle cx="160" cy="230" r="1.4"/><circle cx="300" cy="280" r="1.8"/><circle cx="440" cy="240" r="1.4"/><circle cx="620" cy="300" r="1.8"/><circle cx="780" cy="260" r="1.4"/><circle cx="960" cy="320" r="1.8"/><circle cx="1140" cy="280" r="1.5"/><circle cx="1300" cy="340" r="1.8"/><circle cx="1460" cy="290" r="1.5"/>
+        <circle cx="120" cy="380" r="1.5"/><circle cx="260" cy="430" r="1.5"/><circle cx="520" cy="400" r="1.8"/><circle cx="680" cy="460" r="1.5"/><circle cx="900" cy="440" r="1.5"/><circle cx="1080" cy="480" r="1.8"/><circle cx="1280" cy="450" r="1.5"/><circle cx="1440" cy="500" r="1.5"/>
+      </g>
+      <g fill="#fbbf24" opacity="0.85"><circle cx="380" cy="170" r="2.5"/><circle cx="900" cy="110" r="3"/><circle cx="1260" cy="220" r="2.5"/></g>
+      <g opacity="0.95">
+        <circle cx="260" cy="170" r="68" fill="#f59e0b"/>
+        <ellipse cx="244" cy="156" rx="24" ry="16" fill="#ea580c" opacity="0.55"/>
+        <ellipse cx="284" cy="190" rx="16" ry="10" fill="#fbbf24" opacity="0.6"/>
+      </g>
+      <g transform="translate(1240 280)">
+        <ellipse cx="0" cy="0" rx="120" ry="26" fill="none" stroke="#a78bfa" stroke-width="10" opacity="0.85" transform="rotate(-22)"/>
+        <circle cx="0" cy="0" r="84" fill="#7c3aed"/>
+        <ellipse cx="-22" cy="-14" rx="24" ry="14" fill="#9b6bf3" opacity="0.7"/>
+        <ellipse cx="30" cy="22" rx="34" ry="18" fill="#5b21b6" opacity="0.55"/>
+        <ellipse cx="0" cy="0" rx="120" ry="26" fill="none" stroke="#a78bfa" stroke-width="4" opacity="0.65" transform="rotate(-22)"/>
+      </g>
+      <g transform="translate(580 130) rotate(20)">
+        <path d="M0 0 L18 -80 L36 0 Z" fill="#e5e7eb"/>
+        <rect x="6" y="-40" width="24" height="62" rx="6" fill="#f3f4f6"/>
+        <circle cx="18" cy="-10" r="8" fill="#3b82f6"/><circle cx="18" cy="-10" r="4" fill="#1e40af"/>
+        <polygon points="6,22 0,48 12,38" fill="#dc2626"/><polygon points="30,22 36,48 24,38" fill="#dc2626"/>
+        <polygon points="12,38 18,62 24,38" fill="#f59e0b"/>
+        <polygon points="12,38 18,52 24,38" fill="#fbbf24"/>
+      </g>
+      <g fill="none" stroke="#fef3c7" stroke-width="3" opacity="0.6"><path d="M560 110 Q360 200 60 290"/></g>
+      <g transform="translate(640 480)">
+        <ellipse cx="160" cy="80" rx="540" ry="60" fill="#1a1845"/>
+        <ellipse cx="100" cy="60" rx="40" ry="12" fill="#2d2666"/><ellipse cx="280" cy="80" rx="60" ry="12" fill="#2d2666"/>
+        <circle cx="200" cy="44" r="3" fill="#a78bfa"/><circle cx="320" cy="60" r="2.5" fill="#a78bfa"/>
+      </g>
+      <g transform="translate(720 360)">
+        <ellipse cx="46" cy="140" rx="50" ry="12" fill="black" opacity="0.35"/>
+        <rect x="20" y="90" width="18" height="46" fill="#e5e7eb"/><rect x="54" y="90" width="18" height="46" fill="#e5e7eb"/>
+        <rect x="18" y="132" width="22" height="12" rx="3" fill="white"/><rect x="52" y="132" width="22" height="12" rx="3" fill="white"/>
+        <rect x="12" y="44" width="68" height="54" rx="12" fill="white"/>
+        <rect x="8" y="54" width="12" height="28" rx="5" fill="white"/><rect x="72" y="54" width="12" height="28" rx="5" fill="white"/>
+        <circle cx="46" cy="36" r="32" fill="white"/>
+        <rect x="20" y="26" width="52" height="28" rx="12" fill="#1a1845"/>
+        <rect x="24" y="30" width="44" height="20" rx="8" fill="#7dd3fc"/>
+        <rect x="32" y="34" width="20" height="12" rx="3" fill="white" opacity="0.45"/>
+        <circle cx="80" cy="56" r="5" fill="#dc2626"/><circle cx="12" cy="56" r="5" fill="#22c55e"/>
+      </g>
+    </svg>`,
+    ancient: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="ancSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcd6a3"/><stop offset="0.6" stop-color="#f59e0b"/><stop offset="1" stop-color="#dc8a3e"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#ancSky)"/>
+      <circle cx="800" cy="170" r="86" fill="#fef3c7" opacity="0.95"/>
+      <circle cx="800" cy="170" r="130" fill="#fef3c7" opacity="0.18"/>
+      <g stroke="#fef3c7" stroke-width="2" opacity="0.4"><line x1="800" y1="30" x2="800" y2="320"/><line x1="650" y1="170" x2="950" y2="170"/></g>
+      <g fill="#9b6f3a" opacity="0.55"><polygon points="0,400 320,220 640,400"/><polygon points="960,400 1280,240 1600,400"/></g>
+      <g fill="#7a5530"><polygon points="-100,440 220,260 540,440"/><polygon points="1060,440 1380,260 1700,440"/></g>
+      <rect x="0" y="540" width="1600" height="60" fill="#e5b079"/>
+      <ellipse cx="800" cy="548" rx="900" ry="30" fill="#e5b079"/>
+      <g fill="#c98a4b"><ellipse cx="200" cy="560" rx="160" ry="8"/><ellipse cx="700" cy="572" rx="240" ry="10"/><ellipse cx="1200" cy="562" rx="200" ry="8"/></g>
+      <g transform="translate(600 280)">
+        <polygon points="200,280 0,280 100,60" fill="#d4a374"/>
+        <polygon points="200,280 100,60 152,128" fill="#b88550" opacity="0.6"/>
+        <polygon points="100,60 100,140 70,200 130,200 100,140" fill="#a16939" opacity="0.4"/>
+        <rect x="86" y="232" width="22" height="48" fill="#7a5530"/>
+        <g stroke="#a16939" stroke-width="1.5" opacity="0.5" fill="none"><line x1="20" y1="252" x2="180" y2="252"/><line x1="40" y1="220" x2="160" y2="220"/><line x1="60" y1="188" x2="140" y2="188"/><line x1="80" y1="156" x2="120" y2="156"/></g>
+      </g>
+      <g transform="translate(220 340)">
+        <polygon points="160,240 0,240 80,80" fill="#c89058"/>
+        <polygon points="160,240 80,80 116,128" fill="#a47542" opacity="0.55"/>
+        <g stroke="#8b5a2b" stroke-width="1.2" opacity="0.5" fill="none"><line x1="16" y1="208" x2="144" y2="208"/><line x1="32" y1="176" x2="128" y2="176"/><line x1="48" y1="144" x2="112" y2="144"/></g>
+      </g>
+      <g transform="translate(1140 360)">
+        <polygon points="180,220 0,220 90,90" fill="#c08348"/>
+        <polygon points="180,220 90,90 130,140" fill="#a06b30" opacity="0.55"/>
+        <g stroke="#8b5a2b" stroke-width="1.2" opacity="0.5" fill="none"><line x1="16" y1="188" x2="164" y2="188"/><line x1="32" y1="156" x2="148" y2="156"/></g>
+      </g>
+      <g transform="translate(60 380)">
+        <rect x="0" y="20" width="36" height="140" fill="#f3e6c4"/>
+        <rect x="-6" y="14" width="48" height="12" rx="4" fill="#e8d5a8"/>
+        <rect x="-6" y="156" width="48" height="12" rx="4" fill="#e8d5a8"/>
+        <g stroke="#9b6f3a" stroke-width="1.2" opacity="0.6" fill="#f3e6c4"><circle cx="18" cy="42" r="3"/><circle cx="18" cy="56" r="3"/></g>
+      </g>
+      <g transform="translate(1500 400)">
+        <rect x="0" y="20" width="36" height="124" fill="#f3e6c4"/>
+        <rect x="-6" y="14" width="48" height="12" rx="4" fill="#e8d5a8"/>
+        <rect x="-6" y="140" width="48" height="12" rx="4" fill="#e8d5a8"/>
+      </g>
+      <g transform="translate(750 460) scale(1.1)">
+        <path d="M0 60 Q-2 30 18 24 L80 24 Q98 30 100 60 L100 90 Q98 96 90 96 L10 96 Q2 96 0 90 Z" fill="#e8d5a8" stroke="#8b5a2b" stroke-width="2"/>
+        <circle cx="10" cy="60" r="14" fill="#e8d5a8" stroke="#8b5a2b" stroke-width="2"/>
+        <circle cx="90" cy="60" r="14" fill="#e8d5a8" stroke="#8b5a2b" stroke-width="2"/>
+        <circle cx="10" cy="60" r="6" fill="#c98a4b"/><circle cx="90" cy="60" r="6" fill="#c98a4b"/>
+        <g stroke="#8b5a2b" stroke-width="1.2" opacity="0.7"><line x1="28" y1="46" x2="76" y2="46"/><line x1="28" y1="58" x2="76" y2="58"/><line x1="28" y1="70" x2="76" y2="70"/></g>
+      </g>
+      <g fill="#1a1040" opacity="0.7"><path d="M1380 130 Q1410 125 1430 140 L1445 135 L1440 150 Q1425 156 1410 152 Q1398 158 1384 152 L1378 145 Z"/></g>
+    </svg>`,
+    ocean: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="oceSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#bae6fd"/></linearGradient>
+        <linearGradient id="oceSea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0ea5e9"/><stop offset="0.5" stop-color="#0369a1"/><stop offset="1" stop-color="#082f49"/></linearGradient>
+      </defs>
+      <rect width="1600" height="200" fill="url(#oceSky)"/>
+      <rect y="200" width="1600" height="400" fill="url(#oceSea)"/>
+      <circle cx="1340" cy="100" r="50" fill="#fef3c7" opacity="0.95"/>
+      <g fill="white" opacity="0.85"><ellipse cx="240" cy="90" rx="70" ry="18"/><ellipse cx="320" cy="80" rx="50" ry="14"/><ellipse cx="900" cy="70" rx="84" ry="20"/><ellipse cx="980" cy="60" rx="60" ry="16"/></g>
+      <g fill="white" opacity="0.6"><path d="M0 220 Q200 200 400 220 Q600 240 800 220 Q1000 200 1200 220 Q1400 240 1600 220 L1600 240 L0 240 Z"/></g>
+      <g fill="white" opacity="0.25"><path d="M0 260 Q200 240 400 260 Q600 280 800 260 Q1000 240 1200 260 Q1400 280 1600 260 L1600 280 L0 280 Z"/></g>
+      <g fill="white" opacity="0.15"><path d="M0 320 Q400 300 800 320 Q1200 340 1600 320 L1600 340 L0 340 Z"/></g>
+      <g transform="translate(220 340)">
+        <ellipse cx="60" cy="20" rx="68" ry="22" fill="#fb923c"/>
+        <polygon points="-20,20 12,-2 12,42" fill="#fb923c"/>
+        <polygon points="-20,20 6,8 6,32" fill="#ea580c"/>
+        <circle cx="84" cy="14" r="5" fill="white"/><circle cx="84" cy="14" r="2.5" fill="#082f49"/>
+        <path d="M14 18 Q40 8 80 18" stroke="#ea580c" stroke-width="2" fill="none"/>
+        <path d="M14 22 Q40 32 80 22" stroke="#ea580c" stroke-width="2" fill="none"/>
+        <polygon points="60,-6 70,6 50,6" fill="#ea580c"/><polygon points="60,46 70,34 50,34" fill="#ea580c"/>
+      </g>
+      <g transform="translate(1100 400)">
+        <ellipse cx="50" cy="16" rx="56" ry="18" fill="#fbbf24"/>
+        <polygon points="-14,16 16,2 16,30" fill="#fbbf24"/>
+        <polygon points="-14,16 8,8 8,24" fill="#d97706"/>
+        <circle cx="70" cy="12" r="4" fill="white"/><circle cx="70" cy="12" r="2" fill="#082f49"/>
+        <path d="M14 14 Q34 6 64 14" stroke="#d97706" stroke-width="1.5" fill="none"/>
+      </g>
+      <g transform="translate(640 420)">
+        <ellipse cx="60" cy="20" rx="60" ry="20" fill="#a855f7"/>
+        <polygon points="-10,20 14,4 14,36" fill="#a855f7"/>
+        <polygon points="-10,20 6,10 6,30" fill="#7e22ce"/>
+        <circle cx="80" cy="16" r="5" fill="white"/><circle cx="80" cy="16" r="2.5" fill="#082f49"/>
+        <polygon points="60,-4 70,4 50,4" fill="#7e22ce"/>
+      </g>
+      <g transform="translate(120 470)">
+        <path d="M40 0 Q60 -20 80 0 Q100 -10 110 10 Q120 30 100 40 Q80 60 60 50 Q40 60 20 50 Q0 30 10 10 Q20 -10 40 0 Z" fill="#ec4899" opacity="0.85"/>
+        <circle cx="56" cy="20" r="3" fill="#082f49"/><circle cx="76" cy="22" r="3" fill="#082f49"/>
+        <path d="M28 36 Q22 50 18 60" stroke="#ec4899" stroke-width="6" fill="none" opacity="0.7"/>
+        <path d="M48 44 Q42 60 36 72" stroke="#ec4899" stroke-width="6" fill="none" opacity="0.7"/>
+        <path d="M68 46 Q70 60 64 74" stroke="#ec4899" stroke-width="6" fill="none" opacity="0.7"/>
+        <path d="M88 40 Q92 56 86 70" stroke="#ec4899" stroke-width="6" fill="none" opacity="0.7"/>
+      </g>
+      <g transform="translate(1380 510)">
+        <ellipse cx="0" cy="0" rx="180" ry="20" fill="#0c4a6e"/>
+        <path d="M-50 -8 Q-30 -40 -20 -8" stroke="#dc2626" stroke-width="4" fill="#dc2626"/>
+        <path d="M-10 -10 Q10 -36 30 -10" stroke="#f59e0b" stroke-width="4" fill="#f59e0b"/>
+        <path d="M40 -8 Q60 -34 80 -8" stroke="#a855f7" stroke-width="4" fill="#a855f7"/>
+      </g>
+      <g transform="translate(60 510)">
+        <path d="M0 0 Q-6 -32 4 -50 Q14 -68 10 -86 Q20 -100 14 -116" stroke="#10b981" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <path d="M20 0 Q26 -34 18 -54 Q12 -72 22 -90" stroke="#34d399" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path d="M40 0 Q34 -30 44 -56 Q40 -76 50 -94" stroke="#10b981" stroke-width="5" fill="none" stroke-linecap="round"/>
+      </g>
+      <g fill="white" opacity="0.8"><circle cx="500" cy="350" r="3"/><circle cx="510" cy="356" r="2"/><circle cx="900" cy="380" r="2.5"/><circle cx="910" cy="386" r="1.8"/><circle cx="280" cy="500" r="2"/><circle cx="1240" cy="460" r="2.5"/></g>
+    </svg>`,
+    science: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="sciSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#sciSky)"/>
+      <g stroke="#334155" stroke-width="1" opacity="0.5"><line x1="0" y1="100" x2="1600" y2="100"/><line x1="0" y1="200" x2="1600" y2="200"/><line x1="0" y1="300" x2="1600" y2="300"/><line x1="0" y1="400" x2="1600" y2="400"/><line x1="0" y1="500" x2="1600" y2="500"/><line x1="200" y1="0" x2="200" y2="600"/><line x1="400" y1="0" x2="400" y2="600"/><line x1="600" y1="0" x2="600" y2="600"/><line x1="800" y1="0" x2="800" y2="600"/><line x1="1000" y1="0" x2="1000" y2="600"/><line x1="1200" y1="0" x2="1200" y2="600"/><line x1="1400" y1="0" x2="1400" y2="600"/></g>
+      <rect x="0" y="500" width="1600" height="100" fill="#1e293b"/>
+      <rect x="0" y="494" width="1600" height="10" fill="#334155"/>
+      <g transform="translate(740 240)">
+        <ellipse cx="60" cy="60" rx="60" ry="22" fill="none" stroke="#3b82f6" stroke-width="3"/>
+        <ellipse cx="60" cy="60" rx="60" ry="22" fill="none" stroke="#3b82f6" stroke-width="3" transform="rotate(60 60 60)"/>
+        <ellipse cx="60" cy="60" rx="60" ry="22" fill="none" stroke="#3b82f6" stroke-width="3" transform="rotate(-60 60 60)"/>
+        <circle cx="60" cy="60" r="10" fill="#fbbf24"/>
+        <circle cx="60" cy="60" r="14" fill="none" stroke="#fbbf24" stroke-width="1" opacity="0.5"/>
+        <circle cx="120" cy="60" r="6" fill="#22c55e"/>
+        <circle cx="30" cy="112" r="6" fill="#ef4444"/>
+        <circle cx="30" cy="8" r="6" fill="#a855f7"/>
+      </g>
+      <g transform="translate(220 320)">
+        <path d="M14 0 L14 60 L0 160 Q0 180 16 180 L80 180 Q96 180 96 160 L82 60 L82 0 Z" fill="none" stroke="#7dd3fc" stroke-width="3"/>
+        <path d="M14 0 L82 0" stroke="#7dd3fc" stroke-width="4"/>
+        <path d="M2 130 L94 130 Q92 180 16 180 Q4 180 2 130 Z" fill="#3b82f6" opacity="0.55"/>
+        <circle cx="30" cy="155" r="4" fill="#7dd3fc"/><circle cx="50" cy="165" r="3" fill="#7dd3fc"/><circle cx="70" cy="150" r="4" fill="#7dd3fc"/>
+        <g fill="none" stroke="#7dd3fc" stroke-width="1.5" opacity="0.6"><line x1="6" y1="40" x2="14" y2="40"/><line x1="82" y1="40" x2="90" y2="40"/><line x1="2" y1="80" x2="12" y2="80"/><line x1="84" y1="80" x2="94" y2="80"/></g>
+      </g>
+      <g transform="translate(1180 280)">
+        <path d="M28 0 L28 50 L4 200 Q4 220 24 220 L116 220 Q136 220 136 200 L112 50 L112 0 Z" fill="none" stroke="#86efac" stroke-width="3"/>
+        <path d="M28 0 L112 0" stroke="#86efac" stroke-width="4"/>
+        <path d="M6 150 L134 150 Q132 220 24 220 Q6 220 6 150 Z" fill="#16a34a" opacity="0.55"/>
+        <g fill="#86efac"><circle cx="50" cy="170" r="5"/><circle cx="80" cy="180" r="3"/><circle cx="105" cy="165" r="4"/><circle cx="40" cy="185" r="2.5"/></g>
+        <g fill="none" stroke="#86efac" stroke-width="1.5" opacity="0.6"><line x1="14" y1="60" x2="28" y2="60"/><line x1="112" y1="60" x2="126" y2="60"/><line x1="10" y1="100" x2="22" y2="100"/></g>
+      </g>
+      <g transform="translate(60 400)">
+        <ellipse cx="60" cy="100" rx="50" ry="10" fill="#374151"/>
+        <rect x="50" y="40" width="20" height="60" fill="#6b7280"/>
+        <rect x="34" y="30" width="52" height="14" rx="4" fill="#9ca3af"/>
+        <polygon points="60,20 50,40 70,40" fill="#f97316"/>
+        <polygon points="60,28 54,40 66,40" fill="#fef3c7"/>
+      </g>
+      <g transform="translate(540 410)">
+        <rect x="0" y="0" width="120" height="80" rx="6" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+        <rect x="6" y="6" width="108" height="60" fill="#0f172a"/>
+        <g fill="#10b981" font-family="monospace" font-size="10"><text x="12" y="22">{</text><text x="20" y="34">x:42</text><text x="20" y="46">y:7</text><text x="12" y="58">}</text></g>
+        <circle cx="60" cy="74" r="3" fill="#22c55e"/>
+      </g>
+      <g fill="#fbbf24"><circle cx="500" cy="100" r="4"/><circle cx="900" cy="80" r="3"/><circle cx="1200" cy="120" r="4"/><circle cx="200" cy="60" r="3"/></g>
+      <g stroke="#3b82f6" stroke-width="1.5" fill="none" opacity="0.4"><circle cx="500" cy="100" r="20"/><circle cx="900" cy="80" r="20"/><circle cx="1200" cy="120" r="20"/></g>
+    </svg>`,
+    math: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="mathSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef9c3"/><stop offset="1" stop-color="#fef3c7"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#mathSky)"/>
+      <g stroke="#bae6fd" stroke-width="1" opacity="0.7"><line x1="0" y1="50" x2="1600" y2="50"/><line x1="0" y1="100" x2="1600" y2="100"/><line x1="0" y1="150" x2="1600" y2="150"/><line x1="0" y1="200" x2="1600" y2="200"/><line x1="0" y1="250" x2="1600" y2="250"/><line x1="0" y1="300" x2="1600" y2="300"/><line x1="0" y1="350" x2="1600" y2="350"/><line x1="0" y1="400" x2="1600" y2="400"/><line x1="0" y1="450" x2="1600" y2="450"/><line x1="0" y1="500" x2="1600" y2="500"/><line x1="0" y1="550" x2="1600" y2="550"/></g>
+      <line x1="80" y1="0" x2="80" y2="600" stroke="#fca5a5" stroke-width="2"/>
+      <g transform="translate(140 110)">
+        <text font-family="Georgia,serif" font-size="200" font-weight="700" fill="#1e40af" opacity="0.85">7</text>
+      </g>
+      <g transform="translate(280 130)">
+        <text font-family="Georgia,serif" font-size="150" fill="#dc2626" opacity="0.85">+</text>
+      </g>
+      <g transform="translate(400 110)">
+        <text font-family="Georgia,serif" font-size="200" font-weight="700" fill="#059669" opacity="0.85">5</text>
+      </g>
+      <g transform="translate(540 130)">
+        <text font-family="Georgia,serif" font-size="150" fill="#dc2626" opacity="0.85">=</text>
+      </g>
+      <g transform="translate(700 110)">
+        <text font-family="Georgia,serif" font-size="200" font-weight="700" fill="#7c3aed" opacity="0.85">12</text>
+      </g>
+      <g transform="translate(1000 200)">
+        <rect x="0" y="0" width="120" height="120" fill="#fbbf24" stroke="#92400e" stroke-width="3"/>
+        <line x1="0" y1="60" x2="120" y2="60" stroke="#92400e" stroke-width="3"/>
+        <rect x="0" y="0" width="120" height="60" fill="#f97316"/>
+        <text x="60" y="48" text-anchor="middle" font-family="Georgia,serif" font-size="42" fill="white" font-weight="700">1</text>
+        <text x="60" y="102" text-anchor="middle" font-family="Georgia,serif" font-size="42" fill="#92400e" font-weight="700">2</text>
+      </g>
+      <g transform="translate(1180 320)">
+        <circle cx="50" cy="50" r="50" fill="none" stroke="#ec4899" stroke-width="6"/>
+        <path d="M50 50 L50 0 A50 50 0 0 1 93.3 75 Z" fill="#ec4899" opacity="0.85"/>
+        <text x="50" y="58" text-anchor="middle" font-family="Arial" font-size="14" fill="#831843" font-weight="700">3/4</text>
+      </g>
+      <g transform="translate(1340 280)">
+        <polygon points="60,0 120,100 0,100" fill="#10b981" stroke="#064e3b" stroke-width="3"/>
+        <text x="60" y="72" text-anchor="middle" font-family="Arial" font-size="22" fill="white" font-weight="700">△</text>
+      </g>
+      <g transform="translate(80 380)">
+        <rect x="0" y="0" width="100" height="100" rx="8" fill="none" stroke="#0ea5e9" stroke-width="6"/>
+        <text x="50" y="68" text-anchor="middle" font-family="Arial" font-size="44" fill="#0c4a6e" font-weight="700">□</text>
+      </g>
+      <g font-family="Georgia,serif" font-weight="700" opacity="0.5">
+        <text x="850" y="430" font-size="48" fill="#7c3aed">π</text>
+        <text x="500" y="450" font-size="40" fill="#dc2626">∑</text>
+        <text x="320" y="500" font-size="44" fill="#0ea5e9">√</text>
+        <text x="680" y="490" font-size="36" fill="#16a34a">∞</text>
+        <text x="920" y="480" font-size="38" fill="#f59e0b">×</text>
+      </g>
+      <g transform="translate(220 510)">
+        <rect x="0" y="0" width="40" height="50" fill="#fde047" stroke="#92400e" stroke-width="2"/>
+        <polygon points="0,0 40,0 50,-8 10,-8" fill="#facc15"/>
+        <polygon points="40,0 40,50 50,42 50,-8" fill="#ca8a04"/>
+        <text x="20" y="34" text-anchor="middle" font-family="Georgia,serif" font-size="22" fill="#7c2d12" font-weight="700">A</text>
+      </g>
+      <g transform="translate(60 230) rotate(-12)">
+        <rect x="0" y="0" width="200" height="8" rx="3" fill="#fef08a" stroke="#a16207" stroke-width="1.5"/>
+        <polygon points="200,0 220,4 200,8" fill="#a16207"/>
+        <g stroke="#a16207" stroke-width="1" fill="#fef08a"><line x1="20" y1="0" x2="20" y2="8"/><line x1="40" y1="0" x2="40" y2="8"/><line x1="60" y1="0" x2="60" y2="8"/><line x1="80" y1="0" x2="80" y2="8"/><line x1="100" y1="0" x2="100" y2="8"/><line x1="120" y1="0" x2="120" y2="8"/><line x1="140" y1="0" x2="140" y2="8"/><line x1="160" y1="0" x2="160" y2="8"/><line x1="180" y1="0" x2="180" y2="8"/></g>
+      </g>
+    </svg>`,
+    nature: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="natSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef9c3"/><stop offset="0.5" stop-color="#a7f3d0"/><stop offset="1" stop-color="#86efac"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#natSky)"/>
+      <circle cx="1280" cy="100" r="56" fill="#fef3c7"/>
+      <g stroke="#fde68a" stroke-width="3" opacity="0.6"><line x1="1280" y1="20" x2="1280" y2="180"/><line x1="1190" y1="100" x2="1370" y2="100"/><line x1="1216" y1="36" x2="1344" y2="164"/><line x1="1344" y1="36" x2="1216" y2="164"/></g>
+      <g fill="white" opacity="0.85"><ellipse cx="240" cy="80" rx="70" ry="22"/><ellipse cx="320" cy="68" rx="50" ry="18"/><ellipse cx="900" cy="60" rx="80" ry="22"/></g>
+      <g transform="translate(60 240)">
+        <ellipse cx="80" cy="220" rx="80" ry="22" fill="#15803d" opacity="0.4"/>
+        <rect x="68" y="120" width="24" height="100" fill="#7c2d12"/>
+        <circle cx="80" cy="100" r="80" fill="#22c55e"/>
+        <circle cx="40" cy="80" r="50" fill="#16a34a"/>
+        <circle cx="120" cy="80" r="50" fill="#16a34a"/>
+        <circle cx="80" cy="60" r="56" fill="#4ade80"/>
+        <circle cx="40" cy="100" r="6" fill="#dc2626"/><circle cx="100" cy="120" r="6" fill="#dc2626"/><circle cx="130" cy="80" r="6" fill="#dc2626"/>
+      </g>
+      <g transform="translate(1280 280)">
+        <ellipse cx="80" cy="220" rx="90" ry="22" fill="#15803d" opacity="0.4"/>
+        <rect x="64" y="120" width="32" height="100" fill="#7c2d12"/>
+        <circle cx="80" cy="100" r="90" fill="#16a34a"/>
+        <circle cx="30" cy="80" r="56" fill="#15803d"/>
+        <circle cx="130" cy="80" r="56" fill="#15803d"/>
+        <circle cx="80" cy="50" r="64" fill="#22c55e"/>
+      </g>
+      <g transform="translate(380 280)">
+        <ellipse cx="40" cy="220" rx="50" ry="14" fill="#15803d" opacity="0.4"/>
+        <rect x="32" y="140" width="16" height="80" fill="#7c2d12"/>
+        <polygon points="40,40 -10,140 90,140" fill="#15803d"/>
+        <polygon points="40,70 -4,150 84,150" fill="#16a34a"/>
+        <polygon points="40,100 0,160 80,160" fill="#22c55e"/>
+      </g>
+      <g transform="translate(1080 320)">
+        <ellipse cx="40" cy="180" rx="46" ry="12" fill="#15803d" opacity="0.4"/>
+        <rect x="32" y="120" width="16" height="60" fill="#7c2d12"/>
+        <polygon points="40,30 -6,120 86,120" fill="#15803d"/>
+        <polygon points="40,60 0,128 80,128" fill="#16a34a"/>
+      </g>
+      <rect x="0" y="490" width="1600" height="110" fill="#14532d"/>
+      <ellipse cx="800" cy="500" rx="900" ry="30" fill="#15803d"/>
+      <g fill="#16a34a"><ellipse cx="200" cy="540" rx="200" ry="10"/><ellipse cx="800" cy="556" rx="400" ry="14"/><ellipse cx="1300" cy="544" rx="240" ry="10"/></g>
+      <g transform="translate(720 380)">
+        <ellipse cx="80" cy="120" rx="80" ry="14" fill="#14532d"/>
+        <path d="M40 110 Q20 60 60 30 Q90 10 80 40 Q120 0 130 30 Q160 10 140 50 Q170 90 130 110 Z" fill="#a16207"/>
+        <ellipse cx="80" cy="90" rx="40" ry="22" fill="#92400e"/>
+        <ellipse cx="80" cy="80" rx="34" ry="18" fill="#d97706"/>
+        <circle cx="68" cy="80" r="6" fill="#1f2937"/><circle cx="92" cy="80" r="6" fill="#1f2937"/>
+        <circle cx="69" cy="79" r="2" fill="white"/><circle cx="93" cy="79" r="2" fill="white"/>
+        <ellipse cx="80" cy="90" rx="6" ry="4" fill="#1f2937"/>
+        <polygon points="56,40 50,16 68,38" fill="#a16207"/>
+        <polygon points="104,40 110,16 92,38" fill="#a16207"/>
+      </g>
+      <g transform="translate(440 200)">
+        <ellipse cx="0" cy="0" rx="14" ry="22" fill="#a855f7" transform="rotate(-20)"/>
+        <ellipse cx="22" cy="6" rx="14" ry="22" fill="#a855f7" transform="rotate(20 22 6)"/>
+        <ellipse cx="-4" cy="20" rx="10" ry="16" fill="#7c3aed" transform="rotate(-20)"/>
+        <ellipse cx="26" cy="26" rx="10" ry="16" fill="#7c3aed" transform="rotate(20 26 26)"/>
+        <rect x="9" y="0" width="4" height="40" fill="#1f2937"/>
+        <circle cx="11" cy="-2" r="3" fill="#1f2937"/>
+      </g>
+      <g transform="translate(960 200)">
+        <ellipse cx="0" cy="0" rx="14" ry="22" fill="#ec4899" transform="rotate(-20)"/>
+        <ellipse cx="22" cy="6" rx="14" ry="22" fill="#ec4899" transform="rotate(20 22 6)"/>
+        <rect x="9" y="0" width="4" height="40" fill="#1f2937"/>
+      </g>
+      <g fill="white" opacity="0.4"><ellipse cx="200" cy="500" rx="40" ry="6"/><ellipse cx="1200" cy="520" rx="50" ry="6"/></g>
+    </svg>`,
+    prehistoric: `<svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="preSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="0.6" stop-color="#dc2626"/><stop offset="1" stop-color="#7c2d12"/></linearGradient></defs>
+      <rect width="1600" height="600" fill="url(#preSky)"/>
+      <circle cx="1320" cy="120" r="60" fill="#fef3c7" opacity="0.9"/>
+      <g transform="translate(900 280)">
+        <polygon points="0,200 200,0 400,200" fill="#451a03"/>
+        <polygon points="60,200 200,20 340,200" fill="#7c2d12"/>
+        <polygon points="160,30 200,0 240,30 220,80 180,80" fill="#dc2626"/>
+        <polygon points="170,25 200,5 230,25 222,70 178,70" fill="#f59e0b"/>
+        <path d="M196 0 Q200 -20 204 0" stroke="#fbbf24" stroke-width="2" fill="none"/>
+        <path d="M170 50 Q160 -30 150 60" stroke="#dc2626" stroke-width="6" fill="#dc2626" opacity="0.7"/>
+        <path d="M230 50 Q240 -30 250 60" stroke="#dc2626" stroke-width="6" fill="#dc2626" opacity="0.7"/>
+      </g>
+      <g fill="#1f2937" opacity="0.6"><polygon points="0,400 250,260 500,400"/><polygon points="400,400 600,280 800,400"/></g>
+      <rect x="0" y="490" width="1600" height="110" fill="#451a03"/>
+      <ellipse cx="800" cy="500" rx="900" ry="30" fill="#7c2d12"/>
+      <g fill="#92400e"><ellipse cx="300" cy="540" rx="200" ry="8"/><ellipse cx="1000" cy="556" rx="300" ry="10"/></g>
+      <g transform="translate(80 320)">
+        <ellipse cx="120" cy="140" rx="120" ry="18" fill="#451a03" opacity="0.55"/>
+        <path d="M40 100 Q20 80 30 60 Q50 40 90 50 Q110 30 140 50 Q160 30 200 60 Q220 90 200 110 Q210 130 180 140 L60 140 Q30 130 40 100 Z" fill="#16a34a"/>
+        <ellipse cx="200" cy="56" rx="32" ry="22" fill="#16a34a"/>
+        <ellipse cx="200" cy="50" rx="26" ry="18" fill="#22c55e"/>
+        <circle cx="216" cy="48" r="4" fill="#1f2937"/>
+        <circle cx="217" cy="47" r="1.5" fill="white"/>
+        <polygon points="218,60 226,68 214,66" fill="#fef3c7"/>
+        <polygon points="220,58 228,64 218,64" fill="#fef3c7"/>
+        <path d="M22 100 Q14 96 8 102" stroke="#15803d" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <rect x="60" y="138" width="14" height="22" rx="3" fill="#16a34a"/>
+        <rect x="100" y="138" width="14" height="22" rx="3" fill="#16a34a"/>
+        <rect x="140" y="138" width="14" height="22" rx="3" fill="#16a34a"/>
+        <rect x="170" y="138" width="14" height="22" rx="3" fill="#16a34a"/>
+        <g fill="#15803d"><polygon points="42,40 50,30 58,40"/><polygon points="76,38 84,28 92,38"/><polygon points="120,34 128,24 136,34"/><polygon points="160,40 168,30 176,40"/></g>
+      </g>
+      <g transform="translate(1320 380)">
+        <ellipse cx="60" cy="84" rx="80" ry="12" fill="#451a03" opacity="0.55"/>
+        <ellipse cx="60" cy="50" rx="60" ry="28" fill="#ea580c"/>
+        <ellipse cx="100" cy="40" rx="22" ry="20" fill="#ea580c"/>
+        <polygon points="116,40 130,38 120,46" fill="#f59e0b"/>
+        <circle cx="106" cy="36" r="3" fill="#1f2937"/>
+        <g fill="#c2410c"><polygon points="22,30 30,20 38,30"/><polygon points="42,28 50,18 58,28"/><polygon points="62,26 70,16 78,26"/></g>
+        <rect x="20" y="76" width="10" height="14" rx="2" fill="#ea580c"/>
+        <rect x="44" y="76" width="10" height="14" rx="2" fill="#ea580c"/>
+        <rect x="72" y="76" width="10" height="14" rx="2" fill="#ea580c"/>
+        <path d="M2 50 Q-10 56 -6 64" stroke="#ea580c" stroke-width="10" fill="none" stroke-linecap="round"/>
+      </g>
+      <g transform="translate(440 360)">
+        <ellipse cx="100" cy="80" rx="80" ry="6" fill="#451a03" opacity="0.6"/>
+        <ellipse cx="100" cy="50" rx="56" ry="20" fill="#a16207"/>
+        <ellipse cx="100" cy="40" rx="50" ry="14" fill="#ca8a04"/>
+        <g fill="#a16207"><polygon points="60,40 50,28 68,30"/><polygon points="100,32 92,18 110,20"/><polygon points="140,40 132,28 150,30"/></g>
+      </g>
+      <g transform="translate(680 460)">
+        <ellipse cx="0" cy="0" rx="32" ry="6" fill="#451a03"/>
+        <path d="M-24 -4 L0 -8 L24 -4 L20 0 L-20 0 Z" fill="#fef3c7"/>
+        <path d="M-20 -4 L-16 -10 L-12 -4 Z" fill="#fef3c7"/>
+        <path d="M-4 -4 L0 -12 L4 -4 Z" fill="#fef3c7"/>
+        <path d="M12 -4 L16 -10 L20 -4 Z" fill="#fef3c7"/>
+      </g>
+      <g fill="#fbbf24" opacity="0.7"><circle cx="200" cy="120" r="3"/><circle cx="1180" cy="80" r="2.5"/><circle cx="500" cy="100" r="2"/></g>
+    </svg>`
+  };
+
+  return `<div class="story-illustration">${scenes[scene] || scenes.adventure}</div>`;
+};
+
+const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string, bingoDim?: number }) => {
+  const node = document.getElementById('game-print-area');
+  if (!node) return;
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) return;
+  const todayStr = new Date().toLocaleDateString('pt-BR');
+  const owlSvg = `<svg width="84" height="84" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:0.88;flex-shrink:0">
+    <ellipse cx="30" cy="43" rx="19" ry="16" fill="rgba(255,255,255,0.18)"/>
+    <circle cx="30" cy="20" r="17" fill="rgba(255,255,255,0.18)"/>
+    <polygon points="17,4 22,17 13,17" fill="rgba(255,255,255,0.28)"/>
+    <polygon points="43,4 47,17 38,17" fill="rgba(255,255,255,0.28)"/>
+    <circle cx="22" cy="20" r="8" fill="white"/><circle cx="38" cy="20" r="8" fill="white"/>
+    <circle cx="23" cy="21" r="5" fill="#1e293b"/><circle cx="39" cy="21" r="5" fill="#1e293b"/>
+    <circle cx="25" cy="19" r="2" fill="white"/><circle cx="41" cy="19" r="2" fill="white"/>
+    <polygon points="30,27 25,33 35,33" fill="#fbbf24"/>
+    <ellipse cx="10" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(-15,10,43)"/>
+    <ellipse cx="50" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(15,50,43)"/>
+    <text x="30" y="57" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.65)" font-family="Arial" font-weight="bold" letter-spacing="1">CORUJAO</text>
+  </svg>`;
+  const headerHtml = `
+    <div class="page-header">
+      <div class="header-inner">
+        <div class="header-top-row">
+          <div class="header-text">
+            <div class="school-row">
+              <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
+              <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
+            </div>
+            <div class="activity-tag">${opts.activityLabel}</div>
+            <h1 class="doc-title">${opts.title}</h1>
+          </div>
+          <div class="header-owl">${owlSvg}</div>
+        </div>
+        <div class="fields-grid">
+          <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
+          <div class="field"><span class="field-label">DATA</span><div class="field-line short"></div></div>
+          <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
+          <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
+          <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
+    @page { size: A4; margin: 1.4cm 1.4cm 2cm; }
+    * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
+
+    /* ── HEADER ───────────────────────────────────────────── */
+    .page-header { background: var(--ac,#4338ca); border-radius: 16px; padding: 14px 16px 16px; color: white; position: relative; overflow: hidden; margin-bottom: 18px; }
+    .page-header::before { content:''; position:absolute; inset:0; background-image:radial-gradient(circle, rgba(255,255,255,0.14) 1.5px, transparent 1.5px); background-size:16px 16px; border-radius:16px; pointer-events:none; }
+    .header-inner { position:relative; z-index:1; }
+    .header-top-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .header-text { flex:1; min-width:0; }
+    .header-owl { flex-shrink:0; margin-top:-4px; }
+    .school-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:8.5px; letter-spacing:1.5px; color:rgba(255,255,255,0.75); text-transform:uppercase; font-weight:700; }
+    .school-name { font-weight:900; color:white; }
+    .activity-tag { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.22); color:white; padding:4px 12px; border-radius:20px; font-size:10px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; border:1.5px solid rgba(255,255,255,0.45); }
+    .doc-title { font-size:24px; font-weight:900; color:white; margin:0 0 14px; line-height:1.2; text-shadow:0 1px 6px rgba(0,0,0,0.22); letter-spacing:-0.3px; }
+    .fields-grid { display:grid; grid-template-columns:2fr 1fr 1fr 0.5fr; gap:7px 12px; margin-top:4px; }
+    .field { display:flex; flex-direction:column; gap:2px; }
+    .field.full { grid-column:1/-1; }
+    .field-label { font-size:7px; font-weight:900; color:rgba(255,255,255,0.65); letter-spacing:1.5px; text-transform:uppercase; }
+    .field-line { border-bottom:1.5px solid rgba(255,255,255,0.55); min-height:17px; padding:2px 4px; font-size:10.5px; color:white; font-weight:700; }
+
+    /* ── HOW TO PLAY card ─────────────────────────────────── */
+    .instructions { display:flex; gap:12px; align-items:center; background:white; border:2.5px dashed var(--ac,#4338ca); padding:10px 14px; margin:10px 0 18px; border-radius:10px; font-size:11px; color:#1f2937; }
+    .instructions-icon { width:52px; height:52px; flex-shrink:0; image-rendering:pixelated; image-rendering:crisp-edges; }
+    .instructions-icon svg { width:100%; height:100%; display:block; }
+    .instructions-body { flex:1; }
+    .instructions-title { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
+
+    /* pixel decorations */
+    .px-deco { position:absolute; image-rendering:pixelated; image-rendering:crisp-edges; opacity:0.85; z-index:0; }
+    .px-deco svg { width:100%; height:100%; display:block; }
+
+    /* ── GENERAL CONTENT ──────────────────────────────────── */
+    h2 { font-size:13px; margin:18px 0 8px; color:white; font-weight:900; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
+    h3 { font-size:12px; margin:10px 0 4px; color:#1f2937; font-weight:700; }
+    p { margin:6px 0; }
+
+    /* ── WORD SEARCH ──────────────────────────────────────── */
+    .ws-wrapper { display:flex; justify-content:center; margin:14px 0 10px; page-break-inside:avoid; break-inside:avoid; }
+    .ws-grid { display:grid; gap:0; border:3px solid var(--ac,#4338ca); background:var(--ac,#4338ca); page-break-inside:avoid; break-inside:avoid; padding:2px; border-radius:8px; box-shadow:0 3px 12px rgba(0,0,0,0.15); }
+    .ws-cell { background:white; width:24px; height:24px; text-align:center; line-height:24px; font-weight:800; font-size:12px; font-family:'Courier New',monospace; color:#111; }
+    /* word chips (injected by JS) */
+    .word-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 18px; }
+    .word-chip { display:inline-flex; align-items:center; gap:6px; border:2px solid var(--ac,#4338ca); border-radius:20px; padding:4px 10px 4px 6px; font-size:10px; font-weight:700; color:var(--ac,#4338ca); background:var(--ac-light,#eef2ff); page-break-inside:avoid; }
+    .word-chip-box { width:14px; height:14px; border:1.5px solid var(--ac,#4338ca); border-radius:3px; flex-shrink:0; background:white; }
+
+    /* ── BINGO ────────────────────────────────────────────── */
+    .bingo-card { border:3px solid var(--ac,#4338ca); margin:0 0 22px; page-break-inside:avoid; break-inside:avoid; border-radius:14px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+    .bingo-card-title { display:flex; justify-content:center; gap:0; background:#1e293b; padding:8px 10px; }
+    .bingo-letter { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; font-size:28px; font-weight:900; color:white; border-radius:8px; margin:0 2px; }
+    .bingo-sub { text-align:center; font-size:9px; color:#6b7280; padding:4px 0; background:#f8f7ff; border-bottom:1px solid #ddd6fe; letter-spacing:1px; font-weight:700; }
+    .bingo-grid { display:grid; grid-template-columns:repeat(var(--bingo-dim,5),1fr); gap:0; }
+    .bingo-cell { border-right:1px solid #e0d9ff; border-bottom:1px solid #e0d9ff; padding:10px 4px; min-height:54px; text-align:center; font-size:9.5px; font-weight:700; display:flex; align-items:center; justify-content:center; background:white; }
+    .bingo-cell:nth-child(odd) { background:#faf8ff; }
+    .bingo-cell:nth-child(5n) { border-right:none; }
+    .bingo-cell.free { background:#fbbf24; font-weight:900; color:#78350f; font-size:14px; border-color:#f59e0b; }
+    /* calling circles (injected) */
+    .bingo-calling { padding:10px 12px; background:#f8f7ff; border-top:2px dashed var(--ac,#4338ca); }
+    .bingo-calling-label { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+    .bingo-calling-circles { display:flex; flex-wrap:wrap; gap:5px; }
+    .bingo-circle { display:inline-block; width:22px; height:22px; border-radius:50%; border:1.5px solid var(--ac,#4338ca); background:white; }
+
+    /* ── QUIZ ─────────────────────────────────────────────── */
+    .quiz-progress { display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; }
+    .quiz-dot { width:18px; height:8px; border-radius:4px; background:#e5e7eb; }
+    .quiz-q { border:2px solid #e5e7eb; border-radius:12px; padding:12px 14px 12px 54px; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.07); position:relative; }
+    .quiz-num { position:absolute; left:12px; top:12px; width:30px; height:30px; background:var(--ac,#4338ca); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; }
+    .quiz-q p, .quiz-q b { color:#1f2937; font-weight:700; margin:0 0 8px; }
+    .quiz-opts { display:flex; flex-direction:column; gap:5px; margin-top:8px; }
+    .quiz-opt { display:flex; align-items:center; gap:8px; padding:5px 10px; border-radius:8px; background:#f9fafb; border:1.5px solid #e5e7eb; font-size:11px; }
+    .quiz-opt-letter { width:22px; height:22px; border-radius:50%; background:var(--ac-light,#eef2ff); color:var(--ac,#4338ca); font-weight:900; font-size:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1.5px solid var(--ac,#4338ca); }
+    .quiz-answer { display:none; }
+
+    /* ── MEMORY ───────────────────────────────────────────── */
+    .cut-hint { font-size:10px; color:#6b7280; font-style:italic; margin:0 0 10px; display:flex; align-items:center; gap:5px; padding:6px 10px; background:#fef3c7; border-radius:6px; border:1.5px dashed #f59e0b; }
+    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; page-break-inside:avoid; break-inside:avoid; padding:10px; background:#f9fafb; border-radius:12px; border:2px dashed #d1d5db; }
+    .memory-pair { border:2px dashed #9ca3af; padding:14px 8px; min-height:88px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:8px; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+    .memory-pair::after { content:'✂'; position:absolute; top:-10px; right:6px; font-size:12px; color:#6b7280; background:#f9fafb; padding:0 3px; border-radius:4px; }
+    .memory-pair.concept { background:var(--ac,#4338ca); color:white; font-weight:900; border-color:var(--ac,#4338ca); font-size:11px; border-style:solid; }
+    .memory-pair.concept::after { background:var(--ac,#4338ca); color:rgba(255,255,255,0.7); }
+
+    /* ── TRAIL ────────────────────────────────────────────── */
+    .trail-wrapper { margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
+    .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; padding:16px; background:var(--ac-light,#eef2ff); border-radius:14px; border:3px solid var(--ac,#4338ca); position:relative; background-image:radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size:8px 8px; }
+    .trail-cell { border:3px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); box-shadow:0 2px 4px rgba(0,0,0,0.08); position:relative; }
+    .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
+    .trail-cell.type-pergunta { background:#fbbf24 !important; color:#78350f !important; border-color:#d97706 !important; }
+    .trail-cell.type-bonus { background:#16a34a !important; color:white !important; border-color:#14532d !important; }
+    .trail-cell.type-penalidade { background:#dc2626 !important; color:white !important; border-color:#991b1b !important; }
+    .trail-cell.type-desafio { background:#3b82f6 !important; color:white !important; border-color:#1d4ed8 !important; }
+    .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:18px; box-shadow:0 0 0 3px #fee2e2, 0 2px 6px rgba(0,0,0,0.15); }
+    .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:18px; box-shadow:0 0 0 3px #dcfce7, 0 2px 6px rgba(0,0,0,0.15); }
+    /* legend (injected) */
+    .trail-legend { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:8px 12px; background:white; border-radius:8px; border:1.5px solid #e5e7eb; }
+    .trail-legend-title { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+    .trail-legend-items { display:flex; gap:12px; flex-wrap:wrap; font-size:9.5px; font-weight:600; color:#374151; flex:1; }
+    .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
+
+    /* ── CROSSWORD ────────────────────────────────────────── */
+    .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; }
+    .cw-grid-table td { width:26px; height:26px; padding:0; }
+    .cw-grid-black { background:#1f2937; }
+    .cw-grid-white { border:2px solid #374151; border-radius:2px; position:relative; vertical-align:top; background:white; }
+    .cw-grid-num { position:absolute; top:1px; left:2px; font-size:7px; font-weight:900; color:var(--ac,#4338ca); line-height:1; }
+    .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:12px; }
+    .cw-clue-dir { font-size:9px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin:10px 0 5px; background:none; padding:0; border-radius:0; display:block; }
+    .cw-clue-item { font-size:10.5px; margin-bottom:4px; line-height:1.3; }
+    .cw-item { margin-bottom:16px; page-break-inside:avoid; break-inside:avoid; }
+    .cw-clue { font-weight:700; margin-bottom:5px; color:#1f2937; display:flex; align-items:center; gap:7px; }
+    .cw-num-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--ac,#4338ca); color:white; border-radius:50%; font-size:10px; font-weight:900; flex-shrink:0; }
+    .cw-boxes { display:flex; gap:3px; }
+    .cw-box { border:2px solid #374151; width:27px; height:27px; border-radius:4px; }
+    .cw-answer { display:none; }
+    .clue-list { list-style:none; padding-left:0; columns:2; column-gap:20px; counter-reset:list-item; }
+    .clue-list li { margin-bottom:5px; break-inside:avoid; page-break-inside:avoid; padding-left:24px; position:relative; counter-increment:list-item; }
+    .clue-list li::before { content:counter(list-item)'.'; position:absolute; left:0; font-weight:800; color:var(--ac,#4338ca); }
+
+    /* ── STORY ────────────────────────────────────────────── */
+    .markdown-body h2 { color:white; font-size:14px; margin-top:18px; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
+    .markdown-body h3 { color:#1f2937; font-size:13px; font-weight:800; border-bottom:1.5px solid #e5e7eb; padding-bottom:3px; }
+    .markdown-body ul, .markdown-body ol { padding-left:22px; }
+    .markdown-body li { margin-bottom:4px; }
+    .markdown-body blockquote { border-left:4px solid var(--ac,#4338ca); padding:6px 12px; margin:8px 0; background:var(--ac-light,#eef2ff); color:#1f2937; border-radius:0 8px 8px 0; }
+    .markdown-body table { border-collapse:collapse; width:100%; margin:8px 0; }
+    .markdown-body th, .markdown-body td { border:1px solid #d1d5db; padding:5px 8px; text-align:left; font-size:11px; }
+    .markdown-body th { background:var(--ac,#4338ca); color:white; font-weight:800; }
+
+    /* ── SECTION DIVIDER ──────────────────────────────────── */
+    .section-divider { display:flex; align-items:center; gap:10px; margin:18px 0 14px; opacity:0.7; }
+    .section-divider-line { flex:1; height:2px; background:repeating-linear-gradient(90deg, var(--ac,#4338ca) 0, var(--ac,#4338ca) 3px, transparent 3px, transparent 6px); }
+    .section-divider-icon { width:18px; height:18px; flex-shrink:0; image-rendering:pixelated; }
+    .section-divider-icon svg { width:100%; height:100%; display:block; }
+
+    /* ── BOA SORTE LINE ───────────────────────────────────── */
+    .boa-sorte { display:flex; align-items:center; justify-content:center; gap:8px; margin:20px 0 10px; font-size:11px; font-style:italic; color:var(--ac,#4338ca); font-weight:700; letter-spacing:0.5px; }
+    .boa-sorte-px { width:14px; height:14px; image-rendering:pixelated; }
+    .boa-sorte-px svg { width:100%; height:100%; display:block; }
+
+    /* ── SCORE TRACKER (injected) ─────────────────────────── */
+    .score-tracker { margin:8px 0 12px; padding:16px 18px; border:3px solid var(--ac,#4338ca); border-radius:14px; background:var(--ac-light,#eef2ff); page-break-inside:avoid; break-inside:avoid; position:relative; }
+    .score-tracker::before, .score-tracker::after { content:''; position:absolute; width:18px; height:18px; border:2.5px solid var(--ac,#4338ca); background:#fbbf24; }
+    .score-tracker::before { top:-10px; left:14px; border-radius:50%; }
+    .score-tracker::after { bottom:-10px; right:14px; border-radius:50%; }
+    .score-header { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:10px; }
+    .score-px-star { width:26px; height:26px; flex-shrink:0; image-rendering:pixelated; }
+    .score-px-star svg { width:100%; height:100%; display:block; }
+    .score-title { font-size:12px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:2.5px; text-transform:uppercase; }
+    .score-stars { font-size:22px; letter-spacing:4px; text-align:center; margin-bottom:12px; }
+    .score-row { display:flex; align-items:center; justify-content:center; gap:24px; flex-wrap:wrap; }
+    .score-label { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; }
+    .score-field { border-bottom:2.5px solid var(--ac,#4338ca); min-width:90px; text-align:center; font-size:14px; font-weight:900; color:#1f2937; padding:2px 8px; }
+
+    /* ── ANSWER KEY ───────────────────────────────────────── */
+    .answer-key-page { display:none; page-break-before:always; padding-top:12px; }
+    @media print { .answer-key-page { display:block; } .quiz-answer, .cw-answer { display:none !important; } }
+    .answer-key-header { display:flex; align-items:center; gap:14px; margin-bottom:16px; padding:14px 16px; background:#fef2f2; border-radius:12px; border:2.5px dashed #dc2626; }
+    .answer-key-trophy { width:60px; height:60px; flex-shrink:0; image-rendering:pixelated; }
+    .answer-key-trophy svg { width:100%; height:100%; display:block; }
+    .answer-key-title { font-size:18px; color:#dc2626; font-weight:900; letter-spacing:3px; text-transform:uppercase; padding:0; background:none; border-radius:0; display:block; margin:0; line-height:1; }
+    .answer-key-subtitle { font-size:9px; color:#7f1d1d; font-weight:700; letter-spacing:1.5px; margin-top:4px; }
+    .answer-key-item { font-size:11px; margin-bottom:6px; padding:7px 12px; background:white; border-radius:8px; border-left:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+
+    /* ── STORY ILLUSTRATION (Campanha Narrativa cover) ────── */
+    .story-illustration { margin:0 0 18px; line-height:0; page-break-inside:avoid; break-inside:avoid; }
+    .story-illustration svg { width:100%; height:auto; display:block; border-radius:14px; box-shadow:0 4px 18px rgba(0,0,0,0.18); }
+    .story-section-art { margin:14px 0 6px; page-break-after:avoid; break-after:avoid; break-inside:avoid; line-height:0; }
+    .story-section-art svg { width:100%; height:auto; max-height:180px; display:block; image-rendering:pixelated; image-rendering:crisp-edges; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
+
+    /* ── FOOTER ───────────────────────────────────────────── */
+    .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
+
+    /* ── UTIL ─────────────────────────────────────────────── */
+    .hide-on-screen { display:block; }
+    button { display:none; }
+  </style></head><body>
+    ${headerHtml}
+    ${opts.activityLabel === 'Campanha Narrativa' ? buildStoryIllustration(opts.topic, opts.genre) : ''}
+    ${node.innerHTML}
+    <div class="page-footer">Gerado por Prof. Corujao • ${todayStr}</div>
+    <script>
+    (function(){
+      var label = "${opts.activityLabel}";
+      var themes = {
+        'Campanha Narrativa':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📖' },
+        'Quiz Avaliativo':       { ac:'#ea580c', light:'#fff7ed', emoji:'⚡' },
+        'Caca-Palavras':         { ac:'#2563eb', light:'#eff6ff', emoji:'🔍' },
+        'Palavras Cruzadas':     { ac:'#0d9488', light:'#f0fdfa', emoji:'✏️' },
+        'Bingo Educativo':       { ac:'#7c3aed', light:'#f5f3ff', emoji:'🎱' },
+        'Trilha do Conhecimento':{ ac:'#16a34a', light:'#f0fdf4', emoji:'🎲' },
+        'Jogo da Memoria':       { ac:'#db2777', light:'#fdf2f8', emoji:'🃏' }
+      };
+      var t = themes[label] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
+      document.documentElement.style.setProperty('--ac', t.ac);
+      document.documentElement.style.setProperty('--ac-light', t.light);
+      document.documentElement.style.setProperty('--bingo-dim', '${opts.bingoDim || 5}');
+
+      // emoji on activity tag
+      var tag = document.querySelector('.activity-tag');
+      if (tag) tag.innerHTML = t.emoji + '&nbsp;&nbsp;' + tag.textContent.trim();
+
+      // ── PIXEL ART per activity ───────────────────────────
+      var SR = ' shape-rendering="crispEdges"';
+      var pixelArts = {
+        'Caca-Palavras': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="9" y="9" width="2" height="2" fill="#78350f"/><rect x="10" y="10" width="2" height="2" fill="#92400e"/><rect x="11" y="11" width="2" height="2" fill="#92400e"/><rect x="12" y="12" width="2" height="2" fill="#78350f"/>'
+          + '<rect x="3" y="1" width="5" height="1" fill="#1e3a8a"/><rect x="2" y="2" width="1" height="1" fill="#1e3a8a"/><rect x="8" y="2" width="1" height="1" fill="#1e3a8a"/><rect x="1" y="3" width="1" height="5" fill="#1e3a8a"/><rect x="9" y="3" width="1" height="5" fill="#1e3a8a"/><rect x="2" y="8" width="1" height="1" fill="#1e3a8a"/><rect x="8" y="8" width="1" height="1" fill="#1e3a8a"/><rect x="3" y="9" width="5" height="1" fill="#1e3a8a"/>'
+          + '<rect x="3" y="2" width="5" height="1" fill="#bfdbfe"/><rect x="2" y="3" width="7" height="5" fill="#bfdbfe"/><rect x="3" y="8" width="5" height="1" fill="#bfdbfe"/>'
+          + '<rect x="3" y="3" width="2" height="1" fill="#ffffff"/><rect x="3" y="4" width="1" height="1" fill="#ffffff"/>'
+          + '</svg>',
+        'Quiz Avaliativo': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="8" y="1" width="3" height="1" fill="#9a3412"/><rect x="7" y="2" width="1" height="1" fill="#9a3412"/><rect x="11" y="2" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="6" y="3" width="1" height="1" fill="#9a3412"/><rect x="11" y="3" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="5" y="4" width="1" height="1" fill="#9a3412"/><rect x="11" y="4" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="4" y="5" width="1" height="1" fill="#9a3412"/><rect x="11" y="5" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="3" y="6" width="1" height="1" fill="#9a3412"/><rect x="12" y="6" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="3" y="7" width="10" height="1" fill="#9a3412"/>'
+          + '<rect x="8" y="8" width="1" height="1" fill="#9a3412"/><rect x="7" y="9" width="1" height="1" fill="#9a3412"/><rect x="6" y="10" width="1" height="1" fill="#9a3412"/><rect x="5" y="11" width="1" height="1" fill="#9a3412"/><rect x="4" y="12" width="1" height="1" fill="#9a3412"/><rect x="3" y="13" width="2" height="1" fill="#9a3412"/><rect x="3" y="14" width="1" height="1" fill="#9a3412"/>'
+          + '<rect x="8" y="2" width="3" height="1" fill="#facc15"/><rect x="7" y="3" width="4" height="1" fill="#facc15"/><rect x="6" y="4" width="5" height="1" fill="#facc15"/><rect x="5" y="5" width="6" height="1" fill="#facc15"/><rect x="4" y="6" width="8" height="1" fill="#facc15"/>'
+          + '<rect x="4" y="8" width="4" height="1" fill="#facc15"/><rect x="3" y="9" width="4" height="1" fill="#facc15"/><rect x="3" y="10" width="3" height="1" fill="#facc15"/><rect x="3" y="11" width="2" height="1" fill="#facc15"/><rect x="3" y="12" width="1" height="1" fill="#facc15"/>'
+          + '</svg>',
+        'Bingo Educativo': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="4" y="1" width="6" height="1" fill="#581c87"/><rect x="3" y="2" width="1" height="1" fill="#581c87"/><rect x="10" y="2" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="2" y="3" width="1" height="1" fill="#581c87"/><rect x="11" y="3" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="1" y="4" width="1" height="5" fill="#581c87"/><rect x="12" y="4" width="1" height="5" fill="#581c87"/>'
+          + '<rect x="2" y="9" width="1" height="1" fill="#581c87"/><rect x="11" y="9" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="3" y="10" width="1" height="1" fill="#581c87"/><rect x="10" y="10" width="1" height="1" fill="#581c87"/>'
+          + '<rect x="4" y="11" width="6" height="1" fill="#581c87"/>'
+          + '<rect x="4" y="2" width="6" height="1" fill="#c084fc"/><rect x="3" y="3" width="8" height="1" fill="#c084fc"/>'
+          + '<rect x="2" y="4" width="10" height="5" fill="#c084fc"/><rect x="3" y="9" width="8" height="1" fill="#c084fc"/><rect x="4" y="10" width="6" height="1" fill="#c084fc"/>'
+          + '<rect x="4" y="3" width="2" height="1" fill="#f3e8ff"/><rect x="3" y="4" width="1" height="2" fill="#f3e8ff"/>'
+          + '<rect x="5" y="4" width="3" height="1" fill="#ffffff"/><rect x="5" y="5" width="1" height="1" fill="#ffffff"/><rect x="7" y="5" width="1" height="1" fill="#ffffff"/><rect x="5" y="6" width="3" height="1" fill="#ffffff"/><rect x="5" y="7" width="1" height="1" fill="#ffffff"/><rect x="7" y="7" width="1" height="1" fill="#ffffff"/><rect x="5" y="8" width="3" height="1" fill="#ffffff"/>'
+          + '</svg>',
+        'Jogo da Memoria': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="6" y="2" width="7" height="1" fill="#831843"/><rect x="6" y="3" width="1" height="9" fill="#831843"/><rect x="12" y="3" width="1" height="9" fill="#831843"/><rect x="6" y="12" width="7" height="1" fill="#831843"/>'
+          + '<rect x="7" y="3" width="5" height="9" fill="#fbcfe8"/>'
+          + '<rect x="8" y="4" width="3" height="1" fill="#ec4899"/><rect x="8" y="6" width="3" height="1" fill="#ec4899"/><rect x="8" y="8" width="3" height="1" fill="#ec4899"/><rect x="8" y="10" width="3" height="1" fill="#ec4899"/>'
+          + '<rect x="3" y="5" width="7" height="1" fill="#831843"/><rect x="3" y="6" width="1" height="8" fill="#831843"/><rect x="9" y="6" width="1" height="8" fill="#831843"/><rect x="3" y="14" width="7" height="1" fill="#831843"/>'
+          + '<rect x="4" y="6" width="5" height="8" fill="#ffffff"/>'
+          + '<rect x="5" y="8" width="3" height="1" fill="#ec4899"/><rect x="7" y="9" width="1" height="1" fill="#ec4899"/><rect x="6" y="10" width="1" height="1" fill="#ec4899"/><rect x="6" y="12" width="1" height="1" fill="#ec4899"/>'
+          + '</svg>',
+        'Trilha do Conhecimento': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="3" y="2" width="10" height="1" fill="#14532d"/><rect x="2" y="3" width="1" height="10" fill="#14532d"/><rect x="13" y="3" width="1" height="10" fill="#14532d"/><rect x="3" y="13" width="10" height="1" fill="#14532d"/>'
+          + '<rect x="3" y="3" width="10" height="10" fill="#ffffff"/>'
+          + '<rect x="3" y="3" width="10" height="1" fill="#bbf7d0"/><rect x="3" y="4" width="1" height="9" fill="#bbf7d0"/>'
+          + '<rect x="4" y="4" width="2" height="2" fill="#14532d"/><rect x="10" y="4" width="2" height="2" fill="#14532d"/><rect x="7" y="7" width="2" height="2" fill="#14532d"/><rect x="4" y="10" width="2" height="2" fill="#14532d"/><rect x="10" y="10" width="2" height="2" fill="#14532d"/>'
+          + '</svg>',
+        'Palavras Cruzadas': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="1" y="1" width="10" height="1" fill="#134e4a"/><rect x="1" y="2" width="1" height="9" fill="#134e4a"/><rect x="10" y="2" width="1" height="9" fill="#134e4a"/><rect x="1" y="10" width="10" height="1" fill="#134e4a"/>'
+          + '<rect x="1" y="4" width="10" height="1" fill="#134e4a"/><rect x="1" y="7" width="10" height="1" fill="#134e4a"/>'
+          + '<rect x="4" y="1" width="1" height="10" fill="#134e4a"/><rect x="7" y="1" width="1" height="10" fill="#134e4a"/>'
+          + '<rect x="2" y="2" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="5" y="2" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="8" y="2" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="2" y="5" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="5" y="5" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="8" y="5" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="2" y="8" width="2" height="2" fill="#1f2937"/>'
+          + '<rect x="5" y="8" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="8" y="8" width="2" height="2" fill="#ccfbf1"/>'
+          + '<rect x="11" y="10" width="2" height="1" fill="#f59e0b"/><rect x="12" y="11" width="2" height="1" fill="#f59e0b"/><rect x="13" y="12" width="2" height="1" fill="#f59e0b"/><rect x="14" y="13" width="1" height="2" fill="#451a03"/>'
+          + '</svg>',
+        'Campanha Narrativa': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="2" y="2" width="12" height="1" fill="#3730a3"/><rect x="2" y="3" width="1" height="10" fill="#3730a3"/><rect x="13" y="3" width="1" height="10" fill="#3730a3"/><rect x="2" y="13" width="12" height="1" fill="#3730a3"/>'
+          + '<rect x="3" y="3" width="10" height="10" fill="#fef3c7"/>'
+          + '<rect x="7" y="3" width="2" height="10" fill="#3730a3"/>'
+          + '<rect x="4" y="5" width="3" height="1" fill="#92400e"/><rect x="4" y="7" width="3" height="1" fill="#92400e"/><rect x="4" y="9" width="3" height="1" fill="#92400e"/><rect x="4" y="11" width="2" height="1" fill="#92400e"/>'
+          + '<rect x="9" y="5" width="3" height="1" fill="#92400e"/><rect x="9" y="7" width="3" height="1" fill="#92400e"/><rect x="9" y="9" width="3" height="1" fill="#92400e"/><rect x="9" y="11" width="2" height="1" fill="#92400e"/>'
+          + '<rect x="10" y="3" width="1" height="1" fill="#fbbf24"/><rect x="9" y="4" width="3" height="1" fill="#fbbf24"/><rect x="10" y="5" width="1" height="1" fill="#fbbf24"/>'
+          + '</svg>'
+      };
+      var pxArt = pixelArts[label] || '<div style="font-size:34px;text-align:center;line-height:52px">🎮</div>';
+
+      // ── Instructions box: pixel art + title ─────────────
+      var instr = document.querySelector('.instructions');
+      if (instr) {
+        var body = instr.innerHTML;
+        instr.innerHTML = '<div class="instructions-icon">' + pxArt + '</div><div class="instructions-body"><div class="instructions-title">Como Jogar</div>' + body + '</div>';
+      }
+
+      // ── WORD SEARCH: word chips ─────────────────────────
+      var clueList = document.querySelector('.clue-list');
+      if (clueList && document.querySelector('.ws-grid')) {
+        var items = Array.from(clueList.querySelectorAll('li'));
+        var chips = document.createElement('div');
+        chips.className = 'word-chips';
+        items.forEach(function(li) {
+          var chip = document.createElement('div');
+          chip.className = 'word-chip';
+          chip.innerHTML = '<span class="word-chip-box"></span><span>' + li.textContent.replace(/^\\d+\\.\\s*/, '').trim() + '</span>';
+          chips.appendChild(chip);
+        });
+        clueList.replaceWith(chips);
+      }
+
+      // ── BINGO: colored B-I-N-G-O tiles + calling circles ─
+      var bingoTitle = document.querySelector('.bingo-card-title');
+      if (bingoTitle) {
+        var cols = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+        bingoTitle.innerHTML = 'BINGO'.split('').map(function(l,i){
+          return '<span class="bingo-letter" style="background:' + cols[i] + '">' + l + '</span>';
+        }).join('');
+      }
+      var bingoFree = document.querySelector('.bingo-cell.free');
+      if (bingoFree) {
+        var freeText = bingoFree.textContent.replace('★ ', '').trim();
+        bingoFree.innerHTML = '&#11088;<br>' + (freeText || 'FREE') + '<br>&#11088;';
+      }
+      document.querySelectorAll('.bingo-card').forEach(function(card) {
+        var cellCount = card.querySelectorAll('.bingo-cell:not(.free)').length;
+        var calling = document.createElement('div');
+        calling.className = 'bingo-calling';
+        calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados — marque abaixo:</div><div class="bingo-calling-circles">'
+          + Array(cellCount).fill('<span class="bingo-circle"></span>').join('') + '</div>';
+        card.appendChild(calling);
+      });
+
+      // ── QUIZ: progress dots + numbered badges + option pills ─
+      var quizQs = document.querySelectorAll('.quiz-q');
+      if (quizQs.length) {
+        var prog = document.createElement('div');
+        prog.className = 'quiz-progress';
+        for (var d=0; d<quizQs.length; d++) { var dot=document.createElement('div'); dot.className='quiz-dot'; prog.appendChild(dot); }
+        quizQs[0].before(prog);
+        quizQs.forEach(function(q, i) {
+          var badge = document.createElement('div');
+          badge.className = 'quiz-num';
+          badge.textContent = i + 1;
+          q.insertBefore(badge, q.firstChild);
+          // restyle opts
+          q.querySelectorAll('.quiz-opt').forEach(function(opt) {
+            var b = opt.querySelector('b');
+            if (b) {
+              var letter = document.createElement('span');
+              letter.className = 'quiz-opt-letter';
+              letter.textContent = b.textContent.replace(/[^A-D]/g,'');
+              b.replaceWith(letter);
+            }
+          });
+        });
+      }
+
+      // ── TRAIL: emoji cells + dice + legend ──────────────
+      var cells = document.querySelectorAll('.trail-cell');
+      if (cells.length) {
+        cells[0].textContent = '🚀';
+        cells[cells.length-1].textContent = '🏆';
+        cells.forEach(function(c) {
+          var type = c.dataset ? c.dataset.type : c.getAttribute('data-type');
+          if (c.classList.contains('start')) { c.textContent = '🚀'; }
+          else if (c.classList.contains('end')) { c.textContent = '🏆'; }
+          else if (type === 'pergunta') { c.classList.add('type-pergunta'); c.textContent = '❓'; }
+          else if (type === 'bonus') { c.classList.add('type-bonus'); c.textContent = '⭐'; }
+          else if (type === 'penalidade') { c.classList.add('type-penalidade'); c.textContent = '💀'; }
+          else if (type === 'desafio') { c.classList.add('type-desafio'); c.textContent = '⚡'; }
+          else if (c.classList.contains('special')) { c.textContent = '⭐'; }
+        });
+        var board = document.querySelector('.trail-board');
+        if (board) {
+          var wrapper = document.createElement('div');
+          wrapper.className = 'trail-wrapper';
+          board.parentNode.insertBefore(wrapper, board);
+          wrapper.appendChild(board);
+          var diceSvg = '<svg class="trail-dice" width="38" height="38" viewBox="0 0 40 40"><rect x="2" y="2" width="36" height="36" rx="9" fill="white" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="28" cy="12" r="3.2" fill="currentColor"/><circle cx="20" cy="20" r="3.2" fill="currentColor"/><circle cx="12" cy="28" r="3.2" fill="currentColor"/><circle cx="28" cy="28" r="3.2" fill="currentColor"/></svg>';
+          var legend = document.createElement('div');
+          legend.className = 'trail-legend';
+          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>❓ Pergunta</span><span>⭐ Bônus</span><span>💀 Penalidade</span><span>⚡ Desafio</span></div></div>' + diceSvg;
+          wrapper.appendChild(legend);
+        }
+      }
+
+      // ── MEMORY: cut hint + scissors on grid ─────────────
+      var memGrid = document.querySelector('.memory-grid');
+      if (memGrid) {
+        var hint = document.createElement('p');
+        hint.className = 'cut-hint';
+        hint.innerHTML = '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
+        memGrid.before(hint);
+      }
+
+      // ── CROSSWORD: restyle clue items ────────────────────
+      var cwClueCols = document.querySelector('.cw-clues-cols');
+      if (!cwClueCols) {
+        // Legacy list style: add num badges
+        document.querySelectorAll('.cw-clue').forEach(function(cl) {
+          var m = cl.textContent.match(/^(\\d+)[\\.\\)]/);
+          if (m) {
+            var badge = document.createElement('span');
+            badge.className = 'cw-num-badge';
+            badge.textContent = m[1];
+            cl.innerHTML = cl.innerHTML.replace(/^\\d+[\\.\\)]\\s*/, '');
+            cl.insertBefore(badge, cl.firstChild);
+          }
+        });
+      }
+
+      // ── PIXEL ART decorations ────────────────────────────
+      var pxStar = '<svg viewBox="0 0 16 16"' + SR + '>'
+        + '<rect x="7" y="1" width="2" height="2" fill="#fbbf24"/>'
+        + '<rect x="6" y="3" width="4" height="1" fill="#fbbf24"/>'
+        + '<rect x="1" y="5" width="14" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="7" width="12" height="2" fill="#fbbf24"/>'
+        + '<rect x="3" y="9" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="10" y="9" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="11" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="11" y="11" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="1" y="13" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="12" y="13" width="3" height="2" fill="#fbbf24"/>'
+        + '<rect x="6" y="5" width="4" height="1" fill="#fef3c7"/>'
+        + '<rect x="7" y="6" width="2" height="1" fill="#fef3c7"/>'
+        + '</svg>';
+
+      var pxDiamond = '<svg viewBox="0 0 16 16"' + SR + ' style="color:var(--ac,#4338ca)">'
+        + '<rect x="7" y="2" width="2" height="1" fill="currentColor"/>'
+        + '<rect x="6" y="3" width="4" height="1" fill="currentColor"/>'
+        + '<rect x="5" y="4" width="6" height="1" fill="currentColor"/>'
+        + '<rect x="4" y="5" width="8" height="1" fill="currentColor"/>'
+        + '<rect x="3" y="6" width="10" height="2" fill="currentColor"/>'
+        + '<rect x="4" y="8" width="8" height="1" fill="currentColor"/>'
+        + '<rect x="5" y="9" width="6" height="1" fill="currentColor"/>'
+        + '<rect x="6" y="10" width="4" height="1" fill="currentColor"/>'
+        + '<rect x="7" y="11" width="2" height="2" fill="currentColor"/>'
+        + '</svg>';
+
+      var pxSparkle = '<svg viewBox="0 0 16 16"' + SR + ' style="color:var(--ac,#4338ca)">'
+        + '<rect x="7" y="0" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="6" y="3" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="0" y="7" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="3" y="6" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="11" y="6" width="2" height="4" fill="currentColor"/>'
+        + '<rect x="12" y="7" width="4" height="2" fill="currentColor"/>'
+        + '<rect x="7" y="11" width="2" height="5" fill="currentColor"/>'
+        + '<rect x="6" y="11" width="4" height="2" fill="currentColor"/>'
+        + '</svg>';
+
+      var pxTrophy = '<svg viewBox="0 0 16 16"' + SR + '>'
+        + '<rect x="0" y="2" width="2" height="1" fill="#92400e"/><rect x="14" y="2" width="2" height="1" fill="#92400e"/>'
+        + '<rect x="0" y="3" width="1" height="3" fill="#92400e"/><rect x="15" y="3" width="1" height="3" fill="#92400e"/>'
+        + '<rect x="0" y="6" width="2" height="1" fill="#92400e"/><rect x="14" y="6" width="2" height="1" fill="#92400e"/>'
+        + '<rect x="3" y="1" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="2" y="2" width="1" height="6" fill="#92400e"/><rect x="13" y="2" width="1" height="6" fill="#92400e"/>'
+        + '<rect x="3" y="2" width="10" height="6" fill="#fbbf24"/>'
+        + '<rect x="3" y="8" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="6" y="9" width="4" height="2" fill="#b45309"/>'
+        + '<rect x="3" y="11" width="10" height="1" fill="#78350f"/>'
+        + '<rect x="2" y="12" width="12" height="2" fill="#fbbf24"/>'
+        + '<rect x="2" y="14" width="12" height="1" fill="#78350f"/>'
+        + '<rect x="7" y="4" width="2" height="1" fill="#ffffff"/>'
+        + '<rect x="6" y="5" width="4" height="1" fill="#ffffff"/>'
+        + '<rect x="7" y="6" width="2" height="1" fill="#ffffff"/>'
+        + '<rect x="3" y="3" width="1" height="2" fill="#fde68a"/>'
+        + '</svg>';
+
+      // ── SECTION DIVIDER between instructions and content ─
+      if (instr && instr.nextElementSibling) {
+        var divider = document.createElement('div');
+        divider.className = 'section-divider';
+        divider.innerHTML = '<span class="section-divider-line"></span><span class="section-divider-icon">' + pxDiamond + '</span><span class="section-divider-line"></span>';
+        instr.after(divider);
+      }
+
+      // ── BOA SORTE line + SCORE TRACKER ───────────────────
+      var akPage = document.querySelector('.answer-key-page');
+      var boaSorte = document.createElement('div');
+      boaSorte.className = 'boa-sorte';
+      boaSorte.innerHTML = '<span class="boa-sorte-px">' + pxSparkle + '</span><span>Boa sorte, jogador(a)!</span><span class="boa-sorte-px">' + pxSparkle + '</span>';
+
+      var tracker = document.createElement('div');
+      tracker.className = 'score-tracker';
+      tracker.innerHTML = '<div class="score-header"><div class="score-px-star">' + pxStar + '</div><div class="score-title">Minha Pontuação</div><div class="score-px-star">' + pxStar + '</div></div>'
+        + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
+        + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
+
+      if (akPage) {
+        akPage.before(boaSorte);
+        akPage.before(tracker);
+      } else {
+        var footer = document.querySelector('.page-footer');
+        document.body.insertBefore(boaSorte, footer);
+        document.body.insertBefore(tracker, footer);
+      }
+
+      // ── ANSWER KEY header with pixel-art trophy ──────────
+      var akTitle = document.querySelector('.answer-key-title');
+      if (akTitle) {
+        var wrap = document.createElement('div');
+        wrap.className = 'answer-key-header';
+        wrap.innerHTML = '<div class="answer-key-trophy">' + pxTrophy + '</div>';
+        var titleBox = document.createElement('div');
+        titleBox.appendChild(akTitle.cloneNode(true));
+        var subtitle = document.createElement('div');
+        subtitle.className = 'answer-key-subtitle';
+        subtitle.textContent = 'Confira suas respostas e some os pontos';
+        titleBox.appendChild(subtitle);
+        wrap.appendChild(titleBox);
+        akTitle.replaceWith(wrap);
+      }
+
+      // ── STORY: character card page ────────────────────────
+      if (label === 'Campanha Narrativa') {
+        var h2s = document.querySelectorAll('h2');
+        var classesH2 = null;
+        h2s.forEach(function(h) { if (h.textContent && h.textContent.indexOf('Classes') !== -1) classesH2 = h; });
+        if (classesH2) {
+          var cardPage = document.createElement('div');
+          cardPage.style.cssText = 'page-break-before:always;padding-top:12px;';
+          cardPage.innerHTML = '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;">🎭 Fichas dos Personagens</div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+            + ['🧙 Personagem 1', '⚔️ Personagem 2', '🏹 Personagem 3', '🛡️ Personagem 4'].map(function(name) {
+              return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;padding:12px;min-height:120px;">'
+                + '<div style="font-weight:900;font-size:12px;color:var(--ac,#4338ca);margin-bottom:8px;">' + name + '</div>'
+                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">NOME DO ALUNO: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
+                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">CLASSE: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
+                + '<div style="font-size:9px;font-weight:700;color:var(--ac,#4338ca);margin-top:8px;">XP</div>'
+                + '<div style="display:flex;gap:4px;margin-top:4px;">' + Array(10).fill('<div style="width:18px;height:14px;border:1.5px solid var(--ac,#4338ca);border-radius:3px;"></div>').join('') + '</div>'
+                + '</div>';
+            }).join('') + '</div>';
+          document.body.appendChild(cardPage);
+        }
+      }
+
+      setTimeout(function(){ window.print(); }, 600);
+    })();
+    </script>
+  </body></html>`);
+  w.document.close();
+};
+
 const EstudioScreen = ({
   estudioContext,
   setEstudioContext,
@@ -4726,7 +6363,8 @@ const EstudioScreen = ({
   setScreen,
   setPlannerMode,
   notifications,
-  setNotifications
+  setNotifications,
+  schedules
 }: {
   estudioContext: string,
   setEstudioContext: (c: string | ((prev: string) => string)) => void,
@@ -4736,230 +6374,576 @@ const EstudioScreen = ({
   setScreen: (s: Screen) => void,
   setPlannerMode: (m: PlannerMode) => void,
   notifications?: any[],
-  setNotifications?: (n: any[]) => void
+  setNotifications?: (n: any[]) => void,
+  schedules?: ClassSchedule[]
 }) => {
-  const [activeTab, setActiveTab] = useState<'context' | 'chat'>('context');
-  const [isUploading, setIsUploading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [activeMode, setActiveMode] = useState<GameMode | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [classId, setClassId] = useState<string>('');
+  const [topic, setTopic] = useState('');
+  const [difficulty, setDifficulty] = useState<'fácil' | 'média' | 'difícil'>('média');
+  const [genre, setGenre] = useState('aventura');
+  const [duration, setDuration] = useState('1 aula');
+  const [count, setCount] = useState(10);
+  const [quizType, setQuizType] = useState<'multipla' | 'misto'>('multipla');
+  const [bingoCardCount, setBingoCardCount] = useState(10);
+  const [bingoSize, setBingoSize] = useState<3 | 5>(5);
+  const [bingoFreeText, setBingoFreeText] = useState('LIVRE');
+  const [wsGridSize, setWsGridSize] = useState<10 | 15 | 20>(15);
 
-  useEffect(() => {
-    if (activeTab === 'chat') {
-      chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
-    }
-  }, [studioMessages, activeTab]);
+  const selectedClass = (schedules || []).find(s => s.id === classId);
+  const defaultSubject = selectedClass?.subject || profile.subject || '';
+  const defaultLevel = selectedClass?.level || 'Ensino Fundamental II';
 
-  const [chatInput, setChatInput] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const addStudioMessage = (msg: Omit<typeof studioMessages[0], 'id' | 'date'>) => {
-    const newMsg = { ...msg, id: Math.random().toString(36).substr(2, 9), date: Date.now() };
-    setStudioMessages(prev => [...prev, newMsg]);
-    return newMsg;
-  };
+  const closeModal = () => { setActiveMode(null); setResult(null); setTopic(''); };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setIsUploading(true);
-    
-    const applyContextSafety = (newText: string) => {
-      setEstudioContext(prev => {
-        const MAX_CHAR_LIMIT = 100000;
-        const updated = prev + (prev ? '\n\n' : '') + `--- Arquivo: ${file.name} ---\n` + newText;
-        if (updated.length > MAX_CHAR_LIMIT) {
-          alert('Base de Conhecimento cheia. O texto foi truncado para evitar excesso de memória e custos.');
-          return updated.substring(0, MAX_CHAR_LIMIT);
+  const generate = async () => {
+    if (!topic.trim()) { toast.error('Qual e o tema? O Corujao precisa saber para criar!'); return; }
+    setIsGenerating(true);
+    setResult(null);
+    try {
+      const context = `Disciplina: ${defaultSubject || 'Geral'} | Nível: ${defaultLevel}${selectedClass ? ` | Turma: ${selectedClass.name}` : ''} | Tema: ${topic}`;
+      let prompt = '';
+      if (activeMode === 'story') {
+        prompt = `Você é um designer de jogos educacionais. Crie uma CAMPANHA narrativa gamificada completa para gamificar aulas.
+${context}
+Gênero: ${genre} | Duração: ${duration}
+
+Retorne em Markdown brasileiro com EXATAMENTE as seções abaixo:
+
+## 🌍 Cenário
+(2 parágrafos imersivos onde os alunos são protagonistas. Inclua ambientação, conflito central e papel dos alunos.)
+
+## 👥 Classes de Personagens
+(4 classes que os alunos podem escolher, com nome criativo, descrição curta e habilidade especial em 1 frase. Use lista.)
+
+## ⚔️ Missões
+(${duration === '1 aula' ? '3' : duration.includes('semana') ? '5' : '8'} missões em sequência, cada uma com: **Missão N — Nome**, narrativa de abertura curta (3-4 linhas), desafio (relacionado ao conteúdo "${topic}"), recompensa em XP/moedas.)
+
+## 🏆 Sistema de Pontos
+(Tabela: ação → XP/moedas ganhos. Inclua: participar, acertar resposta, completar missão, ajudar colega.)
+
+## 👑 Boss Final
+(Desafio épico de encerramento, narrativa de 2-3 linhas + descrição da prova/trabalho final tematizada.)
+
+## 📋 Roteiro do Professor
+(Lista numerada de 5 passos práticos para conduzir essa campanha em sala.)
+
+NÃO use código, NÃO use emojis fora dos títulos. Português brasileiro natural.`;
+      } else if (activeMode === 'quiz') {
+        if (quizType === 'misto') {
+          const mc = Math.ceil(count * 0.65), vf = count - Math.ceil(count * 0.65);
+          prompt = `Gere um quiz MISTO sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
+${mc} questões de múltipla escolha (4 alternativas) e ${vf} questões de Verdadeiro/Falso.
+Retorne APENAS JSON válido:
+{"title":"...","questions":[{"type":"multipla"|"vf","q":"...","options":[...],"correct":0,"explain":"..."}]}
+Para questões "vf": options deve ser ["Verdadeiro","Falso"]. "correct" é 0 (Verdadeiro) ou 1 (Falso).`;
+        } else {
+          prompt = `Gere um quiz de múltipla escolha sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
+Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
+{"title":"...","questions":[{"q":"pergunta","options":["a","b","c","d"],"correct":0,"explain":"justificativa breve"}]}
+Gere exatamente ${count} perguntas. As 4 opções devem ser plausíveis. "correct" é o índice 0-3.`;
         }
-        return updated;
-      });
-    };
-
-    try {
-      if (file.type.startsWith('text/') || file.name.endsWith('.md') || file.name.endsWith('.csv')) {
-        const text = await file.text();
-        applyContextSafety(text);
-      } else {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          try {
-            const base64 = (event.target?.result as string).split(',')[1];
-            const response = await generateContentWithRetry({
-              model: 'gemini-3-flash-preview',
-              contents: [
-                { role: 'user', parts: [
-                    { inlineData: { data: base64, mimeType: file.type } },
-                    { text: "Extraia todo o texto útil e informações deste arquivo para servir de base de conhecimento. Formate de forma clara em Markdown." }
-                ]}
-              ]
-            });
-            applyContextSafety(response.text || '');
-          } catch (err) {
-            console.error(err);
-            alert(formatApiError(err, 'Erro ao processar o arquivo com a IA.'));
-          } finally {
-            setIsUploading(false);
-          }
-        };
-        reader.readAsDataURL(file);
-        return;
+      } else if (activeMode === 'wordsearch') {
+        const wsMax = wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20;
+        prompt = `Liste ${Math.min(count, wsMax)} palavras-chave sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para caça-palavras.
+Cada palavra: substantivo, SEM espaços, SEM acentos, entre 4 e ${wsGridSize - 2} letras, MAIÚSCULAS.
+Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","hint":"dica curta para o aluno"}]}`;
+      } else if (activeMode === 'crossword') {
+        prompt = `Crie uma lista de ${Math.min(count, 15)} palavras sobre "${topic}" (${defaultSubject}, ${defaultLevel}) com definições no estilo "palavras cruzadas".
+Cada palavra: 4 a 10 letras, SEM espaços, MAIÚSCULAS, sem acentos. Escolha palavras que compartilhem letras para facilitar o cruzamento.
+Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","clue":"definição/pista clara, estilo dicionário"}]}`;
+      } else if (activeMode === 'bingo') {
+        prompt = `Liste 40 termos/conceitos importantes sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para bingo educativo.
+Cada termo: 1 a 3 palavras, claros e didáticos.
+Retorne APENAS JSON: {"title":"Bingo de ${topic}","items":["termo1","termo2",...]}`;
+      } else if (activeMode === 'trail') {
+        prompt = `Crie uma trilha do conhecimento (jogo de tabuleiro) de ${count} casas sobre "${topic}" (${defaultSubject}, ${defaultLevel}).
+Retorne APENAS JSON:
+{"title":"...","instructions":"regras curtas (até 3 linhas)","questions":[{"casa":N,"type":"pergunta"|"desafio"|"bonus"|"penalidade","text":"o que acontece nessa casa"}]}
+Gere ${Math.min(count, 12)} casas especiais (não precisa preencher todas). Use perguntas factuais sobre ${topic} para tipo "pergunta".`;
+      } else if (activeMode === 'memory') {
+        prompt = `Gere ${count} pares conceito↔definição sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para jogo da memória.
+Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras). Inclua 1 emoji representando o conceito.
+Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"...","emoji":"🎯"}]}`;
       }
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao ler o arquivo.');
+      if (activeMode === 'story') {
+        const [response, pixelArts] = await Promise.all([
+          generateContentWithRetry({ model: AI_MODEL, contents: prompt }),
+          generateStoryPixelArts(topic, genre)
+        ]);
+        setResult({ markdown: response.text || '', pixelArts });
+      } else {
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+        const raw = response.text || '';
+        const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (activeMode === 'wordsearch') {
+          const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word), wsGridSize);
+          setResult({ ...parsed, grid: built.grid });
+        } else if (activeMode === 'bingo') {
+          const cards = buildBingoCards(parsed.items, bingoCardCount, bingoSize, bingoFreeText);
+          setResult({ ...parsed, cards, bingoSize });
+        } else if (activeMode === 'crossword') {
+          const crossword = buildCrosswordGrid(parsed.words || []);
+          setResult({ ...parsed, crossword });
+        } else {
+          setResult(parsed);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Gamification] error:', err);
+      const msg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      toast.error(msg || 'A IA travou nessa. Aguarde um instante e tente de novo.');
     }
-    setIsUploading(false);
+    setIsGenerating(false);
   };
 
-  const sendChatMessage = async () => {
-    if (!chatInput.trim()) return;
-    if (!estudioContext) {
-      alert('Ops! Faça o Upload ou insira texto na "Base de Conhecimento" antes de inicializar o chat!');
-      return;
-    }
-
-    const userText = chatInput;
-    addStudioMessage({ role: 'user', text: userText });
-    setChatInput('');
-    setIsChatLoading(true);
-
-    try {
-      const historyForPrompt = [...studioMessages, { role: 'user' as const, text: userText }];
-      const prompt = `Você é um assistente especialista no material fornecido pelo professor.
-      Responda às perguntas baseando-se ESTRITAMENTE no seguinte conteúdo. NUNCA afirme ter gerado relatórios, aulas, ou ter agendado e executado ações. O seu único propósito nesta tela é analisar e responder sobre o texto fornecido.
-
-      Conteúdo Base:
-      ${estudioContext}
-
-      Histórico da conversa:
-      ${historyForPrompt.map(m => `${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
-
-      Assistente:`;
-
-      const response = await generateContentWithRetry({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-
-      addStudioMessage({ role: 'model', text: response.text || '' });
-    } catch (error) {
-      console.error(error);
-      addStudioMessage({ role: 'model', text: formatApiError(error, 'Desculpe, ocorreu um erro ao analisar o material.') });
-    }
-    setIsChatLoading(false);
+  const modeMeta: Record<GameMode, { title: string, icon: any, color: string, bg: string, desc: string }> = {
+    story: { title: 'Storytelling', icon: ScrollText, color: 'text-white', bg: 'from-indigo-600 to-purple-600', desc: 'Campanha narrativa com missões e personagens' },
+    quiz: { title: 'Quiz', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', desc: 'Perguntas de múltipla escolha ou V/F' },
+    wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', desc: 'Grade com palavras escondidas para achar' },
+    crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', desc: 'Grade cruzada com pistas e definições' },
+    bingo: { title: 'Bingo Educativo', icon: Dice5, color: 'text-pink-600', bg: 'bg-pink-50 border-pink-200', desc: 'Cartelas com termos do conteúdo da aula' },
+    trail: { title: 'Trilha', icon: MapIcon, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', desc: 'Tabuleiro com casas de perguntas e desafios' },
+    memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', desc: 'Pares de conceito e definição para combinar' },
   };
+
+  const smallActivities: GameMode[] = ['quiz', 'wordsearch', 'crossword', 'bingo', 'trail', 'memory'];
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Estúdio ML" subtitle="Laboratório de IA" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png" />
-      
-      <div className="flex gap-2 mb-6 pb-2 shrink-0">
-        <button onClick={() => setActiveTab('context')} className={`flex-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === 'context' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}>Base Conhecimento</button>
-        <button onClick={() => setActiveTab('chat')} className={`flex-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}>Chat com IA</button>
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
+      <Header setScreen={setScreen} title="Estúdio" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
+
+      <div className="px-1 mb-6">
+        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {activeTab === 'context' && (
-        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-                <Database size={20} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900">Base de Conhecimento</h3>
-                <p className="text-xs text-gray-400">Cole conteúdo ou envie arquivos para a IA</p>
-              </div>
-            </div>
-            <label className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center cursor-pointer hover:bg-indigo-100 transition-colors">
-              {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
-              <input type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-            </label>
+      {/* STORYTELLING — destaque */}
+      <button
+        onClick={() => setActiveMode('story')}
+        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 active:scale-[0.98] transition-transform"
+      >
+        <div className="absolute -top-6 -right-6 opacity-20">
+          <ScrollText size={130} className="text-white" />
+        </div>
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] font-black tracking-widest uppercase text-yellow-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Principal</span>
           </div>
-          
-          <textarea
-            value={estudioContext}
-            onChange={(e) => setEstudioContext(e.target.value)}
-            placeholder="Cole aqui o conteúdo da BNCC, capítulos de livros, apostilas ou envie um arquivo no botão acima..."
-            className="w-full flex-1 bg-gray-50 border-none rounded-2xl p-4 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none mb-4"
-          />
-          
-          {estudioContext.length === 0 && (
-            <div className="text-center py-4 text-gray-400 text-xs italic mb-4">
-              A IA ainda não tem contexto. Adicione conteúdo para começar.
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-2 mt-auto shrink-0">
-            <button onClick={() => { setPlannerMode('exam'); setScreen('planner'); }} className="bg-indigo-50 text-indigo-600 py-3 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 border border-indigo-200">
-               <FileQuestion size={18} className="text-indigo-600" />
-               Prova
-            </button>
-            <button onClick={() => { setPlannerMode('activities'); setScreen('planner'); }} className="bg-amber-50 text-amber-600 py-3 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 border border-amber-200">
-               <FileText size={18} className="text-amber-600" />
-               Atividade
-            </button>
-            <button onClick={() => { setPlannerMode('slides'); setScreen('planner'); }} className="bg-emerald-50 text-emerald-600 py-3 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 border border-emerald-200">
-               <Presentation size={18} className="text-emerald-600" />
-               Slides
-            </button>
+          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Storytelling</h2>
+          <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
+            Crie uma campanha narrativa completa: cenário, personagens, missões e boss final para gamificar toda a aula.
+          </p>
+          <div className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-4 py-2 rounded-full text-sm">
+            <Wand2 size={16} /> Criar campanha
           </div>
         </div>
-      )}
+      </button>
 
-      {activeTab === 'chat' && (
-        <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col min-h-[400px]">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs text-gray-400 font-medium">Conversa salva automaticamente</span>
+      {/* Atividades menores */}
+      <div className="grid grid-cols-2 gap-3 mb-8">
+        {smallActivities.map(m => {
+          const meta = modeMeta[m];
+          const Icon = meta.icon;
+          return (
             <button
-              onClick={() => setStudioMessages([{ id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }])}
-              className="text-xs text-red-400 font-bold hover:text-red-600"
+              key={m}
+              onClick={() => setActiveMode(m)}
+              className={`relative rounded-3xl p-4 text-left shadow-sm border-2 ${meta.bg} active:scale-[0.97] transition-transform`}
             >
-              Limpar
+              <Icon size={28} className={`${meta.color} mb-2`} />
+              <h3 className={`font-bold text-sm ${meta.color}`}>{meta.title}</h3>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{meta.desc}</p>
             </button>
-          </div>
-          <div className="flex-1 overflow-y-auto no-scrollbar mb-4 space-y-4 p-2">
-            {!estudioContext && (
-              <div className="text-center py-8 text-gray-400 text-sm">Adicione conteúdo na Base de Conhecimento primeiro.</div>
-            )}
-            {estudioContext && studioMessages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
-                <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-50 text-gray-800 rounded-bl-none shadow-sm border border-gray-100'}`}>
-                  <div className="markdown-body text-sm">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+          );
+        })}
+      </div>
+
+      {/* MODAL */}
+      <AnimatePresence>
+        {activeMode && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={closeModal}
+          >
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="bg-white w-full sm:max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between z-10">
+                <div className="flex items-center gap-3">
+                  {(() => { const Icon = modeMeta[activeMode].icon; return <Icon size={22} className={activeMode === 'story' ? 'text-indigo-600' : modeMeta[activeMode].color} />; })()}
+                  <h3 className="font-bold text-lg text-gray-900">{modeMeta[activeMode].title}</h3>
+                </div>
+                <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"><X size={18} /></button>
+              </div>
+
+              {!result && (
+                <div className="p-5 space-y-4">
+                  {(schedules && schedules.length > 0) && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Turma (opcional)</label>
+                      <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400">
+                        <option value="">Sem turma específica</option>
+                        {schedules.map(s => <option key={s.id} value={s.id}>{s.name} {s.subject ? `· ${s.subject}` : ''}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tema / Conteúdo</label>
+                    <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Revolução Industrial, Frações..." className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400" />
+                  </div>
+
+                  {activeMode === 'story' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Gênero narrativo</label>
+                        <select value={genre} onChange={e => setGenre(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                          <option value="aventura">Aventura</option>
+                          <option value="mistério">Mistério / Detetive</option>
+                          <option value="ficção científica">Ficção Científica</option>
+                          <option value="fantasia medieval">Fantasia Medieval</option>
+                          <option value="exploração espacial">Exploração Espacial</option>
+                          <option value="época histórica">Época Histórica</option>
+                          <option value="apocalíptico">Pós-apocalíptico</option>
+                          <option value="terror leve">Terror leve / Suspense</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Duração</label>
+                        <select value={duration} onChange={e => setDuration(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                          <option value="1 aula">1 aula (3 missões)</option>
+                          <option value="1 semana">1 semana (5 missões)</option>
+                          <option value="1 bimestre">1 bimestre (8 missões)</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {activeMode === 'quiz' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo de questões</label>
+                        <div className="flex gap-2 mt-1">
+                          {(['multipla', 'misto'] as const).map(t => (
+                            <button key={t} onClick={() => setQuizType(t)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${quizType === t ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {t === 'multipla' ? '4 alternativas' : 'Misto V/F + MC'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de perguntas</label>
+                        <input type="number" min={5} max={30} value={count} onChange={e => setCount(Math.max(5, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dificuldade</label>
+                        <select value={difficulty} onChange={e => setDifficulty(e.target.value as any)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                          <option value="fácil">Fácil</option>
+                          <option value="média">Média</option>
+                          <option value="difícil">Difícil</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {activeMode === 'wordsearch' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da grade</label>
+                        <div className="flex gap-2 mt-1">
+                          {([10, 15, 20] as const).map(sz => (
+                            <button key={sz} onClick={() => setWsGridSize(sz)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${wsGridSize === sz ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {sz}×{sz}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de palavras</label>
+                        <input type="number" min={5} max={wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                    </>
+                  )}
+                  {(activeMode === 'crossword' || activeMode === 'memory') && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        {activeMode === 'memory' ? 'Quantidade de pares' : 'Quantidade de palavras'}
+                      </label>
+                      <input type="number" min={5} max={20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                    </div>
+                  )}
+
+                  {activeMode === 'bingo' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Formato da cartela</label>
+                        <div className="flex gap-2 mt-1">
+                          {([5, 3] as const).map(sz => (
+                            <button key={sz} onClick={() => setBingoSize(sz)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${bingoSize === sz ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {sz}×{sz} {sz === 5 ? 'Clássico' : 'Mini'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Número de cartelas</label>
+                        <input type="number" min={1} max={30} value={bingoCardCount} onChange={e => setBingoCardCount(Math.max(1, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                      {bingoSize === 5 && (
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Texto da casa livre</label>
+                          <input value={bingoFreeText} onChange={e => setBingoFreeText(e.target.value || 'LIVRE')} placeholder="LIVRE" className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {activeMode === 'trail' && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da trilha (casas)</label>
+                      <input type="number" min={20} max={48} value={count} onChange={e => setCount(Math.max(20, Math.min(48, parseInt(e.target.value) || 32)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                    </div>
+                  )}
+
+                  <button onClick={generate} disabled={isGenerating || !topic.trim()} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50">
+                    {isGenerating ? <><Loader2 size={18} className="animate-spin" /> Gerando…</> : <><Wand2 size={18} /> Gerar com IA</>}
+                  </button>
+                </div>
+              )}
+
+              {result && (() => {
+                const activityLabels: Record<GameMode, string> = {
+                  story: 'Campanha Narrativa', quiz: 'Quiz Avaliativo', wordsearch: 'Caca-Palavras',
+                  crossword: 'Palavras Cruzadas', bingo: 'Bingo Educativo', trail: 'Trilha do Conhecimento', memory: 'Jogo da Memoria'
+                };
+                const printOpts = {
+                  title: result.title || topic,
+                  subject: defaultSubject,
+                  level: defaultLevel,
+                  className: selectedClass?.name,
+                  teacherName: profile.name,
+                  schoolName: profile.schoolName || selectedClass?.school,
+                  activityLabel: activityLabels[activeMode!],
+                  genre: activeMode === 'story' ? genre : undefined,
+                  topic: activeMode === 'story' ? topic : undefined,
+                  bingoDim: result.bingoSize || 5,
+                };
+                return (
+                <div className="p-5">
+                  <div className="flex gap-2 mb-4">
+                    <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">↻ Refazer</button>
+                    <button onClick={() => printGameResult(printOpts)} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
+                  </div>
+
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 mb-3">
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">{printOpts.activityLabel}</p>
+                    <h1 className="text-base font-black text-indigo-900">{printOpts.title}</h1>
+                    <p className="text-[10px] text-indigo-400 mt-0.5">{printOpts.subject} · {printOpts.level}{printOpts.className ? ` · ${printOpts.className}` : ''}</p>
+                  </div>
+
+                  <div id="game-print-area" className="bg-gray-50 rounded-2xl p-4 text-sm">
+                    {activeMode === 'story' && result.markdown && (
+                      <div className="markdown-body prose prose-sm max-w-none">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h2: ({ children, ...props }) => {
+                              const extractText = (n: any): string => {
+                                if (typeof n === 'string') return n;
+                                if (typeof n === 'number') return String(n);
+                                if (Array.isArray(n)) return n.map(extractText).join('');
+                                if (n?.props?.children) return extractText(n.props.children);
+                                return '';
+                              };
+                              const title = extractText(children).trim();
+                              const svg = result.pixelArts?.[title];
+                              return (
+                                <>
+                                  {svg && <div className="story-section-art" dangerouslySetInnerHTML={{ __html: svg }} />}
+                                  <h2 {...props}>{children}</h2>
+                                </>
+                              );
+                            }
+                          }}
+                        >{result.markdown}</ReactMarkdown>
+                      </div>
+                    )}
+
+                    {activeMode === 'quiz' && result.questions && (
+                      <>
+                        <div className="instructions"><b>Instrucoes:</b> Leia cada questao com atencao e marque a alternativa correta.</div>
+                        <div className="space-y-3">
+                          {result.questions.map((q: any, i: number) => (
+                            <div key={i} className="quiz-q">
+                              <p><b>{i + 1}.</b> {q.q}</p>
+                              <div className="mt-2">
+                                {q.options.map((opt: string, j: number) => (
+                                  <p key={j} className="quiz-opt"><b>{String.fromCharCode(65 + j)})</b> {opt}</p>
+                                ))}
+                              </div>
+                              <p className="quiz-answer text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="answer-key-page">
+                          <h2 className="answer-key-title">Gabarito</h2>
+                          {result.questions.map((q: any, i: number) => (
+                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {activeMode === 'wordsearch' && result.grid && (
+                      <>
+                        <div className="instructions"><b>Instrucoes:</b> Encontre todas as palavras da lista escondidas na grade. Elas podem aparecer na horizontal, vertical ou diagonal.</div>
+                        <div className="ws-wrapper">
+                          <div className="ws-grid" style={{ gridTemplateColumns: `repeat(${result.grid.length}, 24px)` }}>
+                            {result.grid.flatMap((row: string[], r: number) => row.map((cell: string, c: number) => (
+                              <div key={`${r}-${c}`} className="ws-cell">{cell}</div>
+                            )))}
+                          </div>
+                        </div>
+                        <h2>Palavras para encontrar</h2>
+                        <ul className="clue-list">
+                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b> — {w.hint}</li>)}
+                        </ul>
+                      </>
+                    )}
+
+                    {activeMode === 'crossword' && result.words && (
+                      <>
+                        <div className="instructions"><b>Instrucoes:</b> Leia cada definição e preencha as palavras na grade — uma letra por quadrado.</div>
+                        {result.crossword ? (
+                          <>
+                            <div className="overflow-x-auto">
+                              <table style={{ borderCollapse: 'collapse', margin: '10px auto' }}>
+                                <tbody>
+                                  {result.crossword.grid.map((row: (string|null)[], r: number) => (
+                                    <tr key={r}>
+                                      {row.map((cell: string|null, c: number) => {
+                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: '#1f2937' }} />;
+                                        const num = result.crossword.cellNumbers[`${r},${c}`];
+                                        return (
+                                          <td key={c} style={{ width: 26, height: 26, border: '2px solid #374151', position: 'relative', verticalAlign: 'top', padding: 0, background: 'white' }}>
+                                            {num && <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 7, fontWeight: 900, color: '#4338ca', lineHeight: 1 }}>{num}</span>}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              {result.crossword.across.length > 0 && (
+                                <div>
+                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">→ Horizontal</p>
+                                  {result.crossword.across.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                </div>
+                              )}
+                              {result.crossword.down.length > 0 && (
+                                <div>
+                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">↓ Vertical</p>
+                                  {result.crossword.down.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
+                            {result.words.map((w: any, i: number) => (
+                              <li key={i} className="cw-item">
+                                <p className="cw-clue">{w.clue}</p>
+                                <div className="cw-boxes">{w.word.split('').map((_: string, j: number) => <div key={j} className="cw-box" />)}</div>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                        <div className="answer-key-page">
+                          <h2 className="answer-key-title">Gabarito</h2>
+                          {result.crossword ? (
+                            <>
+                              {result.crossword.across.length > 0 && <><p style={{fontWeight:900,marginBottom:4}}>→ Horizontal</p>{result.crossword.across.map((c: any) => <div key={c.num} className="answer-key-item"><b>{c.num}.</b> {c.word}</div>)}</>}
+                              {result.crossword.down.length > 0 && <><p style={{fontWeight:900,margin:'8px 0 4px'}}>↓ Vertical</p>{result.crossword.down.map((c: any) => <div key={c.num} className="answer-key-item"><b>{c.num}.</b> {c.word}</div>)}</>}
+                            </>
+                          ) : result.words.map((w: any, i: number) => (
+                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {w.word}</div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {activeMode === 'bingo' && result.cards && (
+                      <>
+                        <div className="instructions"><b>Como jogar:</b> Distribua uma cartela para cada aluno. O professor sorteia os termos da lista — quem marcar uma linha, coluna ou diagonal completa grita BINGO!</div>
+                        {result.cards.map((card: string[][], i: number) => (
+                          <div key={i} className="bingo-card">
+                            <div className="bingo-card-title">BINGO</div>
+                            <div className="bingo-sub">Cartela {i + 1}</div>
+                            <div className="bingo-grid">
+                              {card.flatMap((row, r) => row.map((cell, c) => (
+                                <div key={`${r}-${c}`} className={`bingo-cell ${cell.startsWith('★') ? 'free' : ''}`}>{cell.replace('★ ', '')}</div>
+                              )))}
+                            </div>
+                          </div>
+                        ))}
+                        <h2>Termos para sortear</h2>
+                        <ul className="clue-list">
+                          {result.items.slice(0, 40).map((it: string, i: number) => <li key={i}>{it}</li>)}
+                        </ul>
+                      </>
+                    )}
+
+                    {activeMode === 'trail' && result.questions && (
+                      <>
+                        <div className="instructions"><b>Regras:</b> {result.instructions}</div>
+                        <div className="trail-board">
+                          {Array.from({ length: count }, (_, i) => {
+                            const special = result.questions.find((q: any) => q.casa === i + 1);
+                            const isEnd = i + 1 === count;
+                            const isStart = i === 0;
+                            return (
+                              <div key={i} className={`trail-cell ${isStart ? 'start' : ''} ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`} data-type={special?.type}>{i + 1}</div>
+                            );
+                          })}
+                        </div>
+                        <h2>Casas especiais</h2>
+                        <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
+                          {result.questions.map((q: any, i: number) => (
+                            <li key={i} style={{ marginBottom: 6, pageBreakInside: 'avoid' }}><b>Casa {q.casa}</b> ({q.type}): {q.text}</li>
+                          ))}
+                        </ol>
+                      </>
+                    )}
+
+                    {activeMode === 'memory' && result.pairs && (
+                      <>
+                        <div className="instructions"><b>Como jogar:</b> Imprima, recorte pelas linhas tracejadas e embaralhe as cartas. Cada aluno (ou dupla) tenta encontrar os pares conceito-definicao virando duas cartas por vez.</div>
+                        <div className="memory-grid">
+                          {result.pairs.flatMap((p: any, i: number) => [
+                            <div key={`c-${i}`} className="memory-pair concept">
+                              {p.emoji && <span style={{fontSize:18,display:'block',marginBottom:2}}>{p.emoji}</span>}
+                              {p.concept}
+                            </div>,
+                            <div key={`d-${i}`} className="memory-pair">{p.definition}</div>
+                          ])}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-            {isChatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-50 p-4 rounded-2xl rounded-bl-none shadow-sm border border-gray-100 flex gap-2 items-center">
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-          <div className="bg-gray-50 p-2 rounded-full flex items-center gap-2 shrink-0">
-            <input 
-              type="text" 
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
-              placeholder="Pergunte sobre o material..." 
-              className="flex-1 bg-transparent border-none px-4 py-2 text-sm focus:outline-none"
-              disabled={!estudioContext}
-            />
-            <button 
-              onClick={sendChatMessage}
-              disabled={isChatLoading || !chatInput.trim() || !estudioContext}
-              className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center disabled:opacity-50"
-            >
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -5219,11 +7203,25 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
 // --- Main App ---
 
+const USERS_PAGE_SIZE = 20;
+
 const AdminScreen = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca'>('users');
+  const [usersError, setUsersError] = useState('');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca' | 'metrics' | 'holidays'>('users');
+  const [userSearch, setUserSearch] = useState('');
+  const [usersPage, setUsersPage] = useState(0);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [globalStats, setGlobalStats] = useState<any>(null);
+  const [monthlyStats, setMonthlyStats] = useState<{key: string, label: string, inp: number, out: number, gens: number}[]>([]);
+  const [announcement, setAnnouncement] = useState('');
+  const [announcementActive, setAnnouncementActive] = useState(false);
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+  const [holidays, setHolidays] = useState<{id: string, name: string, date: string}[]>([]);
+  const [newHoliday, setNewHoliday] = useState({ name: '', date: '' });
+  const [holidaySaving, setHolidaySaving] = useState(false);
 
   // ── Biblioteca state ──────────────────────────────────────────────────────
   const [libItems, setLibItems] = useState<LibraryItem[]>([]);
@@ -5232,22 +7230,70 @@ const AdminScreen = () => {
   const [uploadForm, setUploadForm] = useState({ title: '', type: 'activities' as LibraryItem['type'], subject: '', grade: '', description: '' });
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadErr, setUploadErr] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const reloadStorage = async () => {
-    const snap = await getDoc(doc(db, 'config', 'storage'));
-    setStorageUsed(snap.exists() ? (snap.data().totalBytes || 0) : 0);
+    try {
+      const snap = await getDoc(doc(db, 'config', 'storage'));
+      setStorageUsed(snap.exists() ? (snap.data().totalBytes || 0) : 0);
+    } catch { /* ignore — storage meter is non-critical */ }
   };
 
   useEffect(() => {
+    if (activeTab !== 'biblioteca') return;
     const unsubLib = onSnapshot(collection(db, 'library'), snap => {
       setLibItems(snap.docs.map(d => d.data() as LibraryItem).sort((a, b) => b.uploadDate - a.uploadDate));
     });
     reloadStorage();
     return unsubLib;
-  }, []);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    getDoc(doc(db, 'config', 'stats')).then(snap => {
+      if (snap.exists()) setGlobalStats(snap.data());
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    getDoc(doc(db, 'config', 'announcement')).then(snap => {
+      if (snap.exists()) {
+        setAnnouncement(snap.data().message || '');
+        setAnnouncementActive(snap.data().active || false);
+      }
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'metrics') return;
+    const months: {key: string, label: string}[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      months.push({ key, label });
+    }
+    Promise.all(months.map(m => getDoc(doc(db, 'config', `stats_${m.key}`)))).then(snaps => {
+      setMonthlyStats(months.map((m, i) => {
+        const d = snaps[i].exists() ? snaps[i].data()! : {};
+        return { key: m.key, label: m.label, inp: d.totalInputTokens || 0, out: d.totalOutputTokens || 0, gens: d.totalGenerations || 0 };
+      }));
+    }).catch(() => {});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'holidays') return;
+    getDoc(doc(db, 'config', 'feriados')).then(snap => {
+      if (snap.exists()) setHolidays(snap.data().list || []);
+    }).catch(() => {});
+  }, [activeTab]);
 
   const handleUpload = async () => {
     if (!uploadFile || !uploadForm.title.trim()) { setUploadErr('Preencha o título e selecione um arquivo.'); return; }
+    if (uploadFile.type !== 'application/pdf') { setUploadErr('Apenas arquivos PDF são permitidos.'); return; }
+    if (uploadFile.size > 50 * 1024 * 1024) { setUploadErr('Arquivo muito grande. O limite é 50 MB por arquivo.'); return; }
     setUploadErr('');
     if (storageUsed + uploadFile.size > LIBRARY_LIMIT_BYTES) {
       setUploadErr(`Limite de 4.9 GB atingido. Apague materiais para liberar espaço.`); return;
@@ -5273,13 +7319,14 @@ const AdminScreen = () => {
   };
 
   const handleDeleteLib = async (item: LibraryItem) => {
-    if (!confirm(`Apagar "${item.title}"?`)) return;
+    if (confirmDeleteId !== item.id) { setConfirmDeleteId(item.id); return; }
+    setConfirmDeleteId(null);
     try {
       await deleteObject(storageRef(storage, `library/${item.id}/${item.fileName}`));
       await deleteDoc(doc(db, 'library', item.id));
       await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(-item.fileSizeBytes) }, { merge: true });
       setStorageUsed(p => Math.max(0, p - item.fileSizeBytes));
-    } catch (e: any) { alert(`Erro: ${e.message}`); }
+    } catch (e: any) { toast.error(e?.message || 'Algo deu errado. Tente de novo.'); }
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -5296,8 +7343,10 @@ const AdminScreen = () => {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSysUsers(items.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || '')));
+      setUsersError('');
     }, (error) => {
       console.error("Error fetching users:", error);
+      setUsersError('Sem permissão para listar usuários. Verifique as regras do Firestore.');
     });
 
     return () => {
@@ -5323,18 +7372,70 @@ const AdminScreen = () => {
     }
   };
 
-  const getTrialStatus = (u: any) => {
+  const resetGenerations = async (userId: string) => {
+    try {
+      await setDoc(doc(db, 'users', userId), { generationsUsed: 0 }, { merge: true });
+    } catch (e) { console.error(e); }
+  };
+
+  const saveAnnouncement = async () => {
+    setAnnouncementSaving(true);
+    try {
+      await setDoc(doc(db, 'config', 'announcement'), { message: announcement, active: announcementActive, updatedAt: Date.now() });
+    } catch (e) { console.error(e); } finally { setAnnouncementSaving(false); }
+  };
+
+  const saveHoliday = async () => {
+    if (!newHoliday.name.trim() || !newHoliday.date) return;
+    setHolidaySaving(true);
+    try {
+      const newList = [...holidays, { id: Math.random().toString(36).slice(2), ...newHoliday }];
+      await setDoc(doc(db, 'config', 'feriados'), { list: newList });
+      setHolidays(newList);
+      setNewHoliday({ name: '', date: '' });
+    } catch (e) { console.error(e); } finally { setHolidaySaving(false); }
+  };
+
+  const deleteHoliday = async (id: string) => {
+    const newList = holidays.filter(h => h.id !== id);
+    try {
+      await setDoc(doc(db, 'config', 'feriados'), { list: newList });
+      setHolidays(newList);
+    } catch (e) { console.error(e); }
+  };
+
+  const exportCsv = () => {
+    const rows = [['Nome', 'Email', 'Status', 'Gerações', 'Tokens Entrada', 'Tokens Saída', 'Cadastro']];
+    sysUsers.forEach(u => {
+      rows.push([u.name || '', u.email || '', u.isPro ? 'PRO' : u.role === 'admin' ? 'ADMIN' : 'FREE', u.generationsUsed ?? 0, u.inputTokens ?? 0, u.outputTokens ?? 0, u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '']);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `usuarios_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const FREE_LIMIT = 10;
+
+  const getUsageStatus = (u: any) => {
     if (u.isPro || u.role === 'admin') return null;
-    if (!u.createdAt) return null;
-    const hours = (Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60);
-    if (hours > 24) return 'expired';
-    const remaining = Math.max(0, 24 - hours);
-    return `${Math.floor(remaining)}h restantes`;
+    const used = u.generationsUsed ?? 0;
+    if (used >= FREE_LIMIT) return 'limite';
+    return `${used}/${FREE_LIMIT} gerações`;
   };
 
   const totalUsers = sysUsers.length;
   const proUsers = sysUsers.filter(u => u.isPro).length;
-  const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && u.createdAt && (Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60) > 24).length;
+  const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && (u.generationsUsed ?? 0) >= FREE_LIMIT).length;
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return sysUsers;
+    return sysUsers.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
+  }, [sysUsers, userSearch]);
+  const usersPageCount = Math.ceil(filteredUsers.length / USERS_PAGE_SIZE);
+  const pagedUsers = filteredUsers.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
@@ -5363,19 +7464,16 @@ const AdminScreen = () => {
         </div>
       </div>
 
-      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1">
-        <button onClick={() => setActiveTab('users')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'users' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Usuários
-        </button>
-        <button onClick={() => setActiveTab('feedbacks')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'feedbacks' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Feedbacks
-        </button>
-        <button onClick={() => setActiveTab('biblioteca')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'biblioteca' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-          Biblioteca
-        </button>
+      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1 overflow-x-auto no-scrollbar">
+        {(['users','feedbacks','biblioteca','metrics','holidays'] as const).map(tab => {
+          const labels: Record<string, string> = { users: 'Usuários', feedbacks: 'Feedbacks', biblioteca: 'Biblioteca', metrics: 'Métricas', holidays: 'Feriados' };
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`flex-none px-3 py-2 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
+              {labels[tab]}
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === 'feedbacks' && (
@@ -5488,8 +7586,12 @@ const AdminScreen = () => {
                   <p className="font-bold text-sm text-gray-900 truncate">{item.title}</p>
                   <p className="text-xs text-gray-400">{item.subject} · {item.grade} · {fmtBytes(item.fileSizeBytes)} · {item.downloadCount} downloads</p>
                 </div>
-                <button onClick={() => handleDeleteLib(item)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors shrink-0">
-                  <Trash2 size={16} />
+                <button
+                  onClick={() => handleDeleteLib(item)}
+                  onBlur={() => setConfirmDeleteId(null)}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors shrink-0 ${confirmDeleteId === item.id ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`}
+                >
+                  {confirmDeleteId === item.id ? 'Confirmar?' : <Trash2 size={16} />}
                 </button>
               </div>
             ))}
@@ -5504,9 +7606,25 @@ const AdminScreen = () => {
             Gerenciamento de Usuários
           </h2>
 
+          {usersError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
+              {usersError}
+            </div>
+          )}
+
+          <div className="relative mb-4">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              value={userSearch}
+              onChange={e => { setUserSearch(e.target.value); setUsersPage(0); }}
+              placeholder="Buscar por nome ou e-mail…"
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400"
+            />
+          </div>
+
           <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
-            {sysUsers.map(u => {
-              const trialStatus = getTrialStatus(u);
+            {pagedUsers.map(u => {
+              const trialStatus = getUsageStatus(u);
               const isAdmin = u.role === 'admin';
               return (
                 <div key={u.id} className="p-3 border border-gray-100 rounded-xl bg-gray-50">
@@ -5516,14 +7634,14 @@ const AdminScreen = () => {
                         <p className="font-bold text-sm text-gray-900 truncate">{u.name || 'Sem nome'}</p>
                         {isAdmin && <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-md">ADMIN</span>}
                         {u.isPro && <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md">PRO</span>}
-                        {trialStatus === 'expired' && <span className="text-[10px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md">EXPIRADO</span>}
-                        {trialStatus && trialStatus !== 'expired' && <span className="text-[10px] font-medium bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md">{trialStatus}</span>}
+                        {trialStatus === 'limite' && <span className="text-[10px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md">LIMITE</span>}
+                        {trialStatus && trialStatus !== 'limite' && <span className="text-[10px] font-medium bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md">{trialStatus}</span>}
                       </div>
                       <p className="text-xs text-gray-500 truncate mt-0.5">{u.email || u.id}</p>
                       {u.createdAt && <p className="text-[10px] text-gray-400 mt-0.5">Desde {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-2">
                     <button
                       onClick={() => togglePro(u.id, u.isPro)}
                       className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${u.isPro ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400 hover:text-emerald-600'}`}
@@ -5537,9 +7655,266 @@ const AdminScreen = () => {
                       {isAdmin ? 'ADMIN ATIVO' : 'DAR ADMIN'}
                     </button>
                   </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => resetGenerations(u.id)} className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-gray-200 bg-white text-amber-600 hover:border-amber-400 transition-colors">
+                      Zerar gerações
+                    </button>
+                    <button onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)} className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                      {expandedUserId === u.id ? 'Fechar' : 'Ver detalhes'}
+                    </button>
+                  </div>
+                  {expandedUserId === u.id && (
+                    <div className="mt-2 p-3 bg-indigo-50 rounded-xl text-xs space-y-1 border border-indigo-100">
+                      <p><span className="font-bold text-indigo-700">Gerações usadas:</span> {u.generationsUsed ?? 0}</p>
+                      <p><span className="font-bold text-indigo-700">Tokens entrada:</span> {(u.inputTokens || 0).toLocaleString()}</p>
+                      <p><span className="font-bold text-indigo-700">Tokens saída:</span> {(u.outputTokens || 0).toLocaleString()}</p>
+                      {(() => {
+                        const cost = ((u.inputTokens || 0) * 0.075 / 1_000_000 + (u.outputTokens || 0) * 0.30 / 1_000_000) * 5.2;
+                        return <p><span className="font-bold text-indigo-700">Custo estimado:</span> R$ {cost.toFixed(5)}</p>;
+                      })()}
+                      <p><span className="font-bold text-indigo-700">Telefone:</span> {u.phone || 'Não verificado'}</p>
+                      {u.createdAt && <p><span className="font-bold text-indigo-700">Cadastro:</span> {new Date(u.createdAt).toLocaleDateString('pt-BR')}</p>}
+                    </div>
+                  )}
                 </div>
               );
             })}
+          </div>
+
+          {usersPageCount > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setUsersPage(p => Math.max(0, p - 1))}
+                disabled={usersPage === 0}
+                className="px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ← Anterior
+              </button>
+              <span className="text-xs text-gray-500 font-medium">
+                {usersPage + 1} / {usersPageCount} ({filteredUsers.length} usuários)
+              </span>
+              <button
+                onClick={() => setUsersPage(p => Math.min(usersPageCount - 1, p + 1))}
+                disabled={usersPage >= usersPageCount - 1}
+                className="px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Próxima →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'metrics' && (
+        <div className="space-y-4 mb-8">
+          {/* API Cost Dashboard */}
+          {globalStats && (() => {
+            const inputCost = (globalStats.totalInputTokens || 0) * 0.075 / 1_000_000;
+            const outputCost = (globalStats.totalOutputTokens || 0) * 0.30 / 1_000_000;
+            const totalCostUSD = inputCost + outputCost;
+            const totalCostBRL = totalCostUSD * 5.2;
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>💰</span> Custo Real da API</h3>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-indigo-50 rounded-2xl p-3 text-center">
+                    <p className="text-xl font-black text-indigo-600">R$ {totalCostBRL.toFixed(4)}</p>
+                    <p className="text-xs text-indigo-500 font-medium">Custo total (BRL)</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-2xl p-3 text-center">
+                    <p className="text-xl font-black text-emerald-600">$ {totalCostUSD.toFixed(5)}</p>
+                    <p className="text-xs text-emerald-500 font-medium">Custo total (USD)</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-3 text-center">
+                    <p className="text-lg font-black text-gray-700">{(globalStats.totalGenerations || 0).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 font-medium">Gerações totais</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-3 text-center">
+                    <p className="text-lg font-black text-gray-700">{((globalStats.totalInputTokens || 0) + (globalStats.totalOutputTokens || 0)).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 font-medium">Tokens totais</p>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-400 bg-gray-50 rounded-xl p-2 text-center">
+                  Entrada: {(globalStats.totalInputTokens || 0).toLocaleString()} tokens · Saída: {(globalStats.totalOutputTokens || 0).toLocaleString()} tokens
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Monthly consumption chart */}
+          {monthlyStats.length > 0 && (() => {
+            const now = new Date();
+            const currentKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const current = monthlyStats.find(m => m.key === currentKey);
+            const currentCost = current ? (current.inp * 0.075 + current.out * 0.30) / 1_000_000 : 0;
+            const maxCostMonth = Math.max(...monthlyStats.map(m => (m.inp * 0.075 + m.out * 0.30) / 1_000_000), 0.000001);
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><span>📅</span> Consumo Mensal</h3>
+                <p className="text-xs text-gray-400 mb-3">Últimos 6 meses · custo estimado em USD</p>
+                {current && (
+                  <div className="bg-indigo-50 rounded-2xl p-3 mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-indigo-500 font-medium">Mês atual</p>
+                      <p className="text-2xl font-black text-indigo-700">${currentCost.toFixed(5)}</p>
+                      <p className="text-xs text-indigo-400">{current.gens.toLocaleString()} gerações · {(current.inp + current.out).toLocaleString()} tokens</p>
+                    </div>
+                    <span className="text-3xl">🦉</span>
+                  </div>
+                )}
+                <div className="flex items-end gap-2 h-24">
+                  {monthlyStats.map((m, i) => {
+                    const cost = (m.inp * 0.075 + m.out * 0.30) / 1_000_000;
+                    const pct = (cost / maxCostMonth) * 100;
+                    const isCurrent = m.key === currentKey;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[9px] font-bold text-gray-600">${cost.toFixed(4)}</span>
+                        <div className="w-full flex items-end" style={{ height: '60px' }}>
+                          <div
+                            className={`w-full rounded-t-lg transition-all duration-700 ${isCurrent ? 'bg-indigo-500' : 'bg-indigo-200'}`}
+                            style={{ height: `${Math.max(pct, 2)}%` }}
+                          />
+                        </div>
+                        <span className={`text-[9px] font-semibold ${isCurrent ? 'text-indigo-600' : 'text-gray-400'}`}>{m.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Per-user cost chart */}
+          {(() => {
+            const usersWithCost = sysUsers
+              .map(u => {
+                const inp = u.inputTokens || 0;
+                const out = u.outputTokens || 0;
+                const cost = (inp * 0.075 + out * 0.30) / 1_000_000;
+                return { name: u.displayName || u.email || u.id, cost, inp, out };
+              })
+              .filter(u => u.cost > 0)
+              .sort((a, b) => b.cost - a.cost)
+              .slice(0, 10);
+            if (usersWithCost.length === 0) return null;
+            const maxCost = usersWithCost[0].cost;
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><span>📊</span> Top Consumidores (API)</h3>
+                <p className="text-xs text-gray-400 mb-4">Custo estimado por usuário em USD</p>
+                <div className="space-y-3">
+                  {usersWithCost.map((u, i) => {
+                    const pct = maxCost > 0 ? (u.cost / maxCost) * 100 : 0;
+                    const colors = ['bg-indigo-500','bg-purple-500','bg-pink-500','bg-rose-500','bg-orange-500','bg-amber-500','bg-yellow-500','bg-lime-500','bg-emerald-500','bg-teal-500'];
+                    return (
+                      <div key={i}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-semibold text-gray-700 truncate max-w-[60%]">{u.name}</span>
+                          <span className="text-xs font-black text-gray-900">${u.cost.toFixed(5)}</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${colors[i % colors.length]}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{u.inp.toLocaleString()} in · {u.out.toLocaleString()} out tokens</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Input vs Output split bar */}
+          {globalStats && (() => {
+            const inp = globalStats.totalInputTokens || 0;
+            const out = globalStats.totalOutputTokens || 0;
+            const total = inp + out;
+            const inpPct = total > 0 ? (inp / total) * 100 : 50;
+            return (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>⚖️</span> Input vs Output</h3>
+                <div className="flex rounded-full overflow-hidden h-4 mb-2">
+                  <div className="bg-indigo-500 transition-all duration-700" style={{ width: `${inpPct}%` }} />
+                  <div className="bg-emerald-400 flex-1" />
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span><span className="inline-block w-2 h-2 rounded-full bg-indigo-500 mr-1" />Input {inpPct.toFixed(1)}%</span>
+                  <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1" />Output {(100 - inpPct).toFixed(1)}%</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Announcement */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
+            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>📢</span> Aviso Global</h3>
+            <textarea
+              value={announcement}
+              onChange={e => setAnnouncement(e.target.value)}
+              placeholder="Digite um aviso para todos os usuários..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 resize-none mb-3"
+            />
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={announcementActive} onChange={e => setAnnouncementActive(e.target.checked)} className="w-4 h-4 accent-indigo-600" />
+                Aviso ativo
+              </label>
+              <button onClick={saveAnnouncement} disabled={announcementSaving} className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-50">
+                {announcementSaving ? 'Salvando...' : 'Publicar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Export CSV */}
+          <button onClick={exportCsv} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+            <Download size={16} /> Exportar usuários (CSV)
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'holidays' && (
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>🎉</span> Feriados Globais</h3>
+          <p className="text-xs text-gray-400 mb-4">Aparecem no calendário de todos os professores automaticamente.</p>
+
+          <div className="space-y-2 mb-4">
+            {holidays.sort((a,b) => a.date.localeCompare(b.date)).map(h => (
+              <div key={h.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{h.name}</p>
+                  <p className="text-xs text-gray-500">{new Date(h.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                </div>
+                <button onClick={() => deleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-1">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {holidays.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhum feriado cadastrado.</p>}
+          </div>
+
+          <div className="space-y-2 border-t border-gray-100 pt-4">
+            <input
+              type="text"
+              placeholder="Nome do feriado"
+              value={newHoliday.name}
+              onChange={e => setNewHoliday(h => ({...h, name: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <input
+              type="date"
+              value={newHoliday.date}
+              onChange={e => setNewHoliday(h => ({...h, date: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <button onClick={saveHoliday} disabled={holidaySaving || !newHoliday.name.trim() || !newHoliday.date}
+              className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50">
+              {holidaySaving ? 'Salvando...' : '+ Adicionar feriado'}
+            </button>
           </div>
         </div>
       )}
@@ -5547,7 +7922,7 @@ const AdminScreen = () => {
   );
 };
 
-export default function App() {
+function AppInner() {
   const [user, setUser] = useState<any>(null);
   const [isAuthLoaded, setIsAuthLoaded] = useState(false);
   const [email, setEmail] = useState('');
@@ -5557,6 +7932,14 @@ export default function App() {
   const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
   const [authError, setAuthError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
+  const [phoneStep, setPhoneStep] = useState<'idle' | 'enter' | 'code'>('idle');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneVerifId, setPhoneVerifId] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneSending, setPhoneSending] = useState(false);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const [globalAnnouncement, setGlobalAnnouncement] = useState<{message:string,active:boolean}|null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -5565,6 +7948,13 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, 'config', 'announcement')).then(snap => {
+      if (snap.exists() && snap.data().active) setGlobalAnnouncement(snap.data() as any);
+    }).catch(() => {});
+  }, [user]);
 
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
@@ -5648,11 +8038,99 @@ export default function App() {
   const [customEvents, setCustomEvents] = useFirestoreSync<{id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative'}>('events', user, []);
   const [savedResources, setSavedResources] = useFirestoreSync<SavedResource>('resources', user, []);
   const [notifications, setNotifications] = useFirestoreSync<any>('notifications', user, []);
+
+  // ── Auto-notifications from schedule ─────────────────────────────────────
+  const [readAutoIds, setReadAutoIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('readAutoNotifs') || '[]')); } catch { return new Set(); }
+  });
+
+  const autoNotifications = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayDow = today.getDay();
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    const tomorrowDow = tomorrow.getDay();
+    const todayStr = today.toISOString().slice(0, 10);
+    const notifs: any[] = [];
+
+    // Today's classes
+    schedules.forEach(s => {
+      if (s.days.includes(todayDow)) {
+        const id = `auto-class-today-${s.id}-${todayStr}`;
+        notifs.push({ id, title: `Aula hoje: ${s.name}`, message: `${[s.subject, s.time, s.school].filter(Boolean).join(' · ')}`, date: today.getTime(), read: readAutoIds.has(id), auto: true, icon: 'class' });
+      }
+    });
+
+    // Tomorrow's classes
+    schedules.forEach(s => {
+      if (s.days.includes(tomorrowDow)) {
+        const id = `auto-class-tomorrow-${s.id}-${todayStr}`;
+        notifs.push({ id, title: `Aula amanhã: ${s.name}`, message: `${[s.subject, s.time, s.school].filter(Boolean).join(' · ')}`, date: today.getTime() - 1, read: readAutoIds.has(id), auto: true, icon: 'class' });
+      }
+    });
+
+    // Upcoming events (holidays, prep, admin) within 7 days
+    customEvents.forEach(e => {
+      const eventDate = new Date(e.date + 'T00:00:00');
+      const diff = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff < 0 || diff > 7) return;
+      const id = `auto-event-${e.id}-${todayStr}`;
+      const when = diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : `Em ${diff} dias`;
+      const typeLabel: Record<string, string> = { holiday: 'Feriado', prep: 'Preparação de aula', admin: 'Tarefa administrativa', commemorative: 'Data comemorativa' };
+      notifs.push({ id, title: `${typeLabel[e.type] || 'Evento'}: ${e.title}`, message: `${when} — ${eventDate.toLocaleDateString('pt-BR')}`, date: today.getTime() - 2, read: readAutoIds.has(id), auto: true, icon: e.type });
+    });
+
+    return notifs;
+  }, [schedules, customEvents, readAutoIds]);
+
+  const allNotifications = useMemo(() =>
+    [...autoNotifications, ...notifications].sort((a, b) => b.date - a.date),
+    [autoNotifications, notifications]
+  );
+
+  const handleSetNotifications = (updater: any[] | ((prev: any[]) => any[])) => {
+    const updated = typeof updater === 'function' ? updater(allNotifications) : updater;
+    const newReadIds = new Set(readAutoIds);
+    updated.filter(n => n.auto && n.read).forEach(n => newReadIds.add(n.id));
+    // Clear all: mark all auto as read
+    if (updated.length === 0) autoNotifications.forEach(n => newReadIds.add(n.id));
+    setReadAutoIds(newReadIds);
+    try { localStorage.setItem('readAutoNotifs', JSON.stringify([...newReadIds])); } catch {}
+    setNotifications(updated.filter(n => !n.auto));
+  };
   const [inboxMessages, setInboxMessages] = useFirestoreSync<{id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}>('messages', user, [
     { id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }
   ]);
   
   const [estudioContext, setEstudioContext] = useState<string>('');
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2>(0);
+  const [onboardingName, setOnboardingName] = useState('');
+  const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
+
+  // Show onboarding only for genuinely new users: no onboarded flag AND still has the default name
+  const showOnboarding = !!user && !profile.onboarded && profile.name === 'Prof. Silva';
+
+  const finishOnboarding = async (skipClass = false) => {
+    const newName = onboardingName.trim() || 'Professor';
+    const updates: Partial<UserProfile> = { name: newName, onboarded: true };
+    setProfile({ ...profile, ...updates } as UserProfile);
+    if (!skipClass && onboardingClass.name.trim()) {
+      const newClass: ClassSchedule = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: onboardingClass.name,
+        days: [1, 2, 3, 4, 5],
+        time: '08:00',
+        subject: onboardingClass.subject || undefined,
+        school: onboardingClass.school || undefined,
+        shift: onboardingClass.shift || undefined,
+        level: onboardingClass.level,
+      };
+      setSchedules([...schedules, newClass]);
+    }
+    setOnboardingStep(0);
+  };
   const [studioMessages, setStudioMessages] = useFirestoreSync<{ id: string; role: 'user' | 'model'; text: string; date: number }>('studioMessages', user, [
     { id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }
   ]);
@@ -5776,16 +8254,17 @@ export default function App() {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Initialize profile in Firestore for new users
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
             name: email.split('@')[0],
             email: email.toLowerCase().trim(),
-            subject: 'Nova Disciplina',
             role: 'user',
             isPro: false,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            phoneVerified: false,
           });
+          // Trigger phone verification step
+          setPhoneStep('enter');
         }
       }
     } catch (error: any) {
@@ -5806,20 +8285,76 @@ export default function App() {
     }
   };
 
-  const isTrialExpired = useMemo(() => {
+  const sendPhoneSms = async () => {
+    setPhoneError('');
+    const raw = phoneNumber.replace(/\D/g, '');
+    if (raw.length < 10) { setPhoneError('Digite um número de celular válido.'); return; }
+    const formatted = '+55' + raw;
+    setPhoneSending(true);
+    try {
+      // Check if phone already used by another account
+      const snap = await getDocs(query(collection(db, 'users'), where('phone', '==', formatted)));
+      if (!snap.empty) { setPhoneError('Este número já está vinculado a outra conta.'); setPhoneSending(false); return; }
+
+      if (!recaptchaRef.current) {
+        recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+      }
+      const provider = new PhoneAuthProvider(auth);
+      const verifId = await provider.verifyPhoneNumber(formatted, recaptchaRef.current);
+      setPhoneVerifId(verifId);
+      setPhoneStep('code');
+    } catch (e: any) {
+      setPhoneError(e.code === 'auth/invalid-phone-number' ? 'Número inválido. Use o formato: (11) 91234-5678' : 'Erro ao enviar SMS. Tente novamente.');
+      recaptchaRef.current = null;
+    } finally {
+      setPhoneSending(false);
+    }
+  };
+
+  const verifyPhoneCode = async () => {
+    setPhoneError('');
+    if (phoneCode.length !== 6) { setPhoneError('O código tem 6 dígitos.'); return; }
+    setPhoneSending(true);
+    try {
+      const raw = phoneNumber.replace(/\D/g, '');
+      const formatted = '+55' + raw;
+      const credential = PhoneAuthProvider.credential(phoneVerifId, phoneCode);
+      await linkWithCredential(auth.currentUser!, credential);
+      await setDoc(doc(db, 'users', auth.currentUser!.uid), { phone: formatted, phoneVerified: true }, { merge: true });
+      setPhoneStep('idle');
+    } catch (e: any) {
+      setPhoneError(e.code === 'auth/invalid-verification-code' ? 'Código incorreto. Verifique o SMS.' : 'Erro ao verificar. Tente novamente.');
+    } finally {
+      setPhoneSending(false);
+    }
+  };
+
+  const FREE_GENERATION_LIMIT = 10;
+
+  const isLimitReached = useMemo(() => {
     if (!user) return false;
     if (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') return false;
     if (profile?.isPro) return false;
-    
-      const creationTime = user.metadata?.creationTime || profile?.createdAt;
-      if (creationTime) {
-        const creationDate = new Date(creationTime).getTime();
-        if (isNaN(creationDate)) return false;
-        const hoursPassed = (Date.now() - creationDate) / (1000 * 60 * 60);
-        return hoursPassed > 24;
-      }
-      return false;
+    return (profile?.generationsUsed ?? 0) >= FREE_GENERATION_LIMIT;
   }, [user, profile]);
+
+  const recordGeneration = async () => {
+    if (!user) return;
+    const isPrivileged = profile?.isPro || profile?.role === 'admin';
+    const inputT = _pendingInputTokens; const outputT = _pendingOutputTokens;
+    _pendingInputTokens = 0; _pendingOutputTokens = 0;
+    try {
+      const userUpdate: any = { generationsUsed: increment(1) };
+      if (!isPrivileged) { userUpdate.inputTokens = increment(inputT); userUpdate.outputTokens = increment(outputT); }
+      await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
+      const monthKey = new Date().toISOString().slice(0, 7).replace('-', '_');
+      const statsPayload = { totalGenerations: increment(1), totalInputTokens: increment(inputT), totalOutputTokens: increment(outputT) };
+      await Promise.all([
+        setDoc(doc(db, 'config', 'stats'), statsPayload, { merge: true }),
+        setDoc(doc(db, 'config', `stats_${monthKey}`), statsPayload, { merge: true }),
+      ]);
+    } catch { /* best-effort */ }
+  };
 
   if (!isAuthLoaded) {
     return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FE]"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -5908,26 +8443,106 @@ export default function App() {
     );
   }
 
-  if (isTrialExpired && screen !== 'admin' && screen !== 'profile') {
+  // Phone verification screen — shown to new users right after registration
+  if (user && phoneStep !== 'idle') {
+    return (
+      <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
+        <div id="recaptcha-container" />
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-xl border border-indigo-100 flex flex-col items-center gap-5">
+          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-3xl">📱</div>
+          <div className="text-center">
+            <h2 className="text-xl font-black text-gray-900">Verificação de celular</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {phoneStep === 'enter'
+                ? 'Digite seu celular para receber um código de confirmação via SMS.'
+                : `Código enviado para +55 ${phoneNumber}. Digite os 6 dígitos abaixo.`}
+            </p>
+          </div>
+
+          {phoneError && <p className="text-sm text-red-500 font-medium text-center bg-red-50 p-2 rounded-xl w-full">{phoneError}</p>}
+
+          {phoneStep === 'enter' && (
+            <>
+              <div className="w-full">
+                <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Número do celular</label>
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-indigo-400">
+                  <span className="px-3 py-3 bg-gray-50 text-sm font-bold text-gray-500 border-r border-gray-200">🇧🇷 +55</span>
+                  <input
+                    type="tel"
+                    placeholder="(11) 91234-5678"
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    className="flex-1 px-3 py-3 text-sm focus:outline-none"
+                    inputMode="tel"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={sendPhoneSms}
+                disabled={phoneSending}
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50"
+              >
+                {phoneSending ? 'Enviando SMS...' : 'Enviar código'}
+              </button>
+              <button onClick={() => setPhoneStep('idle')} className="text-xs text-gray-400 underline">
+                Pular por agora
+              </button>
+            </>
+          )}
+
+          {phoneStep === 'code' && (
+            <>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                value={phoneCode}
+                onChange={e => setPhoneCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full text-center text-2xl font-black tracking-widest border border-gray-200 rounded-2xl py-4 focus:outline-none focus:border-indigo-400"
+              />
+              <button
+                onClick={verifyPhoneCode}
+                disabled={phoneSending || phoneCode.length !== 6}
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50"
+              >
+                {phoneSending ? 'Verificando...' : 'Confirmar código'}
+              </button>
+              <button onClick={() => { setPhoneStep('enter'); setPhoneCode(''); setPhoneError(''); }} className="text-xs text-gray-400 underline">
+                Reenviar SMS
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (isLimitReached && screen !== 'admin' && screen !== 'profile') {
     return (
       <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6 relative">
-        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100 flex flex-col items-center">
-          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
-            <Shield size={32} />
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-indigo-100 flex flex-col items-center">
+          <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6">
+            <Sparkles size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Tempo Expirado</h2>
-          <p className="text-gray-500 mb-6">
-            Seu período de teste grátis de 24 horas chegou ao fim. Para continuar usando o aplicativo, ative a versão Pro.
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Limite do plano gratuito</h2>
+          <p className="text-gray-500 mb-2">
+            Você usou todas as <strong>{FREE_GENERATION_LIMIT} gerações gratuitas</strong>. Ative o plano Pro para continuar gerando planos, atividades e slides ilimitados.
           </p>
-          <div className="p-4 bg-indigo-50 text-indigo-800 rounded-xl mb-6 text-sm">
-            Fale com o administrador do sistema informando seu e-mail: <strong>{user.email}</strong> para liberação do acesso Permanente.
+          <p className="text-sm text-gray-400 mb-6">Seu histórico e materiais já gerados continuam disponíveis.</p>
+          <div className="p-4 bg-indigo-50 text-indigo-800 rounded-xl mb-4 text-sm">
+            Ative o plano Pro e gere conteúdo ilimitado — planos de aula, slides, atividades e provas.
           </div>
-          <button
-            onClick={() => logOut()}
-            className="text-gray-500 hover:text-gray-700 font-medium"
+          <a
+            href="https://wa.me/5598981796309?text=Olá! Quero ativar o plano Pro do Prof. Corujão."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-green-500 hover:bg-green-600 text-white rounded-2xl py-3.5 text-base font-bold flex items-center justify-center gap-2 mb-4 transition-colors"
           >
-            Sair da conta
-          </button>
+            <MessageCircle size={20} /> Ativar Pro via WhatsApp
+          </a>
+          <button onClick={() => setScreen('profile')} className="text-indigo-600 font-bold mb-3">Ver meu perfil</button>
+          <button onClick={() => logOut()} className="text-gray-500 hover:text-gray-700 font-medium text-sm">Sair da conta</button>
         </div>
       </div>
     );
@@ -6031,7 +8646,7 @@ export default function App() {
       Sugira quantas aulas (de ${plannerLessonTime}min cada) são necessárias para cobrir esse conteúdo de forma eficaz. 
       Responda apenas o número bruto.`;
       
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const match = response.text?.match(/\d+/);
       const suggested = match ? parseInt(match[0], 10) : 1;
       const finalDuration = isNaN(suggested) || suggested < 1 ? 1 : Math.min(suggested, 20);
@@ -6093,9 +8708,10 @@ export default function App() {
   const generatePlan = async (optTopic?: string, optClassId?: string) => {
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
-    
+
     if (!targetTopic.trim()) return;
-    
+    if (isLimitReached) return;
+
     const taskId = addTask({ type: 'plan', title: `Plano: ${targetTopic}` });
     try {
       const selectedClass = schedules.find(s => s.id === targetClassId);
@@ -6109,7 +8725,7 @@ export default function App() {
       const fechamento = plannerLessonTime - abertura - desenvolvimento;
 
       // ── Solução 2: selecionar habilidades BNCC do banco local ──────────────
-      const bnccSkills = selectBnccSkills(profile.subject || '', className, targetTopic, 4);
+      const bnccSkills = selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4);
       const bnccBlock  = bnccSkills.length > 0
         ? bnccSkills.map(s => `- ${s.code} — ${s.desc}`).join('\n')
         : '- [escolha habilidades BNCC reais para a disciplina e série]';
@@ -6156,39 +8772,32 @@ ${bnccBlock}
 ## REFERÊNCIAS
 [2 ou 3 referências bibliográficas em formato ABNT]`;
 
-      const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const planDraft = response.text || '';
 
-      // ── Solução 3: validação pós-geração das habilidades BNCC ──────────
+      // ── Validação local determinística das habilidades BNCC ──────────────
+      // Substitui a chamada de IA por verificação contra o banco local.
       let planResult = planDraft;
       if (bnccSkills.length > 0) {
-        try {
-          const validationPrompt = `Você é especialista em BNCC. No plano de aula abaixo, verifique SOMENTE a seção "## Habilidade (BNCC)":
-1. Os códigos citados batem com os do banco abaixo?
-2. Se houver código inexistente ou errado, substitua pelo correto do banco.
-3. Não altere NENHUMA outra parte do plano.
-
-BANCO DE HABILIDADES VÁLIDAS (use apenas estes):
-${bnccBlock}
-
-Retorne o plano COMPLETO com a seção corrigida. Sem introduções.
-
-PLANO:
-${planDraft}`;
-          const validated = await withTimeout(
-            generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: validationPrompt }),
-            30000, 'validação BNCC'
+        const validCodes = new Set(bnccSkills.map(s => s.code.toUpperCase()));
+        const allCodesInPlan = (planDraft.match(/\b(EF\d{2}[A-Z]{2}\d{2}|EM13[A-Z]{3}\d{3})\b/g) || [])
+          .map(c => c.toUpperCase());
+        const hasInvalidCode = allCodesInPlan.some(c => !validCodes.has(c));
+        const hasMissingCode = bnccSkills.some(s => !allCodesInPlan.includes(s.code.toUpperCase()));
+        if (hasInvalidCode || hasMissingCode || allCodesInPlan.length === 0) {
+          const correctSection = `## Habilidade (BNCC)\n${bnccBlock}`;
+          planResult = planDraft.replace(
+            /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/,
+            correctSection + '\n'
           );
-          if (validated.text) planResult = validated.text;
-        } catch {
-          // validação falhou — usar o rascunho original (melhor do que nada)
         }
       }
 
       setPlannerPlan(planResult);
       updateTask(taskId, { status: 'completed', result: planResult });
+      recordGeneration();
     } catch (error) {
-      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Erro ao gerar plano.') });
+      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Nao consegui montar o plano dessa vez. Tente novamente.') });
     }
   };
 
@@ -6196,6 +8805,7 @@ ${planDraft}`;
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
     if (!targetTopic.trim()) return;
+    if (isLimitReached) return;
 
     const taskId = addTask({ type, title: `${type === 'slides' ? 'Slides' : 'Atividades'}: ${targetTopic}` });
     try {
@@ -6204,7 +8814,7 @@ ${planDraft}`;
 
       if (type === 'slides') {
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount);
-        const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
         const firstBrace = text.indexOf('{');
@@ -6238,12 +8848,14 @@ ${planDraft}`;
         } catch (e) {
           console.warn('Image fetch timed out — proceeding without all images.');
         }
-        setPlannerPresentationData(parsed);
-        updateTask(taskId, { status: 'completed', result: parsed });
+        const sanitized = sanitizeSlideData(parsed);
+        setPlannerPresentationData(sanitized);
+        updateTask(taskId, { status: 'completed', result: sanitized });
+        recordGeneration();
       } else {
-        const escolaStr = profile.schoolName || '_________________';
+        const escolaStr = selectedClass?.school || profile.schoolName || '_________________';
         const professorStr = profile.name || '_________________';
-        const disciplinaStr = profile.subject || '_________________';
+        const disciplinaStr = selectedClass?.subject || profile.subject || '_________________';
         
         const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
         const mcPts  = parseFloat((plannerExamValue / 10).toFixed(1));
@@ -6362,22 +8974,146 @@ _______________________________________________________________________________
 
 REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`;
           
-        const response = await generateContentWithRetry({ model: 'gemini-3-flash-preview', contents: prompt });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const result = response.text || '';
         if (type === 'exam') setPlannerExam(result);
         else setPlannerActivity(result);
         updateTask(taskId, { status: 'completed', result });
+        recordGeneration();
       }
     } catch (error) {
-      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Erro ao gerar material.') });
+      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Esse material nao saiu como esperado. Tente novamente.') });
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+      <ToastContainer />
+
+      {globalAnnouncement?.active && globalAnnouncement.message && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-indigo-600 text-white text-sm font-medium px-4 py-2 flex items-center justify-between shadow-lg">
+          <span className="flex-1 text-center">{globalAnnouncement.message}</span>
+          <button onClick={() => setGlobalAnnouncement(null)} className="ml-2 text-white/70 hover:text-white"><X size={16} /></button>
+        </div>
+      )}
+
+      {/* ── Onboarding Modal ───────────────────────────────────────────── */}
+      {showOnboarding && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-end justify-center p-0">
+          <div className="bg-white w-full max-w-md rounded-t-[2.5rem] p-6 pb-10 shadow-2xl">
+            {onboardingStep === 0 && (
+              <>
+                <div className="flex flex-col items-center text-center mb-6">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
+                    <span className="text-3xl">🦉</span>
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
+                  <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em 2 passos rápidos.</p>
+                </div>
+                <div className="mb-5">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Qual é o seu nome?</label>
+                  <input
+                    autoFocus
+                    value={onboardingName}
+                    onChange={e => setOnboardingName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && onboardingName.trim() && setOnboardingStep(2)}
+                    placeholder="Ex: Maria Souza"
+                    className="w-full mt-2 p-4 border-2 border-gray-200 rounded-2xl text-lg font-bold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <button
+                  onClick={() => onboardingName.trim() && setOnboardingStep(2)}
+                  disabled={!onboardingName.trim()}
+                  className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-base font-bold disabled:opacity-40"
+                >
+                  Continuar →
+                </button>
+              </>
+            )}
+
+            {onboardingStep === 2 && (
+              <>
+                <div className="mb-4">
+                  <h2 className="text-xl font-black text-gray-900">Cadastre sua primeira turma</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">Você pode adicionar mais turmas depois no Perfil.</p>
+                </div>
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma *</label>
+                    <input
+                      value={onboardingClass.name}
+                      onChange={e => setOnboardingClass(c => ({...c, name: e.target.value}))}
+                      placeholder="Ex: 6º Ano A"
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina *</label>
+                    <select
+                      value={onboardingClass.subject}
+                      onChange={e => setOnboardingClass(c => ({...c, subject: e.target.value}))}
+                      className={`w-full mt-1 p-3 rounded-xl focus:outline-none transition-all ${onboardingClass.subject ? 'bg-indigo-600 text-white font-bold border-none' : 'border border-gray-200 bg-white text-gray-700'}`}
+                    >
+                      <option value="">Selecione</option>
+                      {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível</label>
+                    <select
+                      value={onboardingClass.level}
+                      onChange={e => setOnboardingClass(c => ({...c, level: e.target.value}))}
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 bg-white text-gray-700"
+                    >
+                      <option value="Ensino Fundamental I">Ensino Fundamental I</option>
+                      <option value="Ensino Fundamental II">Ensino Fundamental II</option>
+                      <option value="Ensino Médio">Ensino Médio</option>
+                      <option value="EJA">EJA</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
+                    <div className="flex gap-2 mt-1">
+                      {['Manhã', 'Tarde', 'Noite'].map(s => (
+                        <button key={s} onClick={() => setOnboardingClass(c => ({...c, shift: s}))}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${onboardingClass.shift === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escola</label>
+                    <input
+                      value={onboardingClass.school}
+                      onChange={e => setOnboardingClass(c => ({...c, school: e.target.value}))}
+                      placeholder="Nome da escola"
+                      className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-5">
+                  <button onClick={() => finishOnboarding(true)}
+                    className="flex-1 bg-gray-100 text-gray-600 rounded-2xl py-3.5 text-sm font-bold">
+                    Pular
+                  </button>
+                  <button
+                    onClick={() => finishOnboarding(false)}
+                    disabled={!onboardingClass.name.trim() || !onboardingClass.subject}
+                    className="flex-[2] bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold disabled:opacity-40"
+                  >
+                    Começar →
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
-          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={notifications} setNotifications={setNotifications} setSelectedDate={(d: Date) => {
+          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} setSelectedDate={(d: Date) => {
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
@@ -6423,8 +9159,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                 }]);
               }
             }} 
-            notifications={notifications} 
-            setNotifications={setNotifications}
+            notifications={allNotifications} 
+            setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
             plannerDuration={plannerDuration}
@@ -6454,6 +9190,9 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             getSuggestion={getSuggestion}
             getScheduleBuffer={getScheduleBuffer}
             setPlannerMode={setPlannerMode}
+            generationsUsed={profile?.generationsUsed ?? 0}
+            isLimitReached={isLimitReached}
+            freeGenerationLimit={FREE_GENERATION_LIMIT}
           />}
           {screen === 'chat' && <ChatScreen 
             key="chat" 
@@ -6469,8 +9208,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             addClassItems={addClassItems} 
             customEvents={customEvents} 
             setCustomEvents={setCustomEvents} 
-            notifications={notifications} 
-            setNotifications={setNotifications}
+            notifications={allNotifications} 
+            setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
             plannerTopic={plannerTopic}
@@ -6480,7 +9219,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerMode={setPlannerMode}
             getScheduleBuffer={getScheduleBuffer}
           />}
-          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail" 
             schedules={schedules} 
             selectedDate={selectedDate} 
@@ -6491,7 +9230,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setCustomEvents={setCustomEvents}
             setClasses={setClasses}
           />}
-          {screen === 'profile' && <ProfileScreen key="profile" schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={notifications} setNotifications={setNotifications} onResetAccount={() => {
+          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={allNotifications} setNotifications={handleSetNotifications} onResetAccount={() => {
             setSchedules([]);
             setClasses([]);
             setCustomEvents([]);
@@ -6501,8 +9240,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
             setEstudioContext('');
           }} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={notifications} setNotifications={setNotifications} />}
-          {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={notifications} setNotifications={setNotifications} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} />}
+          {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
 
@@ -6526,5 +9265,13 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-100/30 blur-[120px] rounded-full" />
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
