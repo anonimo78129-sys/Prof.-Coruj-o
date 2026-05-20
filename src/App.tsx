@@ -5928,7 +5928,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     /* ── CROSSWORD ────────────────────────────────────────── */
     .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; }
     .cw-grid-table td { width:26px; height:26px; padding:0; }
-    .cw-grid-black { background:#1f2937; }
+    .cw-grid-black { background:transparent; }
     .cw-grid-white { border:2px solid #374151; border-radius:2px; position:relative; vertical-align:top; background:white; }
     .cw-grid-num { position:absolute; top:1px; left:2px; font-size:7px; font-weight:900; color:var(--ac,#4338ca); line-height:1; }
     .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:12px; }
@@ -5996,7 +5996,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .story-section-art svg { width:100%; height:auto; max-height:180px; display:block; image-rendering:pixelated; image-rendering:crisp-edges; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
 
     /* ── FOOTER ───────────────────────────────────────────── */
-    .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
+    .page-footer { position:fixed; bottom:0.5cm; right:0.3cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
 
     /* ── UTIL ─────────────────────────────────────────────── */
     .hide-on-screen { display:block; }
@@ -6827,7 +6827,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                                   {result.crossword.grid.map((row: (string|null)[], r: number) => (
                                     <tr key={r}>
                                       {row.map((cell: string|null, c: number) => {
-                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: '#1f2937' }} />;
+                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: 'transparent' }} />;
                                         const num = result.crossword.cellNumbers[`${r},${c}`];
                                         return (
                                           <td key={c} style={{ width: 26, height: 26, border: '2px solid #374151', position: 'relative', verticalAlign: 'top', padding: 0, background: 'white' }}>
