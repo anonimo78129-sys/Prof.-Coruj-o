@@ -5022,16 +5022,19 @@ const buildWordSearchGrid = (rawWords: string[], size = 15): { grid: string[][],
   return { grid, placements };
 };
 
-const buildBingoCards = (items: string[], count: number): string[][][] => {
+const buildBingoCards = (items: string[], count: number, dim: 3 | 5 = 5, freeText = 'LIVRE'): string[][][] => {
+  const hasFree = dim === 5;
+  const needed = dim * dim - (hasFree ? 1 : 0);
+  const freeR = Math.floor(dim / 2), freeC = Math.floor(dim / 2);
   const cards: string[][][] = [];
   for (let n = 0; n < count; n++) {
-    const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, 24);
+    const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, needed);
     const card: string[][] = [];
     let idx = 0;
-    for (let r = 0; r < 5; r++) {
+    for (let r = 0; r < dim; r++) {
       const row: string[] = [];
-      for (let c = 0; c < 5; c++) {
-        if (r === 2 && c === 2) row.push('★ LIVRE');
+      for (let c = 0; c < dim; c++) {
+        if (hasFree && r === freeR && c === freeC) row.push(`★ ${freeText}`);
         else row.push(shuffled[idx++] || '');
       }
       card.push(row);
@@ -5039,6 +5042,106 @@ const buildBingoCards = (items: string[], count: number): string[][][] => {
     cards.push(card);
   }
   return cards;
+};
+
+const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
+  const SIZE = 21;
+  const CENTER = Math.floor(SIZE / 2);
+  type Cell = string | null;
+  const grid: Cell[][] = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+  type Placement = {word: string, clue: string, row: number, col: number, dir: 'H' | 'V'};
+  const placements: Placement[] = [];
+  const words = rawWords.slice(0, 15).map(w => ({...w, word: w.word.toUpperCase().replace(/[^A-Z]/g, '')})).filter(w => w.word.length >= 3);
+  if (words.length === 0) return null;
+
+  const canPlace = (word: string, row: number, col: number, dir: 'H' | 'V'): boolean => {
+    const len = word.length;
+    if (dir === 'H') {
+      if (col < 0 || col + len > SIZE || row < 0 || row >= SIZE) return false;
+      if (col > 0 && grid[row][col - 1] !== null) return false;
+      if (col + len < SIZE && grid[row][col + len] !== null) return false;
+      for (let i = 0; i < len; i++) {
+        const cell = grid[row][col + i];
+        if (cell !== null && cell !== word[i]) return false;
+        if (cell === null) {
+          if (row > 0 && grid[row - 1][col + i] !== null) return false;
+          if (row < SIZE - 1 && grid[row + 1][col + i] !== null) return false;
+        }
+      }
+    } else {
+      if (row < 0 || row + len > SIZE || col < 0 || col >= SIZE) return false;
+      if (row > 0 && grid[row - 1][col] !== null) return false;
+      if (row + len < SIZE && grid[row + len][col] !== null) return false;
+      for (let i = 0; i < len; i++) {
+        const cell = grid[row + i][col];
+        if (cell !== null && cell !== word[i]) return false;
+        if (cell === null) {
+          if (col > 0 && grid[row + i][col - 1] !== null) return false;
+          if (col < SIZE - 1 && grid[row + i][col + 1] !== null) return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const doPlace = (word: string, row: number, col: number, dir: 'H' | 'V') => {
+    for (let i = 0; i < word.length; i++) {
+      if (dir === 'H') grid[row][col + i] = word[i];
+      else grid[row + i][col] = word[i];
+    }
+  };
+
+  const first = words[0];
+  doPlace(first.word, CENTER, CENTER - Math.floor(first.word.length / 2), 'H');
+  placements.push({word: first.word, clue: first.clue, row: CENTER, col: CENTER - Math.floor(first.word.length / 2), dir: 'H'});
+
+  for (let wi = 1; wi < words.length; wi++) {
+    const {word, clue} = words[wi];
+    let placed = false;
+    for (const pw of [...placements].reverse()) {
+      if (placed) break;
+      const nd: 'H' | 'V' = pw.dir === 'H' ? 'V' : 'H';
+      for (let ni = 0; ni < word.length && !placed; ni++) {
+        for (let pi = 0; pi < pw.word.length && !placed; pi++) {
+          if (word[ni] !== pw.word[pi]) continue;
+          const row = nd === 'V' ? pw.row - ni : pw.row + pi;
+          const col = nd === 'V' ? pw.col + pi : pw.col - ni;
+          if (canPlace(word, row, col, nd)) {
+            doPlace(word, row, col, nd);
+            placements.push({word, clue, row, col, dir: nd});
+            placed = true;
+          }
+        }
+      }
+    }
+  }
+
+  let minR = SIZE, maxR = 0, minC = SIZE, maxC = 0;
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    if (grid[r][c] !== null) { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); }
+  }
+  if (minR > maxR) return null;
+  const pad = 1;
+  const r0 = Math.max(0, minR - pad), r1 = Math.min(SIZE - 1, maxR + pad);
+  const c0 = Math.max(0, minC - pad), c1 = Math.min(SIZE - 1, maxC + pad);
+  const trimmed: Cell[][] = [];
+  for (let r = r0; r <= r1; r++) trimmed.push(grid[r].slice(c0, c1 + 1));
+  const adjP = placements.map(p => ({...p, row: p.row - r0, col: p.col - c0}));
+  const cellNum = new Map<string, number>();
+  let counter = 1;
+  const sorted = [...adjP].sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
+  const across: {num: number, word: string, clue: string}[] = [];
+  const down: {num: number, word: string, clue: string}[] = [];
+  for (const p of sorted) {
+    const key = `${p.row},${p.col}`;
+    if (!cellNum.has(key)) cellNum.set(key, counter++);
+    const num = cellNum.get(key)!;
+    if (p.dir === 'H') across.push({num, word: p.word, clue: p.clue});
+    else down.push({num, word: p.word, clue: p.clue});
+  }
+  across.sort((a, b) => a.num - b.num);
+  down.sort((a, b) => a.num - b.num);
+  return {grid: trimmed, cellNumbers: Object.fromEntries(cellNum), across, down};
 };
 
 const STORY_SECTIONS = ['🌍 Cenário', '👥 Classes de Personagens', '⚔️ Missões', '🏆 Sistema de Pontos', '👑 Boss Final', '📋 Roteiro do Professor'];
@@ -6164,6 +6267,11 @@ const EstudioScreen = ({
   const [genre, setGenre] = useState('aventura');
   const [duration, setDuration] = useState('1 aula');
   const [count, setCount] = useState(10);
+  const [quizType, setQuizType] = useState<'multipla' | 'misto'>('multipla');
+  const [bingoCardCount, setBingoCardCount] = useState(10);
+  const [bingoSize, setBingoSize] = useState<3 | 5>(5);
+  const [bingoFreeText, setBingoFreeText] = useState('LIVRE');
+  const [wsGridSize, setWsGridSize] = useState<10 | 15 | 20>(15);
 
   const selectedClass = (schedules || []).find(s => s.id === classId);
   const defaultSubject = selectedClass?.subject || profile.subject || '';
@@ -6205,17 +6313,27 @@ Retorne em Markdown brasileiro com EXATAMENTE as seções abaixo:
 
 NÃO use código, NÃO use emojis fora dos títulos. Português brasileiro natural.`;
       } else if (activeMode === 'quiz') {
-        prompt = `Gere um quiz de múltipla escolha sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
+        if (quizType === 'misto') {
+          const mc = Math.ceil(count * 0.65), vf = count - Math.ceil(count * 0.65);
+          prompt = `Gere um quiz MISTO sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
+${mc} questões de múltipla escolha (4 alternativas) e ${vf} questões de Verdadeiro/Falso.
+Retorne APENAS JSON válido:
+{"title":"...","questions":[{"type":"multipla"|"vf","q":"...","options":[...],"correct":0,"explain":"..."}]}
+Para questões "vf": options deve ser ["Verdadeiro","Falso"]. "correct" é 0 (Verdadeiro) ou 1 (Falso).`;
+        } else {
+          prompt = `Gere um quiz de múltipla escolha sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
 Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
 {"title":"...","questions":[{"q":"pergunta","options":["a","b","c","d"],"correct":0,"explain":"justificativa breve"}]}
 Gere exatamente ${count} perguntas. As 4 opções devem ser plausíveis. "correct" é o índice 0-3.`;
+        }
       } else if (activeMode === 'wordsearch') {
-        prompt = `Liste ${count} palavras-chave sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para caça-palavras.
-Cada palavra: substantivo, SEM espaços, SEM acentos, entre 4 e 12 letras, MAIÚSCULAS.
+        const wsMax = wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20;
+        prompt = `Liste ${Math.min(count, wsMax)} palavras-chave sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para caça-palavras.
+Cada palavra: substantivo, SEM espaços, SEM acentos, entre 4 e ${wsGridSize - 2} letras, MAIÚSCULAS.
 Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","hint":"dica curta para o aluno"}]}`;
       } else if (activeMode === 'crossword') {
-        prompt = `Crie uma lista de ${count} palavras sobre "${topic}" (${defaultSubject}, ${defaultLevel}) com definições no estilo "palavras cruzadas".
-Cada palavra entre 4 e 10 letras, SEM espaços, MAIÚSCULAS, sem acentos.
+        prompt = `Crie uma lista de ${Math.min(count, 15)} palavras sobre "${topic}" (${defaultSubject}, ${defaultLevel}) com definições no estilo "palavras cruzadas".
+Cada palavra: 4 a 10 letras, SEM espaços, MAIÚSCULAS, sem acentos. Escolha palavras que compartilhem letras para facilitar o cruzamento.
 Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","clue":"definição/pista clara, estilo dicionário"}]}`;
       } else if (activeMode === 'bingo') {
         prompt = `Liste 40 termos/conceitos importantes sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para bingo educativo.
@@ -6228,8 +6346,8 @@ Retorne APENAS JSON:
 Gere ${Math.min(count, 12)} casas especiais (não precisa preencher todas). Use perguntas factuais sobre ${topic} para tipo "pergunta".`;
       } else if (activeMode === 'memory') {
         prompt = `Gere ${count} pares conceito↔definição sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para jogo da memória.
-Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras).
-Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."}]}`;
+Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras). Inclua 1 emoji representando o conceito.
+Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"...","emoji":"🎯"}]}`;
       }
       if (activeMode === 'story') {
         const [response, pixelArts] = await Promise.all([
@@ -6243,11 +6361,14 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
         const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
         const parsed = JSON.parse(cleaned);
         if (activeMode === 'wordsearch') {
-          const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word));
+          const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word), wsGridSize);
           setResult({ ...parsed, grid: built.grid });
         } else if (activeMode === 'bingo') {
-          const cards = buildBingoCards(parsed.items, 10);
-          setResult({ ...parsed, cards });
+          const cards = buildBingoCards(parsed.items, bingoCardCount, bingoSize, bingoFreeText);
+          setResult({ ...parsed, cards, bingoSize });
+        } else if (activeMode === 'crossword') {
+          const crossword = buildCrosswordGrid(parsed.words || []);
+          setResult({ ...parsed, crossword });
         } else {
           setResult(parsed);
         }
@@ -6388,6 +6509,16 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   {activeMode === 'quiz' && (
                     <>
                       <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo de questões</label>
+                        <div className="flex gap-2 mt-1">
+                          {(['multipla', 'misto'] as const).map(t => (
+                            <button key={t} onClick={() => setQuizType(t)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${quizType === t ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {t === 'multipla' ? '4 alternativas' : 'Misto V/F + MC'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de perguntas</label>
                         <input type="number" min={5} max={30} value={count} onChange={e => setCount(Math.max(5, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
                       </div>
@@ -6402,7 +6533,25 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                     </>
                   )}
 
-                  {(activeMode === 'wordsearch' || activeMode === 'crossword' || activeMode === 'memory') && (
+                  {activeMode === 'wordsearch' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da grade</label>
+                        <div className="flex gap-2 mt-1">
+                          {([10, 15, 20] as const).map(sz => (
+                            <button key={sz} onClick={() => setWsGridSize(sz)} className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition-colors ${wsGridSize === sz ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500'}`}>
+                              {sz}×{sz}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de palavras</label>
+                        <input type="number" min={5} max={wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      </div>
+                    </>
+                  )}
+                  {(activeMode === 'crossword' || activeMode === 'memory') && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                         {activeMode === 'memory' ? 'Quantidade de pares' : 'Quantidade de palavras'}
@@ -6439,6 +6588,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   activityLabel: activityLabels[activeMode!],
                   genre: activeMode === 'story' ? genre : undefined,
                   topic: activeMode === 'story' ? topic : undefined,
+                  bingoDim: result.bingoSize || 5,
                 };
                 return (
                 <div className="p-5">
