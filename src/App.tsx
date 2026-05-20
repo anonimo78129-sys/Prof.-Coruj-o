@@ -796,35 +796,90 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
           <h2 className="text-lg font-bold text-gray-900">Lembretes</h2>
           <button onClick={() => setScreen('calendar')} className="text-indigo-600 text-base font-medium">Ver todos</button>
         </div>
-        <div className="space-y-4">
-          {[...inboxMessages].sort((a,b) => (a.date||0) - (b.date||0)).filter(m => m.role === 'user').slice(-2).reverse().map((msg, i) => (
-            <div key={`msg-${i}`} className="bg-amber-50 rounded-2xl p-4 border border-amber-100 shadow-sm flex items-center gap-4 cursor-pointer" onClick={() => setScreen('chat')}>
-              <div className={`w-14 h-14 rounded-xl bg-amber-100 flex flex-col items-center justify-center text-amber-600 shrink-0`}>
-                <Sparkles size={20} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-900 text-base truncate">Nota Inteligente</h3>
-                <p className="text-gray-600 text-sm mt-0.5 line-clamp-2 leading-snug">{msg.text}</p>
-              </div>
-              <ChevronRight size={20} className="text-amber-300 shrink-0" />
-            </div>
-          ))}
+        {(() => {
+          const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+          const tomorrowStart = new Date(todayStart.getTime() + 86400000);
 
-          <Reorder.Group axis="y" values={classes.filter(c => c.status === 'pending')} onReorder={(newPending) => setClasses([...newPending, ...classes.filter(c => c.status === 'completed')])} className="space-y-4">
-            {classes.filter(c => c.status === 'pending').slice(0, 3).map((cls) => (
-                <Reorder.Item key={cls.id} value={cls} className="w-full">
-                  <ReminderItem cls={cls} setSelectedDate={setSelectedDate} setScreen={setScreen} setClasses={setClasses} classes={classes} />
-                </Reorder.Item>
-            ))}
-          </Reorder.Group>
-          {classes.filter(c => c.status === 'pending').length === 0 && inboxMessages.filter(m => m.role === 'user').length === 0 && (
+          const upcoming = classes
+            .filter(c => c.status === 'pending' && c.timestamp >= todayStart.getTime())
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .slice(0, 5);
+
+          const dayLabel = (ts: number) => {
+            const d = new Date(ts); d.setHours(0,0,0,0);
+            const t = d.getTime();
+            if (t === todayStart.getTime()) return 'Hoje';
+            if (t === tomorrowStart.getTime()) return 'Amanhã';
+            return ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()];
+          };
+
+          const palette = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899'];
+          const classColor = (name: string) => {
+            let h = 0;
+            for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+            return palette[Math.abs(h) % palette.length];
+          };
+
+          const todayCount = upcoming.filter(c => {
+            const d = new Date(c.timestamp); d.setHours(0,0,0,0);
+            return d.getTime() === todayStart.getTime();
+          }).length;
+
+          const nextClass = upcoming[0];
+
+          const groups: { label: string; items: typeof upcoming }[] = [];
+          for (const cls of upcoming) {
+            const lbl = dayLabel(cls.timestamp);
+            const last = groups[groups.length - 1];
+            if (last && last.label === lbl) last.items.push(cls);
+            else groups.push({ label: lbl, items: [cls] });
+          }
+
+          if (upcoming.length === 0) return (
             <div className="flex flex-col items-center justify-center py-8 text-center bg-gray-50/50 rounded-3xl border border-gray-100 border-dashed">
-              <img src="https://i.ibb.co/vCWk2Fry/6-20260419-213906-0001.png" alt="Tudo Vazio" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" />
-              <h3 className="text-gray-600 font-bold mb-1">Tudo limpo por aqui!</h3>
-              <p className="text-gray-400 text-sm max-w-[200px]">Nenhum lembrete ou aula pendente para hoje.</p>
+              <img src="https://i.ibb.co/vCWk2Fry/6-20260419-213906-0001.png" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" />
+              <h3 className="text-gray-600 font-bold mb-1">Sem aulas próximas</h3>
+              <p className="text-gray-400 text-sm max-w-[200px]">Adicione aulas no cronograma para ver aqui.</p>
             </div>
-          )}
-        </div>
+          );
+
+          return (
+            <div className="space-y-1">
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-3 flex items-start gap-3">
+                <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles size={15} className="text-indigo-500" />
+                </div>
+                <p className="text-indigo-700 text-sm leading-snug">
+                  {todayCount > 0
+                    ? `Você tem ${todayCount} aula${todayCount > 1 ? 's' : ''} hoje. Tudo preparado?`
+                    : `Próxima aula: ${nextClass.title}${nextClass.className ? ` — ${nextClass.className}` : ''} (${dayLabel(nextClass.timestamp)}).`
+                  }
+                </p>
+              </div>
+              {groups.map(group => (
+                <div key={group.label}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 mt-3 px-1">{group.label}</p>
+                  <div className="space-y-2">
+                    {group.items.map(cls => (
+                      <button
+                        key={cls.id}
+                        onClick={() => { setSelectedDate(new Date(cls.timestamp)); setScreen('calendar'); }}
+                        className="w-full bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3 active:scale-95 transition-transform"
+                      >
+                        <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: classColor(cls.className || cls.title) }} />
+                        <div className="flex-1 min-w-0 text-left">
+                          <h3 className="font-bold text-gray-900 text-sm truncate">{cls.title}</h3>
+                          {cls.className && <p className="text-gray-400 text-xs mt-0.5 truncate">{cls.className}</p>}
+                        </div>
+                        <span className="text-xs font-medium text-gray-400 shrink-0 bg-gray-50 rounded-lg px-2 py-1">{cls.date}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </motion.div>
   );
