@@ -5928,7 +5928,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     /* ── CROSSWORD ────────────────────────────────────────── */
     .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; }
     .cw-grid-table td { width:26px; height:26px; padding:0; }
-    .cw-grid-black { background:#1f2937; }
+    .cw-grid-black { background:transparent; }
     .cw-grid-white { border:2px solid #374151; border-radius:2px; position:relative; vertical-align:top; background:white; }
     .cw-grid-num { position:absolute; top:1px; left:2px; font-size:7px; font-weight:900; color:var(--ac,#4338ca); line-height:1; }
     .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:12px; }
@@ -6827,7 +6827,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                                   {result.crossword.grid.map((row: (string|null)[], r: number) => (
                                     <tr key={r}>
                                       {row.map((cell: string|null, c: number) => {
-                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: '#1f2937' }} />;
+                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: 'transparent' }} />;
                                         const num = result.crossword.cellNumbers[`${r},${c}`];
                                         return (
                                           <td key={c} style={{ width: 26, height: 26, border: '2px solid #374151', position: 'relative', verticalAlign: 'top', padding: 0, background: 'white' }}>
