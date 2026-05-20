@@ -5996,7 +5996,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .story-section-art svg { width:100%; height:auto; max-height:180px; display:block; image-rendering:pixelated; image-rendering:crisp-edges; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
 
     /* ── FOOTER ───────────────────────────────────────────── */
-    .page-footer { position:fixed; bottom:0.5cm; right:1.4cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
+    .page-footer { position:fixed; bottom:0.5cm; right:0.3cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
 
     /* ── UTIL ─────────────────────────────────────────────── */
     .hide-on-screen { display:block; }
