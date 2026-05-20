@@ -4412,11 +4412,13 @@ const ProfileScreen = ({
               className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl"
             >
               <div className="text-center mb-4">
-                <div className="text-6xl mb-3">🦉💥</div>
+                <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Trash2 size={32} className="text-red-500" />
+                </div>
                 <h2 className="text-xl font-black text-gray-900 mb-1">Eita... tá certo disso?</h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
                   Isso vai apagar <span className="font-bold text-gray-700">tudo</span> — turmas, materiais, notas...
-                  até aquela atividade incrível que você fez às 23h. 😬
+                  até aquela atividade incrível que você fez às 23h.
                 </p>
                 <p className="text-xs text-red-400 font-bold mt-3 bg-red-50 rounded-xl py-2 px-3">
                   Sem volta, viu? Sem recuperar depois!
@@ -4427,7 +4429,7 @@ const ProfileScreen = ({
                   onClick={() => setShowResetConfirm(false)}
                   className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-sm"
                 >
-                  Não, me arrependi! 😅
+                  Não, me arrependi!
                 </button>
                 <button
                   onClick={() => {
@@ -4437,7 +4439,7 @@ const ProfileScreen = ({
                   }}
                   className="flex-1 bg-gray-100 text-red-500 rounded-2xl py-3 text-sm font-bold"
                 >
-                  Sim, manda bala 💥
+                  Sim, pode apagar
                 </button>
               </div>
             </motion.div>
