@@ -538,7 +538,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
   );
 };
 
-const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, setScreen }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string; setScreen?: (s: Screen) => void }) => {
+const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, setScreen }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; setScreen?: (s: Screen) => void }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(
     'Notification' in window ? Notification.permission : 'denied'
@@ -561,11 +561,13 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
 
   return (
   <div className="mb-3 relative z-50">
-    <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
-      <img src={bannerImage || "https://i.ibb.co/TDZNvsJv/20260420-121247-0000.png"} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
-    </div>
-    
-    <div className="flex justify-between items-start pt-28">
+    {bannerImage !== null && (
+      <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
+        <img src={bannerImage || "https://i.ibb.co/TDZNvsJv/20260420-121247-0000.png"} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
+      </div>
+    )}
+
+    <div className={`flex justify-between items-start ${bannerImage !== null ? 'pt-28' : 'pt-4'}`}>
       <div className="px-2">
         <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
         <h1 className="text-2xl font-black text-gray-900 drop-shadow-sm">{title}</h1>
@@ -3486,7 +3488,7 @@ const ChatScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-28 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Assistente" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Assistente" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage={null} />
       
       <div className="mb-2">
         <div className="relative">
