@@ -3769,11 +3769,6 @@ const ChatScreen = ({
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
               >
-                {msg.role === 'model' && (
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mb-1 shadow-sm overflow-hidden border border-white ${isError ? 'bg-red-50' : 'bg-indigo-50'}`}>
-                    {isError ? <AlertCircle className="w-5 h-5 text-red-400" /> : <Sparkles className="w-5 h-5 text-indigo-600" />}
-                  </div>
-                )}
                 <div
                   onTouchStart={() => startLongPress(cleanText)}
                   onTouchEnd={cancelLongPress}
