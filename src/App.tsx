@@ -287,17 +287,25 @@ const toast = {
 const ToastContainer = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   useEffect(() => { _toastSetter = setToasts; return () => { _toastSetter = null; }; }, []);
-  if (!toasts.length) return null;
   return createPortal(
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
-      {toasts.map(t => (
-        <div key={t.id} className={`rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-lg pointer-events-auto flex items-start gap-2 ${
-          t.type === 'error' ? 'bg-red-500' : t.type === 'success' ? 'bg-emerald-500' : 'bg-gray-800'
-        }`}>
-          <span className="flex-1">{t.message}</span>
-          <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="opacity-70 hover:opacity-100 shrink-0 mt-0.5">✕</button>
-        </div>
-      ))}
+      <AnimatePresence>
+        {toasts.map(t => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: -16, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92, y: -8 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            className={`rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-lg pointer-events-auto flex items-start gap-2 ${
+              t.type === 'error' ? 'bg-red-500' : t.type === 'success' ? 'bg-emerald-500' : 'bg-gray-800'
+            }`}
+          >
+            <span className="flex-1">{t.message}</span>
+            <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="opacity-70 hover:opacity-100 shrink-0 mt-0.5">✕</button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>,
     document.body
   );
@@ -858,9 +866,10 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
             </div>
           );
 
+          let reminderIdx = 0;
           return (
             <div className="space-y-1">
-              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-3 flex items-start gap-3">
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-3 flex items-start gap-3">
                 <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
                   <Sparkles size={15} className="text-indigo-500" />
                 </div>
@@ -870,14 +879,19 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
                     : `Próxima aula: ${nextClass.title}${nextClass.className ? ` — ${nextClass.className}` : ''} (${dayLabel(nextClass.timestamp)}).`
                   }
                 </p>
-              </div>
+              </motion.div>
               {groups.map(group => (
                 <div key={group.label}>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 mt-3 px-1">{group.label}</p>
                   <div className="space-y-2">
-                    {group.items.map(cls => (
-                      <button
+                    {group.items.map(cls => {
+                      const delay = 0.1 + reminderIdx++ * 0.07;
+                      return (
+                      <motion.button
                         key={cls.id}
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay, duration: 0.25 }}
                         onClick={() => { setSelectedDate(new Date(cls.timestamp)); setScreen('calendar'); }}
                         className="w-full bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3 active:scale-95 transition-transform"
                       >
@@ -887,8 +901,9 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
                           {cls.className && <p className="text-gray-400 text-xs mt-0.5 truncate">{cls.className}</p>}
                         </div>
                         <span className="text-xs font-medium text-gray-400 shrink-0 bg-gray-50 rounded-lg px-2 py-1">{cls.date}</span>
-                      </button>
-                    ))}
+                      </motion.button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -2836,7 +2851,7 @@ const PlannerScreen = ({
                   }
                 }}
                 disabled={loading || !topic || !selectedClassId}
-                className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+                className={`w-full text-white rounded-2xl py-4 text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.98] ${loading ? 'bg-indigo-500 animate-pulse' : 'bg-indigo-600'}`}
               >
                 {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}
                 {loading ? loadingMessage : (mode === 'plan' ? (duration === 0 ? 'Analisar Conteúdo' : 'Gerar Plano') : mode === 'activities' ? 'Gerar Atividades' : mode === 'exam' ? 'Gerar Prova' : 'Gerar Slides')}
@@ -2965,7 +2980,12 @@ const PlannerScreen = ({
             )}
             
             {(currentResult && mode !== 'slides') && (
-              <div className="flex flex-col gap-2 mb-4">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35 }}
+                className="flex flex-col gap-2 mb-4"
+              >
                 <div className="max-h-64 overflow-y-auto no-scrollbar border border-gray-100 rounded-2xl p-4 bg-gray-50">
                   <div className="markdown-body text-xs">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
@@ -3015,7 +3035,7 @@ const PlannerScreen = ({
                     {preparingDoc === 'main' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                   </button>
                 )}
-              </div>
+              </motion.div>
             )}
 
             {mode !== 'slides' && resources.length > 0 && (
@@ -4861,7 +4881,9 @@ const CalendarScreen = ({
 
   const selectedDayEvents = getDayEvents(selectedDate);
 
+  const [monthDir, setMonthDir] = useState(0);
   const changeMonth = (delta: number) => {
+    setMonthDir(delta);
     let newMonth = currentMonth + delta;
     let newYear = currentYear;
     if (newMonth < 0) { newMonth = 11; newYear -= 1; }
@@ -5024,14 +5046,25 @@ const CalendarScreen = ({
           <button onClick={() => changeMonth(1)} className="p-1 text-gray-400"><ChevronRight size={20} /></button>
         </div>
         
-        <div className="grid grid-cols-7 gap-y-4 text-center">
+        <div className="grid grid-cols-7 gap-y-1 text-center">
           {days.map(d => <span key={d} className="text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</span>)}
-          
+        </div>
+        <div className="overflow-hidden">
+        <AnimatePresence mode="wait" custom={monthDir}>
+        <motion.div
+          key={`${currentYear}-${currentMonth}`}
+          custom={monthDir}
+          initial={(dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 })}
+          animate={{ x: 0, opacity: 1 }}
+          exit={(dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 })}
+          transition={{ duration: 0.22, ease: 'easeInOut' }}
+          className="grid grid-cols-7 gap-y-4 text-center mt-4"
+        >
           {Array(startingEmptyCells).fill(0).map((_, i) => (
             <div key={`empty-${i}`} />
           ))}
 
-          {dates.map(d => {
+          {dates.map((d, di) => {
             const today = new Date();
             const isToday = d === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
             const isSelected = d === selectedDate;
@@ -5057,7 +5090,13 @@ const CalendarScreen = ({
             }
 
             return (
-              <div key={d} className="relative flex justify-center py-0.5">
+              <motion.div
+                key={d}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: di * 0.012, duration: 0.2 }}
+                className="relative flex justify-center py-0.5"
+              >
                 <button
                   onClick={() => { setSelectedDate(d); setScreen('dayDetail'); }}
                   style={cellStyle}
@@ -5068,9 +5107,11 @@ const CalendarScreen = ({
                     <span className="text-[7px] font-black leading-none -mt-0.5 uppercase tracking-wide opacity-80">hoje</span>
                   )}
                 </button>
-              </div>
+              </motion.div>
             );
           })}
+        </motion.div>
+        </AnimatePresence>
         </div>
       </div>
 
@@ -7230,10 +7271,16 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(item => {
+          {filtered.map((item, index) => {
             const meta = typeMeta[item.type] || typeMeta.activities;
             return (
-              <div key={item.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm">
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.06, duration: 0.28 }}
+                className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm"
+              >
                 <div className="flex items-start gap-3">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0 ${meta.color}`}>
                     {meta.icon}
@@ -7261,7 +7308,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
                   {downloading === item.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                   {downloading === item.id ? 'Baixando...' : 'Baixar PDF'}
                 </button>
-              </div>
+              </motion.div>
             );
           })}
         </div>
