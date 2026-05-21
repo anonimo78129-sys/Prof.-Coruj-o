@@ -10,7 +10,7 @@ import {
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
-  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText
+  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -590,7 +590,7 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
       </div>
     )}
 
-    <div className={`flex justify-between items-start ${bannerImage !== null ? 'pt-28' : 'pt-4'}`}>
+    <div className={`flex justify-between items-start ${bannerImage !== null ? 'pt-28' : bannerImage === null ? 'pt-0' : 'pt-4'}`}>
       <div className="px-2">
         <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
         <h1 className="text-2xl font-black text-gray-900 drop-shadow-sm">{title}</h1>
@@ -3283,8 +3283,20 @@ const ChatScreen = ({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showChatMenu]);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const startLongPress = (text: string) => {
+    longPressTimer.current = setTimeout(() => {
+      const plain = text.replace(/[*_~`#>\-]/g, '').trim();
+      navigator.clipboard.writeText(plain).then(() => toast.success('Copiado!')).catch(() => toast.error('Não foi possível copiar.'));
+    }, 600);
+  };
+  const cancelLongPress = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current); };
+
+  const SUGGESTIONS = ['Como montar uma aula?', 'Me dê ideias para atividades', 'Crie um plano de aula', 'Avaliações criativas'];
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -3661,45 +3673,86 @@ const ChatScreen = ({
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar mb-4 space-y-4">
-        {filteredMessages.length === 0 && (
+        {/* Quick suggestions when conversation is empty */}
+        {messages.length <= 1 && !searchQuery && (
+          <div className="flex flex-wrap gap-2 pt-2 pb-1">
+            {SUGGESTIONS.map(s => (
+              <button
+                key={s}
+                onClick={() => sendMessage(s)}
+                className="bg-white border border-indigo-100 text-indigo-600 text-xs font-medium px-3 py-2 rounded-2xl shadow-sm active:scale-95 transition-transform"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Ver mais — pagina o histórico */}
+        {filteredMessages.length > visibleCount && (
+          <button
+            onClick={() => setVisibleCount(v => v + 20)}
+            className="w-full text-xs text-indigo-500 font-semibold py-2 bg-indigo-50 rounded-2xl"
+          >
+            Ver mais ({filteredMessages.length - visibleCount} anteriores)
+          </button>
+        )}
+
+        {filteredMessages.length === 0 && searchQuery && (
           <div className="text-center py-8 text-gray-400 text-sm">Nenhuma nota encontrada.</div>
         )}
+
         <AnimatePresence initial={false}>
-          {filteredMessages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 14, x: msg.role === 'user' ? 20 : -20 }}
-              animate={{ opacity: 1, y: 0, x: 0 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
-            >
-              {msg.role === 'model' && (
-                <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mb-1 shadow-sm overflow-hidden border border-white">
-                  <Sparkles className="w-5 h-5 text-indigo-600" />
-                </div>
-              )}
-              <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none shadow-sm border border-gray-50'}`}>
-                {msg.attachment && (
-                  <div className="mb-2">
-                    {msg.attachment.mimeType.startsWith('image/') && msg.attachment.url ? (
-                      <img src={msg.attachment.url} alt="Anexo" className="max-w-full rounded-xl border border-black/10" />
-                    ) : (
-                      <div className="flex items-center gap-2 bg-black/10 p-3 rounded-xl">
-                        {msg.attachment.mimeType.startsWith('image/') ? <ImageIcon size={20} /> : <FileText size={20} />}
-                        <span className="text-sm font-medium truncate max-w-[150px]">{msg.attachment.name || 'Arquivo anexado'}</span>
-                      </div>
-                    )}
+          {filteredMessages.slice(-visibleCount).map((msg) => {
+            const isError = msg.text.startsWith('❌');
+            const cleanText = isError ? msg.text.replace(/^❌\s*/, '') : msg.text;
+            return (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 14, x: msg.role === 'user' ? 20 : -20 }}
+                animate={{ opacity: 1, y: 0, x: 0 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
+              >
+                {msg.role === 'model' && (
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mb-1 shadow-sm overflow-hidden border border-white ${isError ? 'bg-red-50' : 'bg-indigo-50'}`}>
+                    {isError ? <AlertCircle className="w-5 h-5 text-red-400" /> : <Sparkles className="w-5 h-5 text-indigo-600" />}
                   </div>
                 )}
-                <div className={`markdown-body text-sm ${msg.role === 'user' ? '!text-white' : ''}`}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                <div
+                  onTouchStart={() => startLongPress(cleanText)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  className={`max-w-[85%] p-4 rounded-2xl select-none ${
+                    isError
+                      ? 'bg-red-50 text-red-700 rounded-bl-none border border-red-100'
+                      : msg.role === 'user'
+                      ? 'bg-indigo-600 text-white rounded-br-none'
+                      : 'bg-white text-gray-800 rounded-bl-none shadow-sm border border-gray-50'
+                  }`}
+                >
+                  {msg.attachment && (
+                    <div className="mb-2">
+                      {msg.attachment.mimeType.startsWith('image/') && msg.attachment.url ? (
+                        <img src={msg.attachment.url} alt="Anexo" className="max-w-full rounded-xl border border-black/10" />
+                      ) : (
+                        <div className="flex items-center gap-2 bg-black/10 p-3 rounded-xl">
+                          {msg.attachment.mimeType.startsWith('image/') ? <ImageIcon size={20} /> : <FileText size={20} />}
+                          <span className="text-sm font-medium truncate max-w-[150px]">{msg.attachment.name || 'Arquivo anexado'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className={`markdown-body text-sm ${msg.role === 'user' && !isError ? '!text-white' : ''}`}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanText}</ReactMarkdown>
+                  </div>
+                  <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' && !isError ? 'text-indigo-200' : isError ? 'text-red-300' : 'text-gray-400'}`}>
+                    {new Date(msg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
-                <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' ? 'text-indigo-200' : 'text-gray-400'}`}>
-                  {new Date(msg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
         <div ref={chatEndRef} />
         <AnimatePresence>
