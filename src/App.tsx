@@ -6822,17 +6822,17 @@ const ESCAPE_THEMES: Record<EscapeTheme, {
   space: {
     name: 'Missão Galáctica',
     cover: `radial-gradient(ellipse at top, #4c1d95 0%, #1e1b4b 50%, #020617 100%)`,
-    enigmaBg: `linear-gradient(160deg, #1e1b4b 0%, #0f172a 100%)`,
-    cardBg: '#1e293b',
-    primary: '#020617',
+    enigmaBg: `linear-gradient(160deg, #f5f3ff 0%, #ede9fe 100%)`,
+    cardBg: '#ffffff',
+    primary: '#1e1b4b',
     secondary: '#7c3aed',
-    accent: '#fbbf24',
+    accent: '#d97706',
     textOnDark: '#fef3c7',
-    textOnLight: '#e0e7ff',
+    textOnLight: '#1e1b4b',
     border: '#7c3aed',
     font: `'Orbitron', 'Trebuchet MS', sans-serif`,
     ornament: '★',
-    pageDecor: `radial-gradient(circle at 20% 30%, rgba(251,191,36,0.15) 0%, transparent 1.5px), radial-gradient(circle at 70% 60%, rgba(251,191,36,0.1) 0%, transparent 1px), radial-gradient(circle at 40% 80%, rgba(251,191,36,0.08) 0%, transparent 1.5px)`,
+    pageDecor: `radial-gradient(circle at 20% 30%, rgba(124,58,237,0.18) 0%, transparent 2px), radial-gradient(circle at 70% 60%, rgba(124,58,237,0.13) 0%, transparent 1.5px), radial-gradient(circle at 40% 80%, rgba(217,119,6,0.15) 0%, transparent 2px), radial-gradient(circle at 85% 15%, rgba(124,58,237,0.1) 0%, transparent 2px)`,
     badge: '🚀',
   },
 };
@@ -6863,7 +6863,7 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
         <div class="answer-line"></div>
       </div>
       <div class="hint-block">
-        <div class="hint-label">💡 DICA — DOBRE OU COBRA ESTA ÁREA</div>
+        <div class="hint-label">💡 DICA — USE APENAS SE PRECISAR</div>
         <p class="hint-text">${en.hint}</p>
       </div>
       <footer class="page-footer">
@@ -6921,9 +6921,9 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
     .answer-label { font-size: 11px; letter-spacing: 3px; color: ${theme.secondary}; font-weight: 900; margin-bottom: 8px; text-transform: uppercase; }
     .answer-line { height: 16mm; border: 2.5px dashed ${theme.border}; border-radius: 12px; background: repeating-linear-gradient(180deg, transparent 0, transparent 7mm, rgba(0,0,0,0.05) 7mm, rgba(0,0,0,0.05) 7.5mm); }
     .hint-block { position: relative; z-index: 1; margin-top: auto; background: ${theme.primary}; color: ${theme.textOnDark}; padding: 14px 18px; border-radius: 12px; border: 2px dashed ${theme.accent}; }
-    .hint-label { font-size: 9px; letter-spacing: 2px; opacity: 0.7; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-align: center; }
-    .hint-text { font-size: 11.5px; line-height: 1.5; text-align: center; opacity: 0.55; filter: blur(0.5px); }
-    .page-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; font-size: 9px; letter-spacing: 2px; color: ${theme.secondary}; opacity: 0.6; padding-top: 6mm; border-top: 1px solid ${theme.border}; text-transform: uppercase; font-weight: 700; }
+    .hint-label { font-size: 9px; letter-spacing: 2px; opacity: 0.85; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-align: center; }
+    .hint-text { font-size: 12px; line-height: 1.55; text-align: center; font-weight: 500; }
+    .page-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: 2px; color: ${theme.secondary}; padding-top: 6mm; border-top: 1px solid ${theme.border}; text-transform: uppercase; font-weight: 700; }
 
     /* ──────── ANSWER KEY ──────── */
     .key-page { background: ${theme.cardBg}; color: ${theme.textOnLight}; position: relative; }
