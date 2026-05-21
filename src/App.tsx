@@ -3793,7 +3793,7 @@ const ChatScreen = ({
                       )}
                     </div>
                   )}
-                  <div className="text-sm leading-relaxed">
+                  <div className="text-base leading-relaxed">
                     {renderChatText(cleanText, msg.role === 'user' && !isError)}
                   </div>
                   <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' && !isError ? 'text-indigo-200' : isError ? 'text-red-300' : 'text-gray-400'}`}>
