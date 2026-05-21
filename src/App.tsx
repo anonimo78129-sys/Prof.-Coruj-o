@@ -29,6 +29,24 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
 
 const AI_MODEL = 'gemini-2.5-flash';
 
+function renderChatText(text: string, isUser: boolean): React.ReactNode {
+  const baseColor = isUser ? 'text-white' : 'text-gray-800';
+  return text.split('\n').map((line, li) => {
+    const parts: React.ReactNode[] = [];
+    const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+    let last = 0, m: RegExpExecArray | null;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push(line.slice(last, m.index));
+      if (m[2] !== undefined) parts.push(<strong key={m.index}>{m[2]}</strong>);
+      else if (m[3] !== undefined) parts.push(<em key={m.index}>{m[3]}</em>);
+      else if (m[4] !== undefined) parts.push(<code key={m.index} className="bg-black/10 rounded px-1 text-xs font-mono">{m[4]}</code>);
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) parts.push(line.slice(last));
+    return <React.Fragment key={li}>{parts}{li < text.split('\n').length - 1 && <br />}</React.Fragment>;
+  });
+}
+
 const formatApiError = (error: any, defaultMsg: string): string => {
   let msg = '';
   if (typeof error === 'string') {
@@ -3751,11 +3769,6 @@ const ChatScreen = ({
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
               >
-                {msg.role === 'model' && (
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mb-1 shadow-sm overflow-hidden border border-white ${isError ? 'bg-red-50' : 'bg-indigo-50'}`}>
-                    {isError ? <AlertCircle className="w-5 h-5 text-red-400" /> : <Sparkles className="w-5 h-5 text-indigo-600" />}
-                  </div>
-                )}
                 <div
                   onTouchStart={() => startLongPress(cleanText)}
                   onTouchEnd={cancelLongPress}
@@ -3780,8 +3793,8 @@ const ChatScreen = ({
                       )}
                     </div>
                   )}
-                  <div className={`markdown-body text-sm ${msg.role === 'user' && !isError ? '!text-white' : ''}`}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanText}</ReactMarkdown>
+                  <div className="text-sm leading-relaxed">
+                    {renderChatText(cleanText, msg.role === 'user' && !isError)}
                   </div>
                   <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' && !isError ? 'text-indigo-200' : isError ? 'text-red-300' : 'text-gray-400'}`}>
                     {new Date(msg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
