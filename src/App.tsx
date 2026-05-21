@@ -8401,6 +8401,40 @@ function AppInner() {
   
   const [estudioContext, setEstudioContext] = useState<string>('');
 
+  // ── Notificações locais de aula ───────────────────────────────────────────
+  const scheduledNotifsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!user || !schedules.length || !('Notification' in window) || Notification.permission !== 'granted') return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const today = new Date();
+    const todayDay = today.getDay();
+    const dateStr = today.toDateString();
+
+    schedules.forEach(sched => {
+      if (!sched.days.includes(todayDay) || !sched.time) return;
+      const key = `${sched.id}-${dateStr}`;
+      if (scheduledNotifsRef.current.has(key)) return;
+
+      const [h, m] = sched.time.split(':').map(Number);
+      const classTime = new Date(); classTime.setHours(h, m, 0, 0);
+      const msUntil = classTime.getTime() - 30 * 60 * 1000 - Date.now();
+      if (msUntil <= 0 || msUntil > 24 * 60 * 60 * 1000) return;
+
+      scheduledNotifsRef.current.add(key);
+      timers.push(setTimeout(async () => {
+        const title = 'Aula em 30 minutos';
+        const body = `${sched.subject ? `${sched.subject} — ` : ''}${sched.name} às ${sched.time}`;
+        const icon = 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png';
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification(title, { body, icon, tag: key, requireInteraction: false });
+        } catch { new Notification(title, { body, icon }); }
+      }, msUntil));
+    });
+
+    return () => timers.forEach(clearTimeout);
+  }, [user, schedules]);
+
   // ── Onboarding ────────────────────────────────────────────────────────────
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2>(0);
   const [onboardingName, setOnboardingName] = useState('');
