@@ -15,7 +15,7 @@ import {
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential } from './firebase';
+import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -212,7 +212,7 @@ function useFirestoreDoc<T>(
   docPath: string,
   user: any,
   initialData: T
-): [T, (data: T | ((prev: T) => T)) => void] {
+): [T, (data: T | ((prev: T) => T)) => void, boolean] {
   const [data, setData] = useState<T>(initialData);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -244,7 +244,7 @@ function useFirestoreDoc<T>(
     }
   };
 
-  return [data, updateData];
+  return [data, updateData, isLoaded];
 }
 
 // --- Error Boundary ---
@@ -3912,7 +3912,8 @@ const ProfileScreen = ({
   setCustomEvents,
   notifications,
   setNotifications,
-  onResetAccount
+  onResetAccount,
+  onDeleteAccount
 }: {
   user: any,
   schedules: ClassSchedule[],
@@ -3926,7 +3927,8 @@ const ProfileScreen = ({
   setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
-  onResetAccount?: () => void
+  onResetAccount?: () => void,
+  onDeleteAccount?: () => Promise<void>
 }) => {
   const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
   const [showScheduleConfig, setShowScheduleConfig] = useState(false);
@@ -3945,6 +3947,8 @@ const ProfileScreen = ({
   const [importStatus, setImportStatus] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleRef = useRef<HTMLDivElement>(null);
@@ -4562,7 +4566,7 @@ const ProfileScreen = ({
         <p className="text-xs font-black text-red-400 uppercase tracking-widest mb-4">⚠️ Zona de Perigo</p>
         <button
           onClick={() => setShowResetConfirm(true)}
-          className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-red-100 shadow-sm hover:bg-red-50 transition-colors"
+          className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-red-100 shadow-sm hover:bg-red-50 transition-colors mb-3"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
@@ -4571,6 +4575,21 @@ const ProfileScreen = ({
             <div className="text-left">
               <h3 className="font-bold text-red-700">Resetar Conta</h3>
               <p className="text-xs text-red-400">Apaga todos os seus dados permanentemente</p>
+            </div>
+          </div>
+          <ChevronRight size={20} className="text-red-300" />
+        </button>
+        <button
+          onClick={() => { setDeleteConfirmText(''); setShowDeleteConfirm(true); }}
+          className="w-full flex items-center justify-between p-4 rounded-2xl bg-red-600 border border-red-700 shadow-sm active:scale-[0.98] transition-transform"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center text-white">
+              <X size={20} />
+            </div>
+            <div className="text-left">
+              <h3 className="font-bold text-white">Excluir minha conta</h3>
+              <p className="text-xs text-red-200">Remove sua conta e todos os dados do app</p>
             </div>
           </div>
           <ChevronRight size={20} className="text-red-300" />
@@ -4739,6 +4758,61 @@ const ProfileScreen = ({
                   className="flex-1 bg-gray-100 text-red-500 rounded-2xl py-3 text-sm font-bold"
                 >
                   Sim, pode apagar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl"
+            >
+              <div className="text-center mb-5">
+                <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <X size={32} className="text-red-500" />
+                </div>
+                <h2 className="text-xl font-black text-gray-900 mb-1">Excluir conta?</h2>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Sua conta, dados e materiais serão <span className="font-bold text-gray-700">apagados permanentemente</span>. Essa ação não pode ser desfeita.
+                </p>
+              </div>
+              <p className="text-xs font-bold text-gray-500 mb-2 text-center">Digite <span className="text-red-500">EXCLUIR</span> para confirmar</p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="EXCLUIR"
+                className="w-full border-2 border-red-200 rounded-2xl px-4 py-3 text-center font-bold text-red-600 focus:outline-none focus:border-red-500 mb-4"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={deleteConfirmText !== 'EXCLUIR'}
+                  onClick={async () => {
+                    setShowDeleteConfirm(false);
+                    if (onDeleteAccount) await onDeleteAccount();
+                  }}
+                  className="flex-1 bg-red-600 text-white rounded-2xl py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Excluir conta
                 </button>
               </div>
             </motion.div>
@@ -5263,9 +5337,14 @@ const CalendarScreen = ({
         <motion.div
           key={`${currentYear}-${currentMonth}`}
           custom={monthDir}
-          initial={(dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 })}
-          animate={{ x: 0, opacity: 1 }}
-          exit={(dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 })}
+          variants={{
+            enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
+            center: { x: 0, opacity: 1 },
+            exit: (dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
+          }}
+          initial="enter"
+          animate="center"
+          exit="exit"
           transition={{ duration: 0.22, ease: 'easeInOut' }}
           className="grid grid-cols-7 gap-y-4 text-center mt-4"
         >
@@ -8362,7 +8441,7 @@ function AppInner() {
     return () => clearInterval(interval);
   }, [activeTasks]);
 
-  const [profile, setProfile] = useFirestoreDoc<UserProfile>(
+  const [profile, setProfile, profileLoaded] = useFirestoreDoc<UserProfile>(
     user ? `users/${user.uid}` : 'users/temp',
     user,
     {
@@ -8482,23 +8561,25 @@ function AppInner() {
   const [onboardingName, setOnboardingName] = useState('');
   const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
 
-  // Show onboarding only for genuinely new users: no onboarded flag AND still has the default name
-  // localStorage check prevents the race condition where the profile briefly shows default values before Firestore loads
-  const localOnboarded = typeof window !== 'undefined' && localStorage.getItem('prof-coruja-onboarded') === 'true';
-  const showOnboarding = !!user && !profile.onboarded && profile.name === 'Prof. Silva' && !localOnboarded;
+  // localStorage key is per-user so switching accounts on the same device doesn't bleed over
+  const onboardingLsKey = user ? `prof-coruja-onboarded-${user.uid}` : null;
+  const localOnboarded = !!onboardingLsKey && (() => { try { return localStorage.getItem(onboardingLsKey) === 'true'; } catch { return false; } })();
+  // Wait for Firestore to respond (profileLoaded) before deciding — prevents flash on new users
+  const showOnboarding = !!user && profileLoaded && !profile.onboarded && !localOnboarded;
 
-  // Sync Firestore onboarded flag to localStorage so subsequent loads bypass the form instantly
+  // Sync to localStorage once Firestore confirms the user is onboarded
   useEffect(() => {
-    if (profile.onboarded || (profile.name && profile.name !== 'Prof. Silva')) {
-      try { localStorage.setItem('prof-coruja-onboarded', 'true'); } catch {}
+    if (!onboardingLsKey || !profileLoaded) return;
+    if (profile.onboarded) {
+      try { localStorage.setItem(onboardingLsKey, 'true'); } catch {}
     }
-  }, [profile.onboarded, profile.name]);
+  }, [onboardingLsKey, profileLoaded, profile.onboarded]);
 
   const finishOnboarding = async (skipClass = false) => {
     const newName = onboardingName.trim() || 'Professor';
     const updates: Partial<UserProfile> = { name: newName, onboarded: true };
     setProfile({ ...profile, ...updates } as UserProfile);
-    try { localStorage.setItem('prof-coruja-onboarded', 'true'); } catch {}
+    try { if (onboardingLsKey) localStorage.setItem(onboardingLsKey, 'true'); } catch {}
     if (!skipClass && onboardingClass.name.trim()) {
       const newClass: ClassSchedule = {
         id: Math.random().toString(36).substr(2, 9),
@@ -8630,10 +8711,11 @@ function AppInner() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
-            name: email.split('@')[0],
+            name: 'Prof. Silva',
             email: email.toLowerCase().trim(),
             role: 'user',
             isPro: false,
+            onboarded: false,
             createdAt: new Date().toISOString(),
             phoneVerified: false,
           });
@@ -9647,6 +9729,26 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setInboxMessages([{ id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }]);
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
             setEstudioContext('');
+          }} onDeleteAccount={async () => {
+            if (!user) return;
+            const uid = user.uid;
+            try {
+              const subcols = ['schedules', 'classes', 'events', 'resources', 'notifications', 'messages', 'studioMessages'];
+              for (const col of subcols) {
+                const snap = await getDocs(collection(db, `users/${uid}/${col}`));
+                const batch = writeBatch(db);
+                snap.docs.forEach(d => batch.delete(d.ref));
+                if (snap.docs.length > 0) await batch.commit();
+              }
+              await deleteDoc(doc(db, 'users', uid));
+              await deleteUser(user);
+            } catch (e: any) {
+              if (e?.code === 'auth/requires-recent-login') {
+                toast.error('Por segurança, saia e entre novamente antes de excluir a conta.');
+              } else {
+                toast.error('Erro ao excluir conta. Tente novamente.');
+              }
+            }
           }} />}
           {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
