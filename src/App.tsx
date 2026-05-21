@@ -8696,8 +8696,7 @@ function AppInner() {
     const inputT = _pendingInputTokens; const outputT = _pendingOutputTokens;
     _pendingInputTokens = 0; _pendingOutputTokens = 0;
     try {
-      const userUpdate: any = { generationsUsed: increment(1) };
-      if (!isPrivileged) { userUpdate.inputTokens = increment(inputT); userUpdate.outputTokens = increment(outputT); }
+      const userUpdate: any = { generationsUsed: increment(1), inputTokens: increment(inputT), outputTokens: increment(outputT) };
       await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
       const monthKey = new Date().toISOString().slice(0, 7).replace('-', '_');
       const statsPayload = { totalGenerations: increment(1), totalInputTokens: increment(inputT), totalOutputTokens: increment(outputT) };
