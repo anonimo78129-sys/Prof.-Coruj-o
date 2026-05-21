@@ -523,7 +523,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
     setScreen(id);
     setShowLabels(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => setShowLabels(false), 5000);
+    hideTimerRef.current = setTimeout(() => setShowLabels(false), 3000);
   };
 
   useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
