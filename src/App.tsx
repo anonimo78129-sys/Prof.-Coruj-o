@@ -8816,83 +8816,108 @@ function AppInner() {
   }
 
   if (!user) {
+    const formKey = isResetMode ? 'reset' : isLoginMode ? 'login' : 'register';
     return (
-      <div 
+      <div
         className="min-h-screen bg-cover bg-center flex flex-col items-center justify-center p-6 relative"
         style={{ backgroundImage: 'url(https://i.ibb.co/XZyfzNYw/Design-sem-nome-20260426-213935-0000.png)' }}
       >
         <div className="relative z-10 w-full max-w-sm flex flex-col items-center gap-6">
-          <h1 className="text-4xl font-black text-black tracking-wider drop-shadow-sm text-center">
+          <motion.h1
+            initial={{ opacity: 0, y: -24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="text-4xl font-black text-black tracking-wider drop-shadow-sm text-center"
+          >
             Prof. Corujão
-          </h1>
-          <form onSubmit={isResetMode ? handleResetPassword : handleEmailAuth} className="w-full bg-white p-6 rounded-3xl shadow-xl flex flex-col gap-4 mb-4">
-            <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
-              {isResetMode ? 'Recuperar senha' : (isLoginMode ? 'Acesse sua conta' : 'Crie sua conta')}
-            </h2>
-            {authError && <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{authError}</div>}
-            {resetMessage.text && (
-              <div className={`text-sm text-center p-3 rounded-xl font-medium ${resetMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-blue-50 text-blue-700'}`}>
-                {resetMessage.text}
-                {resetMessage.type === 'success' && (
-                  <p className="text-xs font-normal mt-1 text-green-600">Redirecionando para o login em instantes...</p>
+          </motion.h1>
+
+          <motion.form
+            initial={{ opacity: 0, y: 32 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
+            onSubmit={isResetMode ? handleResetPassword : handleEmailAuth}
+            className="w-full bg-white p-6 rounded-3xl shadow-xl flex flex-col gap-4 mb-4"
+          >
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={formKey}
+                initial={{ opacity: 0, x: isResetMode ? 0 : isLoginMode ? -20 : 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: isLoginMode ? 20 : -20 }}
+                transition={{ duration: 0.22, ease: 'easeInOut' }}
+                className="flex flex-col gap-4"
+              >
+                <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
+                  {isResetMode ? 'Recuperar senha' : (isLoginMode ? 'Acesse sua conta' : 'Crie sua conta')}
+                </h2>
+
+                {authError && <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{authError}</div>}
+                {resetMessage.text && (
+                  <div className={`text-sm text-center p-3 rounded-xl font-medium ${resetMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-blue-50 text-blue-700'}`}>
+                    {resetMessage.text}
+                    {resetMessage.type === 'success' && (
+                      <p className="text-xs font-normal mt-1 text-green-600">Redirecionando para o login em instantes...</p>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            
-            <input
-              type="email"
-              placeholder="Seu e-mail"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-            
-            {!isResetMode && (
-              <div className="flex flex-col gap-2">
+
                 <input
-                  type="password"
-                  placeholder="Sua senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  type="email"
+                  placeholder="Seu e-mail"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
-                {isLoginMode && (
-                  <button
-                    type="button"
-                    onClick={() => { setIsResetMode(true); setAuthError(''); setResetMessage({type:'',text:''}); }}
-                    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium self-end"
-                  >
-                    Esqueceu a senha?
-                  </button>
+
+                {!isResetMode && (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="password"
+                      placeholder="Sua senha"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                    />
+                    {isLoginMode && (
+                      <button
+                        type="button"
+                        onClick={() => { setIsResetMode(true); setAuthError(''); setResetMessage({type:'',text:''}); }}
+                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium self-end"
+                      >
+                        Esqueceu a senha?
+                      </button>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            
-            <button 
-              type="submit"
-              disabled={isAuthProcessing}
-              className={`w-full text-white font-bold py-3 px-6 rounded-xl shadow-md transition-colors ${isAuthProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-            >
-              {isAuthProcessing ? 'Processando...' : (isResetMode ? 'Enviar link' : (isLoginMode ? 'Entrar' : 'Cadastrar'))}
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => {
-                if (isResetMode) {
-                  setIsResetMode(false);
-                } else {
-                  setIsLoginMode(!isLoginMode);
-                }
-                setAuthError('');
-              }}
-              className="text-sm text-gray-500 hover:text-gray-800 font-medium mt-2"
-            >
-              {isResetMode ? 'Voltar para o login' : (isLoginMode ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre')}
-            </button>
-          </form>
+
+                <button
+                  type="submit"
+                  disabled={isAuthProcessing}
+                  className={`w-full text-white font-bold py-3 px-6 rounded-xl shadow-md transition-colors ${isAuthProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                >
+                  {isAuthProcessing ? 'Processando...' : (isResetMode ? 'Enviar link' : (isLoginMode ? 'Entrar' : 'Cadastrar'))}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isResetMode) {
+                      setIsResetMode(false);
+                    } else {
+                      setIsLoginMode(!isLoginMode);
+                    }
+                    setAuthError('');
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-800 font-medium mt-2"
+                >
+                  {isResetMode ? 'Voltar para o login' : (isLoginMode ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre')}
+                </button>
+              </motion.div>
+            </AnimatePresence>
+          </motion.form>
         </div>
       </div>
     );
