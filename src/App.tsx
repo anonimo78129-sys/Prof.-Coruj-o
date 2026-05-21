@@ -812,7 +812,7 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
 
 const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void }) => {
   const quickActions = [
-    { title: 'Gamificar', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
+    { title: 'Gamificação', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
   ];
