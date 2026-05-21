@@ -9,10 +9,69 @@
     <link rel="icon" type="image/png" href="https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png" />
     <link rel="apple-touch-icon" href="https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png" />
     <title>Prof. Corujão</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #ffffff; }
+
+      #splash {
+        position: fixed;
+        inset: 0;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 1;
+      }
+
+      #splash-img {
+        width: 260px;
+        max-width: 72vw;
+        object-fit: contain;
+        user-select: none;
+        pointer-events: none;
+      }
+
+      #splash-bar-track {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #e5e7eb;
+      }
+
+      #splash-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #6366f1, #8b5cf6);
+        width: 0%;
+        border-radius: 0 2px 2px 0;
+        animation: splashBarFill 2.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+
+      @keyframes splashBarFill {
+        0%   { width: 0% }
+        30%  { width: 55% }
+        60%  { width: 78% }
+        85%  { width: 89% }
+        100% { width: 92% }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash">
+      <img
+        id="splash-img"
+        src="PLACEHOLDER_SUA_ILUSTRACAO"
+        alt="Prof. Corujão"
+        onerror="this.src='https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png'"
+      />
+      <div id="splash-bar-track">
+        <div id="splash-bar"></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
