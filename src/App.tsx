@@ -8165,12 +8165,22 @@ function AppInner() {
   const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
 
   // Show onboarding only for genuinely new users: no onboarded flag AND still has the default name
-  const showOnboarding = !!user && !profile.onboarded && profile.name === 'Prof. Silva';
+  // localStorage check prevents the race condition where the profile briefly shows default values before Firestore loads
+  const localOnboarded = typeof window !== 'undefined' && localStorage.getItem('prof-coruja-onboarded') === 'true';
+  const showOnboarding = !!user && !profile.onboarded && profile.name === 'Prof. Silva' && !localOnboarded;
+
+  // Sync Firestore onboarded flag to localStorage so subsequent loads bypass the form instantly
+  useEffect(() => {
+    if (profile.onboarded || (profile.name && profile.name !== 'Prof. Silva')) {
+      try { localStorage.setItem('prof-coruja-onboarded', 'true'); } catch {}
+    }
+  }, [profile.onboarded, profile.name]);
 
   const finishOnboarding = async (skipClass = false) => {
     const newName = onboardingName.trim() || 'Professor';
     const updates: Partial<UserProfile> = { name: newName, onboarded: true };
     setProfile({ ...profile, ...updates } as UserProfile);
+    try { localStorage.setItem('prof-coruja-onboarded', 'true'); } catch {}
     if (!skipClass && onboardingClass.name.trim()) {
       const newClass: ClassSchedule = {
         id: Math.random().toString(36).substr(2, 9),
