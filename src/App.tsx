@@ -8502,7 +8502,7 @@ function AppInner() {
   }, [schedules, customEvents, readAutoIds]);
 
   const allNotifications = useMemo(() =>
-    [...autoNotifications, ...notifications].sort((a, b) => b.date - a.date),
+    [...autoNotifications, ...notifications].sort((a, b) => b.date - a.date).slice(0, 10),
     [autoNotifications, notifications]
   );
 
