@@ -6776,15 +6776,15 @@ const ESCAPE_THEMES: Record<EscapeTheme, {
     cover: `radial-gradient(ellipse at center, #f5e8c8 0%, #e8d5a8 60%, #c9a96b 100%)`,
     enigmaBg: `linear-gradient(135deg, #faf3e0 0%, #f5e8c8 100%)`,
     cardBg: '#fffbf0',
-    primary: '#5b3a1a',
-    secondary: '#8b5a2b',
-    accent: '#b8860b',
+    primary: '#3a2510',
+    secondary: '#5b3a1a',
+    accent: '#92660a',
     textOnDark: '#fef3c7',
     textOnLight: '#3a2510',
-    border: '#8b5a2b',
+    border: '#5b3a1a',
     font: `'Cinzel', 'Georgia', serif`,
     ornament: '⚜',
-    pageDecor: `repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(139,90,43,0.04) 30px, rgba(139,90,43,0.04) 31px)`,
+    pageDecor: `repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(91,58,26,0.05) 30px, rgba(91,58,26,0.05) 31px)`,
     badge: '⚔️',
   },
   lab: {
@@ -6792,15 +6792,15 @@ const ESCAPE_THEMES: Record<EscapeTheme, {
     cover: `linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0c4a6e 100%)`,
     enigmaBg: `#f8fafc`,
     cardBg: '#ffffff',
-    primary: '#0f172a',
-    secondary: '#0284c7',
-    accent: '#10b981',
+    primary: '#0c1e3a',
+    secondary: '#075985',
+    accent: '#047857',
     textOnDark: '#e0f2fe',
-    textOnLight: '#0c4a6e',
-    border: '#0ea5e9',
+    textOnLight: '#0c1e3a',
+    border: '#0369a1',
     font: `'JetBrains Mono', 'Courier New', monospace`,
     ornament: '⚛',
-    pageDecor: `linear-gradient(0deg, transparent 24px, rgba(14,165,233,0.06) 25px), linear-gradient(90deg, transparent 24px, rgba(14,165,233,0.06) 25px)`,
+    pageDecor: `linear-gradient(0deg, transparent 24px, rgba(3,105,161,0.08) 25px), linear-gradient(90deg, transparent 24px, rgba(3,105,161,0.08) 25px)`,
     badge: '⚗️',
   },
   detective: {
@@ -6808,15 +6808,15 @@ const ESCAPE_THEMES: Record<EscapeTheme, {
     cover: `linear-gradient(135deg, #18181b 0%, #3f3f46 50%, #18181b 100%)`,
     enigmaBg: `#f5f5f4`,
     cardBg: '#fafaf9',
-    primary: '#18181b',
-    secondary: '#52525b',
-    accent: '#dc2626',
+    primary: '#0a0a0a',
+    secondary: '#27272a',
+    accent: '#b91c1c',
     textOnDark: '#fafafa',
-    textOnLight: '#27272a',
+    textOnLight: '#18181b',
     border: '#27272a',
     font: `'Courier Prime', 'Courier New', monospace`,
     ornament: '🔍',
-    pageDecor: `repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(0,0,0,0.04) 28px, rgba(0,0,0,0.04) 29px)`,
+    pageDecor: `repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(0,0,0,0.05) 28px, rgba(0,0,0,0.05) 29px)`,
     badge: '🕵️',
   },
   space: {
@@ -6886,57 +6886,57 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
     .cover { background: ${theme.cover}; color: ${theme.textOnDark}; display: flex; flex-direction: column; justify-content: space-between; }
     .cover-top { position: relative; z-index: 1; text-align: center; }
     .cover-badge { font-size: 76px; line-height: 1; margin-bottom: 12mm; filter: drop-shadow(0 4px 18px rgba(0,0,0,0.4)); }
-    .cover-subtitle { font-size: 14px; letter-spacing: 8px; opacity: 0.7; margin-bottom: 8mm; text-transform: uppercase; }
+    .cover-subtitle { font-size: 14px; letter-spacing: 8px; opacity: 0.9; margin-bottom: 8mm; text-transform: uppercase; font-weight: 700; }
     .cover-title { font-size: 42px; font-weight: 900; line-height: 1.1; letter-spacing: -1px; text-shadow: 0 4px 16px rgba(0,0,0,0.5); padding: 0 8mm; }
-    .cover-ornament { font-size: 32px; margin: 8mm 0; opacity: 0.6; }
+    .cover-ornament { font-size: 32px; margin: 8mm 0; opacity: 0.85; }
     .cover-info { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; max-width: 130mm; margin: 0 auto; }
-    .info-box { background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.18); backdrop-filter: blur(8px); border-radius: 12px; padding: 10px 14px; }
-    .info-label { font-size: 9px; letter-spacing: 2.5px; opacity: 0.65; text-transform: uppercase; margin-bottom: 3px; }
-    .info-value { font-size: 14px; font-weight: 700; }
-    .cover-briefing { position: relative; z-index: 1; background: rgba(0,0,0,0.25); border-left: 4px solid currentColor; padding: 16px 20px; border-radius: 0 14px 14px 0; margin-top: 6mm; }
-    .cover-briefing-label { font-size: 10px; letter-spacing: 3px; opacity: 0.7; margin-bottom: 8px; text-transform: uppercase; font-weight: 700; }
-    .cover-briefing-text { font-size: 14px; line-height: 1.7; font-style: italic; }
+    .info-box { background: rgba(255,255,255,0.14); border: 1.5px solid rgba(255,255,255,0.3); backdrop-filter: blur(8px); border-radius: 12px; padding: 10px 14px; }
+    .info-label { font-size: 9px; letter-spacing: 2.5px; opacity: 0.85; text-transform: uppercase; margin-bottom: 3px; font-weight: 700; }
+    .info-value { font-size: 14px; font-weight: 800; }
+    .cover-briefing { position: relative; z-index: 1; background: rgba(0,0,0,0.35); border-left: 4px solid ${theme.accent}; padding: 16px 20px; border-radius: 0 14px 14px 0; margin-top: 6mm; }
+    .cover-briefing-label { font-size: 10px; letter-spacing: 3px; opacity: 0.95; margin-bottom: 8px; text-transform: uppercase; font-weight: 800; color: ${theme.accent}; }
+    .cover-briefing-text { font-size: 14px; line-height: 1.7; font-weight: 500; }
     .cover-rules { position: relative; z-index: 1; margin-top: 4mm; }
-    .cover-rules-title { font-size: 11px; letter-spacing: 3px; opacity: 0.7; margin-bottom: 10px; text-transform: uppercase; font-weight: 700; text-align: center; }
+    .cover-rules-title { font-size: 11px; letter-spacing: 3px; opacity: 0.95; margin-bottom: 10px; text-transform: uppercase; font-weight: 800; text-align: center; }
     .cover-rules-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
-    .cover-rules-list li { font-size: 11px; padding: 8px 12px 8px 30px; background: rgba(255,255,255,0.06); border-radius: 8px; position: relative; line-height: 1.4; }
-    .cover-rules-list li::before { content: counter(rule); counter-increment: rule; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; border-radius: 50%; background: ${theme.accent}; color: ${theme.primary}; font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+    .cover-rules-list li { font-size: 11.5px; padding: 8px 12px 8px 30px; background: rgba(255,255,255,0.12); border-radius: 8px; position: relative; line-height: 1.4; font-weight: 500; }
+    .cover-rules-list li::before { content: counter(rule); counter-increment: rule; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; border-radius: 50%; background: ${theme.accent}; color: white; font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
     .cover-rules-list { counter-reset: rule; }
-    .cover-footer { position: relative; z-index: 1; text-align: center; font-size: 9px; opacity: 0.5; letter-spacing: 2px; padding-top: 4mm; border-top: 1px solid rgba(255,255,255,0.15); }
+    .cover-footer { position: relative; z-index: 1; text-align: center; font-size: 10px; opacity: 0.85; letter-spacing: 2px; padding-top: 4mm; border-top: 1px solid rgba(255,255,255,0.3); font-weight: 600; }
 
     /* ──────── ENIGMA PAGE ──────── */
     .enigma-page { background: ${theme.enigmaBg}; color: ${theme.textOnLight}; display: flex; flex-direction: column; gap: 8mm; }
     .enigma-header { position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 6mm; border-bottom: 3px double ${theme.border}; }
     .enigma-num { font-size: 28px; font-weight: 900; color: ${theme.primary}; letter-spacing: -0.5px; }
-    .enigma-total { font-size: 13px; color: ${theme.secondary}; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+    .enigma-total { font-size: 13px; color: ${theme.primary}; letter-spacing: 2px; text-transform: uppercase; font-weight: 800; }
     .enigma-art { position: relative; z-index: 1; border-radius: 14px; overflow: hidden; max-height: 65mm; box-shadow: 0 8px 24px rgba(0,0,0,0.18); border: 3px solid ${theme.border}; }
     .enigma-art img { width: 100%; height: 100%; object-fit: cover; display: block; max-height: 65mm; }
     .narrative-block { position: relative; z-index: 1; display: flex; gap: 12px; align-items: flex-start; background: ${theme.cardBg}; border-left: 5px solid ${theme.accent}; padding: 14px 18px; border-radius: 0 12px 12px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .narrative-icon { font-size: 22px; color: ${theme.accent}; flex-shrink: 0; }
-    .narrative { font-size: 12.5px; line-height: 1.7; font-style: italic; color: ${theme.primary}; }
+    .narrative { font-size: 13px; line-height: 1.7; color: ${theme.primary}; font-weight: 500; }
     .challenge-block { position: relative; z-index: 1; background: ${theme.cardBg}; border: 2px solid ${theme.border}; border-radius: 14px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
     .challenge-label { font-size: 10px; letter-spacing: 4px; color: ${theme.accent}; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
     .challenge { font-size: 16px; font-weight: 700; line-height: 1.5; color: ${theme.primary}; }
     .answer-block { position: relative; z-index: 1; }
-    .answer-label { font-size: 11px; letter-spacing: 3px; color: ${theme.secondary}; font-weight: 900; margin-bottom: 8px; text-transform: uppercase; }
+    .answer-label { font-size: 11px; letter-spacing: 3px; color: ${theme.primary}; font-weight: 900; margin-bottom: 8px; text-transform: uppercase; }
     .answer-line { height: 16mm; border: 2.5px dashed ${theme.border}; border-radius: 12px; background: repeating-linear-gradient(180deg, transparent 0, transparent 7mm, rgba(0,0,0,0.05) 7mm, rgba(0,0,0,0.05) 7.5mm); }
     .hint-block { position: relative; z-index: 1; margin-top: auto; background: ${theme.primary}; color: ${theme.textOnDark}; padding: 14px 18px; border-radius: 12px; border: 2px dashed ${theme.accent}; }
     .hint-label { font-size: 9px; letter-spacing: 2px; opacity: 0.85; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-align: center; }
     .hint-text { font-size: 12px; line-height: 1.55; text-align: center; font-weight: 500; }
-    .page-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: 2px; color: ${theme.secondary}; padding-top: 6mm; border-top: 1px solid ${theme.border}; text-transform: uppercase; font-weight: 700; }
+    .page-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: 2px; color: ${theme.primary}; padding-top: 6mm; border-top: 1px solid ${theme.border}; text-transform: uppercase; font-weight: 800; }
 
     /* ──────── ANSWER KEY ──────── */
     .key-page { background: ${theme.cardBg}; color: ${theme.textOnLight}; position: relative; }
-    .key-page::before { content: 'GABARITO'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 180px; font-weight: 900; color: ${theme.border}; opacity: 0.04; pointer-events: none; letter-spacing: 12px; }
+    .key-page::before { content: 'GABARITO'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 180px; font-weight: 900; color: ${theme.border}; opacity: 0.06; pointer-events: none; letter-spacing: 12px; }
     .key-header { position: relative; z-index: 1; text-align: center; padding-bottom: 8mm; border-bottom: 3px double ${theme.border}; margin-bottom: 10mm; }
     .key-stamp { display: inline-block; padding: 6px 18px; border: 3px solid ${theme.accent}; color: ${theme.accent}; font-weight: 900; letter-spacing: 4px; font-size: 12px; transform: rotate(-3deg); margin-bottom: 10mm; border-radius: 6px; }
     .key-title { font-size: 36px; font-weight: 900; color: ${theme.primary}; letter-spacing: -1px; }
-    .key-subtitle { font-size: 12px; color: ${theme.secondary}; margin-top: 5mm; letter-spacing: 3px; text-transform: uppercase; }
+    .key-subtitle { font-size: 12px; color: ${theme.primary}; margin-top: 5mm; letter-spacing: 3px; text-transform: uppercase; font-weight: 700; }
     .key-list { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 6mm; }
     .key-item { display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background: ${theme.enigmaBg}; border-left: 4px solid ${theme.accent}; border-radius: 0 12px 12px 0; }
     .key-num { font-size: 22px; font-weight: 900; color: ${theme.accent}; min-width: 32px; line-height: 1; }
     .key-content { flex: 1; }
-    .key-challenge { font-size: 11px; color: ${theme.secondary}; line-height: 1.5; margin-bottom: 6px; }
+    .key-challenge { font-size: 11.5px; color: ${theme.primary}; line-height: 1.5; margin-bottom: 6px; font-weight: 500; }
     .key-answer { font-size: 16px; font-weight: 900; color: ${theme.primary}; letter-spacing: 1px; }
 
     @media print { body { margin: 0; } .page { margin: 0; box-shadow: none; } }
