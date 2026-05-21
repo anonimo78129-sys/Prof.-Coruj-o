@@ -212,7 +212,7 @@ function useFirestoreDoc<T>(
   docPath: string,
   user: any,
   initialData: T
-): [T, (data: T | ((prev: T) => T)) => void] {
+): [T, (data: T | ((prev: T) => T)) => void, boolean] {
   const [data, setData] = useState<T>(initialData);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -244,7 +244,7 @@ function useFirestoreDoc<T>(
     }
   };
 
-  return [data, updateData];
+  return [data, updateData, isLoaded];
 }
 
 // --- Error Boundary ---
@@ -8362,7 +8362,7 @@ function AppInner() {
     return () => clearInterval(interval);
   }, [activeTasks]);
 
-  const [profile, setProfile] = useFirestoreDoc<UserProfile>(
+  const [profile, setProfile, profileLoaded] = useFirestoreDoc<UserProfile>(
     user ? `users/${user.uid}` : 'users/temp',
     user,
     {
@@ -8482,23 +8482,25 @@ function AppInner() {
   const [onboardingName, setOnboardingName] = useState('');
   const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
 
-  // Show onboarding only for genuinely new users: no onboarded flag AND still has the default name
-  // localStorage check prevents the race condition where the profile briefly shows default values before Firestore loads
-  const localOnboarded = typeof window !== 'undefined' && localStorage.getItem('prof-coruja-onboarded') === 'true';
-  const showOnboarding = !!user && !profile.onboarded && profile.name === 'Prof. Silva' && !localOnboarded;
+  // localStorage key is per-user so switching accounts on the same device doesn't bleed over
+  const onboardingLsKey = user ? `prof-coruja-onboarded-${user.uid}` : null;
+  const localOnboarded = !!onboardingLsKey && (() => { try { return localStorage.getItem(onboardingLsKey) === 'true'; } catch { return false; } })();
+  // Wait for Firestore to respond (profileLoaded) before deciding — prevents flash on new users
+  const showOnboarding = !!user && profileLoaded && !profile.onboarded && !localOnboarded;
 
-  // Sync Firestore onboarded flag to localStorage so subsequent loads bypass the form instantly
+  // Sync to localStorage once Firestore confirms the user is onboarded
   useEffect(() => {
-    if (profile.onboarded || (profile.name && profile.name !== 'Prof. Silva')) {
-      try { localStorage.setItem('prof-coruja-onboarded', 'true'); } catch {}
+    if (!onboardingLsKey || !profileLoaded) return;
+    if (profile.onboarded) {
+      try { localStorage.setItem(onboardingLsKey, 'true'); } catch {}
     }
-  }, [profile.onboarded, profile.name]);
+  }, [onboardingLsKey, profileLoaded, profile.onboarded]);
 
   const finishOnboarding = async (skipClass = false) => {
     const newName = onboardingName.trim() || 'Professor';
     const updates: Partial<UserProfile> = { name: newName, onboarded: true };
     setProfile({ ...profile, ...updates } as UserProfile);
-    try { localStorage.setItem('prof-coruja-onboarded', 'true'); } catch {}
+    try { if (onboardingLsKey) localStorage.setItem(onboardingLsKey, 'true'); } catch {}
     if (!skipClass && onboardingClass.name.trim()) {
       const newClass: ClassSchedule = {
         id: Math.random().toString(36).substr(2, 9),
@@ -8630,10 +8632,11 @@ function AppInner() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
-            name: email.split('@')[0],
+            name: 'Prof. Silva',
             email: email.toLowerCase().trim(),
             role: 'user',
             isPro: false,
+            onboarded: false,
             createdAt: new Date().toISOString(),
             phoneVerified: false,
           });
