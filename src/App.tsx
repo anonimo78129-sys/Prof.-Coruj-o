@@ -5337,9 +5337,14 @@ const CalendarScreen = ({
         <motion.div
           key={`${currentYear}-${currentMonth}`}
           custom={monthDir}
-          initial={(dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 })}
-          animate={{ x: 0, opacity: 1 }}
-          exit={(dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 })}
+          variants={{
+            enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
+            center: { x: 0, opacity: 1 },
+            exit: (dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
+          }}
+          initial="enter"
+          animate="center"
+          exit="exit"
           transition={{ duration: 0.22, ease: 'easeInOut' }}
           className="grid grid-cols-7 gap-y-4 text-center mt-4"
         >
