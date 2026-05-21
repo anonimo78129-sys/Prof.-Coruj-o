@@ -531,7 +531,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
     setScreen(id);
     setShowLabels(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => setShowLabels(false), 3000);
+    hideTimerRef.current = setTimeout(() => setShowLabels(false), 2000);
   };
 
   useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
@@ -3597,48 +3597,68 @@ const ChatScreen = ({
         {filteredMessages.length === 0 && (
           <div className="text-center py-8 text-gray-400 text-sm">Nenhuma nota encontrada.</div>
         )}
-        {filteredMessages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
-            {msg.role === 'model' && (
-              <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mb-1 shadow-sm overflow-hidden border border-white">
-                <Sparkles className="w-5 h-5 text-indigo-600" />
-              </div>
-            )}
-            <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none shadow-sm border border-gray-50'}`}>
-              {msg.attachment && (
-                <div className="mb-2">
-                  {msg.attachment.mimeType.startsWith('image/') && msg.attachment.url ? (
-                    <img src={msg.attachment.url} alt="Anexo" className="max-w-full rounded-xl border border-black/10" />
-                  ) : (
-                    <div className="flex items-center gap-2 bg-black/10 p-3 rounded-xl">
-                      {msg.attachment.mimeType.startsWith('image/') ? <ImageIcon size={20} /> : <FileText size={20} />}
-                      <span className="text-sm font-medium truncate max-w-[150px]">{msg.attachment.name || 'Arquivo anexado'}</span>
-                    </div>
-                  )}
+        <AnimatePresence initial={false}>
+          {filteredMessages.map((msg) => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 14, x: msg.role === 'user' ? 20 : -20 }}
+              animate={{ opacity: 1, y: 0, x: 0 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
+            >
+              {msg.role === 'model' && (
+                <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mb-1 shadow-sm overflow-hidden border border-white">
+                  <Sparkles className="w-5 h-5 text-indigo-600" />
                 </div>
               )}
-              <div className={`markdown-body text-sm ${msg.role === 'user' ? '!text-white' : ''}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+              <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none shadow-sm border border-gray-50'}`}>
+                {msg.attachment && (
+                  <div className="mb-2">
+                    {msg.attachment.mimeType.startsWith('image/') && msg.attachment.url ? (
+                      <img src={msg.attachment.url} alt="Anexo" className="max-w-full rounded-xl border border-black/10" />
+                    ) : (
+                      <div className="flex items-center gap-2 bg-black/10 p-3 rounded-xl">
+                        {msg.attachment.mimeType.startsWith('image/') ? <ImageIcon size={20} /> : <FileText size={20} />}
+                        <span className="text-sm font-medium truncate max-w-[150px]">{msg.attachment.name || 'Arquivo anexado'}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className={`markdown-body text-sm ${msg.role === 'user' ? '!text-white' : ''}`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                </div>
+                <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                  {new Date(msg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
-              <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' ? 'text-indigo-200' : 'text-gray-400'}`}>
-                {new Date(msg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
-          </div>
-        ))}
+            </motion.div>
+          ))}
+        </AnimatePresence>
         <div ref={chatEndRef} />
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-white p-4 rounded-2xl rounded-bl-none shadow-sm border border-gray-50 flex gap-2 items-center">
-              <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
-              <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-              <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-            </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {loading && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, x: -20 }}
+              animate={{ opacity: 1, y: 0, x: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              className="flex justify-start"
+            >
+              <div className="bg-white p-4 rounded-2xl rounded-bl-none shadow-sm border border-gray-50 flex gap-2 items-center">
+                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.18s' }} />
+                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.36s' }} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="bg-white p-2 rounded-3xl shadow-sm border border-gray-50 flex flex-col gap-2 shrink-0">
+      <motion.div
+        animate={{ boxShadow: input.length > 0 ? '0 0 0 2px #6366f1' : '0 1px 3px 0 rgb(0 0 0 / 0.05)' }}
+        transition={{ duration: 0.2 }}
+        className="bg-white p-2 rounded-3xl border border-gray-50 flex flex-col gap-2 shrink-0"
+      >
         {fileError && (
           <div className="px-4 py-2 bg-red-50 text-red-600 text-xs rounded-xl mx-2 mt-2 border border-red-100 flex justify-between items-center">
             <span>{fileError}</span>
@@ -3685,15 +3705,17 @@ const ChatScreen = ({
             placeholder="Digite uma ideia, lembrete ou tarefa..." 
             className="flex-1 bg-transparent border-none px-2 py-2 text-base focus:outline-none"
           />
-          <button 
+          <motion.button
             onClick={() => sendMessage()}
             disabled={loading || (!input.trim() && !selectedFile)}
+            whileTap={{ scale: 0.82 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
             className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center disabled:opacity-50 shrink-0"
           >
             <Send size={18} />
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 };
