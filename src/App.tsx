@@ -10,7 +10,7 @@ import {
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
-  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle
+  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -5470,7 +5470,8 @@ const CalendarScreen = ({
   );
 };
 
-type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'trail' | 'memory';
+type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'escape' | 'memory';
+type EscapeTheme = 'medieval' | 'lab' | 'detective' | 'space';
 
 const buildWordSearchGrid = (rawWords: string[], size = 15): { grid: string[][], placements: {word: string, row: number, col: number, dir: string}[] } => {
   const words = rawWords.map(w => w.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÔÃÕÇÜ]/gi, '')).filter(w => w.length >= 3 && w.length <= size);
@@ -6745,6 +6746,264 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
   w.document.close();
 };
 
+type EscapeRoomData = {
+  title: string;
+  briefing: string;
+  timeLimit?: string;
+  rules?: string[];
+  theme: EscapeTheme;
+  enigmas: { narrative: string; challenge: string; answer: string; hint: string; imageUrl?: string }[];
+};
+
+const ESCAPE_THEMES: Record<EscapeTheme, {
+  name: string;
+  cover: string;
+  enigmaBg: string;
+  cardBg: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+  textOnDark: string;
+  textOnLight: string;
+  border: string;
+  font: string;
+  ornament: string;
+  pageDecor: string;
+  badge: string;
+}> = {
+  medieval: {
+    name: 'Pergaminho Medieval',
+    cover: `radial-gradient(ellipse at center, #f5e8c8 0%, #e8d5a8 60%, #c9a96b 100%)`,
+    enigmaBg: `linear-gradient(135deg, #faf3e0 0%, #f5e8c8 100%)`,
+    cardBg: '#fffbf0',
+    primary: '#5b3a1a',
+    secondary: '#8b5a2b',
+    accent: '#b8860b',
+    textOnDark: '#fef3c7',
+    textOnLight: '#3a2510',
+    border: '#8b5a2b',
+    font: `'Cinzel', 'Georgia', serif`,
+    ornament: '⚜',
+    pageDecor: `repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(139,90,43,0.04) 30px, rgba(139,90,43,0.04) 31px)`,
+    badge: '⚔️',
+  },
+  lab: {
+    name: 'Laboratório Científico',
+    cover: `linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0c4a6e 100%)`,
+    enigmaBg: `#f8fafc`,
+    cardBg: '#ffffff',
+    primary: '#0f172a',
+    secondary: '#0284c7',
+    accent: '#10b981',
+    textOnDark: '#e0f2fe',
+    textOnLight: '#0c4a6e',
+    border: '#0ea5e9',
+    font: `'JetBrains Mono', 'Courier New', monospace`,
+    ornament: '⚛',
+    pageDecor: `linear-gradient(0deg, transparent 24px, rgba(14,165,233,0.06) 25px), linear-gradient(90deg, transparent 24px, rgba(14,165,233,0.06) 25px)`,
+    badge: '⚗️',
+  },
+  detective: {
+    name: 'Dossiê Confidencial',
+    cover: `linear-gradient(135deg, #18181b 0%, #3f3f46 50%, #18181b 100%)`,
+    enigmaBg: `#f5f5f4`,
+    cardBg: '#fafaf9',
+    primary: '#18181b',
+    secondary: '#52525b',
+    accent: '#dc2626',
+    textOnDark: '#fafafa',
+    textOnLight: '#27272a',
+    border: '#27272a',
+    font: `'Courier Prime', 'Courier New', monospace`,
+    ornament: '🔍',
+    pageDecor: `repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(0,0,0,0.04) 28px, rgba(0,0,0,0.04) 29px)`,
+    badge: '🕵️',
+  },
+  space: {
+    name: 'Missão Galáctica',
+    cover: `radial-gradient(ellipse at top, #4c1d95 0%, #1e1b4b 50%, #020617 100%)`,
+    enigmaBg: `linear-gradient(160deg, #1e1b4b 0%, #0f172a 100%)`,
+    cardBg: '#1e293b',
+    primary: '#020617',
+    secondary: '#7c3aed',
+    accent: '#fbbf24',
+    textOnDark: '#fef3c7',
+    textOnLight: '#e0e7ff',
+    border: '#7c3aed',
+    font: `'Orbitron', 'Trebuchet MS', sans-serif`,
+    ornament: '★',
+    pageDecor: `radial-gradient(circle at 20% 30%, rgba(251,191,36,0.15) 0%, transparent 1.5px), radial-gradient(circle at 70% 60%, rgba(251,191,36,0.1) 0%, transparent 1px), radial-gradient(circle at 40% 80%, rgba(251,191,36,0.08) 0%, transparent 1.5px)`,
+    badge: '🚀',
+  },
+};
+
+const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teacherName?: string; schoolName?: string; subject?: string; level?: string }) => {
+  const theme = ESCAPE_THEMES[data.theme];
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) return;
+  const todayStr = new Date().toLocaleDateString('pt-BR');
+  const enigmaPages = data.enigmas.map((en, i) => `
+    <section class="page enigma-page">
+      <div class="page-decor"></div>
+      <header class="enigma-header">
+        <span class="enigma-num">ENIGMA ${String(i + 1).padStart(2, '0')}</span>
+        <span class="enigma-total">de ${data.enigmas.length}</span>
+      </header>
+      ${en.imageUrl ? `<div class="enigma-art"><img src="${en.imageUrl}" alt="" crossorigin="anonymous" /></div>` : ''}
+      <div class="narrative-block">
+        <div class="narrative-icon">${theme.ornament}</div>
+        <p class="narrative">${en.narrative}</p>
+      </div>
+      <div class="challenge-block">
+        <div class="challenge-label">DESAFIO</div>
+        <p class="challenge">${en.challenge}</p>
+      </div>
+      <div class="answer-block">
+        <div class="answer-label">🔑 SUA RESPOSTA</div>
+        <div class="answer-line"></div>
+      </div>
+      <div class="hint-block">
+        <div class="hint-label">💡 DICA — DOBRE OU COBRA ESTA ÁREA</div>
+        <p class="hint-text">${en.hint}</p>
+      </div>
+      <footer class="page-footer">
+        <span>${data.title}</span><span>${i + 1} / ${data.enigmas.length}</span>
+      </footer>
+    </section>
+  `).join('');
+
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${data.title}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=JetBrains+Mono:wght@400;700&family=Courier+Prime:wght@400;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; margin: 0; padding: 0; }
+    body { font-family: ${theme.font}; color: ${theme.textOnLight}; background: white; }
+    .page { width: 210mm; height: 297mm; padding: 22mm 20mm; position: relative; overflow: hidden; page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+    .page-decor { position: absolute; inset: 0; background-image: ${theme.pageDecor}; pointer-events: none; opacity: 0.8; }
+
+    /* ──────── COVER ──────── */
+    .cover { background: ${theme.cover}; color: ${theme.textOnDark}; display: flex; flex-direction: column; justify-content: space-between; }
+    .cover-top { position: relative; z-index: 1; text-align: center; }
+    .cover-badge { font-size: 76px; line-height: 1; margin-bottom: 12mm; filter: drop-shadow(0 4px 18px rgba(0,0,0,0.4)); }
+    .cover-subtitle { font-size: 14px; letter-spacing: 8px; opacity: 0.7; margin-bottom: 8mm; text-transform: uppercase; }
+    .cover-title { font-size: 42px; font-weight: 900; line-height: 1.1; letter-spacing: -1px; text-shadow: 0 4px 16px rgba(0,0,0,0.5); padding: 0 8mm; }
+    .cover-ornament { font-size: 32px; margin: 8mm 0; opacity: 0.6; }
+    .cover-info { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; max-width: 130mm; margin: 0 auto; }
+    .info-box { background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.18); backdrop-filter: blur(8px); border-radius: 12px; padding: 10px 14px; }
+    .info-label { font-size: 9px; letter-spacing: 2.5px; opacity: 0.65; text-transform: uppercase; margin-bottom: 3px; }
+    .info-value { font-size: 14px; font-weight: 700; }
+    .cover-briefing { position: relative; z-index: 1; background: rgba(0,0,0,0.25); border-left: 4px solid currentColor; padding: 16px 20px; border-radius: 0 14px 14px 0; margin-top: 6mm; }
+    .cover-briefing-label { font-size: 10px; letter-spacing: 3px; opacity: 0.7; margin-bottom: 8px; text-transform: uppercase; font-weight: 700; }
+    .cover-briefing-text { font-size: 14px; line-height: 1.7; font-style: italic; }
+    .cover-rules { position: relative; z-index: 1; margin-top: 4mm; }
+    .cover-rules-title { font-size: 11px; letter-spacing: 3px; opacity: 0.7; margin-bottom: 10px; text-transform: uppercase; font-weight: 700; text-align: center; }
+    .cover-rules-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+    .cover-rules-list li { font-size: 11px; padding: 8px 12px 8px 30px; background: rgba(255,255,255,0.06); border-radius: 8px; position: relative; line-height: 1.4; }
+    .cover-rules-list li::before { content: counter(rule); counter-increment: rule; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; border-radius: 50%; background: ${theme.accent}; color: ${theme.primary}; font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+    .cover-rules-list { counter-reset: rule; }
+    .cover-footer { position: relative; z-index: 1; text-align: center; font-size: 9px; opacity: 0.5; letter-spacing: 2px; padding-top: 4mm; border-top: 1px solid rgba(255,255,255,0.15); }
+
+    /* ──────── ENIGMA PAGE ──────── */
+    .enigma-page { background: ${theme.enigmaBg}; color: ${theme.textOnLight}; display: flex; flex-direction: column; gap: 8mm; }
+    .enigma-header { position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 6mm; border-bottom: 3px double ${theme.border}; }
+    .enigma-num { font-size: 28px; font-weight: 900; color: ${theme.primary}; letter-spacing: -0.5px; }
+    .enigma-total { font-size: 13px; color: ${theme.secondary}; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+    .enigma-art { position: relative; z-index: 1; border-radius: 14px; overflow: hidden; max-height: 65mm; box-shadow: 0 8px 24px rgba(0,0,0,0.18); border: 3px solid ${theme.border}; }
+    .enigma-art img { width: 100%; height: 100%; object-fit: cover; display: block; max-height: 65mm; }
+    .narrative-block { position: relative; z-index: 1; display: flex; gap: 12px; align-items: flex-start; background: ${theme.cardBg}; border-left: 5px solid ${theme.accent}; padding: 14px 18px; border-radius: 0 12px 12px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .narrative-icon { font-size: 22px; color: ${theme.accent}; flex-shrink: 0; }
+    .narrative { font-size: 12.5px; line-height: 1.7; font-style: italic; color: ${theme.primary}; }
+    .challenge-block { position: relative; z-index: 1; background: ${theme.cardBg}; border: 2px solid ${theme.border}; border-radius: 14px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .challenge-label { font-size: 10px; letter-spacing: 4px; color: ${theme.accent}; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
+    .challenge { font-size: 16px; font-weight: 700; line-height: 1.5; color: ${theme.primary}; }
+    .answer-block { position: relative; z-index: 1; }
+    .answer-label { font-size: 11px; letter-spacing: 3px; color: ${theme.secondary}; font-weight: 900; margin-bottom: 8px; text-transform: uppercase; }
+    .answer-line { height: 16mm; border: 2.5px dashed ${theme.border}; border-radius: 12px; background: repeating-linear-gradient(180deg, transparent 0, transparent 7mm, rgba(0,0,0,0.05) 7mm, rgba(0,0,0,0.05) 7.5mm); }
+    .hint-block { position: relative; z-index: 1; margin-top: auto; background: ${theme.primary}; color: ${theme.textOnDark}; padding: 14px 18px; border-radius: 12px; border: 2px dashed ${theme.accent}; }
+    .hint-label { font-size: 9px; letter-spacing: 2px; opacity: 0.7; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; text-align: center; }
+    .hint-text { font-size: 11.5px; line-height: 1.5; text-align: center; opacity: 0.55; filter: blur(0.5px); }
+    .page-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; font-size: 9px; letter-spacing: 2px; color: ${theme.secondary}; opacity: 0.6; padding-top: 6mm; border-top: 1px solid ${theme.border}; text-transform: uppercase; font-weight: 700; }
+
+    /* ──────── ANSWER KEY ──────── */
+    .key-page { background: ${theme.cardBg}; color: ${theme.textOnLight}; position: relative; }
+    .key-page::before { content: 'GABARITO'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 180px; font-weight: 900; color: ${theme.border}; opacity: 0.04; pointer-events: none; letter-spacing: 12px; }
+    .key-header { position: relative; z-index: 1; text-align: center; padding-bottom: 8mm; border-bottom: 3px double ${theme.border}; margin-bottom: 10mm; }
+    .key-stamp { display: inline-block; padding: 6px 18px; border: 3px solid ${theme.accent}; color: ${theme.accent}; font-weight: 900; letter-spacing: 4px; font-size: 12px; transform: rotate(-3deg); margin-bottom: 10mm; border-radius: 6px; }
+    .key-title { font-size: 36px; font-weight: 900; color: ${theme.primary}; letter-spacing: -1px; }
+    .key-subtitle { font-size: 12px; color: ${theme.secondary}; margin-top: 5mm; letter-spacing: 3px; text-transform: uppercase; }
+    .key-list { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 6mm; }
+    .key-item { display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background: ${theme.enigmaBg}; border-left: 4px solid ${theme.accent}; border-radius: 0 12px 12px 0; }
+    .key-num { font-size: 22px; font-weight: 900; color: ${theme.accent}; min-width: 32px; line-height: 1; }
+    .key-content { flex: 1; }
+    .key-challenge { font-size: 11px; color: ${theme.secondary}; line-height: 1.5; margin-bottom: 6px; }
+    .key-answer { font-size: 16px; font-weight: 900; color: ${theme.primary}; letter-spacing: 1px; }
+
+    @media print { body { margin: 0; } .page { margin: 0; box-shadow: none; } }
+  </style></head><body>
+
+  <!-- ════════ COVER ════════ -->
+  <section class="page cover">
+    <div class="page-decor"></div>
+    <div class="cover-top">
+      <div class="cover-badge">${theme.badge}</div>
+      <div class="cover-subtitle">Escape Room Educacional</div>
+      <h1 class="cover-title">${data.title}</h1>
+      <div class="cover-ornament">${theme.ornament}  ${theme.ornament}  ${theme.ornament}</div>
+    </div>
+
+    <div class="cover-info">
+      <div class="info-box"><div class="info-label">Turma</div><div class="info-value">${opts.className || '—'}</div></div>
+      <div class="info-box"><div class="info-label">Tempo</div><div class="info-value">${data.timeLimit || '45 min'}</div></div>
+      <div class="info-box"><div class="info-label">Professor</div><div class="info-value">${opts.teacherName || '—'}</div></div>
+      <div class="info-box"><div class="info-label">Enigmas</div><div class="info-value">${data.enigmas.length} desafios</div></div>
+    </div>
+
+    <div class="cover-briefing">
+      <div class="cover-briefing-label">▸ Briefing da Missão</div>
+      <p class="cover-briefing-text">${data.briefing}</p>
+    </div>
+
+    ${data.rules && data.rules.length ? `<div class="cover-rules">
+      <div class="cover-rules-title">Regras do Jogo</div>
+      <ul class="cover-rules-list">
+        ${data.rules.map(r => `<li>${r}</li>`).join('')}
+      </ul>
+    </div>` : ''}
+
+    <div class="cover-footer">
+      ${opts.schoolName || ''} ${opts.subject ? '· ' + opts.subject : ''} ${opts.level ? '· ' + opts.level : ''} · ${todayStr}
+    </div>
+  </section>
+
+  ${enigmaPages}
+
+  <!-- ════════ ANSWER KEY ════════ -->
+  <section class="page key-page">
+    <div class="page-decor"></div>
+    <header class="key-header">
+      <div class="key-stamp">CONFIDENCIAL · PROFESSOR</div>
+      <h2 class="key-title">Gabarito</h2>
+      <p class="key-subtitle">Respostas dos Enigmas</p>
+    </header>
+    <div class="key-list">
+      ${data.enigmas.map((en, i) => `
+        <div class="key-item">
+          <div class="key-num">${String(i + 1).padStart(2, '0')}</div>
+          <div class="key-content">
+            <p class="key-challenge">${en.challenge}</p>
+            <p class="key-answer">→ ${en.answer}</p>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </section>
+
+  <script>setTimeout(function(){ window.print(); }, 800);</script>
+  </body></html>`);
+  w.document.close();
+};
+
 const EstudioScreen = ({
   estudioContext,
   setEstudioContext,
@@ -6782,6 +7041,8 @@ const EstudioScreen = ({
   const [bingoSize, setBingoSize] = useState<3 | 5>(5);
   const [bingoFreeText, setBingoFreeText] = useState('LIVRE');
   const [wsGridSize, setWsGridSize] = useState<10 | 15 | 20>(15);
+  const [escapeTheme, setEscapeTheme] = useState<EscapeTheme>('medieval');
+  const [escapeEnigmaCount, setEscapeEnigmaCount] = useState<4 | 5 | 6>(5);
 
   const selectedClass = (schedules || []).find(s => s.id === classId);
   const defaultSubject = selectedClass?.subject || profile.subject || '';
@@ -6849,11 +7110,24 @@ Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","clue":"definiç�
         prompt = `Liste 40 termos/conceitos importantes sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para bingo educativo.
 Cada termo: 1 a 3 palavras, claros e didáticos.
 Retorne APENAS JSON: {"title":"Bingo de ${topic}","items":["termo1","termo2",...]}`;
-      } else if (activeMode === 'trail') {
-        prompt = `Crie uma trilha do conhecimento (jogo de tabuleiro) de ${count} casas sobre "${topic}" (${defaultSubject}, ${defaultLevel}).
-Retorne APENAS JSON:
-{"title":"...","instructions":"regras curtas (até 3 linhas)","questions":[{"casa":N,"type":"pergunta"|"desafio"|"bonus"|"penalidade","text":"o que acontece nessa casa"}]}
-Gere ${Math.min(count, 12)} casas especiais (não precisa preencher todas). Use perguntas factuais sobre ${topic} para tipo "pergunta".`;
+      } else if (activeMode === 'escape') {
+        const themeLabel = { medieval: 'Medieval / Fantasia', lab: 'Laboratório Científico', detective: 'Detetive / Investigação', space: 'Espacial / Sci-Fi' }[escapeTheme];
+        prompt = `Você é um designer de Escape Rooms educacionais. Crie um escape room IMERSIVO sobre "${topic}" (${defaultSubject}, ${defaultLevel}), dificuldade ${difficulty}, ambientação ${themeLabel}.
+
+Estrutura:
+- title: nome cinematográfico do escape room (até 8 palavras)
+- briefing: narrativa de abertura em 3-4 frases imersivas, na 2ª pessoa ("Você é..."), conectando ao tema "${topic}"
+- timeLimit: tempo sugerido (ex: "45 minutos")
+- rules: array com 3-4 regras curtas
+- enigmas: array com EXATAMENTE ${escapeEnigmaCount} enigmas encadeados sobre "${topic}". Cada enigma DEVE testar conhecimento REAL e específico de "${topic}", não trivial. Tipos variados: pergunta direta, charada, cálculo, anagrama, código, sequência. Cada um com:
+  - narrative: 1-2 frases situando o enigma na história
+  - challenge: o desafio em si (claro e específico)
+  - answer: resposta curta (1-3 palavras), em MAIÚSCULAS
+  - hint: dica que ajuda sem entregar a resposta
+  - keyword: 2-4 palavras EM INGLÊS para buscar ilustração no Pixabay (relacionada ao enigma específico)
+
+Retorne APENAS JSON válido (sem markdown):
+{"title":"...","briefing":"...","timeLimit":"...","rules":["...","..."],"enigmas":[{"narrative":"...","challenge":"...","answer":"...","hint":"...","keyword":"..."}]}`;
       } else if (activeMode === 'memory') {
         prompt = `Gere ${count} pares conceito↔definição sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para jogo da memória.
 Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras). Inclua 1 emoji representando o conceito.
@@ -6865,6 +7139,33 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
           generateStoryImages(topic, genre)
         ]);
         setResult({ markdown: response.text || '', sectionImages });
+      } else if (activeMode === 'escape') {
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+        const raw = response.text || '';
+        const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        const parsed = JSON.parse(cleaned);
+        const apiKey = process.env.PIXABAY_API_KEY;
+        if (apiKey && parsed.enigmas) {
+          const withImages = await Promise.all(parsed.enigmas.map(async (en: any) => {
+            const q = en.keyword;
+            if (!q) return en;
+            const cacheKey = `illus|${q.trim().toLowerCase()}`;
+            if (pixabayCache.has(cacheKey)) return { ...en, imageUrl: pixabayCache.get(cacheKey) };
+            try {
+              const url = `https://pixabay.com/api/?key=${apiKey}&q=${encodeURIComponent(q.trim())}&image_type=illustration&safesearch=true&orientation=horizontal&per_page=20&order=popular`;
+              const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+              if (!res.ok) return en;
+              const data = await res.json();
+              if (!data.hits?.length) return en;
+              const hit = data.hits[Math.floor(Math.random() * Math.min(5, data.hits.length))];
+              const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
+              if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
+              return { ...en, imageUrl: imgUrl };
+            } catch { return en; }
+          }));
+          parsed.enigmas = withImages;
+        }
+        setResult({ ...parsed, theme: escapeTheme });
       } else {
         const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const raw = response.text || '';
@@ -6897,11 +7198,11 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
     wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', desc: 'Grade com palavras escondidas para achar' },
     crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', desc: 'Grade cruzada com pistas e definições' },
     bingo: { title: 'Bingo Educativo', icon: Dice5, color: 'text-pink-600', bg: 'bg-pink-50 border-pink-200', desc: 'Cartelas com termos do conteúdo da aula' },
-    trail: { title: 'Trilha', icon: MapIcon, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', desc: 'Tabuleiro com casas de perguntas e desafios' },
+    escape: { title: 'Escape Room', icon: KeyRound, color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200', desc: 'Enigmas encadeados temáticos para imprimir' },
     memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', desc: 'Pares de conceito e definição para combinar' },
   };
 
-  const smallActivities: GameMode[] = ['quiz', 'wordsearch', 'crossword', 'bingo', 'trail', 'memory'];
+  const smallActivities: GameMode[] = ['escape', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
@@ -7094,11 +7395,53 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                       )}
                     </>
                   )}
-                  {activeMode === 'trail' && (
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tamanho da trilha (casas)</label>
-                      <input type="number" min={20} max={48} value={count} onChange={e => setCount(Math.max(20, Math.min(48, parseInt(e.target.value) || 32)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
-                    </div>
+                  {activeMode === 'escape' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ambientação</label>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          {([
+                            { v: 'medieval', label: '⚔️ Medieval', sub: 'Pergaminhos e castelos' },
+                            { v: 'lab', label: '⚗️ Científico', sub: 'Laboratório secreto' },
+                            { v: 'detective', label: '🔍 Detetive', sub: 'Dossiê criminal' },
+                            { v: 'space', label: '🚀 Espacial', sub: 'Missão galáctica' },
+                          ] as { v: EscapeTheme; label: string; sub: string }[]).map(t => (
+                            <button
+                              key={t.v}
+                              type="button"
+                              onClick={() => setEscapeTheme(t.v)}
+                              className={`p-3 rounded-2xl border-2 text-left transition-colors ${escapeTheme === t.v ? 'border-rose-500 bg-rose-50' : 'border-gray-200 bg-white'}`}
+                            >
+                              <p className={`text-sm font-bold ${escapeTheme === t.v ? 'text-rose-700' : 'text-gray-700'}`}>{t.label}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">{t.sub}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de enigmas</label>
+                        <div className="grid grid-cols-3 gap-2 mt-1">
+                          {[4, 5, 6].map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setEscapeEnigmaCount(n as 4 | 5 | 6)}
+                              className={`py-2 rounded-2xl border-2 font-bold ${escapeEnigmaCount === n ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-gray-200 bg-white text-gray-600'}`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dificuldade</label>
+                        <select value={difficulty} onChange={e => setDifficulty(e.target.value as any)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                          <option value="fácil">Fácil</option>
+                          <option value="média">Média</option>
+                          <option value="difícil">Difícil</option>
+                        </select>
+                      </div>
+                    </>
                   )}
 
                   <button onClick={generate} disabled={isGenerating || !topic.trim()} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50">
@@ -7110,7 +7453,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
               {result && (() => {
                 const activityLabels: Record<GameMode, string> = {
                   story: 'Campanha Narrativa', quiz: 'Quiz Avaliativo', wordsearch: 'Caca-Palavras',
-                  crossword: 'Palavras Cruzadas', bingo: 'Bingo Educativo', trail: 'Trilha do Conhecimento', memory: 'Jogo da Memoria'
+                  crossword: 'Palavras Cruzadas', bingo: 'Bingo Educativo', escape: 'Escape Room', memory: 'Jogo da Memoria'
                 };
                 const printOpts = {
                   title: result.title || topic,
@@ -7128,7 +7471,13 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                 <div className="p-5">
                   <div className="flex gap-2 mb-4">
                     <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">↻ Refazer</button>
-                    <button onClick={() => printGameResult(printOpts)} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
+                    <button onClick={() => {
+                      if (activeMode === 'escape' && result.enigmas) {
+                        printEscapeRoom(result as EscapeRoomData, { className: selectedClass?.name, teacherName: profile.name, schoolName: profile.schoolName || selectedClass?.school, subject: defaultSubject, level: defaultLevel });
+                      } else {
+                        printGameResult(printOpts);
+                      }
+                    }} className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"><Download size={16} /> Imprimir / PDF</button>
                   </div>
 
                   <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3 mb-3">
@@ -7291,26 +7640,27 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                       </>
                     )}
 
-                    {activeMode === 'trail' && result.questions && (
-                      <>
-                        <div className="instructions"><b>Regras:</b> {result.instructions}</div>
-                        <div className="trail-board">
-                          {Array.from({ length: count }, (_, i) => {
-                            const special = result.questions.find((q: any) => q.casa === i + 1);
-                            const isEnd = i + 1 === count;
-                            const isStart = i === 0;
-                            return (
-                              <div key={i} className={`trail-cell ${isStart ? 'start' : ''} ${special ? 'special' : ''} ${isEnd ? 'end' : ''}`} data-type={special?.type}>{i + 1}</div>
-                            );
-                          })}
+                    {activeMode === 'escape' && result.enigmas && (
+                      <div className="escape-preview">
+                        <div className="bg-gradient-to-br from-rose-600 to-purple-700 text-white rounded-2xl p-4 mb-3">
+                          <p className="text-[10px] font-black tracking-widest opacity-80 uppercase">{result.timeLimit || '45 min'} · {result.enigmas.length} enigmas</p>
+                          <h2 className="text-lg font-black leading-tight my-1">{result.title}</h2>
+                          <p className="text-xs text-rose-100 leading-relaxed mt-2">{result.briefing}</p>
                         </div>
-                        <h2>Casas especiais</h2>
-                        <ol style={{ listStyle: 'decimal', paddingLeft: 20 }}>
-                          {result.questions.map((q: any, i: number) => (
-                            <li key={i} style={{ marginBottom: 6, pageBreakInside: 'avoid' }}><b>Casa {q.casa}</b> ({q.type}): {q.text}</li>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Enigmas</p>
+                        <div className="space-y-2">
+                          {result.enigmas.map((en: any, i: number) => (
+                            <div key={i} className="bg-white border border-gray-200 rounded-2xl p-3 flex gap-3">
+                              {en.imageUrl && <img src={en.imageUrl} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-black text-rose-600">ENIGMA {i + 1}</p>
+                                <p className="text-xs font-bold text-gray-800 truncate">{en.challenge}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">🔑 {en.answer}</p>
+                              </div>
+                            </div>
                           ))}
-                        </ol>
-                      </>
+                        </div>
+                      </div>
                     )}
 
                     {activeMode === 'memory' && result.pairs && (
