@@ -561,7 +561,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
   );
 };
 
-const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, setScreen }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; setScreen?: (s: Screen) => void }) => {
+const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, setScreen, rightAction }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; setScreen?: (s: Screen) => void; rightAction?: React.ReactNode }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(
     'Notification' in window ? Notification.permission : 'denied'
@@ -603,15 +603,17 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
         )}
       </button>
-      <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-indigo-600 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
-        {profile.photo ? (
-          <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white">
-            <User className="w-6 h-6" />
-          </div>
-        )}
-      </button>
+      {rightAction !== undefined ? rightAction : (
+        <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-indigo-600 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
+          {profile.photo ? (
+            <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white">
+              <User className="w-6 h-6" />
+            </div>
+          )}
+        </button>
+      )}
 
       <AnimatePresence>
         {showNotifications && (
@@ -3266,6 +3268,21 @@ const ChatScreen = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFile, setSelectedFile] = useState<{ file: File, url: string, base64: string } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showChatMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(e.target as Node)) {
+        setShowChatMenu(false);
+        setConfirmClear(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showChatMenu]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -3578,7 +3595,57 @@ const ChatScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-28 h-full flex flex-col">
-      <Header setScreen={setScreen} title="Prof. Corujão" subtitle="Assistente" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage={null} />
+      <Header
+        setScreen={setScreen}
+        title="Prof. Corujão"
+        subtitle="Assistente"
+        profile={profile}
+        notifications={notifications}
+        setNotifications={setNotifications}
+        bannerImage={null}
+        rightAction={
+          <div ref={chatMenuRef} className="relative">
+            <button
+              onClick={() => { setShowChatMenu(v => !v); setConfirmClear(false); }}
+              className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm border border-gray-100"
+            >
+              <Settings size={20} className="text-gray-600" />
+            </button>
+            <AnimatePresence>
+              {showChatMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-12 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 min-w-[190px] z-50"
+                >
+                  {!confirmClear ? (
+                    <button
+                      onClick={() => setConfirmClear(true)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-red-500 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                      <span className="text-sm font-medium">Apagar histórico</span>
+                    </button>
+                  ) : (
+                    <div className="px-3 py-2">
+                      <p className="text-xs text-gray-500 mb-3 leading-snug">Tem certeza? Isso apaga toda a conversa.</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setConfirmClear(false)} className="flex-1 text-xs py-2 rounded-xl bg-gray-100 text-gray-600 font-semibold">Não</button>
+                        <button
+                          onClick={() => { setMessages([]); setShowChatMenu(false); setConfirmClear(false); toast.success('Histórico apagado.'); }}
+                          className="flex-1 text-xs py-2 rounded-xl bg-red-500 text-white font-semibold"
+                        >Apagar</button>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        }
+      />
       
       <div className="mb-2">
         <div className="relative">
