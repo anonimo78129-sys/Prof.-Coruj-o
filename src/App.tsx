@@ -8842,10 +8842,10 @@ function AppInner() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={formKey}
-                initial={{ opacity: 0, x: isResetMode ? 0 : isLoginMode ? -20 : 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: isLoginMode ? 20 : -20 }}
-                transition={{ duration: 0.22, ease: 'easeInOut' }}
+                initial={{ opacity: 0, ...(isResetMode ? { y: 24 } : { x: isLoginMode ? -24 : 24 }) }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                exit={{ opacity: 0, ...(isResetMode ? { y: -16 } : { x: isLoginMode ? 24 : -24 }) }}
+                transition={{ duration: 0.25, ease: 'easeInOut' }}
                 className="flex flex-col gap-4"
               >
                 <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
