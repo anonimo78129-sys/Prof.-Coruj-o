@@ -5626,48 +5626,40 @@ const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
 
 const STORY_SECTIONS = ['🌍 Cenário', '👥 Classes de Personagens', '⚔️ Missões', '🏆 Sistema de Pontos', '👑 Boss Final', '📋 Roteiro do Professor'];
 
-const generateStoryPixelArts = async (topic: string, genre: string): Promise<Record<string, string>> => {
+const generateStoryImages = async (topic: string, genre: string): Promise<Record<string, string>> => {
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey) return {};
   try {
-    const prompt = `Gere 6 pixel art SVG cinematográficos (32x18) ÚNICOS e TEMÁTICOS para uma campanha gamificada.
-
-TEMA: "${topic}"
-GÊNERO: ${genre}
-
-Crie uma cena PIXEL ART diferente para cada seção, refletindo o tema "${topic}":
-- "🌍 Cenário" → paisagem ampla (céu, terreno, vegetação ou estrutura ambiental do tema)
-- "👥 Classes de Personagens" → 3-4 figuras humanoides lado a lado, cada uma com classe distinta (cores/chapéus/armas diferentes)
-- "⚔️ Missões" → mapa com X marcando local, ou ícone de quest (espada, pergaminho, bússola)
-- "🏆 Sistema de Pontos" → moedas douradas empilhadas + estrelas + troféu
-- "👑 Boss Final" → silhueta grande de inimigo intimidador com olhos brilhantes, ocupando centro
-- "📋 Roteiro do Professor" → figura de professor com livro/cajado em frente a quadro/atril
-
-REGRAS ESTRITAS:
-- viewBox="0 0 32 18" (cinema 16:9)
-- Use APENAS <rect> com width e height inteiros (geralmente "1")
-- Coordenadas integers: x 0–31, y 0–17
-- 6–10 cores hexadecimais por cena, com paleta apropriada ao tema "${topic}"
-- 40–120 rects por cena
-- Inclua shape-rendering="crispEdges" e xmlns
-- Composições centralizadas e LEGÍVEIS
-
-Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
-{
-  "🌍 Cenário": "<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 32 18\\" shape-rendering=\\"crispEdges\\">...</svg>",
-  "👥 Classes de Personagens": "<svg ...>...</svg>",
-  "⚔️ Missões": "<svg ...>...</svg>",
-  "🏆 Sistema de Pontos": "<svg ...>...</svg>",
-  "👑 Boss Final": "<svg ...>...</svg>",
-  "📋 Roteiro do Professor": "<svg ...>...</svg>"
-}
-
-Use as chaves EXATAMENTE como acima (com emojis).`;
-    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const keywordPrompt = `For a gamified storytelling campaign about "${topic}" (genre: ${genre}), generate one short English search keyword (2-4 words) per section to find an illustration on Pixabay.
+Return ONLY valid JSON with these exact keys:
+{"🌍 Cenário":"...","👥 Classes de Personagens":"...","⚔️ Missões":"...","🏆 Sistema de Pontos":"...","👑 Boss Final":"...","📋 Roteiro do Professor":"..."}`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: keywordPrompt });
     const raw = response.text || '';
     const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    const keywords: Record<string, string> = JSON.parse(cleaned);
+
+    const entries = await Promise.all(
+      STORY_SECTIONS.map(async section => {
+        const q = keywords[section];
+        if (!q) return [section, ''] as [string, string];
+        const cacheKey = `illus|${q.trim().toLowerCase()}`;
+        if (pixabayCache.has(cacheKey)) return [section, pixabayCache.get(cacheKey)!] as [string, string];
+        try {
+          const url = `https://pixabay.com/api/?key=${apiKey}&q=${encodeURIComponent(q.trim())}&image_type=illustration&safesearch=true&orientation=horizontal&per_page=20&order=popular`;
+          const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+          if (!res.ok) return [section, ''] as [string, string];
+          const data = await res.json();
+          if (!data.hits?.length) return [section, ''] as [string, string];
+          const hit = data.hits[Math.floor(Math.random() * Math.min(5, data.hits.length))];
+          const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
+          if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
+          return [section, imgUrl] as [string, string];
+        } catch { return [section, ''] as [string, string]; }
+      })
+    );
+    return Object.fromEntries(entries.filter(([, v]) => v));
   } catch (err) {
-    console.warn('[StoryPixelArts] generation failed:', err);
+    console.warn('[StoryImages] failed:', err);
     return {};
   }
 };
@@ -6868,11 +6860,11 @@ Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras). 
 Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"...","emoji":"🎯"}]}`;
       }
       if (activeMode === 'story') {
-        const [response, pixelArts] = await Promise.all([
+        const [response, sectionImages] = await Promise.all([
           generateContentWithRetry({ model: AI_MODEL, contents: prompt }),
-          generateStoryPixelArts(topic, genre)
+          generateStoryImages(topic, genre)
         ]);
-        setResult({ markdown: response.text || '', pixelArts });
+        setResult({ markdown: response.text || '', sectionImages });
       } else {
         const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const raw = response.text || '';
@@ -7160,10 +7152,10 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                                 return '';
                               };
                               const title = extractText(children).trim();
-                              const svg = result.pixelArts?.[title];
+                              const imgUrl = result.sectionImages?.[title];
                               return (
                                 <>
-                                  {svg && <div className="story-section-art" dangerouslySetInnerHTML={{ __html: svg }} />}
+                                  {imgUrl && <img src={imgUrl} alt={title} className="w-full rounded-xl mb-3 object-cover" style={{ maxHeight: 180 }} />}
                                   <h2 {...props}>{children}</h2>
                                 </>
                               );
