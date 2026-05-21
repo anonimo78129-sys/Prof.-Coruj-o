@@ -516,24 +516,39 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
     navItems.push({ id: 'admin', icon: Shield, label: 'Admin' });
   }
 
+  const [showLabels, setShowLabels] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTabClick = (id: Screen) => {
+    setScreen(id);
+    setShowLabels(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setShowLabels(false), 5000);
+  };
+
+  useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
+
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-sm bg-indigo-600 rounded-[2rem] py-3 px-6 flex justify-between items-center shadow-2xl z-50">
-      {navItems.map((item) => (
-        <button
-          key={item.id}
-          onClick={() => setScreen(item.id)}
-          className={`relative p-2 flex flex-col items-center gap-1 transition-all ${activeScreen === item.id ? 'text-white' : 'text-indigo-300 hover:text-indigo-200'}`}
-        >
-          <item.icon size={22} strokeWidth={activeScreen === item.id ? 2.5 : 2} className={activeScreen === item.id ? '-translate-y-1 transition-transform' : 'transition-transform'} />
-          <span className={`text-[9px] font-bold tracking-wider transition-opacity ${activeScreen === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
-          {activeScreen === item.id && (
-            <motion.div
-              layoutId="nav-glow"
-              className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full"
-            />
-          )}
-        </button>
-      ))}
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-sm bg-indigo-600 rounded-[2rem] py-3 px-6 flex justify-between items-center shadow-2xl z-50 transition-all duration-300">
+      {navItems.map((item) => {
+        const showLabel = activeScreen === item.id && showLabels;
+        return (
+          <button
+            key={item.id}
+            onClick={() => handleTabClick(item.id)}
+            className={`relative p-2 flex flex-col items-center transition-all duration-300 ${showLabel ? 'gap-1' : 'gap-0'} ${activeScreen === item.id ? 'text-white' : 'text-indigo-300 hover:text-indigo-200'}`}
+          >
+            <item.icon size={22} strokeWidth={activeScreen === item.id ? 2.5 : 2} className={activeScreen === item.id ? '-translate-y-1 transition-transform' : 'transition-transform'} />
+            <span className={`text-[9px] font-bold tracking-wider overflow-hidden transition-all duration-300 ${showLabel ? 'opacity-100 max-h-3' : 'opacity-0 max-h-0'}`}>{item.label}</span>
+            {activeScreen === item.id && (
+              <motion.div
+                layoutId="nav-glow"
+                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full"
+              />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 };
