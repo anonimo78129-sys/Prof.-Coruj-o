@@ -8256,7 +8256,7 @@ function AppInner() {
   const [phoneError, setPhoneError] = useState('');
   const [phoneSending, setPhoneSending] = useState(false);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const [globalAnnouncement, setGlobalAnnouncement] = useState<{message:string,active:boolean}|null>(null);
+  const [globalAnnouncement, setGlobalAnnouncement] = useState<{message:string,active:boolean,updatedAt:number}|null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -8268,10 +8268,23 @@ function AppInner() {
 
   useEffect(() => {
     if (!user) return;
-    getDoc(doc(db, 'config', 'announcement')).then(snap => {
-      if (snap.exists() && snap.data().active) setGlobalAnnouncement(snap.data() as any);
-    }).catch(() => {});
+    const unsub = onSnapshot(doc(db, 'config', 'announcement'), snap => {
+      if (!snap.exists()) { setGlobalAnnouncement(null); return; }
+      const data = snap.data() as {message:string,active:boolean,updatedAt:number};
+      if (!data.active || !data.message) { setGlobalAnnouncement(null); return; }
+      const dismissed = (() => { try { return localStorage.getItem('prof-coruja-announcement-seen'); } catch { return null; } })();
+      if (dismissed && Number(dismissed) === data.updatedAt) { setGlobalAnnouncement(null); return; }
+      setGlobalAnnouncement(data);
+    }, () => {});
+    return unsub;
   }, [user]);
+
+  const dismissAnnouncement = () => {
+    if (globalAnnouncement?.updatedAt) {
+      try { localStorage.setItem('prof-coruja-announcement-seen', String(globalAnnouncement.updatedAt)); } catch {}
+    }
+    setGlobalAnnouncement(null);
+  };
 
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
@@ -9341,12 +9354,47 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
     <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
       <ToastContainer />
 
-      {globalAnnouncement?.active && globalAnnouncement.message && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-indigo-600 text-white text-sm font-medium px-4 py-2 flex items-center justify-between shadow-lg">
-          <span className="flex-1 text-center">{globalAnnouncement.message}</span>
-          <button onClick={() => setGlobalAnnouncement(null)} className="ml-2 text-white/70 hover:text-white"><X size={16} /></button>
-        </div>
-      )}
+      <AnimatePresence>
+        {globalAnnouncement?.active && globalAnnouncement.message && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={dismissAnnouncement}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 px-6 py-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-2xl">📢</div>
+                  <h3 className="text-white font-bold text-lg">Aviso</h3>
+                </div>
+                <button onClick={dismissAnnouncement} className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-gray-700 text-base leading-relaxed whitespace-pre-wrap">{globalAnnouncement.message}</p>
+              </div>
+              <div className="px-6 pb-5">
+                <button
+                  onClick={dismissAnnouncement}
+                  className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl active:scale-[0.98] transition-transform shadow-md"
+                >
+                  Entendi
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Onboarding Modal ───────────────────────────────────────────── */}
       {showOnboarding && (
