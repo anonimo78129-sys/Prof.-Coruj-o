@@ -8245,15 +8245,6 @@ function AppInner() {
           }]);
           saved = true;
         }
-        if (saved) {
-          const typeLabel = task.type === 'slides' ? 'Slides' : task.type === 'activities' ? 'Atividades' : task.type === 'exam' ? 'Prova' : 'Plano de Aula';
-          setInboxMessages(prev => [...prev, {
-            id: Math.random().toString(36).substr(2, 9),
-            role: 'model' as const,
-            text: `${typeLabel} sobre "${topicLabel}" gerado com sucesso.`,
-            date: Date.now()
-          }]);
-        }
       }
     });
   }, [activeTasks]);
