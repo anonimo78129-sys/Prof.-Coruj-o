@@ -597,11 +597,22 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
       </div>
       <div className="flex gap-3 relative">
         {children}
+      {/* Bell with shake animation when unread */}
       <button onClick={() => setShowNotifications(!showNotifications)} className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm border border-gray-100 relative">
-        <Bell size={20} className="text-gray-600" />
-        {unreadCount > 0 && (
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-        )}
+        <motion.div
+          animate={unreadCount > 0 ? { rotate: [0, -18, 18, -12, 12, -6, 6, 0] } : { rotate: 0 }}
+          transition={{ duration: 0.6, repeat: unreadCount > 0 ? Infinity : 0, repeatDelay: 4 }}
+        >
+          <Bell size={20} className="text-gray-600" />
+        </motion.div>
+        <AnimatePresence>
+          {unreadCount > 0 && (
+            <motion.span
+              initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+              className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"
+            />
+          )}
+        </AnimatePresence>
       </button>
       {rightAction !== undefined ? rightAction : (
         <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-indigo-600 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
@@ -616,79 +627,106 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
       )}
 
       <AnimatePresence>
-        {showNotifications && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute top-12 right-0 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 origin-top-right"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-900">Notificações</h3>
-              {unreadCount > 0 && (
-                <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{unreadCount} nova{unreadCount > 1 ? 's' : ''}</span>
-              )}
-            </div>
-            
-            <div className="space-y-3 mb-4 max-h-[60vh] overflow-y-auto no-scrollbar">
-              {notifications.length > 0 ? (
-                notifications.map(notification => {
-                  const iconMap: Record<string, string> = { class: '📚', holiday: '🎉', prep: '📝', admin: '📋', commemorative: '🎊' };
-                  const emoji = notification.auto ? (iconMap[notification.icon] || '📌') : '✨';
-                  return (
-                    <div key={notification.id} className={`cursor-pointer p-3 rounded-xl border ${notification.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100/50'}`} onClick={() => {
-                      if (setScreen) setScreen('calendar');
-                      if (setNotifications) {
-                        setNotifications(notifications.map(n => n.id === notification.id ? {...n, read: true} : n));
-                      }
-                      setShowNotifications(false);
-                    }}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-base leading-none">{emoji}</span>
-                        <p className={`text-sm font-bold ${notification.read ? 'text-gray-700' : 'text-indigo-900'}`}>{notification.title}</p>
-                      </div>
-                      <p className={`text-xs leading-relaxed ${notification.read ? 'text-gray-600' : 'text-indigo-700'}`}>{notification.message}</p>
+        {showNotifications && (() => {
+          const relTime = (d: number) => {
+            const m = Math.floor((Date.now() - d) / 60000);
+            if (m < 1) return 'Agora';
+            if (m < 60) return `Há ${m}min`;
+            const h = Math.floor(m / 60);
+            if (h < 24) return `Há ${h}h`;
+            return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+          };
+          const iconCfg: Record<string, { icon: React.ReactNode; bg: string; text: string }> = {
+            class:          { icon: <BookOpen size={14} />,      bg: 'bg-indigo-100', text: 'text-indigo-600' },
+            holiday:        { icon: <Sparkles size={14} />,      bg: 'bg-amber-100',  text: 'text-amber-600' },
+            prep:           { icon: <FileText size={14} />,      bg: 'bg-violet-100', text: 'text-violet-600' },
+            admin:          { icon: <ClipboardList size={14} />, bg: 'bg-blue-100',   text: 'text-blue-600' },
+            commemorative:  { icon: <Trophy size={14} />,        bg: 'bg-pink-100',   text: 'text-pink-600' },
+            manual:         { icon: <Sparkles size={14} />,      bg: 'bg-indigo-100', text: 'text-indigo-600' },
+          };
+          // Only show: unread auto + all manual; hides read autos so "Limpar" truly clears the panel
+          const displayNotifs = notifications.filter(n => !(n.auto && n.read));
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute top-12 right-0 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 origin-top-right z-50"
+            >
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-gray-900 text-sm">Notificações</h3>
+                {unreadCount > 0 && (
+                  <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{unreadCount} nova{unreadCount > 1 ? 's' : ''}</span>
+                )}
+              </div>
+
+              <div className="space-y-2 mb-3 max-h-[55vh] overflow-y-auto no-scrollbar">
+                {displayNotifs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                      <Bell size={22} className="text-gray-400" />
                     </div>
-                  );
-                })
-              ) : (
-                <div className="flex flex-col items-center justify-center py-6 text-center">
-                  <Bell size={32} className="text-gray-300 mb-3" />
-                  <p className="text-sm font-bold text-gray-900">Tudo limpo!</p>
-                  <p className="text-xs text-gray-500 mt-1">Você não tem novas notificações.</p>
+                    <p className="text-sm font-bold text-gray-700">Tudo em dia!</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Nenhuma notificação no momento.</p>
+                  </div>
+                ) : (
+                  displayNotifs.map(n => {
+                    const cfg = iconCfg[n.auto ? (n.icon || 'class') : 'manual'];
+                    const dest: Screen = (!n.auto && n.title === 'Material Salvo') ? 'biblioteca' : 'calendar';
+                    return (
+                      <motion.div
+                        key={n.id}
+                        initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                        onClick={() => {
+                          if (setScreen) setScreen(dest);
+                          if (setNotifications) setNotifications(notifications.map(x => x.id === n.id ? { ...x, read: true } : x));
+                          setShowNotifications(false);
+                        }}
+                        className={`cursor-pointer p-3 rounded-xl flex items-start gap-3 transition-colors ${n.read ? 'bg-gray-50' : 'bg-indigo-50'}`}
+                      >
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.text}`}>
+                          {cfg.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start gap-1">
+                            <p className={`text-xs font-bold leading-snug ${n.read ? 'text-gray-700' : 'text-gray-900'}`}>{n.title}</p>
+                            <span className="text-[9px] text-gray-400 shrink-0 mt-0.5">{relTime(n.date)}</span>
+                          </div>
+                          <p className={`text-[11px] mt-0.5 leading-snug ${n.read ? 'text-gray-500' : 'text-gray-600'}`}>{n.message}</p>
+                        </div>
+                        {!n.read && <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full shrink-0 mt-1.5" />}
+                      </motion.div>
+                    );
+                  })
+                )}
+              </div>
+
+              {(displayNotifs.length > 0 || unreadCount > 0) && setNotifications && (
+                <div className="flex gap-2 mb-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))}
+                      className="flex-1 text-[11px] font-bold bg-indigo-50 text-indigo-600 py-2 rounded-xl"
+                    >Marcar lidas</button>
+                  )}
+                  <button
+                    onClick={() => setNotifications([])}
+                    className="flex-1 text-[11px] font-bold bg-gray-100 text-gray-600 py-2 rounded-xl"
+                  >Limpar tudo</button>
                 </div>
               )}
-            </div>
 
-            {notifications.length > 0 && setNotifications && (
-              <div className="flex gap-2 mb-2">
-                {unreadCount > 0 && (
-                  <button
-                    onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))}
-                    className="flex-1 text-[11px] font-bold bg-indigo-50 text-indigo-600 py-2.5 rounded-xl hover:bg-indigo-100 transition-colors"
-                  >
-                    Marcar lidas
-                  </button>
-                )}
-                <button
-                  onClick={() => setNotifications([])}
-                  className="flex-1 text-[11px] font-bold bg-gray-50 text-gray-600 py-2.5 rounded-xl hover:bg-gray-100 transition-colors border border-gray-200"
-                >
-                  Limpar Histórico
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={requestNotificationPermission}
-              disabled={permissionStatus === 'granted'}
-              className="w-full text-xs font-bold bg-gray-50 text-gray-600 py-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 border border-gray-200 mt-2"
-            >
-              <Bell size={14} />
-              {permissionStatus === 'granted' ? 'Notificações do sistema ativadas' : 'Ativar notificações do sistema'}
-            </button>
-          </motion.div>
-        )}
+              <button
+                onClick={requestNotificationPermission}
+                disabled={permissionStatus === 'granted'}
+                className="w-full text-[11px] font-bold bg-gray-50 text-gray-500 py-2 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5 border border-gray-100"
+              >
+                <Bell size={12} />
+                {permissionStatus === 'granted' ? 'Notificações ativas' : 'Ativar notificações do sistema'}
+              </button>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
     </div>
     </div>
