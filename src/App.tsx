@@ -2799,8 +2799,17 @@ const PlannerScreen = ({
                 <button
                   key={key}
                   onClick={() => setPlannerMode(key)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${mode === key ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}
+                  className="relative flex-1 py-2 rounded-xl text-xs font-bold transition-colors z-10"
+                  style={{ color: mode === key ? '#4338ca' : '#6b7280' }}
                 >
+                  {mode === key && (
+                    <motion.div
+                      layoutId="planner-tab-pill"
+                      className="absolute inset-0 bg-white rounded-xl shadow-sm"
+                      style={{ zIndex: -1 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                    />
+                  )}
                   {label}
                 </button>
               ))}
