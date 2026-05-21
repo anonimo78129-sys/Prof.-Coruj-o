@@ -616,13 +616,12 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
       </button>
       {rightAction !== undefined ? rightAction : (
         <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-indigo-600 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
-          {profile.photo ? (
-            <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white">
-              <User className="w-6 h-6" />
-            </div>
-          )}
+          <img
+            src={profile.photo || 'https://i.ibb.co/67chNLnZ/20260521-122245-0000.png'}
+            alt="Profile"
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
         </button>
       )}
 
