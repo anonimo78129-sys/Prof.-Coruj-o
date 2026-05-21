@@ -1,0 +1,22 @@
+{
+  "short_name": "Prof. Corujão",
+  "name": "Prof. Corujão - IA Educacional",
+  "icons": [
+    {
+      "src": "https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#4f46e5",
+  "background_color": "#4f46e5"
+}
