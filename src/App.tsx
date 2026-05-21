@@ -4031,8 +4031,8 @@ const ProfileScreen = ({
       <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
-        <div className="relative">
-          <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
+        <div className="relative inline-block mb-4">
+          <div className="w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
               <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
@@ -4045,6 +4045,14 @@ const ProfileScreen = ({
             </div>
             {isUploadingPhoto && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={24} className="text-white animate-spin" /></div>}
           </div>
+          {profile.photo && !isUploadingPhoto && (
+            <button
+              onClick={() => setProfile({ ...profile, photo: '' })}
+              className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md border-2 border-white"
+            >
+              <X size={12} />
+            </button>
+          )}
           <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
         </div>
         {isEditingProfile ? (
