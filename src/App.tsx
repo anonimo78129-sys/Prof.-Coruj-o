@@ -477,7 +477,11 @@ interface BackgroundTask {
   result?: any;
   error?: string;
   startTime: number;
+  meta?: Record<string, any>;
 }
+
+const STUDIO_TASK_TYPES = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'escape', 'memory'] as const;
+const isStudioTaskType = (t: string) => (STUDIO_TASK_TYPES as readonly string[]).includes(t);
 
 interface UserProfile {
   name: string;
@@ -7047,7 +7051,13 @@ const EstudioScreen = ({
   setPlannerMode,
   notifications,
   setNotifications,
-  schedules
+  schedules,
+  addTask,
+  updateTask,
+  activeTasks,
+  removeTask,
+  studioReopenTaskId,
+  setStudioReopenTaskId,
 }: {
   estudioContext: string,
   setEstudioContext: (c: string | ((prev: string) => string)) => void,
@@ -7058,7 +7068,13 @@ const EstudioScreen = ({
   setPlannerMode: (m: PlannerMode) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
-  schedules?: ClassSchedule[]
+  schedules?: ClassSchedule[],
+  addTask: (task: Omit<BackgroundTask, 'id' | 'status' | 'startTime'>) => string,
+  updateTask: (id: string, updates: Partial<BackgroundTask>) => void,
+  activeTasks: Record<string, BackgroundTask>,
+  removeTask: (id: string) => void,
+  studioReopenTaskId: string | null,
+  setStudioReopenTaskId: (id: string | null) => void,
 }) => {
   const [activeMode, setActiveMode] = useState<GameMode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -7082,12 +7098,39 @@ const EstudioScreen = ({
   const defaultSubject = selectedClass?.subject || profile.subject || '';
   const defaultLevel = selectedClass?.level || 'Ensino Fundamental II';
 
-  const closeModal = () => { setActiveMode(null); setResult(null); setTopic(''); };
+  const localGenActiveRef = useRef(false);
+
+  const closeModal = () => {
+    localGenActiveRef.current = false;
+    setActiveMode(null); setResult(null); setTopic(''); setIsGenerating(false);
+  };
+
+  useEffect(() => {
+    if (!studioReopenTaskId) return;
+    const task = activeTasks[studioReopenTaskId];
+    if (!task || task.status !== 'completed' || !task.meta) return;
+    const meta = task.meta as { mode?: GameMode; topic?: string; classId?: string; escapeTheme?: EscapeTheme; bingoSize?: 3 | 5 };
+    if (meta.mode) setActiveMode(meta.mode);
+    if (meta.topic) setTopic(meta.topic);
+    if (meta.classId !== undefined) setClassId(meta.classId);
+    if (meta.escapeTheme) setEscapeTheme(meta.escapeTheme);
+    setResult(task.result);
+    removeTask(studioReopenTaskId);
+    setStudioReopenTaskId(null);
+  }, [studioReopenTaskId, activeTasks, removeTask, setStudioReopenTaskId]);
 
   const generate = async () => {
     if (!topic.trim()) { toast.error('Qual e o tema? O Corujao precisa saber para criar!'); return; }
+    if (!activeMode) return;
     setIsGenerating(true);
     setResult(null);
+    localGenActiveRef.current = true;
+    const modeLabels: Record<GameMode, string> = { story: 'Storytelling', quiz: 'Quiz', wordsearch: 'Caça-Palavras', crossword: 'Cruzadas', bingo: 'Bingo', escape: 'Escape Room', memory: 'Memória' };
+    const taskId = addTask({
+      type: activeMode,
+      title: `${modeLabels[activeMode]}: ${topic.trim().slice(0, 40)}`,
+      meta: { mode: activeMode, topic, classId, escapeTheme, bingoSize, bingoFreeText, bingoCardCount, wsGridSize, escapeEnigmaCount, difficulty, genre, duration, count, quizType },
+    });
     try {
       const context = `Disciplina: ${defaultSubject || 'Geral'} | Nível: ${defaultLevel}${selectedClass ? ` | Turma: ${selectedClass.name}` : ''} | Tema: ${topic}`;
       let prompt = '';
@@ -7167,12 +7210,13 @@ Retorne APENAS JSON válido (sem markdown):
 Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras). Inclua 1 emoji representando o conceito.
 Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"...","emoji":"🎯"}]}`;
       }
+      let finalResult: any = null;
       if (activeMode === 'story') {
         const [response, sectionImages] = await Promise.all([
           generateContentWithRetry({ model: AI_MODEL, contents: prompt }),
           generateStoryImages(topic, genre)
         ]);
-        setResult({ markdown: response.text || '', sectionImages });
+        finalResult = { markdown: response.text || '', sectionImages };
       } else if (activeMode === 'escape') {
         const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const raw = response.text || '';
@@ -7199,7 +7243,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
           }));
           parsed.enigmas = withImages;
         }
-        setResult({ ...parsed, theme: escapeTheme });
+        finalResult = { ...parsed, theme: escapeTheme };
       } else {
         const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const raw = response.text || '';
@@ -7207,23 +7251,27 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
         const parsed = JSON.parse(cleaned);
         if (activeMode === 'wordsearch') {
           const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word), wsGridSize);
-          setResult({ ...parsed, grid: built.grid });
+          finalResult = { ...parsed, grid: built.grid };
         } else if (activeMode === 'bingo') {
           const cards = buildBingoCards(parsed.items, bingoCardCount, bingoSize, bingoFreeText);
-          setResult({ ...parsed, cards, bingoSize });
+          finalResult = { ...parsed, cards, bingoSize };
         } else if (activeMode === 'crossword') {
           const crossword = buildCrosswordGrid(parsed.words || []);
-          setResult({ ...parsed, crossword });
+          finalResult = { ...parsed, crossword };
         } else {
-          setResult(parsed);
+          finalResult = parsed;
         }
       }
+      updateTask(taskId, { status: 'completed', result: finalResult });
+      if (localGenActiveRef.current) setResult(finalResult);
     } catch (err: any) {
       console.error('[Gamification] error:', err);
       const msg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
-      toast.error(msg || 'A IA travou nessa. Aguarde um instante e tente de novo.');
+      updateTask(taskId, { status: 'error', error: msg || 'Falha ao gerar.' });
+      if (localGenActiveRef.current) toast.error(msg || 'A IA travou nessa. Aguarde um instante e tente de novo.');
     }
-    setIsGenerating(false);
+    if (localGenActiveRef.current) setIsGenerating(false);
+    localGenActiveRef.current = false;
   };
 
   const modeMeta: Record<GameMode, { title: string, icon: any, color: string, bg: string, desc: string }> = {
@@ -7306,8 +7354,20 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   {(() => { const Icon = modeMeta[activeMode].icon; return <Icon size={22} className={activeMode === 'story' ? 'text-indigo-600' : modeMeta[activeMode].color} />; })()}
                   <h3 className="font-bold text-lg text-gray-900">{modeMeta[activeMode].title}</h3>
                 </div>
-                <button onClick={closeModal} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"><X size={18} /></button>
+                <button
+                  onClick={closeModal}
+                  title={isGenerating ? 'Fechar — a geração continua em segundo plano' : 'Fechar'}
+                  className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
+                >
+                  <X size={18} />
+                </button>
               </div>
+              {isGenerating && (
+                <div className="px-5 pt-3 -mb-1 flex items-center gap-2 text-[11px] text-indigo-500 font-semibold">
+                  <Loader2 size={12} className="animate-spin" />
+                  <span>Pode fechar — a geração continua em segundo plano.</span>
+                </div>
+              )}
 
               {!result && (
                 <div className="p-5 space-y-4">
@@ -7757,6 +7817,54 @@ const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, n
 
 // --- Global Task Indicator ---
 
+const TaskCard = ({ task, onTaskClick }: { task: BackgroundTask, onTaskClick?: (task: BackgroundTask) => void }) => {
+  const ctx: 'planner' | 'studio' = isStudioTaskType(task.type) ? 'studio' : 'planner';
+  const rotatingMsg = useFunnyLoadingMessage(task.status === 'processing', ctx);
+  return (
+    <motion.div
+      key={task.id}
+      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+      onClick={() => task.status === 'completed' && onTaskClick?.(task)}
+      className={`pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-xl border border-indigo-100 flex items-center justify-between gap-4 max-w-sm mx-auto overflow-hidden relative ${task.status === 'completed' ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+    >
+      {task.status === 'processing' && (
+        <motion.div
+          className="absolute bottom-0 left-0 h-1 bg-indigo-500"
+          initial={{ width: '0%' }}
+          animate={{ width: '95%' }}
+          transition={{ duration: 25, ease: 'linear' }}
+        />
+      )}
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+          task.status === 'processing' ? 'bg-indigo-600 text-white' :
+          task.status === 'completed' ? 'bg-emerald-500 text-white' :
+          'bg-red-500 text-white'
+        }`}>
+          {task.status === 'processing' ? <Loader2 className="animate-spin" size={18} /> :
+           task.status === 'completed' ? <CheckCircle2 size={18} /> :
+           <Sparkles size={18} />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-black text-gray-900 truncate uppercase tracking-tight">{task.title}</p>
+          <p className="text-[10px] text-gray-500 font-bold truncate">
+            {task.status === 'processing' ? (rotatingMsg || 'Iniciando...') :
+             task.status === 'completed' ? 'Pronto! Toque para abrir.' :
+             'Erro ao processar'}
+          </p>
+        </div>
+      </div>
+      {task.status === 'completed' && (
+        <div className="w-6 h-6 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500">
+          <CheckCircle2 size={14} />
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 const GlobalTaskIndicator = ({ tasks, onTaskClick }: { tasks: Record<string, BackgroundTask>, onTaskClick?: (task: BackgroundTask) => void }) => {
   const activeTasksList = Object.values(tasks);
   if (activeTasksList.length === 0) return null;
@@ -7765,47 +7873,7 @@ const GlobalTaskIndicator = ({ tasks, onTaskClick }: { tasks: Record<string, Bac
     <div className="fixed bottom-28 left-4 right-4 z-[100] space-y-2 pointer-events-none">
       <AnimatePresence>
         {activeTasksList.map(task => (
-          <motion.div
-            key={task.id}
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-            onClick={() => task.status === 'completed' && onTaskClick?.(task)}
-            className={`pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-xl border border-indigo-100 flex items-center justify-between gap-4 max-w-sm mx-auto overflow-hidden relative ${task.status === 'completed' ? 'cursor-pointer hover:bg-slate-50' : ''}`}
-          >
-            {task.status === 'processing' && (
-              <motion.div 
-                className="absolute bottom-0 left-0 h-1 bg-indigo-500"
-                initial={{ width: "0%" }}
-                animate={{ width: "95%" }}
-                transition={{ duration: 25, ease: "linear" }}
-              />
-            )}
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                task.status === 'processing' ? 'bg-indigo-600 text-white' :
-                task.status === 'completed' ? 'bg-emerald-500 text-white' :
-                'bg-red-500 text-white'
-              }`}>
-                {task.status === 'processing' ? <Loader2 className="animate-spin" size={18} /> :
-                 task.status === 'completed' ? <CheckCircle2 size={18} /> :
-                 <Sparkles size={18} />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-black text-gray-900 truncate uppercase tracking-tight">{task.title}</p>
-                <p className="text-[10px] text-gray-500 font-bold">
-                  {task.status === 'processing' ? 'Processando em segundo plano...' :
-                   task.status === 'completed' ? 'Finalizado com sucesso!' :
-                   'Erro ao processar'}
-                </p>
-              </div>
-            </div>
-            {task.status === 'completed' && (
-              <div className="w-6 h-6 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500">
-                <CheckCircle2 size={14} />
-              </div>
-            )}
-          </motion.div>
+          <TaskCard key={task.id} task={task} onTaskClick={onTaskClick} />
         ))}
       </AnimatePresence>
     </div>
@@ -8758,6 +8826,7 @@ function AppInner() {
   
   // Background Task Management
   const [activeTasks, setActiveTasks] = useState<Record<string, BackgroundTask>>({});
+  const [studioReopenTaskId, setStudioReopenTaskId] = useState<string | null>(null);
   
   const addTask = (task: Omit<BackgroundTask, 'id' | 'status' | 'startTime'>): string => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -8793,6 +8862,10 @@ function AppInner() {
     if (updates.status === 'completed' || updates.status === 'error') {
       setTimeout(() => {
         setActiveTasks(prev => {
+          const task = prev[id];
+          if (!task) return prev;
+          // Keep completed studio tasks alive until user clicks to reopen the result.
+          if (task.status === 'completed' && isStudioTaskType(task.type)) return prev;
           const newState = { ...prev };
           delete newState[id];
           return newState;
@@ -8801,13 +8874,13 @@ function AppInner() {
     }
   };
 
-  // Watchdog: any task processing for more than 90s is auto-failed.
+  // Watchdog: any task processing for more than the per-type limit is auto-failed.
   // Prevents the UI from being stuck in "loading" forever if a Promise hangs silently.
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
       Object.values(activeTasks).forEach(task => {
-        const limit = task.type === 'plan' ? 150000 : 90000;
+        const limit = task.type === 'plan' ? 150000 : isStudioTaskType(task.type) ? 150000 : 90000;
         if (task.status === 'processing' && now - task.startTime > limit) {
           console.warn(`Task ${task.id} (${task.type}) stuck > ${limit / 1000}s — auto-failing.`);
           updateTask(task.id, { status: 'error', error: 'A geração demorou demais e foi cancelada. Tente novamente.' });
@@ -10151,7 +10224,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               }
             }
           }} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
@@ -10159,13 +10232,18 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         <GlobalTaskIndicator 
           tasks={activeTasks} 
           onTaskClick={(task) => {
+            if (isStudioTaskType(task.type)) {
+              setStudioReopenTaskId(task.id);
+              setScreen('estudio');
+              return;
+            }
             if (task.type === 'plan') setPlannerMode('plan');
             else if (task.type === 'slides') setPlannerMode('slides');
             else if (task.type === 'activities') setPlannerMode('activities');
             else if (task.type === 'exam') setPlannerMode('exam');
             setScreen('planner');
             removeTask(task.id);
-          }} 
+          }}
         />
         <BottomNav activeScreen={screen} setScreen={setScreen} isAdmin={profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com'} />
       </div>
