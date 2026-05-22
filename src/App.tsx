@@ -29,42 +29,48 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
 
 const AI_MODEL = 'gemini-2.5-flash';
 
-const FUNNY_LOADING_MESSAGES = [
-  "Acordando o Corujão às 3 da manhã...",
-  "Consultando os pergaminhos ancestrais...",
-  "Pedindo ajuda pra turma do 9º ano...",
-  "O Corujão está bebendo café extra forte...",
-  "Tentando não dormir na própria aula...",
-  "Revisando a matéria de véspera...",
-  "Corrigindo provas em tempo recorde...",
-  "Calculando quantos alunos vão passar...",
-  "Digitando mais rápido que o diretor vê...",
-  "Buscando inspiração no quadro negro...",
-  "Finalizando o planejamento às 23h59...",
-  "Convencendo a IA a não tirar nota vermelha...",
-  "Bebendo a 4ª xícara de café do dia...",
-  "Rezando pra impressora não enguiçar...",
-  "Procurando o apagador que sumiu de novo...",
-  "Pedindo silêncio pra turma barulhenta...",
-  "Atualizando o diário de bordo pedagógico...",
-  "Verificando se alguém fez o dever de casa...",
-  "Separando a turma que não para de conversar...",
-  "Quase lá! O Corujão está no modo turbo...",
-];
+const LOADING_MESSAGES = {
+  planner: [
+    "Dando uma olhada no tema...",
+    "Pensando nos objetivos da aula...",
+    "Montando a sequência didática...",
+    "Definindo como vai fluir a aula...",
+    "Escrevendo com atenção...",
+    "Adaptando para a turma...",
+    "Dando os últimos ajustes...",
+    "Quase pronto...",
+  ],
+  studio: [
+    "Criando o cenário...",
+    "Pensando nos desafios...",
+    "Calibrando a dificuldade...",
+    "Encaixando as peças...",
+    "Escrevendo os enigmas...",
+    "Checando se faz sentido...",
+    "Finalizando tudo...",
+  ],
+  chat: [
+    "Lendo aqui com atenção...",
+    "Pensando na melhor resposta...",
+    "Organizando as ideias...",
+    "Checando as informações...",
+    "Escrevendo pra você...",
+  ],
+};
 
-function useFunnyLoadingMessage(isLoading: boolean): string {
+function useFunnyLoadingMessage(isLoading: boolean, context: keyof typeof LOADING_MESSAGES = 'planner'): string {
   const [msg, setMsg] = React.useState('');
   React.useEffect(() => {
-    if (!isLoading) return;
-    const shuffled = [...FUNNY_LOADING_MESSAGES].sort(() => Math.random() - 0.5);
+    if (!isLoading) { setMsg(''); return; }
+    const messages = LOADING_MESSAGES[context];
     let i = 0;
-    setMsg(shuffled[0]);
+    setMsg(messages[0]);
     const id = setInterval(() => {
-      i = (i + 1) % shuffled.length;
-      setMsg(shuffled[i]);
+      i = Math.min(i + 1, messages.length - 1);
+      setMsg(messages[i]);
     }, 3000);
     return () => clearInterval(id);
-  }, [isLoading]);
+  }, [isLoading, context]);
   return msg;
 }
 
@@ -2342,7 +2348,7 @@ const PlannerScreen = ({
   const profileSchoolName = profile.schoolName;
   const selectedClass = schedules.find(s => s.id === selectedClassId);
 
-  const loadingMessage = useFunnyLoadingMessage(loading);
+  const loadingMessage = useFunnyLoadingMessage(loading, 'planner');
 
   const getSlidesPrompt = (topicText: string, className: string, tone: string, complexity: string, focus: string, groundingContent: string, slideCount: number) => `Você é um Diretor de Arte Sênior. Sua tarefa é analisar o conteúdo do usuário e transformá-lo em uma apresentação de ${slideCount} slides sobre "${topicText}". 
         Turma: "${className}"
@@ -3356,7 +3362,7 @@ const ChatScreen = ({
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const chatMenuRef = useRef<HTMLDivElement>(null);
-  const chatLoadingMsg = useFunnyLoadingMessage(loading);
+  const chatLoadingMsg = useFunnyLoadingMessage(loading, 'chat');
 
   useEffect(() => {
     if (!showChatMenu) return;
@@ -7071,7 +7077,7 @@ const EstudioScreen = ({
   const [escapeTheme, setEscapeTheme] = useState<EscapeTheme>('medieval');
   const [escapeEnigmaCount, setEscapeEnigmaCount] = useState<4 | 5 | 6>(5);
 
-  const studioLoadingMsg = useFunnyLoadingMessage(isGenerating);
+  const studioLoadingMsg = useFunnyLoadingMessage(isGenerating, 'studio');
   const selectedClass = (schedules || []).find(s => s.id === classId);
   const defaultSubject = selectedClass?.subject || profile.subject || '';
   const defaultLevel = selectedClass?.level || 'Ensino Fundamental II';
