@@ -2020,6 +2020,7 @@ const sanitizeSlideData = (parsed: any): any => {
         data: {
           ...d,
           title: stripSlideMarkup(d.title),
+          kicker: stripSlideMarkup(d.kicker),
           subtitle: stripSlideMarkup(d.subtitle),
           author: stripSlideMarkup(d.author),
           quote: stripSlideMarkup(d.quote),
@@ -2429,6 +2430,7 @@ const PlannerScreen = ({
         - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
         - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
         - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
+        - KICKER (obrigatório em TODO slide): campo "kicker" com um rótulo editorial curto de 1-2 palavras em MAIÚSCULAS que aparece acima do título (ex: "CONCEITO", "CONTEXTO", "EXEMPLO", "APLICAÇÃO", "RESUMO", "DEFINIÇÃO"). Deve resumir o papel do slide.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
         - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
             **palavra** → negrito estratégico para termos-chave
@@ -2445,14 +2447,14 @@ const PlannerScreen = ({
           "presentationTitle": "...",
           "theme": { "primaryColor": "#hex", "accentColor": "#hex", "backgroundColor": "#hex", "fontTitle": "...", "fontBody": "..." },
           "slides": [
-            { "layoutID": "LAYOUT_COVER",        "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_COVER",        "data": { "kicker": "APRESENTAÇÃO", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
             { "layoutID": "LAYOUT_QUOTE",         "data": { "title": "...", "quote": "...", "author": "..." } },
             { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "title": "...", "column1": "...", "column2": "..." } },
             { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
             { "layoutID": "LAYOUT_STATS",         "data": { "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "..." }] } },
             { "layoutID": "LAYOUT_TIMELINE",      "data": { "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
             { "layoutID": "LAYOUT_TOPICS",        "data": { "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }] } },
-            { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "title": "...", "text": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "kicker": "CONCEITO", "title": "...", "text": "...", "illustrationQuery": "..." } },
             { "layoutID": "LAYOUT_REFERENCES",    "data": { "title": "Referências", "references": ["..."] } }
           ]
         }`;
@@ -2583,22 +2585,52 @@ const PlannerScreen = ({
       const teacherLabel = profileName || '';
       const totalSlides = presentationData.slides.length;
 
+      // Typography — Segoe UI is clean, modern and ships with Office on every
+      // Windows machine, so it renders reliably (unlike web-only fonts).
+      const FONT_T = 'Segoe UI';        // títulos
+      const FONT_B = 'Segoe UI';        // corpo
+      const FONT_Q = 'Georgia';         // citações (serifa de contraste)
+      const LEFT = 0.55;                // margem esquerda consistente
+      const INK = '334155';             // corpo de texto (slate-700, mais suave que preto)
+      const INK_SOFT = '64748B';        // texto secundário
+
+      // Rasteriza um ícone Lucide para PNG (branco) para uso nos cards.
+      const iconCache = new Map<string, string>();
+      const svgStringToPng = (svg: string, px: number): Promise<string> => new Promise(resolve => {
+        const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = px; canvas.height = px;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { URL.revokeObjectURL(url); resolve(''); return; }
+          ctx.drawImage(img, 0, 0, px, px);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
+        img.src = url;
+      });
+      const renderIconPng = async (name: string, colorHex: string, px = 128): Promise<string> => {
+        const key = `${name}|${colorHex}`;
+        if (iconCache.has(key)) return iconCache.get(key)!;
+        try {
+          const { renderToStaticMarkup } = await import('react-dom/server');
+          let svg = renderToStaticMarkup(React.createElement(DynamicIcon, { name, color: colorHex, size: px, strokeWidth: 2 } as any) as any);
+          if (!svg.includes('xmlns')) svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+          const png = await svgStringToPng(svg, px);
+          iconCache.set(key, png);
+          return png;
+        } catch { return ''; }
+      };
+
       const addFooter = (slide: any, slideNum: number, darkBg = false) => {
         const fg = darkBg ? 'FFFFFF' : 'C4C9D4';
         // Número do slide — canto inferior esquerdo, muito discreto
         slide.addText(`${slideNum} / ${totalSlides}`, { x: 0.15, y: 5.22, w: 0.8, h: 0.22, fontSize: 7, color: fg, align: 'left' as const, transparency: 35 });
         // Marca d'água "Prof. Corujão" — canto inferior direito, discreta
         slide.addText('Prof. Corujão', { x: 7.25, y: 5.22, w: 2.6, h: 0.22, fontSize: 7, color: darkBg ? 'FFFFFF' : 'B0B7C3', transparency: darkBg ? 35 : 45, italic: true, align: 'right' as const, fontFace: 'Calibri' });
-      };
-
-      const addAccentBar = (slide: any, vertical = false) => {
-        if (vertical) {
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.18, h: 5.1, fill: { color: pc } });
-          slide.addShape(pres.ShapeType.rect, { x: 0.18, y: 0, w: 0.06, h: 5.1, fill: { color: ac, transparency: 40 } });
-        } else {
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
-        }
       };
 
       // Pre-fetch all images as base64 to avoid CORS failures when pptxgenjs
@@ -2623,12 +2655,34 @@ const PlannerScreen = ({
         }
       };
 
+      // Pre-render every icon used in topics/stats to white PNGs (sit on colored circles).
+      const iconNames = new Set<string>();
+      presentationData.slides.forEach(s => {
+        if (Array.isArray((s.data as any).topics)) (s.data as any).topics.forEach((t: any) => t?.icon && iconNames.add(t.icon));
+        if (Array.isArray((s.data as any).stats)) (s.data as any).stats.forEach((t: any) => t?.icon && iconNames.add(t.icon));
+      });
+      await Promise.all(Array.from(iconNames).map(n => renderIconPng(n, '#FFFFFF', 128)));
+      const iconPng = (name?: string) => (name ? iconCache.get(`${name}|#FFFFFF`) || '' : '');
+
+      // Cabeçalho consistente: eyebrow (rótulo) + título + traço de acento.
+      const addHeader = (slide: any, kicker: string | undefined, title: string, darkBg = false) => {
+        const hasKick = !!(kicker && kicker.trim());
+        if (hasKick) {
+          slide.addText((kicker as string).toUpperCase(), { x: LEFT, y: 0.42, w: 9.0 - LEFT, h: 0.28, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
+        }
+        const titleY = hasKick ? 0.74 : 0.5;
+        slide.addText(title || '', { x: LEFT, y: titleY, w: 9.0 - LEFT, h: 0.85, fontSize: 30, color: darkBg ? 'FFFFFF' : pc, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
+        slide.addShape(pres.ShapeType.rect, { x: LEFT, y: titleY + 0.78, w: 0.9, h: 0.055, fill: { color: ac } });
+        return titleY + 0.95; // y onde o conteúdo pode começar
+      };
+      const imgShadow = { type: 'outer' as const, blur: 10, offset: 3, angle: 90, color: '94A3B8', opacity: 0.45 };
+
       for (let si = 0; si < presentationData.slides.length; si++) {
         const slideData = presentationData.slides[si];
         const slide = pres.addSlide();
-        const titleOpts = { fontFace: 'Calibri', color: pc, bold: true, fit: 'shrink' as const };
-        const bodyOpts = { fontFace: 'Calibri', color: '374151', fontSize: 13 };
+        const bodyOpts = { fontFace: FONT_B, color: INK, fontSize: 13 };
         const shrink = { fit: 'shrink' as const };
+        const kicker = (slideData.data as any).kicker as string | undefined;
 
         if (slideData.layoutID === 'LAYOUT_COVER') {
           slide.background = { color: pc };
@@ -2640,74 +2694,73 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.ellipse, { x: -0.4, y: 3.8, w: 1.8, h: 1.8, fill: { color: ac, transparency: 60 } });
           slide.addShape(pres.ShapeType.ellipse, { x: 3.5, y: -0.4, w: 1.2, h: 1.2, fill: { color: 'FFFFFF', transparency: 80 } });
 
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 1.1, w: 4.7, h: 2.2, fontSize: 38, fontFace: 'Calibri', color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5, ...shrink });
-          slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.35, w: 1.2, h: 0.06, fill: { color: ac } });
-          slide.addText(slideData.data.subtitle || '', { x: 0.5, y: 3.5, w: 4.7, h: 0.7, fontSize: 14, fontFace: 'Calibri', color: 'D1D5DB', align: 'left', ...shrink });
-          slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.5, y: 4.6, w: 4.7, h: 0.35, fontSize: 9, fontFace: 'Calibri', color: 'A5B4FC', align: 'left' });
+          // Eyebrow / kicker
+          slide.addText((kicker || 'Apresentação').toUpperCase(), { x: 0.55, y: 0.85, w: 4.6, h: 0.3, fontSize: 11, fontFace: FONT_B, color: 'FFFFFF', bold: true, charSpacing: 3, transparency: 25 });
+          slide.addText(slideData.data.title || '', { x: 0.5, y: 1.25, w: 4.7, h: 2.1, fontSize: 40, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5, ...shrink });
+          slide.addShape(pres.ShapeType.rect, { x: 0.55, y: 3.42, w: 1.2, h: 0.06, fill: { color: ac } });
+          slide.addText(slideData.data.subtitle || '', { x: 0.55, y: 3.62, w: 4.6, h: 0.7, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
+          slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.55, y: 4.65, w: 4.6, h: 0.35, fontSize: 9, fontFace: FONT_B, color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: 5.6, y: 0.3, w: 4.2, h: 4.8, sizing: { type: 'contain', w: 4.2, h: 4.8 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 5.7, y: 0.5, w: 4.0, h: 4.5, sizing: { type: 'cover', w: 4.0, h: 4.5 }, rounding: false, shadow: imgShadow });
           }
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
           slide.background = { color: bg };
           const isLeft = slideData.layoutID === 'LAYOUT_CONTENT_LEFT';
-          addAccentBar(slide, false);
-          const textX = isLeft ? 0.4 : 0.4;
-          const imgX = isLeft ? 5.8 : 0.4;
-          const contentX = isLeft ? 0.4 : 4.4;
+          const imgX = isLeft ? 6.0 : 0.0;
+          const contentX = isLeft ? LEFT : 4.35;
+          const contentW = 4.85;
 
+          // Full-height image panel with brand tint for unity
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'cover', w: 3.8, h: 4.8 } });
-            slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 82 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0, w: 4.0, h: 5.5, sizing: { type: 'cover', w: 4.0, h: 5.5 } });
+            slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0, w: 4.0, h: 5.5, fill: { color: pc, transparency: 78 } });
+            slide.addShape(pres.ShapeType.rect, { x: isLeft ? imgX : imgX + 3.94, y: 0, w: 0.06, h: 5.5, fill: { color: ac } });
           }
 
-          // Title area with accent
-          slide.addShape(pres.ShapeType.rect, { x: contentX, y: 0.22, w: 5.2, h: 0.08, fill: { color: ac } });
-          slide.addText(slideData.data.title || '', { x: contentX, y: 0.38, w: 5.2, h: 0.8, fontSize: 24, ...titleOpts });
-          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 22 });
-          slide.addText(parsedText, { x: contentX, y: 1.3, w: 5.2, h: 3.6, valign: 'top', align: 'left', ...shrink });
-          // Arrow pointing toward image
-          const arrowX = isLeft ? 5.45 : 4.35;
-          slide.addShape(pres.ShapeType.rect, { x: arrowX, y: 2.45, w: 0.3, h: 0.06, fill: { color: ac } });
-          slide.addShape(pres.ShapeType.rect, { x: isLeft ? arrowX + 0.22 : arrowX, y: 2.27, w: 0.08, h: 0.42, fill: { color: ac }, rotate: isLeft ? 45 : -45 });
+          const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false);
+          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13, lineSpacing: 24 });
+          slide.addText(parsedText, { x: contentX, y: contentStartY + 0.05, w: contentW, h: 4.7 - contentStartY, valign: 'top', align: 'left', ...shrink });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_TOP') {
           slide.background = { color: bg };
-          addAccentBar(slide, false);
-          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.22, w: 9.2, h: 0.06, fill: { color: ac } });
-          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.36, w: 9.2, h: 0.7, fontSize: 26, ...titleOpts });
-          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(parsedText, { x: 0.4, y: 1.2, w: 9.2, h: 1.55, valign: 'top', align: 'left', ...shrink });
-          // Down arrow between text and image
-          slide.addShape(pres.ShapeType.rect, { x: 4.94, y: 2.62, w: 0.12, h: 0.28, fill: { color: ac } });
-          slide.addShape(pres.ShapeType.rect, { x: 4.7, y: 2.78, w: 0.6, h: 0.08, fill: { color: ac }, rotate: 0 });
+          const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false);
+          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13, lineSpacing: 22 });
+          slide.addText(parsedText, { x: LEFT, y: contentStartY, w: 9.0 - LEFT, h: 2.85 - contentStartY, valign: 'top', align: 'left', ...shrink });
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: 0.4, y: 3.0, w: 9.2, h: 2.0, sizing: { type: 'contain', w: 9.2, h: 2.0 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: LEFT, y: 2.95, w: 9.0 - LEFT, h: 2.05, sizing: { type: 'cover', w: 9.0 - LEFT, h: 2.05 }, shadow: imgShadow });
           }
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_TOPICS') {
           slide.background = { color: bg };
-          addAccentBar(slide, true);
-          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.22, w: 9.2, h: 0.7, fontSize: 26, ...titleOpts });
+          const startY = addHeader(slide, kicker, slideData.data.title || '', false);
 
           if (slideData.data.topics) {
-            const cols = Math.min(slideData.data.topics.length, 3);
-            const colW = 9.0 / cols;
-            slideData.data.topics.slice(0, 3).forEach((topic: any, i: number) => {
-              const xPos = 0.5 + i * colW;
-              // Card background
-              slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: 1.1, w: colW - 0.2, h: 3.9, fill: { color: 'FFFFFF' }, line: { color: 'E5E7EB', width: 0.75 }, rectRadius: 0.12 });
-              // Colored header strip on card
-              slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: 1.1, w: colW - 0.2, h: 0.7, fill: { color: pc }, rectRadius: 0.12 });
-              slide.addShape(pres.ShapeType.rect, { x: xPos, y: 1.5, w: colW - 0.2, h: 0.3, fill: { color: pc } });
-              // Icon circle with a clean number badge (Lucide names can't render in PPTX)
-              slide.addShape(pres.ShapeType.ellipse, { x: xPos + (colW - 0.2) / 2 - 0.38, y: 1.75, w: 0.76, h: 0.76, fill: { color: ac } });
-              slide.addText(`${i + 1}`, { x: xPos + (colW - 0.2) / 2 - 0.38, y: 1.75, w: 0.76, h: 0.76, fontSize: 22, color: 'FFFFFF', align: 'center', valign: 'middle', bold: true });
-              slide.addText(topic.title || '', { x: xPos + 0.1, y: 2.62, w: colW - 0.4, h: 0.4, fontSize: 12, bold: true, align: 'center', color: pc, ...shrink });
-              slide.addText(topic.content || '', { x: xPos + 0.1, y: 3.08, w: colW - 0.4, h: 1.75, fontSize: 10, align: 'center', color: '4B5563', valign: 'top', ...shrink });
+            const items = slideData.data.topics.slice(0, 3);
+            const cols = Math.max(items.length, 1);
+            const gap = 0.3;
+            const totalW = 9.0 - LEFT - 0.15;
+            const colW = (totalW - gap * (cols - 1)) / cols;
+            const cardY = Math.max(startY + 0.05, 1.55);
+            const cardH = 5.0 - cardY;
+            items.forEach((topic: any, i: number) => {
+              const xPos = LEFT + i * (colW + gap);
+              // Card with soft shadow, no harsh border
+              slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: cardY, w: colW, h: cardH, fill: { color: 'FFFFFF' }, line: { color: 'EEF2F7', width: 1 }, rectRadius: 0.1, shadow: { type: 'outer', blur: 9, offset: 3, angle: 90, color: 'CBD5E1', opacity: 0.4 } });
+              // Icon disc
+              const discD = 0.92;
+              const discX = xPos + colW / 2 - discD / 2;
+              const discY = cardY + 0.32;
+              slide.addShape(pres.ShapeType.ellipse, { x: discX, y: discY, w: discD, h: discD, fill: { color: pc } });
+              const png = iconPng(topic.icon);
+              if (png) slide.addImage({ data: png, x: discX + 0.23, y: discY + 0.23, w: discD - 0.46, h: discD - 0.46 });
+              else slide.addText(`${i + 1}`, { x: discX, y: discY, w: discD, h: discD, fontSize: 24, color: 'FFFFFF', align: 'center', valign: 'middle', bold: true, fontFace: FONT_T });
+              const txtY = discY + discD + 0.22;
+              slide.addText(topic.title || '', { x: xPos + 0.15, y: txtY, w: colW - 0.3, h: 0.5, fontSize: 14, bold: true, align: 'center', color: pc, fontFace: FONT_T, valign: 'top', ...shrink });
+              slide.addText(topic.content || '', { x: xPos + 0.2, y: txtY + 0.5, w: colW - 0.4, h: cardY + cardH - (txtY + 0.5) - 0.2, fontSize: 11, align: 'center', color: INK_SOFT, fontFace: FONT_B, valign: 'top', lineSpacing: 16, ...shrink });
             });
           }
           addFooter(slide, si + 1);
@@ -2720,56 +2773,46 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.ellipse, { x: 7.5, y: 3.5, w: 3.5, h: 3.5, fill: { color: 'FFFFFF', transparency: 92 } });
           slide.addShape(pres.ShapeType.ellipse, { x: 8.5, y: -0.5, w: 2, h: 2, fill: { color: ac, transparency: 70 } });
 
-          slide.addText(slideData.data.title || 'Referências', { x: 0.7, y: 0.4, w: 8, h: 0.8, fontSize: 32, color: 'FFFFFF', bold: true, fontFace: 'Calibri' });
-          slide.addShape(pres.ShapeType.rect, { x: 0.7, y: 1.3, w: 2.4, h: 0.06, fill: { color: ac } });
+          slide.addText('REFERÊNCIAS', { x: 0.7, y: 0.55, w: 8, h: 0.3, fontSize: 11, color: 'FFFFFF', bold: true, charSpacing: 3, fontFace: FONT_B, transparency: 30 });
+          slide.addText(slideData.data.title || 'Para saber mais', { x: 0.7, y: 0.85, w: 8, h: 0.8, fontSize: 32, color: 'FFFFFF', bold: true, fontFace: FONT_T, ...shrink });
+          slide.addShape(pres.ShapeType.rect, { x: 0.7, y: 1.72, w: 2.4, h: 0.06, fill: { color: ac } });
           if (slideData.data.references) {
-            const refText = slideData.data.references.map((r: string) => ({ text: `• ${r}`, options: { breakLine: true, color: 'E0E7FF', fontSize: 13, fontFace: 'Calibri', paraSpaceBefore: 6 } }));
-            slide.addText(refText, { x: 0.7, y: 1.5, w: 8.5, h: 3.5, valign: 'top', ...shrink });
+            const refText = slideData.data.references.map((r: string) => ({ text: r, options: { bullet: { characterCode: '2022', indent: 18 }, breakLine: true, color: 'E2E8F0', fontSize: 13, fontFace: FONT_B, paraSpaceBefore: 8 } }));
+            slide.addText(refText, { x: 0.75, y: 2.0, w: 8.3, h: 3.0, valign: 'top', ...shrink });
           }
           addFooter(slide, si + 1, true);
 
         } else if (slideData.layoutID === 'LAYOUT_QUOTE') {
           slide.background = { color: bg };
           // Giant decorative quote marks
-          slide.addText('“', { x: 0.2, y: -0.3, w: 2.5, h: 2, fontSize: 160, color: pc, transparency: 88, fontFace: 'Georgia', bold: true });
-          slide.addText('”', { x: 7.5, y: 3.0, w: 2.5, h: 2, fontSize: 160, color: pc, transparency: 88, fontFace: 'Georgia', bold: true });
-          // Accent bar
-          slide.addShape(pres.ShapeType.rect, { x: 4.35, y: 0.7, w: 1.3, h: 0.08, fill: { color: ac } });
+          slide.addText('“', { x: 0.2, y: -0.3, w: 2.5, h: 2, fontSize: 180, color: pc, transparency: 90, fontFace: FONT_Q, bold: true });
+          slide.addText('”', { x: 7.5, y: 3.0, w: 2.5, h: 2, fontSize: 180, color: pc, transparency: 90, fontFace: FONT_Q, bold: true });
           // Topic label
           if (slideData.data.title) {
-            slide.addText(slideData.data.title, { x: 1, y: 0.55, w: 8, h: 0.35, fontSize: 10, color: pc, bold: true, align: 'center', charSpacing: 3 });
+            slide.addText(slideData.data.title.toUpperCase(), { x: 1, y: 0.62, w: 8, h: 0.32, fontSize: 11, color: ac, bold: true, align: 'center', charSpacing: 3, fontFace: FONT_B });
           }
+          slide.addShape(pres.ShapeType.rect, { x: 4.5, y: 1.02, w: 1.0, h: 0.06, fill: { color: ac } });
           // Quote
-          slide.addText(slideData.data.quote || '', { x: 1, y: 1.2, w: 8, h: 2.6, fontSize: 26, fontFace: 'Georgia', color: pc, bold: false, italic: true, align: 'center', valign: 'middle', lineSpacing: 36, ...shrink });
-          // Divider
-          slide.addShape(pres.ShapeType.rect, { x: 4.35, y: 3.9, w: 1.3, h: 0.06, fill: { color: ac } });
+          slide.addText(slideData.data.quote || '', { x: 1, y: 1.25, w: 8, h: 2.55, fontSize: 27, fontFace: FONT_Q, color: pc, bold: false, italic: true, align: 'center', valign: 'middle', lineSpacing: 38, ...shrink });
+          slide.addShape(pres.ShapeType.rect, { x: 4.5, y: 3.95, w: 1.0, h: 0.05, fill: { color: ac } });
           // Author
-          slide.addText(`— ${slideData.data.author || ''}`, { x: 1, y: 4.1, w: 8, h: 0.4, fontSize: 14, color: '6B7280', align: 'center', bold: true, charSpacing: 1 });
+          slide.addText(`— ${slideData.data.author || ''}`, { x: 1, y: 4.15, w: 8, h: 0.4, fontSize: 14, color: INK_SOFT, align: 'center', bold: true, charSpacing: 1, fontFace: FONT_B });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_TWO_COLUMNS') {
           slide.background = { color: bg };
-          // Top accent
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
-          // Title
-          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.28, w: 9.2, h: 0.65, fontSize: 26, ...titleOpts });
-          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.98, w: 1.0, h: 0.06, fill: { color: ac } });
-          // Divider line
-          slide.addShape(pres.ShapeType.rect, { x: 5.0, y: 1.2, w: 0.04, h: 3.7, fill: { color: pc, transparency: 80 } });
-          // Col 1 label
-          slide.addShape(pres.ShapeType.ellipse, { x: 0.4, y: 1.15, w: 0.35, h: 0.35, fill: { color: ac } });
-          slide.addText('1', { x: 0.4, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
-          const col1 = parseMarkdown(slideData.data.column1 || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(col1, { x: 0.4, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left', ...shrink });
-          // Central arrow divider
-          slide.addShape(pres.ShapeType.ellipse, { x: 4.63, y: 2.5, w: 0.5, h: 0.5, fill: { color: pc } });
-          slide.addText('⟺', { x: 4.63, y: 2.5, w: 0.5, h: 0.5, fontSize: 13, color: 'FFFFFF', align: 'center', bold: true });
-          // Col 2 label
-          slide.addShape(pres.ShapeType.ellipse, { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fill: { color: pc } });
-          slide.addText('2', { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
-          const col2 = parseMarkdown(slideData.data.column2 || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(col2, { x: 5.3, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left', ...shrink });
+          const startY = addHeader(slide, kicker, slideData.data.title || '', false);
+          const colY = Math.max(startY + 0.05, 1.5);
+          const colH = 4.9 - colY;
+          const cardW = 4.32;
+          // Two soft cards side by side
+          [[LEFT, slideData.data.column1, '1'], [LEFT + cardW + 0.26, slideData.data.column2, '2']].forEach(([cx, content, num]: any, idx) => {
+            slide.addShape(pres.ShapeType.roundRect, { x: cx, y: colY, w: cardW, h: colH, fill: { color: 'FFFFFF' }, line: { color: 'EEF2F7', width: 1 }, rectRadius: 0.08, shadow: { type: 'outer', blur: 8, offset: 2, angle: 90, color: 'CBD5E1', opacity: 0.35 } });
+            slide.addShape(pres.ShapeType.ellipse, { x: cx + 0.28, y: colY + 0.26, w: 0.42, h: 0.42, fill: { color: idx === 0 ? pc : ac } });
+            slide.addText(num, { x: cx + 0.28, y: colY + 0.26, w: 0.42, h: 0.42, fontSize: 13, color: 'FFFFFF', align: 'center', valign: 'middle', bold: true, fontFace: FONT_T });
+            const parsed = parseMarkdown(content || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
+            slide.addText(parsed, { x: cx + 0.28, y: colY + 0.85, w: cardW - 0.56, h: colH - 1.1, valign: 'top', align: 'left', ...shrink });
+          });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
@@ -2782,63 +2825,79 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 3.5, w: 10, h: 2.0, fill: { color: '000000', transparency: 10 } });
           // Left accent bar
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.12, h: 5.5, fill: { color: ac } });
+          // Eyebrow above title
+          if (kicker) slide.addText(kicker.toUpperCase(), { x: 0.55, y: 2.95, w: 9, h: 0.3, fontSize: 11, color: 'FFFFFF', bold: true, charSpacing: 3, fontFace: FONT_B, shadow: { type: 'outer', blur: 4, offset: 1, angle: 45, color: '000000' } });
           // Accent line above title
-          slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.2, w: 1.0, h: 0.07, fill: { color: ac } });
+          slide.addShape(pres.ShapeType.rect, { x: 0.55, y: kicker ? 3.32 : 3.2, w: 1.0, h: 0.07, fill: { color: ac } });
           // Title
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 3.35, w: 9, h: 1.3, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: 'Calibri', valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000' }, ...shrink });
+          slide.addText(slideData.data.title || '', { x: 0.5, y: kicker ? 3.45 : 3.35, w: 9, h: 1.2, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: FONT_T, valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000' }, ...shrink });
           // Subtitle
           if (slideData.data.subtitle) {
-            slide.addText(slideData.data.subtitle, { x: 0.5, y: 4.7, w: 9, h: 0.45, fontSize: 16, color: 'D1D5DB', fontFace: 'Calibri', ...shrink });
+            slide.addText(slideData.data.subtitle, { x: 0.55, y: 4.75, w: 9, h: 0.4, fontSize: 15, color: 'E2E8F0', fontFace: FONT_B, shadow: { type: 'outer', blur: 4, offset: 1, angle: 45, color: '000000' }, ...shrink });
           }
           addFooter(slide, si + 1, true);
 
         } else if (slideData.layoutID === 'LAYOUT_STATS') {
           slide.background = { color: bg };
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
-          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.28, w: 9.2, h: 0.65, fontSize: 26, ...titleOpts });
-          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.95, w: 1.0, h: 0.06, fill: { color: ac } });
+          const startY = addHeader(slide, kicker, slideData.data.title || '', false);
 
           const stats = (slideData.data.stats || []).slice(0, 4);
-          const cardW = stats.length > 0 ? (9.2 / stats.length) - 0.2 : 2.2;
+          const gap = 0.3;
+          const totalW = 9.0 - LEFT - 0.15;
+          const cardW = stats.length > 0 ? (totalW - gap * (stats.length - 1)) / stats.length : 2.2;
+          const cardY = Math.max(startY + 0.1, 1.6);
+          const cardH = 5.0 - cardY;
           stats.forEach((s: any, i: number) => {
-            const xPos = 0.4 + i * (cardW + 0.2);
+            const xPos = LEFT + i * (cardW + gap);
             const isDark = i % 2 === 0;
-            slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: 1.15, w: cardW, h: 3.8, fill: { color: isDark ? pc : 'FFFFFF' }, line: { color: isDark ? pc : 'E5E7EB', width: 0.75 }, rectRadius: 0.15 });
-            // Icon circle
-            slide.addShape(pres.ShapeType.ellipse, { x: xPos + cardW / 2 - 0.35, y: 1.45, w: 0.7, h: 0.7, fill: { color: isDark ? 'FFFFFF' : ac, transparency: isDark ? 80 : 0 } });
+            const cardBg = isDark ? pc : 'FFFFFF';
+            slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: cardY, w: cardW, h: cardH, fill: { color: cardBg }, line: { color: isDark ? pc : 'EEF2F7', width: 1 }, rectRadius: 0.1, shadow: { type: 'outer', blur: 9, offset: 3, angle: 90, color: 'CBD5E1', opacity: isDark ? 0.5 : 0.4 } });
+            // Icon disc
+            const discD = 0.78, discX = xPos + cardW / 2 - discD / 2, discY = cardY + 0.3;
+            slide.addShape(pres.ShapeType.ellipse, { x: discX, y: discY, w: discD, h: discD, fill: { color: isDark ? ac : pc } });
+            const png = iconPng(s.icon);
+            if (png) slide.addImage({ data: png, x: discX + 0.2, y: discY + 0.2, w: discD - 0.4, h: discD - 0.4 });
             // Value
-            slide.addText(s.value || '—', { x: xPos + 0.1, y: 2.3, w: cardW - 0.2, h: 1.1, fontSize: 36, bold: true, align: 'center', color: isDark ? 'FFFFFF' : pc, ...shrink });
+            const valY = discY + discD + 0.18;
+            slide.addText(s.value || '—', { x: xPos + 0.1, y: valY, w: cardW - 0.2, h: 0.85, fontSize: 34, bold: true, align: 'center', color: isDark ? 'FFFFFF' : pc, fontFace: FONT_T, ...shrink });
+            // Mini progress bar when the value is a percentage
+            const pctMatch = String(s.value || '').match(/(\d{1,3})\s*%/);
+            let labelY = valY + 0.95;
+            if (pctMatch) {
+              const pct = Math.max(0, Math.min(100, parseInt(pctMatch[1], 10)));
+              const barW = cardW - 0.8, barX = xPos + 0.4, barY = valY + 0.92;
+              slide.addShape(pres.ShapeType.roundRect, { x: barX, y: barY, w: barW, h: 0.12, fill: { color: isDark ? 'FFFFFF' : 'E2E8F0', transparency: isDark ? 70 : 0 }, rectRadius: 0.06 });
+              if (pct > 0) slide.addShape(pres.ShapeType.roundRect, { x: barX, y: barY, w: Math.max(barW * pct / 100, 0.12), h: 0.12, fill: { color: ac }, rectRadius: 0.06 });
+              labelY = barY + 0.32;
+            }
             // Label
-            slide.addText(s.label || '', { x: xPos + 0.1, y: 3.45, w: cardW - 0.2, h: 0.9, fontSize: 12, align: 'center', color: isDark ? 'D1D5DB' : '6B7280', valign: 'top', ...shrink });
+            slide.addText(s.label || '', { x: xPos + 0.15, y: labelY, w: cardW - 0.3, h: cardY + cardH - labelY - 0.15, fontSize: 11, align: 'center', color: isDark ? 'E2E8F0' : INK_SOFT, valign: 'top', fontFace: FONT_B, lineSpacing: 15, ...shrink });
           });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_TIMELINE') {
           slide.background = { color: bg };
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.12, fill: { color: pc } });
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0.12, w: 10, h: 0.04, fill: { color: ac, transparency: 30 } });
-          slide.addText(slideData.data.title || '', { x: 0.4, y: 0.28, w: 9.2, h: 0.65, fontSize: 26, ...titleOpts });
-          slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.95, w: 1.0, h: 0.06, fill: { color: ac } });
+          addHeader(slide, kicker, slideData.data.title || '', false);
 
           const events = (slideData.data.events || []).slice(0, 5);
           if (events.length > 0) {
             const cols = events.length;
-            const colW = 9.2 / cols;
+            const colW = (9.0 - LEFT) / cols;
+            const lineY = 2.55;
             // Horizontal timeline line
-            slide.addShape(pres.ShapeType.rect, { x: 0.4 + colW * 0.5, y: 2.0, w: colW * (cols - 1), h: 0.06, fill: { color: pc } });
+            slide.addShape(pres.ShapeType.rect, { x: LEFT + colW * 0.5, y: lineY, w: colW * (cols - 1), h: 0.05, fill: { color: ac, transparency: 30 } });
             events.forEach((ev: any, i: number) => {
-              const cx = 0.4 + colW * i + colW * 0.5 - 0.25;
+              const cx = LEFT + colW * i + colW * 0.5 - 0.25;
               const isDot = i % 2 === 0;
               // Dot
-              slide.addShape(pres.ShapeType.ellipse, { x: cx, y: 1.78, w: 0.5, h: 0.5, fill: { color: isDot ? pc : ac }, line: { color: 'FFFFFF', width: 2 } });
-              slide.addText(`${i + 1}`, { x: cx, y: 1.78, w: 0.5, h: 0.5, fontSize: 11, color: 'FFFFFF', align: 'center', bold: true });
+              slide.addShape(pres.ShapeType.ellipse, { x: cx, y: lineY - 0.22, w: 0.5, h: 0.5, fill: { color: isDot ? pc : ac }, line: { color: bg, width: 3 } });
+              slide.addText(`${i + 1}`, { x: cx, y: lineY - 0.22, w: 0.5, h: 0.5, fontSize: 12, color: 'FFFFFF', align: 'center', valign: 'middle', bold: true, fontFace: FONT_T });
               // Year
-              slide.addText(ev.year || '', { x: cx - 0.25, y: 1.25, w: 1.0, h: 0.4, fontSize: 12, bold: true, align: 'center', color: pc });
+              slide.addText(ev.year || '', { x: cx - 0.3, y: lineY - 1.0, w: 1.1, h: 0.4, fontSize: 13, bold: true, align: 'center', color: pc, fontFace: FONT_T });
               // Event title
-              slide.addText(ev.title || '', { x: cx - 0.55, y: 2.4, w: 1.6, h: 0.5, fontSize: 11, bold: true, align: 'center', color: '1F2937', ...shrink });
+              slide.addText(ev.title || '', { x: cx - 0.55, y: lineY + 0.45, w: 1.6, h: 0.6, fontSize: 11, bold: true, align: 'center', color: INK, fontFace: FONT_T, valign: 'top', ...shrink });
               // Description
-              slide.addText(ev.description || '', { x: cx - 0.55, y: 2.95, w: 1.6, h: 1.8, fontSize: 10, align: 'center', color: '6B7280', valign: 'top', lineSpacing: 16, ...shrink });
+              slide.addText(ev.description || '', { x: cx - 0.6, y: lineY + 1.05, w: 1.7, h: 1.6, fontSize: 10, align: 'center', color: INK_SOFT, valign: 'top', lineSpacing: 14, fontFace: FONT_B, ...shrink });
             });
           }
           addFooter(slide, si + 1);
@@ -9585,6 +9644,7 @@ function AppInner() {
         - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
         - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
         - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
+        - KICKER (obrigatório em TODO slide): campo "kicker" com um rótulo editorial curto de 1-2 palavras em MAIÚSCULAS que aparece acima do título (ex: "CONCEITO", "CONTEXTO", "EXEMPLO", "APLICAÇÃO", "RESUMO", "DEFINIÇÃO"). Deve resumir o papel do slide.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
         - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
             **palavra** → negrito estratégico para termos-chave
@@ -9601,14 +9661,14 @@ function AppInner() {
           "presentationTitle": "...",
           "theme": { "primaryColor": "#hex", "accentColor": "#hex", "backgroundColor": "#hex", "fontTitle": "...", "fontBody": "..." },
           "slides": [
-            { "layoutID": "LAYOUT_COVER",        "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_COVER",        "data": { "kicker": "APRESENTAÇÃO", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
             { "layoutID": "LAYOUT_QUOTE",         "data": { "title": "...", "quote": "...", "author": "..." } },
             { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "title": "...", "column1": "...", "column2": "..." } },
             { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
             { "layoutID": "LAYOUT_STATS",         "data": { "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "..." }] } },
             { "layoutID": "LAYOUT_TIMELINE",      "data": { "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
             { "layoutID": "LAYOUT_TOPICS",        "data": { "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }] } },
-            { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "title": "...", "text": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "kicker": "CONCEITO", "title": "...", "text": "...", "illustrationQuery": "..." } },
             { "layoutID": "LAYOUT_REFERENCES",    "data": { "title": "Referências", "references": ["..."] } }
           ]
         }`;
