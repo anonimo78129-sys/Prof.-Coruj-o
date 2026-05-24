@@ -1350,7 +1350,26 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
   const bg = (isRef || isCover) ? theme.primaryColor : theme.backgroundColor;
   const imgSrc = slide.data.imageUrl || getImageUrl(slide.data.imagePrompt, 1200, 800);
 
-  const titleStyle = { color: isCover || isRef ? '#ffffff' : theme.primaryColor, fontFamily: 'system-ui, sans-serif', fontWeight: 800 };
+  const FONT_T = '"Segoe UI", system-ui, sans-serif';
+  const FONT_B = '"Segoe UI", system-ui, sans-serif';
+  const FONT_Q = 'Georgia, serif';
+  const INK = '#334155';
+  const INK_SOFT = '#64748B';
+  const PAD = 52; // margem esquerda consistente (~0.55in)
+  const cardShadow = '0 6px 20px rgba(100,116,139,0.18)';
+
+  const titleStyle = { color: isCover || isRef ? '#ffffff' : theme.primaryColor, fontFamily: FONT_T, fontWeight: 800 };
+
+  // Cabeçalho editável: eyebrow (kicker) + título + traço de acento.
+  const EditableHeader = ({ darkBg = false }: { darkBg?: boolean }) => (
+    <div style={{ marginBottom: 14 }}>
+      <input value={slide.data.kicker || ''} onChange={e => onUpdate({ kicker: e.target.value })} placeholder="RÓTULO"
+        style={{ fontSize: 12, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: theme.accentColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', marginBottom: 6, fontFamily: FONT_B }} />
+      <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
+        style={{ ...titleStyle, color: darkBg ? '#fff' : theme.primaryColor, fontSize: 30, lineHeight: 1.18, background: 'transparent', border: 'none', width: '100%', outline: 'none', display: 'block' }} />
+      <div style={{ width: 54, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 10 }} />
+    </div>
+  );
 
   if (isCover) return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, position: 'relative', display: 'flex', overflow: 'hidden' }}>
@@ -1358,20 +1377,27 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
       <div style={{ position: 'absolute', left: 462, top: 0, width: 6, height: SLIDE_H, backgroundColor: theme.accentColor, zIndex: 2 }} />
       {/* Decorative circles */}
       <div style={{ position: 'absolute', left: -30, bottom: -30, width: 160, height: 160, borderRadius: '50%', backgroundColor: theme.accentColor, opacity: 0.25 }} />
+      <div style={{ position: 'absolute', left: 320, top: -40, width: 110, height: 110, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.12)' }} />
       {/* Left panel */}
-      <div style={{ width: 460, height: SLIDE_H, padding: '48px 48px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 1 }}>
+      <div style={{ width: 460, height: SLIDE_H, padding: '44px 48px 38px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 1 }}>
         <div>
-          {schoolName && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16 }}>{schoolName}</div>}
+          <input value={slide.data.kicker || ''} onChange={e => onUpdate({ kicker: e.target.value })} placeholder="APRESENTAÇÃO"
+            style={{ fontSize: 12, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)', background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', marginBottom: 14, fontFamily: FONT_B }} />
           <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-            style={{ ...titleStyle, fontSize: 46, lineHeight: 1.15, background: 'transparent', border: 'none', borderBottom: '2px solid rgba(255,255,255,0.4)', width: '100%', outline: 'none', color: '#fff', marginBottom: 20, display: 'block' }} />
+            style={{ ...titleStyle, fontSize: 46, lineHeight: 1.12, background: 'transparent', border: 'none', width: '100%', outline: 'none', color: '#fff', marginBottom: 18, display: 'block' }} />
+          <div style={{ width: 54, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginBottom: 16 }} />
           <input value={slide.data.subtitle || ''} onChange={e => onUpdate({ subtitle: e.target.value })} placeholder="Subtítulo"
-            style={{ fontSize: 17, color: 'rgba(255,255,255,0.85)', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.2)', width: '100%', outline: 'none', fontWeight: 600, letterSpacing: 1, display: 'block' }} />
+            style={{ fontSize: 16, color: 'rgba(255,255,255,0.88)', background: 'transparent', border: 'none', width: '100%', outline: 'none', fontWeight: 500, display: 'block', fontFamily: FONT_B }} />
         </div>
-        {teacherName && <div style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 15 }}>Prof. {teacherName}</div>}
+        <div style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600, fontSize: 13, fontFamily: FONT_B }}>
+          {teacherName ? `Prof. ${teacherName}` : ''}{teacherName && schoolName ? '  ·  ' : ''}{schoolName || ''}
+        </div>
       </div>
       {/* Right panel image */}
-      <div style={{ flex: 1, height: SLIDE_H, overflow: 'hidden' }}>
-        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+      <div style={{ flex: 1, height: SLIDE_H, padding: '28px 28px 28px 0' }}>
+        <div style={{ width: '100%', height: '100%', borderRadius: 14, overflow: 'hidden', boxShadow: cardShadow }}>
+          <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+        </div>
       </div>
     </div>
   );
@@ -1379,21 +1405,18 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
   if (slide.layoutID === 'LAYOUT_CONTENT_LEFT' || slide.layoutID === 'LAYOUT_CONTENT_RIGHT') {
     const isLeft = slide.layoutID === 'LAYOUT_CONTENT_LEFT';
     const textPanel = (
-      <div style={{ width: 480, padding: '44px 40px 44px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}>
-        <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 16 }} />
-        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-          style={{ ...titleStyle, fontSize: 30, lineHeight: 1.2, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 20, display: 'block' }} />
+      <div style={{ flex: 1, padding: `40px ${PAD}px 40px`, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+        <EditableHeader />
         <RichBodyWithIcons value={slide.data.text || ''} onChange={v => onUpdate({ text: v })}
           primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
-        {/* Arrow pointing toward image */}
-        <div style={{ position: 'absolute', top: '50%', [isLeft ? 'right' : 'left']: -18, transform: 'translateY(-50%)', fontSize: 28, color: theme.accentColor, fontWeight: 900, lineHeight: 1 }}>
-          {isLeft ? '▶' : '◀'}
-        </div>
       </div>
     );
     const imgPanel = (
-      <div style={{ width: 480, height: SLIDE_H, overflow: 'hidden' }}>
+      <div style={{ width: 384, height: SLIDE_H, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
         <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+        {/* brand tint for unity */}
+        <div style={{ position: 'absolute', inset: 0, backgroundColor: theme.primaryColor, opacity: 0.22 }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, [isLeft ? 'left' : 'right']: 0, width: 6, backgroundColor: theme.accentColor }} />
       </div>
     );
     return (
@@ -1405,38 +1428,30 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
 
   if (slide.layoutID === 'LAYOUT_CONTENT_TOP') return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ padding: '32px 48px 16px', flexShrink: 0 }}>
-        <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 14 }} />
-        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-          style={{ ...titleStyle, fontSize: 28, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 12, display: 'block' }} />
+      <div style={{ padding: `34px ${PAD}px 12px`, flexShrink: 0 }}>
+        <EditableHeader />
         <RichBodyWithIcons value={slide.data.text || ''} onChange={v => onUpdate({ text: v })}
-          primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ minHeight: 80 }} />
-        {/* Arrow pointing down to image */}
-        <div style={{ textAlign: 'center', fontSize: 20, color: theme.accentColor, marginTop: 6, lineHeight: 1 }}>▼</div>
+          primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ minHeight: 60 }} />
       </div>
-      <div style={{ flex: 1, margin: '4px 48px 32px', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ flex: 1, margin: `4px ${PAD}px 30px`, borderRadius: 14, overflow: 'hidden', boxShadow: cardShadow }}>
         <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
       </div>
     </div>
   );
 
   if (slide.layoutID === 'LAYOUT_TOPICS') return (
-    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', padding: '36px 48px 36px', overflow: 'hidden' }}>
-      <div style={{ width: 60, height: 4, backgroundColor: theme.accentColor, marginBottom: 14 }} />
-      <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-        style={{ ...titleStyle, fontSize: 28, background: 'transparent', border: 'none', borderBottom: `2px solid ${theme.primaryColor}33`, width: '100%', outline: 'none', marginBottom: 24, display: 'block' }} />
-      <div style={{ display: 'flex', gap: 24, flex: 1 }}>
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', padding: `34px ${PAD}px 32px`, overflow: 'hidden' }}>
+      <EditableHeader />
+      <div style={{ display: 'flex', gap: 22, flex: 1, marginTop: 6 }}>
         {slide.data.topics?.slice(0, 3).map((t: any, i: number) => (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', flexShrink: 0 }}>
-              <DynamicIcon name={t.icon} size={26} color="white" />
+          <div key={i} style={{ flex: 1, background: '#fff', borderRadius: 16, padding: '24px 16px 18px', border: '1px solid #eef2f7', boxShadow: cardShadow, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', backgroundColor: theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, flexShrink: 0 }}>
+              <DynamicIcon name={t.icon || 'Sparkles'} size={26} color="white" />
             </div>
-            <div style={{ flex: 1, width: '100%', borderRadius: 14, padding: '14px 12px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', backgroundColor: `${theme.primaryColor}0A` }}>
-              <input value={t.title || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, title: e.target.value } : t2) })} placeholder="Tópico"
-                style={{ fontSize: 13, fontWeight: 700, color: theme.primaryColor, background: 'transparent', border: 'none', width: '100%', outline: 'none', textAlign: 'center', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }} />
-              <textarea value={t.content || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, content: e.target.value } : t2) })} placeholder="Conteúdo"
-                style={{ fontSize: 12, color: '#555', lineHeight: 1.55, background: 'transparent', border: 'none', width: '100%', outline: 'none', resize: 'none', flex: 1, fontFamily: 'inherit', textAlign: 'center' }} />
-            </div>
+            <input value={t.title || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, title: e.target.value } : t2) })} placeholder="Tópico"
+              style={{ fontSize: 15, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', width: '100%', outline: 'none', textAlign: 'center', marginBottom: 8, fontFamily: FONT_T }} />
+            <textarea value={t.content || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, content: e.target.value } : t2) })} placeholder="Conteúdo"
+              style={{ fontSize: 12.5, color: INK_SOFT, lineHeight: 1.55, background: 'transparent', border: 'none', width: '100%', outline: 'none', resize: 'none', flex: 1, fontFamily: FONT_B, textAlign: 'center' }} />
           </div>
         ))}
       </div>
@@ -1444,69 +1459,51 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
   );
 
   if (isRef) return (
-    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', padding: '48px', overflow: 'hidden' }}>
+    <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', padding: `48px ${PAD}px`, overflow: 'hidden', position: 'relative' }}>
       <div style={{ width: 8, height: SLIDE_H, backgroundColor: theme.accentColor, position: 'absolute', left: 0, top: 0 }} />
       <div style={{ position: 'absolute', right: -60, bottom: -60, width: 300, height: 300, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.06)' }} />
-      <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Referências"
-        style={{ fontSize: 34, fontWeight: 800, color: '#fff', background: 'transparent', border: 'none', borderBottom: '2px solid rgba(255,255,255,0.2)', width: '100%', outline: 'none', marginBottom: 28, display: 'block', fontFamily: 'inherit' }} />
+      <div style={{ position: 'absolute', right: 40, top: -50, width: 130, height: 130, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)' }} />
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', marginBottom: 8, fontFamily: FONT_B }}>Referências</div>
+      <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Para saber mais"
+        style={{ fontSize: 34, fontWeight: 800, color: '#fff', background: 'transparent', border: 'none', width: '100%', outline: 'none', display: 'block', fontFamily: FONT_T }} />
+      <div style={{ width: 54, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, margin: '12px 0 22px' }} />
       <textarea value={slide.data.references?.join('\n') || ''} onChange={e => onUpdate({ references: e.target.value.split('\n') })} placeholder="Uma referência por linha"
-        style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.7, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '16px', width: '100%', flex: 1, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+        style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', lineHeight: 1.8, background: 'transparent', border: 'none', width: '100%', flex: 1, outline: 'none', resize: 'none', fontFamily: FONT_B }} />
     </div>
   );
 
   if (slide.layoutID === 'LAYOUT_QUOTE') return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 100px', position: 'relative', overflow: 'hidden' }}>
       {/* Giant decorative quote marks */}
-      <div style={{ position: 'absolute', top: 20, left: 48, fontSize: 200, lineHeight: 1, color: theme.primaryColor, opacity: 0.12, fontFamily: 'Georgia, serif', fontWeight: 900, userSelect: 'none' }}>"</div>
-      <div style={{ position: 'absolute', bottom: -30, right: 48, fontSize: 200, lineHeight: 1, color: theme.primaryColor, opacity: 0.12, fontFamily: 'Georgia, serif', fontWeight: 900, userSelect: 'none', transform: 'rotate(180deg)' }}>"</div>
-      {/* Accent bar */}
-      <div style={{ width: 56, height: 5, backgroundColor: theme.accentColor, borderRadius: 3, marginBottom: 32 }} />
+      <div style={{ position: 'absolute', top: 10, left: 40, fontSize: 220, lineHeight: 1, color: theme.primaryColor, opacity: 0.1, fontFamily: FONT_Q, fontWeight: 900, userSelect: 'none' }}>"</div>
+      <div style={{ position: 'absolute', bottom: -40, right: 40, fontSize: 220, lineHeight: 1, color: theme.primaryColor, opacity: 0.1, fontFamily: FONT_Q, fontWeight: 900, userSelect: 'none', transform: 'rotate(180deg)' }}>"</div>
+      {slide.data.title !== undefined && (
+        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="RÓTULO"
+          style={{ fontSize: 12, color: theme.accentColor, textAlign: 'center', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 3, background: 'transparent', border: 'none', outline: 'none', width: '60%', marginBottom: 18, fontFamily: FONT_B }} />
+      )}
+      <div style={{ width: 56, height: 4, backgroundColor: theme.accentColor, borderRadius: 3, marginBottom: 26 }} />
       <textarea value={slide.data.quote || ''} onChange={e => onUpdate({ quote: e.target.value })} placeholder="Citação impactante..."
-        style={{ fontSize: 28, fontStyle: 'italic', color: theme.primaryColor, textAlign: 'center', lineHeight: 1.5, background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', fontFamily: 'Georgia, serif', fontWeight: 600, marginBottom: 24, overflow: 'hidden' }}
+        style={{ fontSize: 28, fontStyle: 'italic', color: theme.primaryColor, textAlign: 'center', lineHeight: 1.5, background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', fontFamily: FONT_Q, fontWeight: 600, marginBottom: 22, overflow: 'hidden' }}
         rows={4} />
       <div style={{ width: 56, height: 2, backgroundColor: theme.accentColor, borderRadius: 3, marginBottom: 16 }} />
       <input value={slide.data.author || ''} onChange={e => onUpdate({ author: e.target.value })} placeholder="— Autor"
-        style={{ fontSize: 16, color: '#6B7280', textAlign: 'center', background: 'transparent', border: 'none', outline: 'none', fontWeight: 600, letterSpacing: 1 }} />
-      {slide.data.title && <div style={{ position: 'absolute', top: 28, left: 0, right: 0, textAlign: 'center', fontSize: 12, color: theme.primaryColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 3, opacity: 0.6 }}>{slide.data.title}</div>}
+        style={{ fontSize: 16, color: INK_SOFT, textAlign: 'center', background: 'transparent', border: 'none', outline: 'none', fontWeight: 700, letterSpacing: 1, fontFamily: FONT_B }} />
     </div>
   );
 
   if (slide.layoutID === 'LAYOUT_TWO_COLUMNS') return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Top accent bar */}
-      <div style={{ height: 6, backgroundColor: theme.primaryColor, flexShrink: 0 }} />
-      <div style={{ padding: '28px 48px 20px', flexShrink: 0 }}>
-        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-          style={{ fontSize: 28, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block' }} />
-        <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 8 }} />
+      <div style={{ padding: `32px ${PAD}px 14px`, flexShrink: 0 }}>
+        <EditableHeader />
       </div>
-      <div style={{ display: 'flex', flex: 1, gap: 0, padding: '0 48px 32px' }}>
-        {/* Column 1 */}
-        <div style={{ flex: 1, paddingRight: 20, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: theme.accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 800, flexShrink: 0 }}>1</div>
-            <div style={{ height: 2, flex: 1, backgroundColor: `${theme.primaryColor}22` }} />
+      <div style={{ display: 'flex', flex: 1, gap: 22, padding: `0 ${PAD}px 30px` }}>
+        {[{ key: 'column1', num: '1', c: theme.primaryColor }, { key: 'column2', num: '2', c: theme.accentColor }].map(col => (
+          <div key={col.key} style={{ flex: 1, background: '#fff', borderRadius: 16, border: '1px solid #eef2f7', boxShadow: cardShadow, padding: '20px 22px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: col.c, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff', fontWeight: 800, flexShrink: 0, marginBottom: 12, fontFamily: FONT_T }}>{col.num}</div>
+            <RichBodyWithIcons value={slide.data[col.key] || ''} onChange={v => onUpdate({ [col.key]: v })}
+              primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
           </div>
-          <RichBodyWithIcons value={slide.data.column1 || ''} onChange={v => onUpdate({ column1: v })}
-            primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
-        </div>
-        {/* Arrow divider */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 8px', flexShrink: 0 }}>
-          <div style={{ width: 2, height: 60, backgroundColor: `${theme.primaryColor}22` }} />
-          <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', flexShrink: 0 }}>
-            <span style={{ color: '#fff', fontSize: 16, fontWeight: 900 }}>⟺</span>
-          </div>
-          <div style={{ width: 2, height: 60, backgroundColor: `${theme.primaryColor}22` }} />
-        </div>
-        {/* Column 2 */}
-        <div style={{ flex: 1, paddingLeft: 20, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ height: 2, flex: 1, backgroundColor: `${theme.primaryColor}22` }} />
-            <div style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 800, flexShrink: 0 }}>2</div>
-          </div>
-          <RichBodyWithIcons value={slide.data.column2 || ''} onChange={v => onUpdate({ column2: v })}
-            primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -1520,12 +1517,14 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.1) 100%)' }} />
         {/* Accent left bar */}
         <div style={{ position: 'absolute', left: 0, top: 0, width: 7, height: '100%', backgroundColor: theme.accentColor }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 64px 48px' }}>
-          <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginBottom: 18 }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: `0 ${PAD}px 44px` }}>
+          <input value={slide.data.kicker || ''} onChange={e => onUpdate({ kicker: e.target.value })} placeholder="RÓTULO"
+            style={{ fontSize: 12, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: '#fff', background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', marginBottom: 10, textShadow: '0 1px 6px rgba(0,0,0,0.6)', fontFamily: FONT_B }} />
+          <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginBottom: 14 }} />
           <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-            style={{ fontSize: 44, fontWeight: 900, color: '#ffffff', background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', lineHeight: 1.15, marginBottom: 12, textShadow: '0 2px 12px rgba(0,0,0,0.5)' }} />
+            style={{ fontSize: 44, fontWeight: 900, color: '#ffffff', background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', lineHeight: 1.15, marginBottom: 12, textShadow: '0 2px 12px rgba(0,0,0,0.5)', fontFamily: FONT_T }} />
           <input value={slide.data.subtitle || ''} onChange={e => onUpdate({ subtitle: e.target.value })} placeholder="Subtítulo"
-            style={{ fontSize: 18, color: 'rgba(255,255,255,0.82)', background: 'transparent', border: 'none', outline: 'none', fontWeight: 500, letterSpacing: 0.5 }} />
+            style={{ fontSize: 17, color: 'rgba(255,255,255,0.88)', background: 'transparent', border: 'none', outline: 'none', fontWeight: 500, letterSpacing: 0.5, fontFamily: FONT_B, textShadow: '0 1px 6px rgba(0,0,0,0.5)' }} />
         </div>
       </div>
     );
@@ -1533,24 +1532,31 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
 
   if (slide.layoutID === 'LAYOUT_STATS') return (
     <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ height: 6, backgroundColor: theme.primaryColor, flexShrink: 0 }} />
-      <div style={{ padding: '24px 48px 16px', flexShrink: 0 }}>
-        <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-          style={{ fontSize: 28, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block' }} />
-        <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 8 }} />
+      <div style={{ padding: `32px ${PAD}px 14px`, flexShrink: 0 }}>
+        <EditableHeader />
       </div>
-      <div style={{ display: 'flex', gap: 20, flex: 1, padding: '0 48px 36px', alignItems: 'stretch' }}>
-        {(slide.data.stats || [{ value: '', label: '' }, { value: '', label: '' }, { value: '', label: '' }]).slice(0, 4).map((s: any, i: number) => (
-          <div key={i} style={{ flex: 1, background: i % 2 === 0 ? theme.primaryColor : `${theme.primaryColor}12`, borderRadius: 16, padding: '28px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: `2px solid ${theme.primaryColor}22` }}>
-            <div style={{ width: 44, height: 44, borderRadius: '50%', backgroundColor: i % 2 === 0 ? 'rgba(255,255,255,0.2)' : theme.accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-              <DynamicIcon name={s.icon || 'BarChart2'} size={22} color={i % 2 === 0 ? '#fff' : '#fff'} />
+      <div style={{ display: 'flex', gap: 22, flex: 1, padding: `0 ${PAD}px 32px`, alignItems: 'stretch' }}>
+        {(slide.data.stats || [{ value: '', label: '' }, { value: '', label: '' }, { value: '', label: '' }]).slice(0, 4).map((s: any, i: number) => {
+          const isDark = i % 2 === 0;
+          const pctMatch = String(s.value || '').match(/(\d{1,3})\s*%/);
+          const pct = pctMatch ? Math.max(0, Math.min(100, parseInt(pctMatch[1], 10))) : null;
+          return (
+            <div key={i} style={{ flex: 1, background: isDark ? theme.primaryColor : '#fff', borderRadius: 16, padding: '22px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', border: isDark ? 'none' : '1px solid #eef2f7', boxShadow: cardShadow }}>
+              <div style={{ width: 50, height: 50, borderRadius: '50%', backgroundColor: isDark ? theme.accentColor : theme.primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, flexShrink: 0 }}>
+                <DynamicIcon name={s.icon || 'BarChart2'} size={24} color="#fff" />
+              </div>
+              <input value={s.value || ''} onChange={e => onUpdate({ stats: (slide.data.stats || []).map((s2: any, j: number) => j === i ? { ...s2, value: e.target.value } : s2) })} placeholder="00"
+                style={{ fontSize: 36, fontWeight: 900, color: isDark ? '#fff' : theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', textAlign: 'center', width: '100%', lineHeight: 1.05, fontFamily: FONT_T }} />
+              {pct !== null && (
+                <div style={{ width: '78%', height: 7, borderRadius: 4, marginTop: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.25)' : '#e2e8f0', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, backgroundColor: theme.accentColor }} />
+                </div>
+              )}
+              <input value={s.label || ''} onChange={e => onUpdate({ stats: (slide.data.stats || []).map((s2: any, j: number) => j === i ? { ...s2, label: e.target.value } : s2) })} placeholder="Rótulo"
+                style={{ fontSize: 12.5, color: isDark ? 'rgba(255,255,255,0.85)' : INK_SOFT, background: 'transparent', border: 'none', outline: 'none', textAlign: 'center', width: '100%', marginTop: 10, fontWeight: 600, fontFamily: FONT_B }} />
             </div>
-            <input value={s.value || ''} onChange={e => onUpdate({ stats: (slide.data.stats || []).map((s2: any, j: number) => j === i ? { ...s2, value: e.target.value } : s2) })} placeholder="00"
-              style={{ fontSize: 38, fontWeight: 900, color: i % 2 === 0 ? '#fff' : theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', textAlign: 'center', width: '100%', lineHeight: 1 }} />
-            <input value={s.label || ''} onChange={e => onUpdate({ stats: (slide.data.stats || []).map((s2: any, j: number) => j === i ? { ...s2, label: e.target.value } : s2) })} placeholder="Rótulo"
-              style={{ fontSize: 13, color: i % 2 === 0 ? 'rgba(255,255,255,0.8)' : '#6B7280', background: 'transparent', border: 'none', outline: 'none', textAlign: 'center', width: '100%', marginTop: 6, fontWeight: 600 }} />
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1559,29 +1565,26 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
     const events = slide.data.events || [];
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, backgroundColor: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ height: 6, backgroundColor: theme.primaryColor, flexShrink: 0 }} />
-        <div style={{ padding: '24px 48px 16px', flexShrink: 0 }}>
-          <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-            style={{ fontSize: 28, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block' }} />
-          <div style={{ width: 48, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 8 }} />
+        <div style={{ padding: `32px ${PAD}px 8px`, flexShrink: 0 }}>
+          <EditableHeader />
         </div>
         {/* Timeline line */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 48px 32px' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: `0 ${PAD}px 32px` }}>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 0 }}>
             {/* Horizontal line */}
-            <div style={{ position: 'absolute', top: 20, left: 20, right: 20, height: 3, backgroundColor: theme.primaryColor, zIndex: 0 }} />
+            <div style={{ position: 'absolute', top: 20, left: 20, right: 20, height: 3, backgroundColor: `${theme.accentColor}55`, zIndex: 0 }} />
             {events.slice(0, 5).map((ev: any, i: number) => {
               const cols = Math.min(events.length, 5);
               return (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
                   {/* Dot */}
                   <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: i % 2 === 0 ? theme.primaryColor : theme.accentColor, border: `4px solid ${bg}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', marginBottom: 14 }}>
-                    <span style={{ fontSize: 11, color: '#fff', fontWeight: 800 }}>{i + 1}</span>
+                    <span style={{ fontSize: 12, color: '#fff', fontWeight: 800, fontFamily: FONT_T }}>{i + 1}</span>
                   </div>
                   <div style={{ textAlign: 'center', padding: '0 6px', width: `${100 / cols}%` }}>
-                    <div style={{ fontSize: 13, fontWeight: 900, color: theme.primaryColor, marginBottom: 4 }}>{ev.year || '____'}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1F2937', marginBottom: 4, lineHeight: 1.3 }}>{ev.title || 'Evento'}</div>
-                    <div style={{ fontSize: 11, color: '#6B7280', lineHeight: 1.4 }}>{ev.description || ''}</div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: theme.primaryColor, marginBottom: 4, fontFamily: FONT_T }}>{ev.year || '____'}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 4, lineHeight: 1.3, fontFamily: FONT_T }}>{ev.title || 'Evento'}</div>
+                    <div style={{ fontSize: 11, color: INK_SOFT, lineHeight: 1.4, fontFamily: FONT_B }}>{ev.description || ''}</div>
                   </div>
                 </div>
               );
