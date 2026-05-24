@@ -1255,11 +1255,20 @@ const parseRichHtml = (text: string, primaryColor: string, accentColor: string):
   const ac = accentColor || '#6366F1';
   const pc = primaryColor || '#4F46E5';
   return text
-    .replace(/^## (.+)$/gm, `<div style="font-size:17px;font-weight:800;color:${pc};margin:10px 0 4px;letter-spacing:-0.3px">$1</div>`)
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/==(.*?)==/g, `<mark style="background:${ac}44;color:inherit;padding:1px 5px;border-radius:4px;font-weight:600">$1</mark>`)
-    .replace(/\[\[(.*?)\]\]/g, `<span style="color:${pc};font-weight:800">$1</span>`)
+    // Strip (PascalCase) icon-name placeholders the AI sometimes inserts
+    .replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '')
+    // Headers (#, ##, ###) → bold sub-heading
+    .replace(/^\s*#{1,6}\s+(.+)$/gm, `<div style="font-size:17px;font-weight:800;color:${pc};margin:10px 0 4px;letter-spacing:-0.3px">$1</div>`)
+    // Bullet lines (-, •, or single * + space) → bullet glyph
+    .replace(/^\s*(?:[-•]|\*(?!\*))\s+(.+)$/gm, `<div style="padding-left:4px"><span style="color:${ac};font-weight:800">•</span>&nbsp;$1</div>`)
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/==(.+?)==/g, `<mark style="background:${ac}44;color:inherit;padding:1px 5px;border-radius:4px;font-weight:600">$1</mark>`)
+    .replace(/\[\[(.+?)\]\]/g, `<span style="color:${pc};font-weight:800">$1</span>`)
     .replace(/\{([A-Za-z0-9]+)\}/g, `<span data-icon="$1" style="color:${pc};font-size:0.85em;vertical-align:middle;margin-right:2px">◆</span>`)
+    // Remove any leftover stray markers
+    .replace(/\*+/g, '')
+    .replace(/`+/g, '')
     .replace(/\n/g, '<br/>');
 };
 
@@ -1280,29 +1289,41 @@ const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, acce
   const raw = typeof text === 'string' ? text : JSON.stringify(text);
   const pc = (primaryColor || '#4F46E5').replace('#', '');
   const ac = (accentColor || '#6366F1').replace('#', '');
+  const baseSize = typeof baseOpts.fontSize === 'number' ? baseOpts.fontSize : 13;
 
   // Strip (PascalCaseWord) icon-name placeholders the AI sometimes inserts
   const str = raw.replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '');
 
-  // Only inline patterns — no multiline matches to avoid cross-line surprises
-  const INLINE = /(\*\*[^*\n]+\*\*|==[^=\n]+==|\[\[[^\]\n]+\]\]|\{[A-Za-z0-9]+\})/g;
+  // Remove any stray markdown markers left in a plain-text fragment (malformed
+  // bold like "** texto", leftover backticks, lone asterisks/hashes).
+  const stripStray = (s: string): string =>
+    s.replace(/\*+/g, '').replace(/`+/g, '').replace(/^#+\s*/, '').trim();
+
+  // Inline patterns — triple/double asterisk, highlight, primary, icon token
+  const INLINE = /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|==[^=\n]+==|\[\[[^\]\n]+\]\]|\{[A-Za-z0-9]+\})/g;
 
   const processLine = (line: string): any[] => {
     const parts = line.split(INLINE);
     const runs: any[] = [];
     parts.forEach(part => {
       if (!part) return;
-      if (/^\*\*[^*\n]+\*\*$/.test(part)) {
-        const inner = part.slice(2, -2);
+      if (/^\*\*\*[^*\n]+\*\*\*$/.test(part)) {
+        const inner = part.slice(3, -3).trim();
+        if (inner) runs.push({ text: inner, options: { ...baseOpts, bold: true, italic: true } });
+      } else if (/^\*\*[^*\n]+\*\*$/.test(part)) {
+        const inner = part.slice(2, -2).trim();
         if (inner) runs.push({ text: inner, options: { ...baseOpts, bold: true } });
       } else if (/^==[^=\n]+==$/.test(part)) {
-        runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: ac } });
+        const inner = part.slice(2, -2).trim();
+        if (inner) runs.push({ text: inner, options: { ...baseOpts, bold: true, color: ac } });
       } else if (/^\[\[[^\]\n]+\]\]$/.test(part)) {
-        runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: pc } });
+        const inner = part.slice(2, -2).trim();
+        if (inner) runs.push({ text: inner, options: { ...baseOpts, bold: true, color: pc } });
       } else if (/^\{[A-Za-z0-9]+\}$/.test(part)) {
         runs.push({ text: '◆ ', options: { ...baseOpts, bold: true, color: ac } });
       } else {
-        runs.push({ text: part, options: { ...baseOpts } });
+        const clean = stripStray(part);
+        if (clean) runs.push({ text: clean, options: { ...baseOpts } });
       }
     });
     return runs;
@@ -1312,7 +1333,23 @@ const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, acce
   const allRuns: any[] = [];
   lines.forEach((line, idx) => {
     const isLast = idx === lines.length - 1;
-    const lineRuns = processLine(line);
+
+    // Markdown header (#, ##, ###) → bold sub-heading in primary colour
+    const headerMatch = line.match(/^\s*#{1,6}\s+(.*)$/);
+    // Bullet line (-, •, or single * + space) → real bullet glyph
+    const bulletMatch = line.match(/^\s*(?:[-•]|\*(?!\*))\s+(.*)$/);
+
+    let lineRuns: any[];
+    if (headerMatch) {
+      const inner = processLine(headerMatch[1]);
+      lineRuns = inner.map(r => ({ ...r, options: { ...r.options, bold: true, color: pc, fontSize: baseSize + 1, paraSpaceBefore: 6 } }));
+    } else if (bulletMatch) {
+      lineRuns = processLine(bulletMatch[1]);
+      if (lineRuns.length) lineRuns.unshift({ text: '•  ', options: { ...baseOpts, bold: true, color: ac } });
+    } else {
+      lineRuns = processLine(line);
+    }
+
     if (lineRuns.length === 0) {
       // Blank line — a single space keeps the break valid (never text:'')
       allRuns.push({ text: ' ', options: { ...baseOpts, breakLine: !isLast } });
@@ -1324,7 +1361,7 @@ const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, acce
     }
     lineRuns.forEach(r => allRuns.push(r));
   });
-  return allRuns.length ? allRuns : [{ text: str || ' ', options: { ...baseOpts } }];
+  return allRuns.length ? allRuns : [{ text: stripStray(str) || ' ', options: { ...baseOpts } }];
 };
 
 // Renders rich text inside SlideCanvas (editable toggle)
@@ -2496,14 +2533,21 @@ const PlannerScreen = ({
         - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
         - KICKER (obrigatório em TODO slide): campo "kicker" com um rótulo editorial curto de 1-2 palavras em MAIÚSCULAS que aparece acima do título (ex: "CONCEITO", "CONTEXTO", "EXEMPLO", "APLICAÇÃO", "RESUMO", "DEFINIÇÃO"). Deve resumir o papel do slide.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
-        - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
-            **palavra** → negrito estratégico para termos-chave
+        - CONCISÃO (REGRA CRÍTICA — slide NÃO é documento):
+            • Campo "text" (LAYOUT_CONTENT_*): no MÁXIMO 4 a 5 linhas curtas OU ~60 palavras. Frases curtas e diretas, nunca parágrafos longos.
+            • Cada "topics[].content": 1 frase curta, no máximo 12 palavras.
+            • Colunas (column1/column2): no máximo 4 linhas curtas cada, além do título da coluna.
+            • Prefira listas curtas a texto corrido. Cada linha = uma ideia. Não encha o slide.
+            • É melhor cortar conteúdo e criar mais slides do que espremer texto demais em um só.
+        - FORMATAÇÃO DE TEXTO RICA (use com MODERAÇÃO nos campos "text", "column1", "column2"):
+            **palavra** → negrito para termos-chave (feche SEMPRE com **; sem espaço logo após o ** de abertura)
             ==palavra== → termo em destaque com cor de acento (use em definições e conceitos centrais)
             [[palavra]] → palavra-chave colorida em destaque primário (2-3 por slide máximo)
             {IconName} → ícone Lucide inline antes de tópicos (ex: {Target} Objetivo, {Brain} Conceito)
-            ## Subtítulo → subtítulo dentro do corpo para hierarquia visual
+            ## Subtítulo → use no MÁXIMO 1 vez por slide, só para separar dois blocos
+            - item → listas: comece a linha com "- " (hífen e espaço). Uma ideia por linha.
         - Combine as marcações: ex: {Target} **[[Objetivo]]**: ==aprender a== estrutura...
-        - NUNCA use emojis. NUNCA coloque nomes de ícones entre parênteses no texto (ex: ERRADO: "(CheckCircle) Título"). Use APENAS a sintaxe {IconName} para ícones inline.
+        - NUNCA use emojis. NUNCA coloque nomes de ícones entre parênteses no texto (ERRADO: "(CheckCircle) Título", "(User) Pessoas", "(Nature) Natureza"). Use APENAS a sintaxe {IconName}. NUNCA use ### ou mais de dois # para títulos.
         - LAYOUT_TWO_COLUMNS — IMPORTANTE: a PRIMEIRA linha de column1 e column2 é tratada como título da coluna (renderizado em destaque). Coloque o título da coluna na primeira linha, depois uma quebra de linha (\n), depois o conteúdo. Ex: column1: "Título da Coluna 1\n\nConteúdo detalhado com **marcações**..."
         - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
 
@@ -2721,16 +2765,19 @@ const PlannerScreen = ({
 
       // Cabeçalho consistente: eyebrow (rótulo) + título + traço de acento.
       // Title uses INK (dark slate) for light-bg slides — readable regardless of user's chosen primary colour.
-      const addHeader = (slide: any, kicker: string | undefined, title: string, darkBg = false) => {
+      // region {x,w} confines the header to a column so it never overlaps a side image.
+      const addHeader = (slide: any, kicker: string | undefined, title: string, darkBg = false, region?: { x: number; w: number }) => {
+        const hx = region?.x ?? LEFT;
+        const hw = region?.w ?? (9.0 - LEFT);
         const hasKick = !!(kicker && kicker.trim());
         if (hasKick) {
-          slide.addText((kicker as string).toUpperCase(), { x: LEFT, y: 0.42, w: 9.0 - LEFT, h: 0.28, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
+          slide.addText((kicker as string).toUpperCase(), { x: hx, y: 0.42, w: hw, h: 0.28, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
         }
         const titleY = hasKick ? 0.74 : 0.5;
         // Use high-contrast INK for light-background slides; white for dark-background slides
         const titleColor = darkBg ? 'FFFFFF' : INK;
-        slide.addText(title || '', { x: LEFT, y: titleY, w: 9.0 - LEFT, h: 0.85, fontSize: 30, color: titleColor, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
-        slide.addShape(pres.ShapeType.rect, { x: LEFT, y: titleY + 0.78, w: 0.9, h: 0.055, fill: { color: ac } });
+        slide.addText(title || '', { x: hx, y: titleY, w: hw, h: 0.85, fontSize: 30, color: titleColor, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
+        slide.addShape(pres.ShapeType.rect, { x: hx, y: titleY + 0.78, w: 0.9, h: 0.055, fill: { color: ac } });
         return titleY + 0.95; // y onde o conteúdo pode começar
       };
       const imgShadow = { type: 'outer' as const, blur: 10, offset: 3, angle: 90, color: '94A3B8', opacity: 0.45 };
@@ -2789,7 +2836,7 @@ const PlannerScreen = ({
             slide.addShape(pres.ShapeType.rect, { x: isLeft ? imgX : imgX + 3.94, y: 0, w: 0.06, h: 5.5, fill: { color: ac } });
           }
 
-          const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false);
+          const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false, { x: contentX, w: contentW });
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
           slide.addText(parsedText, { x: contentX, y: contentStartY + 0.05, w: contentW, h: 4.7 - contentStartY, valign: 'top', align: 'left', lineSpacing: 24, ...shrink });
           addFooter(slide, si + 1);
@@ -9727,14 +9774,21 @@ function AppInner() {
         - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
         - KICKER (obrigatório em TODO slide): campo "kicker" com um rótulo editorial curto de 1-2 palavras em MAIÚSCULAS que aparece acima do título (ex: "CONCEITO", "CONTEXTO", "EXEMPLO", "APLICAÇÃO", "RESUMO", "DEFINIÇÃO"). Deve resumir o papel do slide.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
-        - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
-            **palavra** → negrito estratégico para termos-chave
+        - CONCISÃO (REGRA CRÍTICA — slide NÃO é documento):
+            • Campo "text" (LAYOUT_CONTENT_*): no MÁXIMO 4 a 5 linhas curtas OU ~60 palavras. Frases curtas e diretas, nunca parágrafos longos.
+            • Cada "topics[].content": 1 frase curta, no máximo 12 palavras.
+            • Colunas (column1/column2): no máximo 4 linhas curtas cada, além do título da coluna.
+            • Prefira listas curtas a texto corrido. Cada linha = uma ideia. Não encha o slide.
+            • É melhor cortar conteúdo e criar mais slides do que espremer texto demais em um só.
+        - FORMATAÇÃO DE TEXTO RICA (use com MODERAÇÃO nos campos "text", "column1", "column2"):
+            **palavra** → negrito para termos-chave (feche SEMPRE com **; sem espaço logo após o ** de abertura)
             ==palavra== → termo em destaque com cor de acento (use em definições e conceitos centrais)
             [[palavra]] → palavra-chave colorida em destaque primário (2-3 por slide máximo)
             {IconName} → ícone Lucide inline antes de tópicos (ex: {Target} Objetivo, {Brain} Conceito)
-            ## Subtítulo → subtítulo dentro do corpo para hierarquia visual
+            ## Subtítulo → use no MÁXIMO 1 vez por slide, só para separar dois blocos
+            - item → listas: comece a linha com "- " (hífen e espaço). Uma ideia por linha.
         - Combine as marcações: ex: {Target} **[[Objetivo]]**: ==aprender a== estrutura...
-        - NUNCA use emojis. NUNCA coloque nomes de ícones entre parênteses no texto (ex: ERRADO: "(CheckCircle) Título"). Use APENAS a sintaxe {IconName} para ícones inline.
+        - NUNCA use emojis. NUNCA coloque nomes de ícones entre parênteses no texto (ERRADO: "(CheckCircle) Título", "(User) Pessoas", "(Nature) Natureza"). Use APENAS a sintaxe {IconName}. NUNCA use ### ou mais de dois # para títulos.
         - LAYOUT_TWO_COLUMNS — IMPORTANTE: a PRIMEIRA linha de column1 e column2 é tratada como título da coluna (renderizado em destaque). Coloque o título da coluna na primeira linha, depois uma quebra de linha (\n), depois o conteúdo. Ex: column1: "Título da Coluna 1\n\nConteúdo detalhado com **marcações**..."
         - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
 
