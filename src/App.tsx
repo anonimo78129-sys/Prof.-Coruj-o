@@ -1263,32 +1263,65 @@ const parseRichHtml = (text: string, primaryColor: string, accentColor: string):
     .replace(/\n/g, '<br/>');
 };
 
-// Extended parseMarkdown for pptxgenjs text runs
+// Extended parseMarkdown for pptxgenjs text runs.
+//
+// Fixes vs old version:
+// 1. Strip (IconName) patterns — AI sometimes emits "(CheckCircle) Title"
+//    instead of the correct {CheckCircle} inline-icon syntax.
+// 2. Process line by line so \n creates proper pptxgenjs break runs
+//    instead of being buried inside a text-run string.
+// 3. ==highlight== now uses accent colour (not the `highlight: boolean`
+//    pptxgenjs option, which would apply a yellow mark-up regardless of
+//    the hex string we were passing).
+// 4. Guard ** matches so a lone `*` or empty `****` is treated as plain
+//    text instead of triggering slice errors.
 const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, accentColor?: string): any[] => {
   if (!text) return [];
-  const str = typeof text === 'string' ? text : JSON.stringify(text);
+  const raw = typeof text === 'string' ? text : JSON.stringify(text);
   const pc = (primaryColor || '#4F46E5').replace('#', '');
   const ac = (accentColor || '#6366F1').replace('#', '');
-  const regex = /(\*\*.*?\*\*|==.*?==|\[\[.*?\]\]|\{[A-Za-z0-9]+\}|^## .+$)/gm;
-  const parts = str.split(regex);
-  const runs: any[] = [];
-  parts.forEach(part => {
-    if (!part) return;
-    if (part.startsWith('## ')) {
-      runs.push({ text: part.slice(3), options: { ...baseOpts, bold: true, fontSize: (baseOpts.fontSize || 12) + 4, color: pc, breakLine: true } });
-    } else if (part.startsWith('**') && part.endsWith('**')) {
-      runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true } });
-    } else if (part.startsWith('==') && part.endsWith('==')) {
-      runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, highlight: ac.padEnd(6, '0') } });
-    } else if (part.startsWith('[[') && part.endsWith(']]')) {
-      runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: pc } });
-    } else if (/^\{[A-Za-z0-9]+\}$/.test(part)) {
-      runs.push({ text: '◆ ', options: { ...baseOpts, bold: true, color: ac } });
-    } else {
-      runs.push({ text: part, options: baseOpts });
+
+  // Strip (PascalCaseWord) icon-name placeholders the AI sometimes inserts
+  const str = raw.replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '');
+
+  // Only inline patterns — no multiline matches to avoid cross-line surprises
+  const INLINE = /(\*\*[^*\n]+\*\*|==.+?==|\[\[.+?\]\]|\{[A-Za-z0-9]+\})/g;
+
+  const processLine = (line: string): any[] => {
+    const parts = line.split(INLINE);
+    const runs: any[] = [];
+    parts.forEach(part => {
+      if (!part) return;
+      if (part.startsWith('## ')) {
+        runs.push({ text: part.slice(3), options: { ...baseOpts, bold: true, fontSize: (baseOpts.fontSize || 12) + 3, color: pc } });
+      } else if (/^\*\*[^*].+[^*]\*\*$/.test(part) || /^\*\*.\*\*$/.test(part)) {
+        // **bold** — length > 4 and has non-star content
+        const inner = part.slice(2, -2);
+        if (inner) runs.push({ text: inner, options: { ...baseOpts, bold: true } });
+      } else if (part.startsWith('==') && part.endsWith('==') && part.length > 4) {
+        // ==highlight== → accent-coloured bold (no pptxgenjs `highlight` prop)
+        runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: ac } });
+      } else if (part.startsWith('[[') && part.endsWith(']]')) {
+        runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: pc } });
+      } else if (/^\{[A-Za-z0-9]+\}$/.test(part)) {
+        runs.push({ text: '◆ ', options: { ...baseOpts, bold: true, color: ac } });
+      } else {
+        runs.push({ text: part, options: { ...baseOpts } });
+      }
+    });
+    return runs;
+  };
+
+  const lines = str.split('\n');
+  const allRuns: any[] = [];
+  lines.forEach((line, idx) => {
+    if (idx > 0) {
+      // Explicit line-break run — pptxgenjs creates <a:br/> for breakLine:true
+      allRuns.push({ text: '', options: { ...baseOpts, breakLine: true } });
     }
+    processLine(line).forEach(r => allRuns.push(r));
   });
-  return runs;
+  return allRuns;
 };
 
 // Renders rich text inside SlideCanvas (editable toggle)
@@ -1496,14 +1529,34 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
       <div style={{ padding: `32px ${PAD}px 14px`, flexShrink: 0 }}>
         <EditableHeader />
       </div>
-      <div style={{ display: 'flex', flex: 1, gap: 22, padding: `0 ${PAD}px 30px` }}>
-        {[{ key: 'column1', num: '1', c: theme.primaryColor }, { key: 'column2', num: '2', c: theme.accentColor }].map(col => (
-          <div key={col.key} style={{ flex: 1, background: '#fff', borderRadius: 16, border: '1px solid #eef2f7', boxShadow: cardShadow, padding: '20px 22px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: col.c, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff', fontWeight: 800, flexShrink: 0, marginBottom: 12, fontFamily: FONT_T }}>{col.num}</div>
-            <RichBodyWithIcons value={slide.data[col.key] || ''} onChange={v => onUpdate({ [col.key]: v })}
-              primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ flex: 1 }} />
-          </div>
-        ))}
+      <div style={{ display: 'flex', flex: 1, gap: 20, padding: `0 ${PAD}px 30px` }}>
+        {[{ key: 'column1', num: '1', c: theme.primaryColor }, { key: 'column2', num: '2', c: theme.accentColor }].map(col => {
+          // Extract first line as column title (mirrors PPTX export logic)
+          const rawVal = (slide.data[col.key] || '') as string;
+          const firstBreak = rawVal.search(/\n/);
+          const colTitle = (firstBreak > 0 ? rawVal.slice(0, firstBreak) : rawVal)
+            .replace(/\*\*/g, '').replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '').trim();
+          const colBody = firstBreak > 0 ? rawVal.slice(firstBreak + 1).trim() : '';
+          return (
+            <div key={col.key} style={{ flex: 1, background: '#fff', borderRadius: 16, border: '1px solid #eef2f7', boxShadow: cardShadow, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Accent top stripe */}
+              <div style={{ height: 5, backgroundColor: col.c, flexShrink: 0 }} />
+              <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Column title */}
+                {colTitle && (
+                  <div style={{ fontSize: 15, fontWeight: 800, color: col.c, fontFamily: FONT_T, marginBottom: 10, lineHeight: 1.3 }}>{colTitle}</div>
+                )}
+                {/* Column body */}
+                <RichBodyWithIcons
+                  value={colBody || rawVal}
+                  onChange={v => onUpdate({ [col.key]: colTitle ? `${colTitle}\n${v}` : v })}
+                  primaryColor={theme.primaryColor} accentColor={theme.accentColor}
+                  style={{ flex: 1, fontSize: 13 }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -2443,12 +2496,13 @@ const PlannerScreen = ({
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
         - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
             **palavra** → negrito estratégico para termos-chave
-            ==palavra== → marca-texto com cor de acento (use em definições e conceitos centrais)
+            ==palavra== → termo em destaque com cor de acento (use em definições e conceitos centrais)
             [[palavra]] → palavra-chave colorida em destaque primário (2-3 por slide máximo)
             {IconName} → ícone Lucide inline antes de tópicos (ex: {Target} Objetivo, {Brain} Conceito)
             ## Subtítulo → subtítulo dentro do corpo para hierarquia visual
         - Combine as marcações: ex: {Target} **[[Objetivo]]**: ==aprender a== estrutura...
-        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe', 'Target', 'CheckCircle', 'AlertTriangle', 'Lightbulb').
+        - NUNCA use emojis. NUNCA coloque nomes de ícones entre parênteses no texto (ex: ERRADO: "(CheckCircle) Título"). Use APENAS a sintaxe {IconName} para ícones inline.
+        - LAYOUT_TWO_COLUMNS — IMPORTANTE: a PRIMEIRA linha de column1 e column2 é tratada como título da coluna (renderizado em destaque). Coloque o título da coluna na primeira linha, depois uma quebra de linha (\n), depois o conteúdo. Ex: column1: "Título da Coluna 1\n\nConteúdo detalhado com **marcações**..."
         - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
 
         SAÍDA: JSON estrito (sem Markdown ao redor):
@@ -2457,14 +2511,14 @@ const PlannerScreen = ({
           "theme": { "primaryColor": "#hex", "accentColor": "#hex", "backgroundColor": "#hex", "fontTitle": "...", "fontBody": "..." },
           "slides": [
             { "layoutID": "LAYOUT_COVER",        "data": { "kicker": "APRESENTAÇÃO", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_QUOTE",         "data": { "title": "...", "quote": "...", "author": "..." } },
-            { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "title": "...", "column1": "...", "column2": "..." } },
-            { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_STATS",         "data": { "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "..." }] } },
-            { "layoutID": "LAYOUT_TIMELINE",      "data": { "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
-            { "layoutID": "LAYOUT_TOPICS",        "data": { "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }] } },
+            { "layoutID": "LAYOUT_QUOTE",         "data": { "kicker": "REFLEXÃO", "title": "...", "quote": "...", "author": "..." } },
+            { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "kicker": "COMPARAÇÃO", "title": "...", "column1": "Título Coluna A\n\nConteúdo com **marcações**...", "column2": "Título Coluna B\n\nConteúdo com **marcações**..." } },
+            { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "kicker": "VISUAL", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_STATS",         "data": { "kicker": "DADOS", "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "TrendingUp" }] } },
+            { "layoutID": "LAYOUT_TIMELINE",      "data": { "kicker": "HISTÓRIA", "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
+            { "layoutID": "LAYOUT_TOPICS",        "data": { "kicker": "ESTRUTURA", "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "BookOpen" }] } },
             { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "kicker": "CONCEITO", "title": "...", "text": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_REFERENCES",    "data": { "title": "Referências", "references": ["..."] } }
+            { "layoutID": "LAYOUT_REFERENCES",    "data": { "kicker": "FONTES", "title": "Referências", "references": ["..."] } }
           ]
         }`;
 
@@ -2719,15 +2773,15 @@ const PlannerScreen = ({
           }
 
           const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false);
-          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13, lineSpacing: 24 });
-          slide.addText(parsedText, { x: contentX, y: contentStartY + 0.05, w: contentW, h: 4.7 - contentStartY, valign: 'top', align: 'left', ...shrink });
+          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
+          slide.addText(parsedText, { x: contentX, y: contentStartY + 0.05, w: contentW, h: 4.7 - contentStartY, valign: 'top', align: 'left', lineSpacing: 24, ...shrink });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_TOP') {
           slide.background = { color: bg };
           const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false);
-          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13, lineSpacing: 22 });
-          slide.addText(parsedText, { x: LEFT, y: contentStartY, w: 9.0 - LEFT, h: 2.85 - contentStartY, valign: 'top', align: 'left', ...shrink });
+          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
+          slide.addText(parsedText, { x: LEFT, y: contentStartY, w: 9.0 - LEFT, h: 2.85 - contentStartY, valign: 'top', align: 'left', lineSpacing: 22, ...shrink });
           if (slideData.data.imageUrl) {
             addSlideImage(slide, slideData.data.imageUrl, { x: LEFT, y: 2.95, w: 9.0 - LEFT, h: 2.05, sizing: { type: 'cover', w: 9.0 - LEFT, h: 2.05 }, shadow: imgShadow });
           }
@@ -2806,11 +2860,25 @@ const PlannerScreen = ({
           const cardW = 4.32;
           // Two soft cards side by side
           [[LEFT, slideData.data.column1, '1'], [LEFT + cardW + 0.26, slideData.data.column2, '2']].forEach(([cx, content, num]: any, idx) => {
+            const colColor = idx === 0 ? pc : ac;
             slide.addShape(pres.ShapeType.roundRect, { x: cx, y: colY, w: cardW, h: colH, fill: { color: 'FFFFFF' }, line: { color: 'EEF2F7', width: 1 }, rectRadius: 0.08, shadow: { type: 'outer', blur: 8, offset: 2, angle: 90, color: 'CBD5E1', opacity: 0.35 } });
-            slide.addShape(pres.ShapeType.ellipse, { x: cx + 0.28, y: colY + 0.26, w: 0.42, h: 0.42, fill: { color: idx === 0 ? pc : ac } });
-            slide.addText(num, { x: cx + 0.28, y: colY + 0.26, w: 0.42, h: 0.42, fontSize: 13, color: 'FFFFFF', align: 'center', valign: 'middle', bold: true, fontFace: FONT_T });
-            const parsed = parseMarkdown(content || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-            slide.addText(parsed, { x: cx + 0.28, y: colY + 0.85, w: cardW - 0.56, h: colH - 1.1, valign: 'top', align: 'left', ...shrink });
+
+            // Accent top stripe per column
+            slide.addShape(pres.ShapeType.roundRect, { x: cx, y: colY, w: cardW, h: 0.12, fill: { color: colColor }, rectRadius: 0.08 });
+
+            // Extract first non-empty line as column title (AI often puts a header there)
+            const rawContent = (typeof content === 'string' ? content : '').trim();
+            const firstBreak = rawContent.search(/\n/);
+            const colTitle = (firstBreak > 0 ? rawContent.slice(0, firstBreak) : rawContent)
+              .replace(/\*\*/g, '').replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '').trim();
+            const colBody = firstBreak > 0 ? rawContent.slice(firstBreak + 1).trim() : '';
+
+            // Column title
+            slide.addText(colTitle, { x: cx + 0.22, y: colY + 0.24, w: cardW - 0.44, h: 0.52, fontSize: 14, bold: true, color: colColor, fontFace: FONT_T, valign: 'middle', align: 'left', ...shrink });
+
+            // Column body
+            const parsed = parseMarkdown(colBody || rawContent, { ...bodyOpts, fontSize: 12 });
+            slide.addText(parsed, { x: cx + 0.22, y: colY + 0.85, w: cardW - 0.44, h: colH - 1.05, valign: 'top', align: 'left', lineSpacing: 20, ...shrink });
           });
           addFooter(slide, si + 1);
 
@@ -9632,12 +9700,13 @@ function AppInner() {
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
         - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
             **palavra** → negrito estratégico para termos-chave
-            ==palavra== → marca-texto com cor de acento (use em definições e conceitos centrais)
+            ==palavra== → termo em destaque com cor de acento (use em definições e conceitos centrais)
             [[palavra]] → palavra-chave colorida em destaque primário (2-3 por slide máximo)
             {IconName} → ícone Lucide inline antes de tópicos (ex: {Target} Objetivo, {Brain} Conceito)
             ## Subtítulo → subtítulo dentro do corpo para hierarquia visual
         - Combine as marcações: ex: {Target} **[[Objetivo]]**: ==aprender a== estrutura...
-        - NUNCA use emojis. Para icons, use nomes do Lucide-React (ex: 'Brain', 'TrendingUp', 'Globe', 'Target', 'CheckCircle', 'AlertTriangle', 'Lightbulb').
+        - NUNCA use emojis. NUNCA coloque nomes de ícones entre parênteses no texto (ex: ERRADO: "(CheckCircle) Título"). Use APENAS a sintaxe {IconName} para ícones inline.
+        - LAYOUT_TWO_COLUMNS — IMPORTANTE: a PRIMEIRA linha de column1 e column2 é tratada como título da coluna (renderizado em destaque). Coloque o título da coluna na primeira linha, depois uma quebra de linha (\n), depois o conteúdo. Ex: column1: "Título da Coluna 1\n\nConteúdo detalhado com **marcações**..."
         - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
 
         SAÍDA: JSON estrito (sem Markdown ao redor):
@@ -9646,14 +9715,14 @@ function AppInner() {
           "theme": { "primaryColor": "#hex", "accentColor": "#hex", "backgroundColor": "#hex", "fontTitle": "...", "fontBody": "..." },
           "slides": [
             { "layoutID": "LAYOUT_COVER",        "data": { "kicker": "APRESENTAÇÃO", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_QUOTE",         "data": { "title": "...", "quote": "...", "author": "..." } },
-            { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "title": "...", "column1": "...", "column2": "..." } },
-            { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_STATS",         "data": { "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "..." }] } },
-            { "layoutID": "LAYOUT_TIMELINE",      "data": { "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
-            { "layoutID": "LAYOUT_TOPICS",        "data": { "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "..." }] } },
+            { "layoutID": "LAYOUT_QUOTE",         "data": { "kicker": "REFLEXÃO", "title": "...", "quote": "...", "author": "..." } },
+            { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "kicker": "COMPARAÇÃO", "title": "...", "column1": "Título Coluna A\n\nConteúdo com **marcações**...", "column2": "Título Coluna B\n\nConteúdo com **marcações**..." } },
+            { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "kicker": "VISUAL", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
+            { "layoutID": "LAYOUT_STATS",         "data": { "kicker": "DADOS", "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "TrendingUp" }] } },
+            { "layoutID": "LAYOUT_TIMELINE",      "data": { "kicker": "HISTÓRIA", "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
+            { "layoutID": "LAYOUT_TOPICS",        "data": { "kicker": "ESTRUTURA", "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "BookOpen" }] } },
             { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "kicker": "CONCEITO", "title": "...", "text": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_REFERENCES",    "data": { "title": "Referências", "references": ["..."] } }
+            { "layoutID": "LAYOUT_REFERENCES",    "data": { "kicker": "FONTES", "title": "Referências", "references": ["..."] } }
           ]
         }`;
 
