@@ -2536,12 +2536,11 @@ const PlannerScreen = ({
       const totalSlides = presentationData.slides.length;
 
       const addFooter = (slide: any, slideNum: number, darkBg = false) => {
-        const fg = darkBg ? 'FFFFFF' : '9CA3AF';
-        slide.addShape(pres.ShapeType.rect, { x: 0, y: 5.15, w: 10, h: 0.35, fill: { color: pc, transparency: darkBg ? 40 : 85 }, line: { color: pc, transparency: 85, width: 0 } });
-        if (schoolLabel) slide.addText(schoolLabel, { x: 0.2, y: 5.17, w: 5.5, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false });
-        if (teacherLabel) slide.addText(`Prof. ${teacherLabel}`, { x: 0.2, y: 5.17, w: 5.5, h: 0.28, fontSize: 8, color: darkBg ? 'FFFFFF' : pc, bold: false, align: schoolLabel ? 'right' as const : 'left' as const });
-        slide.addText('Prof. Corujão', { x: 5.9, y: 5.17, w: 3.0, h: 0.28, fontSize: 7, color: darkBg ? 'FFFFFF' : pc, transparency: 20, align: 'center' as const, italic: true, fontFace: 'Calibri' });
-        slide.addText(`${slideNum} / ${totalSlides}`, { x: 9.3, y: 5.17, w: 0.6, h: 0.28, fontSize: 8, color: fg, align: 'right' });
+        const fg = darkBg ? 'FFFFFF' : 'C4C9D4';
+        // Número do slide — canto inferior direito, discreto
+        slide.addText(`${slideNum} / ${totalSlides}`, { x: 9.3, y: 5.22, w: 0.6, h: 0.22, fontSize: 7, color: fg, align: 'right' as const, transparency: 30 });
+        // Marca d'água "Prof. Corujão" — canto inferior esquerdo, muito discreta
+        slide.addText('Prof. Corujão', { x: 0.15, y: 5.22, w: 2.2, h: 0.22, fontSize: 6.5, color: darkBg ? 'FFFFFF' : 'B0B7C3', transparency: 45, italic: true, fontFace: 'Calibri' });
       };
 
       const addAccentBar = (slide: any, vertical = false) => {
