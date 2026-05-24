@@ -2044,19 +2044,25 @@ const sanitizeSlideData = (parsed: any): any => {
   };
 };
 
-const downloadDocx = (blob: Blob, filename: string): void => {
+// Generic blob download — appends a temporary <a> to document.body so the
+// browser treats it as a real anchor click (avoids the "ghost click" problem
+// where some browsers silently block programmatic downloads after the first).
+const downloadBlob = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
-  a.style.display = 'none';
+  a.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none';
   document.body.appendChild(a);
   a.click();
+  // Revoke after a generous delay to guarantee the download has started
   setTimeout(() => {
-    if (document.body.contains(a)) document.body.removeChild(a);
+    try { document.body.removeChild(a); } catch { /* already removed */ }
     URL.revokeObjectURL(url);
-  }, 1000);
+  }, 30_000);
 };
+
+const downloadDocx = (blob: Blob, filename: string): void => downloadBlob(blob, filename);
 
 const buildDocHtml = (
   rawMd: string,
@@ -2542,20 +2548,10 @@ const PlannerScreen = ({
 
   const [isExporting, setIsExporting] = useState(false);
   const [preparingDoc, setPreparingDoc] = useState<'main' | number | null>(null);
-  const [docReady, setDocReady] = useState<{url: string; filename: string; target: 'main' | number} | null>(null);
 
-  // Clean up download URL and reset state on mode change
-  useEffect(() => {
-    if (docReady) URL.revokeObjectURL(docReady.url);
-    setDocReady(null);
-    setPreparingDoc(null);
-  }, [mode]);
-
-  // When content changes (new generation), reset download state
-  useEffect(() => {
-    if (docReady) URL.revokeObjectURL(docReady.url);
-    setDocReady(null);
-  }, [currentResult]);
+  // Reset preparingDoc when mode or content changes
+  useEffect(() => { setPreparingDoc(null); }, [mode]);
+  useEffect(() => { setPreparingDoc(null); }, [currentResult]);
 
   const fetchImageAsBase64 = async (url: string): Promise<string | null> => {
     try {
@@ -2906,12 +2902,19 @@ const PlannerScreen = ({
           addFooter(slide, si + 1);
         }
       }
-      await pres.writeFile({ fileName: `Aula_${presentationData.presentationTitle.replace(/\s+/g, '_')}.pptx` });
+      // Use write() + our own downloadBlob instead of writeFile() so we control
+      // the anchor element lifecycle — pres.writeFile() uses an internal "ghost"
+      // click that some browsers silently block on the second call within the
+      // same page session.
+      const blob = await pres.write({ outputType: 'blob' }) as Blob;
+      const safeName = presentationData.presentationTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'Apresentacao';
+      downloadBlob(blob, `Aula_${safeName}.pptx`);
     } catch (e) {
       console.error(e);
-      toast.error('A apresentacao nao saiu dessa vez. Confere a conexao e tenta de novo.');
+      toast.error('A apresentação não saiu dessa vez. Confere a conexão e tenta de novo.');
+    } finally {
+      setIsExporting(false);
     }
-    setIsExporting(false);
   };
 
   const generateAndSetBuffer = (startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule) => {
@@ -3199,19 +3202,9 @@ const PlannerScreen = ({
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
                   </div>
                 </div>
-                {docReady?.target === 'main' ? (
-                  <a
-                    href={docReady.url}
-                    download={docReady.filename}
-                    onClick={() => setTimeout(() => { URL.revokeObjectURL(docReady!.url); setDocReady(null); }, 1000)}
-                    className="w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                  >
-                    <Download size={16} /> Baixar Word
-                  </a>
-                ) : (
-                  <button
+                <button
                     onClick={async () => {
-                      if (preparingDoc !== null || docReady !== null) return;
+                      if (preparingDoc !== null) return;
                       setPreparingDoc('main');
                       try {
                         const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
@@ -3229,7 +3222,7 @@ const PlannerScreen = ({
                         });
                         const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
                         const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                        setDocReady({ url: URL.createObjectURL(blob), filename, target: 'main' });
+                        downloadBlob(blob, filename);
                       } catch (e) {
                         console.error('Erro ao exportar Word:', e);
                         toast.error('O documento Word fugiu! Tenta gerar de novo.');
@@ -3237,12 +3230,11 @@ const PlannerScreen = ({
                         setPreparingDoc(null);
                       }
                     }}
-                    disabled={preparingDoc !== null || docReady !== null}
+                    disabled={preparingDoc !== null}
                     className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {preparingDoc === 'main' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                   </button>
-                )}
               </motion.div>
             )}
 
@@ -3261,19 +3253,9 @@ const PlannerScreen = ({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {docReady?.target === i ? (
-                        <a
-                          href={docReady.url}
-                          download={docReady.filename}
-                          onClick={() => setTimeout(() => { URL.revokeObjectURL(docReady!.url); setDocReady(null); }, 1000)}
-                          className="w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-                        >
-                          <Download size={16} /> Baixar Word
-                        </a>
-                      ) : (
                         <button
                           onClick={async () => {
-                            if (preparingDoc !== null || docReady !== null) return;
+                            if (preparingDoc !== null) return;
                             setPreparingDoc(i);
                             try {
                               const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
@@ -3291,7 +3273,7 @@ const PlannerScreen = ({
                               });
                               const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
                               const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                              setDocReady({ url: URL.createObjectURL(blob), filename, target: i });
+                              downloadBlob(blob, filename);
                             } catch (e) {
                               console.error('Erro ao exportar Word:', e);
                               toast.error('O documento Word fugiu! Tenta gerar de novo.');
@@ -3299,12 +3281,11 @@ const PlannerScreen = ({
                               setPreparingDoc(null);
                             }
                           }}
-                          disabled={preparingDoc !== null || docReady !== null}
+                          disabled={preparingDoc !== null}
                           className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                         >
                           {preparingDoc === i ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
                         </button>
-                      )}
                     </div>
                   </div>
                 ))}
