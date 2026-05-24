@@ -1962,10 +1962,57 @@ const buildDocx = async (
 const stripSlideMarkup = (s: any): string =>
   typeof s === 'string' ? s.replace(/\[\[|\]\]/g, '') : (s ?? '');
 
+const clampHex = (c: any, fallback: string): string => {
+  if (typeof c === 'string' && /^#?[0-9a-fA-F]{6}$/.test(c.trim())) return `#${c.trim().replace('#', '')}`;
+  return fallback;
+};
+
+const hexToHsl = (hex: string): [number, number, number] => {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let hue = 0, sat = 0; const li = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    sat = li > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) hue = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) hue = (b - r) / d + 2;
+    else hue = (r - g) / d + 4;
+    hue /= 6;
+  }
+  return [hue * 360, sat * 100, li * 100];
+};
+
+const hslToHex = (h: number, s: number, l: number): string => {
+  h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  const to = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${to(r)}${to(g)}${to(b)}`.toUpperCase();
+};
+
+// Force a clean monochromatic palette from a single hue, so the deck never
+// mixes clashing colors (blue+yellow etc). Accent and background share the
+// primary's hue, differing only in lightness/saturation.
+const makeMonochromePalette = (rawPrimary: any) => {
+  const primary = clampHex(rawPrimary, '#4338CA');
+  const [h, s] = hexToHsl(primary);
+  const sat = Math.min(Math.max(s, 45), 85);
+  return {
+    primaryColor: hslToHex(h, sat, 38),
+    accentColor: hslToHex(h, Math.min(sat + 8, 92), 56),
+    backgroundColor: hslToHex(h, Math.min(sat, 26), 97),
+  };
+};
+
 const sanitizeSlideData = (parsed: any): any => {
   if (!parsed?.slides) return parsed;
+  const mono = makeMonochromePalette(parsed?.theme?.primaryColor);
   return {
     ...parsed,
+    theme: { ...(parsed.theme || {}), ...mono },
     slides: parsed.slides.map((slide: any) => {
       const d = slide.data || {};
       return {
@@ -2381,7 +2428,7 @@ const PlannerScreen = ({
         - Use LAYOUT_QUOTE, LAYOUT_FULL_IMAGE ou LAYOUT_STATS para criar momentos de impacto.
         - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
         - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
-        - Paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo) — escolha cores profissionais adequadas ao tema.
+        - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
         - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
             **palavra** → negrito estratégico para termos-chave
@@ -2512,7 +2559,8 @@ const PlannerScreen = ({
       const blob = await res.blob();
       return await new Promise<string>(resolve => {
         const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        // Keep the full data URL so the real MIME type (png/jpeg/webp) is preserved.
+        reader.onload = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
     } catch {
@@ -2537,10 +2585,10 @@ const PlannerScreen = ({
 
       const addFooter = (slide: any, slideNum: number, darkBg = false) => {
         const fg = darkBg ? 'FFFFFF' : 'C4C9D4';
-        // Número do slide — canto inferior direito, discreto
-        slide.addText(`${slideNum} / ${totalSlides}`, { x: 9.3, y: 5.22, w: 0.6, h: 0.22, fontSize: 7, color: fg, align: 'right' as const, transparency: 30 });
-        // Marca d'água "Prof. Corujão" — canto inferior esquerdo, muito discreta
-        slide.addText('Prof. Corujão', { x: 0.15, y: 5.22, w: 2.2, h: 0.22, fontSize: 6.5, color: darkBg ? 'FFFFFF' : 'B0B7C3', transparency: 45, italic: true, fontFace: 'Calibri' });
+        // Número do slide — canto inferior esquerdo, muito discreto
+        slide.addText(`${slideNum} / ${totalSlides}`, { x: 0.15, y: 5.22, w: 0.8, h: 0.22, fontSize: 7, color: fg, align: 'left' as const, transparency: 35 });
+        // Marca d'água "Prof. Corujão" — canto inferior direito, discreta
+        slide.addText('Prof. Corujão', { x: 7.25, y: 5.22, w: 2.6, h: 0.22, fontSize: 7, color: darkBg ? 'FFFFFF' : 'B0B7C3', transparency: darkBg ? 35 : 45, italic: true, align: 'right' as const, fontFace: 'Calibri' });
       };
 
       const addAccentBar = (slide: any, vertical = false) => {
@@ -2567,9 +2615,9 @@ const PlannerScreen = ({
           })
       );
       const addSlideImage = (slide: any, url: string, opts: any) => {
-        const b64 = imageCache.get(url);
-        if (b64) {
-          slide.addImage({ data: `image/jpeg;base64,${b64}`, ...opts });
+        const dataUrl = imageCache.get(url);
+        if (dataUrl) {
+          slide.addImage({ data: dataUrl, ...opts });
         } else {
           slide.addImage({ path: url, ...opts });
         }
@@ -2578,8 +2626,9 @@ const PlannerScreen = ({
       for (let si = 0; si < presentationData.slides.length; si++) {
         const slideData = presentationData.slides[si];
         const slide = pres.addSlide();
-        const titleOpts = { fontFace: 'Calibri', color: pc, bold: true };
+        const titleOpts = { fontFace: 'Calibri', color: pc, bold: true, fit: 'shrink' as const };
         const bodyOpts = { fontFace: 'Calibri', color: '374151', fontSize: 13 };
+        const shrink = { fit: 'shrink' as const };
 
         if (slideData.layoutID === 'LAYOUT_COVER') {
           slide.background = { color: pc };
@@ -2591,9 +2640,9 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.ellipse, { x: -0.4, y: 3.8, w: 1.8, h: 1.8, fill: { color: ac, transparency: 60 } });
           slide.addShape(pres.ShapeType.ellipse, { x: 3.5, y: -0.4, w: 1.2, h: 1.2, fill: { color: 'FFFFFF', transparency: 80 } });
 
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 1.1, w: 4.7, h: 2.2, fontSize: 38, fontFace: 'Calibri', color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5 });
+          slide.addText(slideData.data.title || '', { x: 0.5, y: 1.1, w: 4.7, h: 2.2, fontSize: 38, fontFace: 'Calibri', color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5, ...shrink });
           slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.35, w: 1.2, h: 0.06, fill: { color: ac } });
-          slide.addText(slideData.data.subtitle || '', { x: 0.5, y: 3.5, w: 4.7, h: 0.7, fontSize: 14, fontFace: 'Calibri', color: 'D1D5DB', align: 'left' });
+          slide.addText(slideData.data.subtitle || '', { x: 0.5, y: 3.5, w: 4.7, h: 0.7, fontSize: 14, fontFace: 'Calibri', color: 'D1D5DB', align: 'left', ...shrink });
           slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.5, y: 4.6, w: 4.7, h: 0.35, fontSize: 9, fontFace: 'Calibri', color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
@@ -2609,15 +2658,15 @@ const PlannerScreen = ({
           const contentX = isLeft ? 0.4 : 4.4;
 
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'contain', w: 3.8, h: 4.8 } });
-            slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 75 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0.2, w: 3.8, h: 4.8, sizing: { type: 'cover', w: 3.8, h: 4.8 } });
+            slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0.2, w: 3.8, h: 4.8, fill: { color: pc, transparency: 82 } });
           }
 
           // Title area with accent
           slide.addShape(pres.ShapeType.rect, { x: contentX, y: 0.22, w: 5.2, h: 0.08, fill: { color: ac } });
           slide.addText(slideData.data.title || '', { x: contentX, y: 0.38, w: 5.2, h: 0.8, fontSize: 24, ...titleOpts });
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 22 });
-          slide.addText(parsedText, { x: contentX, y: 1.3, w: 5.2, h: 3.6, valign: 'top', align: 'left' });
+          slide.addText(parsedText, { x: contentX, y: 1.3, w: 5.2, h: 3.6, valign: 'top', align: 'left', ...shrink });
           // Arrow pointing toward image
           const arrowX = isLeft ? 5.45 : 4.35;
           slide.addShape(pres.ShapeType.rect, { x: arrowX, y: 2.45, w: 0.3, h: 0.06, fill: { color: ac } });
@@ -2630,7 +2679,7 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.rect, { x: 0.4, y: 0.22, w: 9.2, h: 0.06, fill: { color: ac } });
           slide.addText(slideData.data.title || '', { x: 0.4, y: 0.36, w: 9.2, h: 0.7, fontSize: 26, ...titleOpts });
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(parsedText, { x: 0.4, y: 1.2, w: 9.2, h: 1.35, valign: 'top', align: 'left' });
+          slide.addText(parsedText, { x: 0.4, y: 1.2, w: 9.2, h: 1.55, valign: 'top', align: 'left', ...shrink });
           // Down arrow between text and image
           slide.addShape(pres.ShapeType.rect, { x: 4.94, y: 2.62, w: 0.12, h: 0.28, fill: { color: ac } });
           slide.addShape(pres.ShapeType.rect, { x: 4.7, y: 2.78, w: 0.6, h: 0.08, fill: { color: ac }, rotate: 0 });
@@ -2654,11 +2703,11 @@ const PlannerScreen = ({
               // Colored header strip on card
               slide.addShape(pres.ShapeType.roundRect, { x: xPos, y: 1.1, w: colW - 0.2, h: 0.7, fill: { color: pc }, rectRadius: 0.12 });
               slide.addShape(pres.ShapeType.rect, { x: xPos, y: 1.5, w: colW - 0.2, h: 0.3, fill: { color: pc } });
-              // Icon circle
+              // Icon circle with a clean number badge (Lucide names can't render in PPTX)
               slide.addShape(pres.ShapeType.ellipse, { x: xPos + (colW - 0.2) / 2 - 0.38, y: 1.75, w: 0.76, h: 0.76, fill: { color: ac } });
-              slide.addText(topic.icon ? topic.icon.substring(0, 2).toUpperCase() : '★', { x: xPos + (colW - 0.2) / 2 - 0.38, y: 1.75, w: 0.76, h: 0.76, fontSize: 13, color: 'FFFFFF', align: 'center', bold: true });
-              slide.addText(topic.title || '', { x: xPos + 0.1, y: 2.62, w: colW - 0.4, h: 0.4, fontSize: 12, bold: true, align: 'center', color: pc });
-              slide.addText(topic.content || '', { x: xPos + 0.1, y: 3.08, w: colW - 0.4, h: 1.75, fontSize: 10, align: 'center', color: '4B5563', valign: 'top' });
+              slide.addText(`${i + 1}`, { x: xPos + (colW - 0.2) / 2 - 0.38, y: 1.75, w: 0.76, h: 0.76, fontSize: 22, color: 'FFFFFF', align: 'center', valign: 'middle', bold: true });
+              slide.addText(topic.title || '', { x: xPos + 0.1, y: 2.62, w: colW - 0.4, h: 0.4, fontSize: 12, bold: true, align: 'center', color: pc, ...shrink });
+              slide.addText(topic.content || '', { x: xPos + 0.1, y: 3.08, w: colW - 0.4, h: 1.75, fontSize: 10, align: 'center', color: '4B5563', valign: 'top', ...shrink });
             });
           }
           addFooter(slide, si + 1);
@@ -2675,7 +2724,7 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.rect, { x: 0.7, y: 1.3, w: 2.4, h: 0.06, fill: { color: ac } });
           if (slideData.data.references) {
             const refText = slideData.data.references.map((r: string) => ({ text: `• ${r}`, options: { breakLine: true, color: 'E0E7FF', fontSize: 13, fontFace: 'Calibri', paraSpaceBefore: 6 } }));
-            slide.addText(refText, { x: 0.7, y: 1.5, w: 8.5, h: 3.5, valign: 'top' });
+            slide.addText(refText, { x: 0.7, y: 1.5, w: 8.5, h: 3.5, valign: 'top', ...shrink });
           }
           addFooter(slide, si + 1, true);
 
@@ -2691,7 +2740,7 @@ const PlannerScreen = ({
             slide.addText(slideData.data.title, { x: 1, y: 0.55, w: 8, h: 0.35, fontSize: 10, color: pc, bold: true, align: 'center', charSpacing: 3 });
           }
           // Quote
-          slide.addText(slideData.data.quote || '', { x: 1, y: 1.2, w: 8, h: 2.6, fontSize: 26, fontFace: 'Georgia', color: pc, bold: false, italic: true, align: 'center', valign: 'middle', lineSpacing: 36 });
+          slide.addText(slideData.data.quote || '', { x: 1, y: 1.2, w: 8, h: 2.6, fontSize: 26, fontFace: 'Georgia', color: pc, bold: false, italic: true, align: 'center', valign: 'middle', lineSpacing: 36, ...shrink });
           // Divider
           slide.addShape(pres.ShapeType.rect, { x: 4.35, y: 3.9, w: 1.3, h: 0.06, fill: { color: ac } });
           // Author
@@ -2712,7 +2761,7 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.ellipse, { x: 0.4, y: 1.15, w: 0.35, h: 0.35, fill: { color: ac } });
           slide.addText('1', { x: 0.4, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
           const col1 = parseMarkdown(slideData.data.column1 || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(col1, { x: 0.4, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left' });
+          slide.addText(col1, { x: 0.4, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left', ...shrink });
           // Central arrow divider
           slide.addShape(pres.ShapeType.ellipse, { x: 4.63, y: 2.5, w: 0.5, h: 0.5, fill: { color: pc } });
           slide.addText('⟺', { x: 4.63, y: 2.5, w: 0.5, h: 0.5, fontSize: 13, color: 'FFFFFF', align: 'center', bold: true });
@@ -2720,13 +2769,13 @@ const PlannerScreen = ({
           slide.addShape(pres.ShapeType.ellipse, { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fill: { color: pc } });
           slide.addText('2', { x: 5.25, y: 1.15, w: 0.35, h: 0.35, fontSize: 10, color: 'FFFFFF', align: 'center', bold: true });
           const col2 = parseMarkdown(slideData.data.column2 || '', { ...bodyOpts, fontSize: 12, lineSpacing: 20 });
-          slide.addText(col2, { x: 5.3, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left' });
+          slide.addText(col2, { x: 5.3, y: 1.65, w: 4.3, h: 3.2, valign: 'top', align: 'left', ...shrink });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
           slide.background = { color: '111111' };
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'contain', w: 10, h: 5.5 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'cover', w: 10, h: 5.5 } });
           }
           // Dark gradient overlay via semi-transparent rect
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.3, fill: { color: '000000', transparency: 25 } });
@@ -2736,11 +2785,12 @@ const PlannerScreen = ({
           // Accent line above title
           slide.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.2, w: 1.0, h: 0.07, fill: { color: ac } });
           // Title
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 3.35, w: 9, h: 1.3, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: 'Calibri', valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000' } });
+          slide.addText(slideData.data.title || '', { x: 0.5, y: 3.35, w: 9, h: 1.3, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: 'Calibri', valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000' }, ...shrink });
           // Subtitle
           if (slideData.data.subtitle) {
-            slide.addText(slideData.data.subtitle, { x: 0.5, y: 4.7, w: 9, h: 0.45, fontSize: 16, color: 'D1D5DB', fontFace: 'Calibri' });
+            slide.addText(slideData.data.subtitle, { x: 0.5, y: 4.7, w: 9, h: 0.45, fontSize: 16, color: 'D1D5DB', fontFace: 'Calibri', ...shrink });
           }
+          addFooter(slide, si + 1, true);
 
         } else if (slideData.layoutID === 'LAYOUT_STATS') {
           slide.background = { color: bg };
@@ -2758,9 +2808,9 @@ const PlannerScreen = ({
             // Icon circle
             slide.addShape(pres.ShapeType.ellipse, { x: xPos + cardW / 2 - 0.35, y: 1.45, w: 0.7, h: 0.7, fill: { color: isDark ? 'FFFFFF' : ac, transparency: isDark ? 80 : 0 } });
             // Value
-            slide.addText(s.value || '—', { x: xPos + 0.1, y: 2.3, w: cardW - 0.2, h: 1.1, fontSize: 36, bold: true, align: 'center', color: isDark ? 'FFFFFF' : pc });
+            slide.addText(s.value || '—', { x: xPos + 0.1, y: 2.3, w: cardW - 0.2, h: 1.1, fontSize: 36, bold: true, align: 'center', color: isDark ? 'FFFFFF' : pc, ...shrink });
             // Label
-            slide.addText(s.label || '', { x: xPos + 0.1, y: 3.45, w: cardW - 0.2, h: 0.9, fontSize: 12, align: 'center', color: isDark ? 'D1D5DB' : '6B7280', valign: 'top' });
+            slide.addText(s.label || '', { x: xPos + 0.1, y: 3.45, w: cardW - 0.2, h: 0.9, fontSize: 12, align: 'center', color: isDark ? 'D1D5DB' : '6B7280', valign: 'top', ...shrink });
           });
           addFooter(slide, si + 1);
 
@@ -2786,9 +2836,9 @@ const PlannerScreen = ({
               // Year
               slide.addText(ev.year || '', { x: cx - 0.25, y: 1.25, w: 1.0, h: 0.4, fontSize: 12, bold: true, align: 'center', color: pc });
               // Event title
-              slide.addText(ev.title || '', { x: cx - 0.55, y: 2.4, w: 1.6, h: 0.5, fontSize: 11, bold: true, align: 'center', color: '1F2937' });
+              slide.addText(ev.title || '', { x: cx - 0.55, y: 2.4, w: 1.6, h: 0.5, fontSize: 11, bold: true, align: 'center', color: '1F2937', ...shrink });
               // Description
-              slide.addText(ev.description || '', { x: cx - 0.55, y: 2.95, w: 1.6, h: 1.8, fontSize: 10, align: 'center', color: '6B7280', valign: 'top', lineSpacing: 16 });
+              slide.addText(ev.description || '', { x: cx - 0.55, y: 2.95, w: 1.6, h: 1.8, fontSize: 10, align: 'center', color: '6B7280', valign: 'top', lineSpacing: 16, ...shrink });
             });
           }
           addFooter(slide, si + 1);
@@ -9534,7 +9584,7 @@ function AppInner() {
         - Use LAYOUT_QUOTE, LAYOUT_FULL_IMAGE ou LAYOUT_STATS para criar momentos de impacto.
         - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
         - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
-        - Paleta de NO MÁXIMO 3 CORES (Primária, Acento, Fundo) — escolha cores profissionais adequadas ao tema.
+        - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
         - FORMATAÇÃO DE TEXTO RICA (use obrigatoriamente nos campos "text", "column1", "column2"):
             **palavra** → negrito estratégico para termos-chave
