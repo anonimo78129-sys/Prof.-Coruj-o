@@ -1397,12 +1397,13 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
   const titleStyle = { color: isCover || isRef ? '#ffffff' : theme.primaryColor, fontFamily: FONT_T, fontWeight: 800 };
 
   // Cabeçalho editável: eyebrow (kicker) + título + traço de acento.
+  // Title uses INK (dark slate) on light-bg slides for reliable readability regardless of chosen primary colour.
   const EditableHeader = ({ darkBg = false }: { darkBg?: boolean }) => (
     <div style={{ marginBottom: 14 }}>
       <input value={slide.data.kicker || ''} onChange={e => onUpdate({ kicker: e.target.value })} placeholder="RÓTULO"
         style={{ fontSize: 12, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: theme.accentColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', marginBottom: 6, fontFamily: FONT_B }} />
       <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-        style={{ ...titleStyle, color: darkBg ? '#fff' : theme.primaryColor, fontSize: 30, lineHeight: 1.18, background: 'transparent', border: 'none', width: '100%', outline: 'none', display: 'block' }} />
+        style={{ ...titleStyle, color: darkBg ? '#fff' : INK, fontSize: 30, lineHeight: 1.18, background: 'transparent', border: 'none', width: '100%', outline: 'none', display: 'block' }} />
       <div style={{ width: 54, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 10 }} />
     </div>
   );
@@ -1429,11 +1430,9 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
           {teacherName ? `Prof. ${teacherName}` : ''}{teacherName && schoolName ? '  ·  ' : ''}{schoolName || ''}
         </div>
       </div>
-      {/* Right panel image */}
-      <div style={{ flex: 1, height: SLIDE_H, padding: '28px 28px 28px 0' }}>
-        <div style={{ width: '100%', height: '100%', borderRadius: 14, overflow: 'hidden', boxShadow: cardShadow }}>
-          <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
-        </div>
+      {/* Right panel image — full bleed, no padding/border */}
+      <div style={{ flex: 1, height: SLIDE_H, overflow: 'hidden' }}>
+        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
       </div>
     </div>
   );
@@ -2721,13 +2720,16 @@ const PlannerScreen = ({
       const iconPng = (name?: string) => (name ? iconCache.get(`${name}|#FFFFFF`) || '' : '');
 
       // Cabeçalho consistente: eyebrow (rótulo) + título + traço de acento.
+      // Title uses INK (dark slate) for light-bg slides — readable regardless of user's chosen primary colour.
       const addHeader = (slide: any, kicker: string | undefined, title: string, darkBg = false) => {
         const hasKick = !!(kicker && kicker.trim());
         if (hasKick) {
           slide.addText((kicker as string).toUpperCase(), { x: LEFT, y: 0.42, w: 9.0 - LEFT, h: 0.28, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
         }
         const titleY = hasKick ? 0.74 : 0.5;
-        slide.addText(title || '', { x: LEFT, y: titleY, w: 9.0 - LEFT, h: 0.85, fontSize: 30, color: darkBg ? 'FFFFFF' : pc, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
+        // Use high-contrast INK for light-background slides; white for dark-background slides
+        const titleColor = darkBg ? 'FFFFFF' : INK;
+        slide.addText(title || '', { x: LEFT, y: titleY, w: 9.0 - LEFT, h: 0.85, fontSize: 30, color: titleColor, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
         slide.addShape(pres.ShapeType.rect, { x: LEFT, y: titleY + 0.78, w: 0.9, h: 0.055, fill: { color: ac } });
         return titleY + 0.95; // y onde o conteúdo pode começar
       };
@@ -2752,13 +2754,25 @@ const PlannerScreen = ({
 
           // Eyebrow / kicker
           slide.addText((kicker || 'Apresentação').toUpperCase(), { x: 0.55, y: 0.85, w: 4.6, h: 0.3, fontSize: 11, fontFace: FONT_B, color: 'FFFFFF', bold: true, charSpacing: 3, transparency: 25 });
-          slide.addText(slideData.data.title || '', { x: 0.5, y: 1.25, w: 4.7, h: 2.1, fontSize: 40, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5, ...shrink });
+          // Smart title: if very long, split near midpoint so font stays readable
+          const rawCoverTitle = (slideData.data.title || '').trim();
+          const coverWords = rawCoverTitle.split(/\s+/);
+          if (rawCoverTitle.length > 38 && coverWords.length >= 4) {
+            const mid = Math.ceil(coverWords.length / 2);
+            const titlePart1 = coverWords.slice(0, mid).join(' ');
+            const titlePart2 = coverWords.slice(mid).join(' ');
+            slide.addText(titlePart1, { x: 0.5, y: 1.15, w: 4.7, h: 1.05, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
+            slide.addText(titlePart2, { x: 0.5, y: 2.22, w: 4.7, h: 1.05, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
+          } else {
+            slide.addText(rawCoverTitle, { x: 0.5, y: 1.25, w: 4.7, h: 2.1, fontSize: 40, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5, ...shrink });
+          }
           slide.addShape(pres.ShapeType.rect, { x: 0.55, y: 3.42, w: 1.2, h: 0.06, fill: { color: ac } });
           slide.addText(slideData.data.subtitle || '', { x: 0.55, y: 3.62, w: 4.6, h: 0.7, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
           slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.55, y: 4.65, w: 4.6, h: 0.35, fontSize: 9, fontFace: FONT_B, color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: 5.7, y: 0.5, w: 4.0, h: 4.5, sizing: { type: 'cover', w: 4.0, h: 4.5 }, rounding: false, shadow: imgShadow });
+            // Full-bleed: image fills the entire right panel (after the accent stripe at x=5.52)
+            addSlideImage(slide, slideData.data.imageUrl, { x: 5.52, y: 0, w: 4.48, h: 5.5, sizing: { type: 'cover', w: 4.48, h: 5.5 }, rounding: false });
           }
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
@@ -6984,12 +6998,12 @@ const ESCAPE_THEMES: Record<EscapeTheme, {
 }> = {
   medieval: {
     name: 'Pergaminho Medieval',
-    cover: `radial-gradient(ellipse at center, #f5e8c8 0%, #e8d5a8 60%, #c9a96b 100%)`,
+    cover: `linear-gradient(135deg, #2c1408 0%, #4a2208 50%, #1c0d04 100%)`,
     enigmaBg: `linear-gradient(135deg, #faf3e0 0%, #f5e8c8 100%)`,
     cardBg: '#fffbf0',
     primary: '#3a2510',
     secondary: '#5b3a1a',
-    accent: '#92660a',
+    accent: '#c07c1a',
     textOnDark: '#fef3c7',
     textOnLight: '#3a2510',
     border: '#5b3a1a',
@@ -7911,19 +7925,20 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                     {activeMode === 'escape' && result.enigmas && (
                       <div className="escape-preview">
                         <div className="bg-gradient-to-br from-rose-600 to-purple-700 text-white rounded-2xl p-4 mb-3">
-                          <p className="text-[10px] font-black tracking-widest opacity-80 uppercase">{result.timeLimit || '45 min'} · {result.enigmas.length} enigmas</p>
-                          <h2 className="text-lg font-black leading-tight my-1">{result.title}</h2>
-                          <p className="text-xs text-rose-100 leading-relaxed mt-2">{result.briefing}</p>
+                          <p className="text-xs font-black tracking-widest uppercase text-white/90">{result.timeLimit || '45 min'} · {result.enigmas.length} enigmas</p>
+                          <h2 className="text-lg font-black leading-tight my-1 text-white">{result.title}</h2>
+                          <p className="text-sm text-rose-100 leading-relaxed mt-2">{result.briefing}</p>
                         </div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Enigmas</p>
+                        <p className="text-xs font-black text-gray-600 uppercase tracking-widest mb-2">Enigmas</p>
                         <div className="space-y-2">
                           {result.enigmas.map((en: any, i: number) => (
                             <div key={i} className="bg-white border border-gray-200 rounded-2xl p-3 flex gap-3">
                               {en.imageUrl && <img src={en.imageUrl} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />}
                               <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-black text-rose-600">ENIGMA {i + 1}</p>
-                                <p className="text-xs font-bold text-gray-800 truncate">{en.challenge}</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">🔑 {en.answer}</p>
+                                <p className="text-xs font-black text-rose-600 mb-1">ENIGMA {i + 1}</p>
+                                <p className="text-sm font-bold text-gray-800 leading-snug">{en.challenge}</p>
+                                {en.narrative && <p className="text-xs text-gray-600 mt-1 leading-snug italic line-clamp-2">{en.narrative}</p>}
+                                <p className="text-xs font-semibold text-emerald-700 mt-1.5">🔑 {en.answer}</p>
                               </div>
                             </div>
                           ))}
