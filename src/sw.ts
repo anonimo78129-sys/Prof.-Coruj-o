@@ -1,8 +1,10 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 
 declare const self: ServiceWorkerGlobalScope;
 
+// v1.0.0 — limpa caches antigos e registra novos assets
+cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 // Abre/foca o app ao tocar em uma notificação
