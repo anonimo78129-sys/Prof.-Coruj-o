@@ -2974,7 +2974,15 @@ const PlannerScreen = ({
       // the anchor element lifecycle — pres.writeFile() uses an internal "ghost"
       // click that some browsers silently block on the second call within the
       // same page session.
-      const blob = await pres.write({ outputType: 'blob' }) as Blob;
+      //
+      // pres.write({ outputType: 'blob' }) sometimes returns a Blob typed as
+      // 'application/zip' (PPTX is a ZIP archive internally), which causes some
+      // browsers (especially on Android) to append ".zip" to the filename even
+      // when the <a download> attribute specifies ".pptx".
+      // Re-wrapping with the correct OOXML MIME type prevents that.
+      const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      const rawBlob = await pres.write({ outputType: 'arraybuffer' }) as ArrayBuffer;
+      const blob = new Blob([rawBlob], { type: PPTX_MIME });
       const safeName = presentationData.presentationTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'Apresentacao';
       downloadBlob(blob, `Aula_${safeName}.pptx`);
     } catch (e) {
