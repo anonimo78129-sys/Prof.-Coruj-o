@@ -1268,13 +1268,13 @@ const parseRichHtml = (text: string, primaryColor: string, accentColor: string):
 // Fixes vs old version:
 // 1. Strip (IconName) patterns — AI sometimes emits "(CheckCircle) Title"
 //    instead of the correct {CheckCircle} inline-icon syntax.
-// 2. Process line by line so \n creates proper pptxgenjs break runs
-//    instead of being buried inside a text-run string.
+// 2. Line breaks: breakLine:true is applied to the LAST run of each line
+//    (never an empty text run — pptxgenjs emits an invalid <a:t></a:t> for
+//    text:'' which corrupts the whole .pptx in PowerPoint).
 // 3. ==highlight== now uses accent colour (not the `highlight: boolean`
 //    pptxgenjs option, which would apply a yellow mark-up regardless of
 //    the hex string we were passing).
-// 4. Guard ** matches so a lone `*` or empty `****` is treated as plain
-//    text instead of triggering slice errors.
+// 4. Guard ** matches so a lone `*` or empty `****` is treated as plain text.
 const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, accentColor?: string): any[] => {
   if (!text) return [];
   const raw = typeof text === 'string' ? text : JSON.stringify(text);
@@ -1285,23 +1285,19 @@ const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, acce
   const str = raw.replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '');
 
   // Only inline patterns — no multiline matches to avoid cross-line surprises
-  const INLINE = /(\*\*[^*\n]+\*\*|==.+?==|\[\[.+?\]\]|\{[A-Za-z0-9]+\})/g;
+  const INLINE = /(\*\*[^*\n]+\*\*|==[^=\n]+==|\[\[[^\]\n]+\]\]|\{[A-Za-z0-9]+\})/g;
 
   const processLine = (line: string): any[] => {
     const parts = line.split(INLINE);
     const runs: any[] = [];
     parts.forEach(part => {
       if (!part) return;
-      if (part.startsWith('## ')) {
-        runs.push({ text: part.slice(3), options: { ...baseOpts, bold: true, fontSize: (baseOpts.fontSize || 12) + 3, color: pc } });
-      } else if (/^\*\*[^*].+[^*]\*\*$/.test(part) || /^\*\*.\*\*$/.test(part)) {
-        // **bold** — length > 4 and has non-star content
+      if (/^\*\*[^*\n]+\*\*$/.test(part)) {
         const inner = part.slice(2, -2);
         if (inner) runs.push({ text: inner, options: { ...baseOpts, bold: true } });
-      } else if (part.startsWith('==') && part.endsWith('==') && part.length > 4) {
-        // ==highlight== → accent-coloured bold (no pptxgenjs `highlight` prop)
+      } else if (/^==[^=\n]+==$/.test(part)) {
         runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: ac } });
-      } else if (part.startsWith('[[') && part.endsWith(']]')) {
+      } else if (/^\[\[[^\]\n]+\]\]$/.test(part)) {
         runs.push({ text: part.slice(2, -2), options: { ...baseOpts, bold: true, color: pc } });
       } else if (/^\{[A-Za-z0-9]+\}$/.test(part)) {
         runs.push({ text: '◆ ', options: { ...baseOpts, bold: true, color: ac } });
@@ -1315,13 +1311,20 @@ const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, acce
   const lines = str.split('\n');
   const allRuns: any[] = [];
   lines.forEach((line, idx) => {
-    if (idx > 0) {
-      // Explicit line-break run — pptxgenjs creates <a:br/> for breakLine:true
-      allRuns.push({ text: '', options: { ...baseOpts, breakLine: true } });
+    const isLast = idx === lines.length - 1;
+    const lineRuns = processLine(line);
+    if (lineRuns.length === 0) {
+      // Blank line — a single space keeps the break valid (never text:'')
+      allRuns.push({ text: ' ', options: { ...baseOpts, breakLine: !isLast } });
+      return;
     }
-    processLine(line).forEach(r => allRuns.push(r));
+    if (!isLast) {
+      const last = lineRuns[lineRuns.length - 1];
+      lineRuns[lineRuns.length - 1] = { ...last, options: { ...last.options, breakLine: true } };
+    }
+    lineRuns.forEach(r => allRuns.push(r));
   });
-  return allRuns;
+  return allRuns.length ? allRuns : [{ text: str || ' ', options: { ...baseOpts } }];
 };
 
 // Renders rich text inside SlideCanvas (editable toggle)
@@ -2830,8 +2833,11 @@ const PlannerScreen = ({
           slide.addText(slideData.data.title || 'Para saber mais', { x: 0.7, y: 0.85, w: 8, h: 0.8, fontSize: 32, color: 'FFFFFF', bold: true, fontFace: FONT_T, ...shrink });
           slide.addShape(pres.ShapeType.rect, { x: 0.7, y: 1.72, w: 2.4, h: 0.06, fill: { color: ac } });
           if (slideData.data.references) {
-            const refText = slideData.data.references.map((r: string) => ({ text: r, options: { bullet: { characterCode: '2022', indent: 18 }, breakLine: true, color: 'E2E8F0', fontSize: 13, fontFace: FONT_B, paraSpaceBefore: 8 } }));
-            slide.addText(refText, { x: 0.75, y: 2.0, w: 8.3, h: 3.0, valign: 'top', ...shrink });
+            const refs = slideData.data.references.map((r: string) => (r || '').trim()).filter(Boolean);
+            if (refs.length) {
+              const refText = refs.map((r: string) => ({ text: r, options: { bullet: { characterCode: '2022', indent: 18 }, breakLine: true, color: 'E2E8F0', fontSize: 13, fontFace: FONT_B, paraSpaceBefore: 8 } }));
+              slide.addText(refText, { x: 0.75, y: 2.0, w: 8.3, h: 3.0, valign: 'top', ...shrink });
+            }
           }
           addFooter(slide, si + 1, true);
 
