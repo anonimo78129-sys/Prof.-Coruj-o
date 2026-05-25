@@ -6147,14 +6147,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
     /* ── CROSSWORD ────────────────────────────────────────── */
-    .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; }
-    .cw-grid-table td { width:26px; height:26px; padding:0; }
+    /* Cell size is driven by inline style (computed from grid width in React).
+       .cw-grid-table centres the grid and provides page-break protection. */
+    .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; break-inside:avoid; }
     .cw-grid-black { background:transparent; }
     .cw-grid-white { border:2px solid #374151; border-radius:2px; position:relative; vertical-align:top; background:white; }
     .cw-grid-num { position:absolute; top:1px; left:2px; font-size:7px; font-weight:900; color:var(--ac,#4338ca); line-height:1; }
-    .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:12px; }
-    .cw-clue-dir { font-size:9px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin:10px 0 5px; background:none; padding:0; border-radius:0; display:block; }
-    .cw-clue-item { font-size:10.5px; margin-bottom:4px; line-height:1.3; }
+    /* Clue container — 2-column layout that works WITHOUT Tailwind */
+    .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:10px 22px; margin-top:14px; padding:12px 14px; background:var(--ac-light,#eef2ff); border:2px solid var(--ac,#4338ca); border-radius:10px; page-break-inside:avoid; break-inside:avoid; }
+    .cw-clue-dir { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin:0 0 6px; display:block; border-bottom:1.5px solid var(--ac,#4338ca); padding-bottom:4px; }
+    .cw-clue-item { font-size:10.5px; margin-bottom:4px; line-height:1.35; color:#1f2937; }
     .cw-item { margin-bottom:16px; page-break-inside:avoid; break-inside:avoid; }
     .cw-clue { font-weight:700; margin-bottom:5px; color:#1f2937; display:flex; align-items:center; gap:7px; }
     .cw-num-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--ac,#4338ca); color:white; border-radius:50%; font-size:10px; font-weight:900; flex-shrink:0; }
@@ -7486,35 +7488,41 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                         {result.crossword ? (
                           <>
                             <div className="overflow-x-auto">
-                              <table style={{ borderCollapse: 'collapse', margin: '10px auto' }}>
-                                <tbody>
-                                  {result.crossword.grid.map((row: (string|null)[], r: number) => (
-                                    <tr key={r}>
-                                      {row.map((cell: string|null, c: number) => {
-                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: 'transparent' }} />;
-                                        const num = result.crossword.cellNumbers[`${r},${c}`];
-                                        return (
-                                          <td key={c} style={{ width: 26, height: 26, border: '2px solid #374151', position: 'relative', verticalAlign: 'top', padding: 0, background: 'white' }}>
-                                            {num && <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 7, fontWeight: 900, color: '#4338ca', lineHeight: 1 }}>{num}</span>}
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              {(() => {
+                                const numCols = result.crossword.grid[0]?.length || 10;
+                                const cellPx = Math.min(44, Math.max(26, Math.floor(560 / numCols)));
+                                return (
+                                  <table className="cw-grid-table">
+                                    <tbody>
+                                      {result.crossword.grid.map((row: (string|null)[], r: number) => (
+                                        <tr key={r}>
+                                          {row.map((cell: string|null, c: number) => {
+                                            if (cell === null) return <td key={c} className="cw-grid-black" style={{ width: cellPx, height: cellPx }} />;
+                                            const num = result.crossword.cellNumbers[`${r},${c}`];
+                                            return (
+                                              <td key={c} className="cw-grid-white" style={{ width: cellPx, height: cellPx, padding: 0 }}>
+                                                {num && <span className="cw-grid-num">{num}</span>}
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                );
+                              })()}
                             </div>
-                            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                            <div className="cw-clues-cols">
                               {result.crossword.across.length > 0 && (
                                 <div>
-                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">→ Horizontal</p>
-                                  {result.crossword.across.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                  <span className="cw-clue-dir">→ Horizontal</span>
+                                  {result.crossword.across.map((c: any) => <p key={c.num} className="cw-clue-item"><b>{c.num}.</b> {c.clue}</p>)}
                                 </div>
                               )}
                               {result.crossword.down.length > 0 && (
                                 <div>
-                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">↓ Vertical</p>
-                                  {result.crossword.down.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                  <span className="cw-clue-dir">↓ Vertical</span>
+                                  {result.crossword.down.map((c: any) => <p key={c.num} className="cw-clue-item"><b>{c.num}.</b> {c.clue}</p>)}
                                 </div>
                               )}
                             </div>
