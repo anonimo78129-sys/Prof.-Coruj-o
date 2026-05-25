@@ -1250,6 +1250,23 @@ const SLIDE_H = 540;
 //   {IconName}     → ícone Lucide inline (preview) / bullet colorido (PPTX)
 //   ## Subtitle    → subtítulo dentro do corpo (linha maior)
 
+// Removes ALL inline markup from a string so it renders cleanly in plain-text
+// fields (card/topic/column titles, stat labels) that don't support rich runs.
+// Without this, tokens like {Sun} or **bold** leak into the slide as literal text.
+const stripInlineMarkup = (s: string): string =>
+  (s || '')
+    .replace(/\{[A-Za-z0-9]+\}/g, '')              // {IconName} tokens
+    .replace(/\(([A-Z][a-zA-Z0-9]+)\)/g, '')       // (PascalCase) icon names
+    .replace(/\*\*\*(.+?)\*\*\*/g, '$1')           // ***bold italic***
+    .replace(/\*\*(.+?)\*\*/g, '$1')               // **bold**
+    .replace(/==(.+?)==/g, '$1')                   // ==highlight==
+    .replace(/\[\[(.+?)\]\]/g, '$1')               // [[keyword]]
+    .replace(/`+/g, '')                            // backticks
+    .replace(/^\s*#+\s*/, '')                       // leading # headers
+    .replace(/\*+/g, '')                           // stray asterisks
+    .replace(/\s{2,}/g, ' ')                        // collapse double spaces
+    .trim();
+
 const parseRichHtml = (text: string, primaryColor: string, accentColor: string): string => {
   if (!text) return '';
   const ac = accentColor || '#6366F1';
@@ -1573,8 +1590,7 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
           // Extract first line as column title (mirrors PPTX export logic)
           const rawVal = (slide.data[col.key] || '') as string;
           const firstBreak = rawVal.search(/\n/);
-          const colTitle = (firstBreak > 0 ? rawVal.slice(0, firstBreak) : rawVal)
-            .replace(/\*\*/g, '').replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '').trim();
+          const colTitle = stripInlineMarkup(firstBreak > 0 ? rawVal.slice(0, firstBreak) : rawVal);
           const colBody = firstBreak > 0 ? rawVal.slice(firstBreak + 1).trim() : '';
           return (
             <div key={col.key} style={{ flex: 1, background: '#fff', borderRadius: 16, border: '1px solid #eef2f7', boxShadow: cardShadow, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -2669,6 +2685,36 @@ const PlannerScreen = ({
     }
   };
 
+  // Works around a pptxgenjs 4.0.1 bug where [Content_Types].xml declares an
+  // Override for slideMaster1..N (one per slide) while only slideMaster1.xml is
+  // actually written. The dangling parts make PowerPoint reject the file. We
+  // re-open the package, drop Override entries pointing at missing slideMaster
+  // parts, and repackage. Returns the original buffer untouched on any failure.
+  const repairPptxContentTypes = async (buffer: ArrayBuffer): Promise<ArrayBuffer> => {
+    try {
+      const { default: JSZip } = await import('jszip');
+      const zip = await JSZip.loadAsync(buffer);
+      const ctFile = zip.file('[Content_Types].xml');
+      if (!ctFile) return buffer;
+      const xml = await ctFile.async('string');
+      const existingMasters = new Set(
+        Object.keys(zip.files)
+          .map(p => p.match(/^ppt\/slideMasters\/(slideMaster\d+\.xml)$/)?.[1])
+          .filter((v): v is string => !!v)
+      );
+      const fixed = xml.replace(
+        /<Override PartName="\/ppt\/slideMasters\/(slideMaster\d+\.xml)"[^>]*\/>/g,
+        (full, name: string) => (existingMasters.has(name) ? full : '')
+      );
+      if (fixed === xml) return buffer;
+      zip.file('[Content_Types].xml', fixed);
+      return await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
+    } catch (err) {
+      console.error('repairPptxContentTypes failed, using original buffer', err);
+      return buffer;
+    }
+  };
+
   const exportPPTX = async () => {
     if (!presentationData) return;
     setIsExporting(true);
@@ -2890,8 +2936,8 @@ const PlannerScreen = ({
               if (png) slide.addImage({ data: png, x: discX + 0.23, y: discY + 0.23, w: discD - 0.46, h: discD - 0.46 });
               else slide.addText(`${i + 1}`, { x: discX, y: discY, w: discD, h: discD, fontSize: 24, color: 'FFFFFF', align: 'center', valign: 'middle', bold: true, fontFace: FONT_T });
               const txtY = discY + discD + 0.22;
-              slide.addText(topic.title || '', { x: xPos + 0.15, y: txtY, w: colW - 0.3, h: 0.5, fontSize: 14, bold: true, align: 'center', color: pc, fontFace: FONT_T, valign: 'top', ...shrink });
-              slide.addText(topic.content || '', { x: xPos + 0.2, y: txtY + 0.5, w: colW - 0.4, h: cardY + cardH - (txtY + 0.5) - 0.2, fontSize: 11, align: 'center', color: INK_SOFT, fontFace: FONT_B, valign: 'top', lineSpacing: 16, ...shrink });
+              slide.addText(stripInlineMarkup(topic.title || ''), { x: xPos + 0.15, y: txtY, w: colW - 0.3, h: 0.5, fontSize: 14, bold: true, align: 'center', color: pc, fontFace: FONT_T, valign: 'top', ...shrink });
+              slide.addText(stripInlineMarkup(topic.content || ''), { x: xPos + 0.2, y: txtY + 0.5, w: colW - 0.4, h: cardY + cardH - (txtY + 0.5) - 0.2, fontSize: 11, align: 'center', color: INK_SOFT, fontFace: FONT_B, valign: 'top', lineSpacing: 16, ...shrink });
             });
           }
           addFooter(slide, si + 1);
@@ -2950,8 +2996,7 @@ const PlannerScreen = ({
             // Extract first non-empty line as column title (AI often puts a header there)
             const rawContent = (typeof content === 'string' ? content : '').trim();
             const firstBreak = rawContent.search(/\n/);
-            const colTitle = (firstBreak > 0 ? rawContent.slice(0, firstBreak) : rawContent)
-              .replace(/\*\*/g, '').replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '').trim();
+            const colTitle = stripInlineMarkup(firstBreak > 0 ? rawContent.slice(0, firstBreak) : rawContent);
             const colBody = firstBreak > 0 ? rawContent.slice(firstBreak + 1).trim() : '';
 
             // Column title
@@ -3063,7 +3108,14 @@ const PlannerScreen = ({
       // Re-wrapping with the correct OOXML MIME type prevents that.
       const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
       const rawBlob = await pres.write({ outputType: 'arraybuffer' }) as ArrayBuffer;
-      const blob = new Blob([rawBlob], { type: PPTX_MIME });
+
+      // pptxgenjs 4.0.1 has a bug in [Content_Types].xml generation: it writes one
+      // <Override .../slideMaster{N}.xml> per slide (slideMaster1..N) even though
+      // only slideMaster1.xml actually exists. PowerPoint then refuses to open the
+      // file ("needs repair"). Strip the Override entries for any slideMaster part
+      // that isn't present in the package, leaving the package spec-valid.
+      const repaired = await repairPptxContentTypes(rawBlob);
+      const blob = new Blob([repaired], { type: PPTX_MIME });
       const safeName = presentationData.presentationTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'Apresentacao';
       downloadBlob(blob, `Aula_${safeName}.pptx`);
     } catch (e) {
