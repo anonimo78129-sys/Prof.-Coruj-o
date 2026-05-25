@@ -6147,14 +6147,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
     /* ── CROSSWORD ────────────────────────────────────────── */
-    .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; }
-    .cw-grid-table td { width:26px; height:26px; padding:0; }
+    /* Cell size is driven by inline style (computed from grid width in React).
+       .cw-grid-table centres the grid and provides page-break protection. */
+    .cw-grid-table { border-collapse:collapse; margin:14px auto; page-break-inside:avoid; break-inside:avoid; }
     .cw-grid-black { background:transparent; }
     .cw-grid-white { border:2px solid #374151; border-radius:2px; position:relative; vertical-align:top; background:white; }
     .cw-grid-num { position:absolute; top:1px; left:2px; font-size:7px; font-weight:900; color:var(--ac,#4338ca); line-height:1; }
-    .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:12px; }
-    .cw-clue-dir { font-size:9px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin:10px 0 5px; background:none; padding:0; border-radius:0; display:block; }
-    .cw-clue-item { font-size:10.5px; margin-bottom:4px; line-height:1.3; }
+    /* Clue container — 2-column layout that works WITHOUT Tailwind */
+    .cw-clues-cols { display:grid; grid-template-columns:1fr 1fr; gap:10px 22px; margin-top:14px; padding:12px 14px; background:var(--ac-light,#eef2ff); border:2px solid var(--ac,#4338ca); border-radius:10px; page-break-inside:avoid; break-inside:avoid; }
+    .cw-clue-dir { font-size:8.5px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1.5px; text-transform:uppercase; margin:0 0 6px; display:block; border-bottom:1.5px solid var(--ac,#4338ca); padding-bottom:4px; }
+    .cw-clue-item { font-size:10.5px; margin-bottom:4px; line-height:1.35; color:#1f2937; }
     .cw-item { margin-bottom:16px; page-break-inside:avoid; break-inside:avoid; }
     .cw-clue { font-weight:700; margin-bottom:5px; color:#1f2937; display:flex; align-items:center; gap:7px; }
     .cw-num-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:var(--ac,#4338ca); color:white; border-radius:50%; font-size:10px; font-weight:900; flex-shrink:0; }
@@ -6174,6 +6176,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .markdown-body table { border-collapse:collapse; width:100%; margin:8px 0; }
     .markdown-body th, .markdown-body td { border:1px solid #d1d5db; padding:5px 8px; text-align:left; font-size:11px; }
     .markdown-body th { background:var(--ac,#4338ca); color:white; font-weight:800; }
+    /* Images: centred block, never wider than column, never overlapping text */
+    .markdown-body img { display:block; max-width:55%; max-height:200px; object-fit:cover; border-radius:10px; margin:10px auto 14px; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
 
     /* ── SECTION DIVIDER ──────────────────────────────────── */
     .section-divider { display:flex; align-items:center; gap:10px; margin:18px 0 14px; opacity:0.7; }
@@ -6502,6 +6506,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       }
 
       // ── BOA SORTE line + SCORE TRACKER ───────────────────
+      // For Campanha Narrativa the tracker is embedded in the character-card page (see below).
       var akPage = document.querySelector('.answer-key-page');
       var boaSorte = document.createElement('div');
       boaSorte.className = 'boa-sorte';
@@ -6513,13 +6518,17 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
         + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
 
-      if (akPage) {
-        akPage.before(boaSorte);
-        akPage.before(tracker);
-      } else {
-        var footer = document.querySelector('.page-footer');
-        document.body.insertBefore(boaSorte, footer);
-        document.body.insertBefore(tracker, footer);
+      // Only inject standalone tracker for non-storytelling activities.
+      // For 'Campanha Narrativa' the tracker is bundled with the character-card page.
+      if (label !== 'Campanha Narrativa') {
+        if (akPage) {
+          akPage.before(boaSorte);
+          akPage.before(tracker);
+        } else {
+          var footer = document.querySelector('.page-footer');
+          document.body.insertBefore(boaSorte, footer);
+          document.body.insertBefore(tracker, footer);
+        }
       }
 
       // ── ANSWER KEY header with pixel-art trophy ──────────
@@ -6539,26 +6548,64 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       }
 
       // ── STORY: character card page ────────────────────────
+      // ── STORY: last page = score tracker + character cards ─
       if (label === 'Campanha Narrativa') {
-        var h2s = document.querySelectorAll('h2');
-        var classesH2 = null;
-        h2s.forEach(function(h) { if (h.textContent && h.textContent.indexOf('Classes') !== -1) classesH2 = h; });
-        if (classesH2) {
-          var cardPage = document.createElement('div');
-          cardPage.style.cssText = 'page-break-before:always;padding-top:12px;';
-          cardPage.innerHTML = '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;">🎭 Fichas dos Personagens</div>'
-            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-            + ['🧙 Personagem 1', '⚔️ Personagem 2', '🏹 Personagem 3', '🛡️ Personagem 4'].map(function(name) {
-              return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;padding:12px;min-height:120px;">'
-                + '<div style="font-weight:900;font-size:12px;color:var(--ac,#4338ca);margin-bottom:8px;">' + name + '</div>'
-                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">NOME DO ALUNO: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
-                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">CLASSE: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
-                + '<div style="font-size:9px;font-weight:700;color:var(--ac,#4338ca);margin-top:8px;">XP</div>'
-                + '<div style="display:flex;gap:4px;margin-top:4px;">' + Array(10).fill('<div style="width:18px;height:14px;border:1.5px solid var(--ac,#4338ca);border-radius:3px;"></div>').join('') + '</div>'
-                + '</div>';
-            }).join('') + '</div>';
-          document.body.appendChild(cardPage);
-        }
+        var xpBoxes = Array(10).fill('<div style="width:22px;height:18px;border:2px solid var(--ac,#4338ca);border-radius:4px;background:white;flex-shrink:0;"></div>').join('');
+        var missionBoxes = ['M1','M2','M3'].map(function(m){
+          return '<div style="display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;color:var(--ac,#4338ca);">'
+            + '<div style="width:17px;height:17px;border:2px solid var(--ac,#4338ca);border-radius:3px;flex-shrink:0;"></div>'
+            + m + '</div>';
+        }).join('');
+        var charDefs = [
+          { emoji:'🧙', label:'Personagem 1' },
+          { emoji:'⚔️', label:'Personagem 2' },
+          { emoji:'🏹', label:'Personagem 3' },
+          { emoji:'🛡️', label:'Personagem 4' }
+        ];
+        var cards = charDefs.map(function(ch){
+          return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">'
+            + '<div style="background:var(--ac,#4338ca);padding:9px 14px;display:flex;align-items:center;gap:8px;">'
+            + '<span style="font-size:18px;">' + ch.emoji + '</span>'
+            + '<span style="font-weight:900;font-size:12px;color:white;letter-spacing:0.3px;">' + ch.label + '</span>'
+            + '</div>'
+            + '<div style="padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:9px;">'
+            // Nome
+            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">NOME DO ALUNO</div>'
+            + '<div style="border-bottom:1.5px solid #d1d5db;min-height:20px;"></div></div>'
+            // Classe
+            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">CLASSE</div>'
+            + '<div style="border-bottom:1.5px solid #d1d5db;min-height:20px;"></div></div>'
+            // XP
+            + '<div><div style="font-size:7.5px;color:var(--ac,#4338ca);font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">XP GANHO</div>'
+            + '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + xpBoxes + '</div></div>'
+            // Missões
+            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">MISSÕES CONCLUÍDAS</div>'
+            + '<div style="display:flex;gap:14px;">' + missionBoxes + '</div></div>'
+            // Anotações
+            + '<div style="flex:1;display:flex;flex-direction:column;">'
+            + '<div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">ANOTAÇÕES</div>'
+            + '<div style="flex:1;border:1.5px dashed #d1d5db;border-radius:7px;min-height:44px;background:#fafafa;"></div>'
+            + '</div>'
+            + '</div>'
+            + '</div>';
+        }).join('');
+
+        var cardPage = document.createElement('div');
+        cardPage.style.cssText = 'page-break-before:always;padding:14px;';
+        cardPage.innerHTML =
+          // ── Compact score tracker at the top ──
+          '<div class="score-tracker" style="margin:0 0 16px;">'
+          + '<div class="score-header"><div class="score-px-star">' + pxStar + '</div><div class="score-title">Minha Pontuação</div><div class="score-px-star">' + pxStar + '</div></div>'
+          + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
+          + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>'
+          + '</div>'
+          // ── Characters section header ──
+          + '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;letter-spacing:0.3px;">🎭 Fichas dos Personagens</div>'
+          // ── 2×2 grid — cards fill the remaining page space ──
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;min-height:420px;">'
+          + cards
+          + '</div>';
+        document.body.appendChild(cardPage);
       }
 
       setTimeout(function(){ window.print(); }, 600);
@@ -7069,7 +7116,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
     memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', desc: 'Pares de conceito e definição para combinar' },
   };
 
-  const smallActivities: GameMode[] = ['escape', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
+  const smallActivities: GameMode[] = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
@@ -7079,24 +7126,24 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
         <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {/* STORYTELLING — destaque */}
+      {/* ESCAPE ROOM — destaque */}
       <button
-        onClick={() => setActiveMode('story')}
-        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 active:scale-[0.98] transition-transform"
+        onClick={() => setActiveMode('escape')}
+        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-rose-600 via-red-600 to-orange-500 active:scale-[0.98] transition-transform"
       >
         <div className="absolute -top-6 -right-6 opacity-20">
-          <ScrollText size={130} className="text-white" />
+          <KeyRound size={130} className="text-white" />
         </div>
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[10px] font-black tracking-widest uppercase text-yellow-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Principal</span>
           </div>
-          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Storytelling</h2>
-          <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
-            Crie uma campanha narrativa completa: cenário, personagens, missões e boss final para gamificar toda a aula.
+          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Escape Room</h2>
+          <p className="text-sm text-rose-100 max-w-[80%] leading-relaxed mb-4">
+            Crie enigmas encadeados temáticos para imprimir e jogar em sala — desafio a resolver em equipe.
           </p>
-          <div className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-4 py-2 rounded-full text-sm">
-            <Wand2 size={16} /> Criar campanha
+          <div className="inline-flex items-center gap-2 bg-white text-rose-700 font-bold px-4 py-2 rounded-full text-sm">
+            <KeyRound size={16} /> Criar escape room
           </div>
         </div>
       </button>
@@ -7441,35 +7488,41 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                         {result.crossword ? (
                           <>
                             <div className="overflow-x-auto">
-                              <table style={{ borderCollapse: 'collapse', margin: '10px auto' }}>
-                                <tbody>
-                                  {result.crossword.grid.map((row: (string|null)[], r: number) => (
-                                    <tr key={r}>
-                                      {row.map((cell: string|null, c: number) => {
-                                        if (cell === null) return <td key={c} style={{ width: 26, height: 26, background: 'transparent' }} />;
-                                        const num = result.crossword.cellNumbers[`${r},${c}`];
-                                        return (
-                                          <td key={c} style={{ width: 26, height: 26, border: '2px solid #374151', position: 'relative', verticalAlign: 'top', padding: 0, background: 'white' }}>
-                                            {num && <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 7, fontWeight: 900, color: '#4338ca', lineHeight: 1 }}>{num}</span>}
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              {(() => {
+                                const numCols = result.crossword.grid[0]?.length || 10;
+                                const cellPx = Math.min(44, Math.max(26, Math.floor(560 / numCols)));
+                                return (
+                                  <table className="cw-grid-table">
+                                    <tbody>
+                                      {result.crossword.grid.map((row: (string|null)[], r: number) => (
+                                        <tr key={r}>
+                                          {row.map((cell: string|null, c: number) => {
+                                            if (cell === null) return <td key={c} className="cw-grid-black" style={{ width: cellPx, height: cellPx }} />;
+                                            const num = result.crossword.cellNumbers[`${r},${c}`];
+                                            return (
+                                              <td key={c} className="cw-grid-white" style={{ width: cellPx, height: cellPx, padding: 0 }}>
+                                                {num && <span className="cw-grid-num">{num}</span>}
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                );
+                              })()}
                             </div>
-                            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                            <div className="cw-clues-cols">
                               {result.crossword.across.length > 0 && (
                                 <div>
-                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">→ Horizontal</p>
-                                  {result.crossword.across.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                  <span className="cw-clue-dir">→ Horizontal</span>
+                                  {result.crossword.across.map((c: any) => <p key={c.num} className="cw-clue-item"><b>{c.num}.</b> {c.clue}</p>)}
                                 </div>
                               )}
                               {result.crossword.down.length > 0 && (
                                 <div>
-                                  <p className="font-black text-indigo-600 uppercase tracking-wider text-[10px] mb-1">↓ Vertical</p>
-                                  {result.crossword.down.map((c: any) => <p key={c.num} className="mb-0.5"><b>{c.num}.</b> {c.clue}</p>)}
+                                  <span className="cw-clue-dir">↓ Vertical</span>
+                                  {result.crossword.down.map((c: any) => <p key={c.num} className="cw-clue-item"><b>{c.num}.</b> {c.clue}</p>)}
                                 </div>
                               )}
                             </div>
