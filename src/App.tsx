@@ -2791,35 +2791,40 @@ const PlannerScreen = ({
 
         if (slideData.layoutID === 'LAYOUT_COVER') {
           slide.background = { color: pc };
-          // Right panel light bg
-          slide.addShape(pres.ShapeType.rect, { x: 5.4, y: 0, w: 4.6, h: 5.5, fill: { color: bg } });
+          // Right panel light bg — full height matches LAYOUT_16x9 (5.63")
+          slide.addShape(pres.ShapeType.rect, { x: 5.4, y: 0, w: 4.6, h: 5.63, fill: { color: bg } });
           // Accent stripe
-          slide.addShape(pres.ShapeType.rect, { x: 5.4, y: 0, w: 0.12, h: 5.5, fill: { color: ac } });
+          slide.addShape(pres.ShapeType.rect, { x: 5.4, y: 0, w: 0.12, h: 5.63, fill: { color: ac } });
           // Decorative circles
           slide.addShape(pres.ShapeType.ellipse, { x: -0.4, y: 3.8, w: 1.8, h: 1.8, fill: { color: ac, transparency: 60 } });
           slide.addShape(pres.ShapeType.ellipse, { x: 3.5, y: -0.4, w: 1.2, h: 1.2, fill: { color: 'FFFFFF', transparency: 80 } });
 
-          // Eyebrow / kicker
-          slide.addText((kicker || 'Apresentação').toUpperCase(), { x: 0.55, y: 0.85, w: 4.6, h: 0.3, fontSize: 11, fontFace: FONT_B, color: 'FFFFFF', bold: true, charSpacing: 3, transparency: 25 });
+          // Eyebrow / kicker — positioned high to match the in-app preview layout
+          slide.addText((kicker || 'Apresentação').toUpperCase(), { x: 0.55, y: 0.50, w: 4.6, h: 0.28, fontSize: 11, fontFace: FONT_B, color: 'FFFFFF', bold: true, charSpacing: 3, transparency: 25 });
           // Smart title: if very long, split near midpoint so font stays readable
           const rawCoverTitle = (slideData.data.title || '').trim();
           const coverWords = rawCoverTitle.split(/\s+/);
+          // coverBarY: where the accent bar and subtitle will be anchored
+          let coverBarY: number;
           if (rawCoverTitle.length > 38 && coverWords.length >= 4) {
             const mid = Math.ceil(coverWords.length / 2);
             const titlePart1 = coverWords.slice(0, mid).join(' ');
             const titlePart2 = coverWords.slice(mid).join(' ');
-            slide.addText(titlePart1, { x: 0.5, y: 1.15, w: 4.7, h: 1.05, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
-            slide.addText(titlePart2, { x: 0.5, y: 2.22, w: 4.7, h: 1.05, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
+            slide.addText(titlePart1, { x: 0.5, y: 0.86, w: 4.7, h: 0.68, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
+            slide.addText(titlePart2, { x: 0.5, y: 1.58, w: 4.7, h: 0.68, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
+            coverBarY = 2.34;
           } else {
-            slide.addText(rawCoverTitle, { x: 0.5, y: 1.25, w: 4.7, h: 2.1, fontSize: 40, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'middle', charSpacing: -0.5, ...shrink });
+            // valign:'top' so text anchors to the top of the box; bar/subtitle follow immediately
+            slide.addText(rawCoverTitle, { x: 0.5, y: 0.86, w: 4.7, h: 0.92, fontSize: 40, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
+            coverBarY = 1.84;
           }
-          slide.addShape(pres.ShapeType.rect, { x: 0.55, y: 3.42, w: 1.2, h: 0.06, fill: { color: ac } });
-          slide.addText(slideData.data.subtitle || '', { x: 0.55, y: 3.62, w: 4.6, h: 0.7, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
-          slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.55, y: 4.65, w: 4.6, h: 0.35, fontSize: 9, fontFace: FONT_B, color: 'A5B4FC', align: 'left' });
+          slide.addShape(pres.ShapeType.rect, { x: 0.55, y: coverBarY, w: 1.2, h: 0.06, fill: { color: ac } });
+          slide.addText(slideData.data.subtitle || '', { x: 0.55, y: coverBarY + 0.18, w: 4.6, h: 0.55, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
+          slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.55, y: 5.05, w: 4.6, h: 0.35, fontSize: 9, fontFace: FONT_B, color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
             // Full-bleed: image fills the entire right panel (after the accent stripe at x=5.52)
-            addSlideImage(slide, slideData.data.imageUrl, { x: 5.52, y: 0, w: 4.48, h: 5.5, sizing: { type: 'cover', w: 4.48, h: 5.5 }, rounding: false });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 5.52, y: 0, w: 4.48, h: 5.63, sizing: { type: 'cover', w: 4.48, h: 5.63 }, rounding: false });
           }
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_LEFT' || slideData.layoutID === 'LAYOUT_CONTENT_RIGHT') {
@@ -2831,23 +2836,32 @@ const PlannerScreen = ({
 
           // Full-height image panel with brand tint for unity
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0, w: 4.0, h: 5.5, sizing: { type: 'cover', w: 4.0, h: 5.5 } });
-            slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0, w: 4.0, h: 5.5, fill: { color: pc, transparency: 78 } });
-            slide.addShape(pres.ShapeType.rect, { x: isLeft ? imgX : imgX + 3.94, y: 0, w: 0.06, h: 5.5, fill: { color: ac } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: imgX, y: 0, w: 4.0, h: 5.63, sizing: { type: 'cover', w: 4.0, h: 5.63 } });
+            slide.addShape(pres.ShapeType.rect, { x: imgX, y: 0, w: 4.0, h: 5.63, fill: { color: pc, transparency: 78 } });
+            slide.addShape(pres.ShapeType.rect, { x: isLeft ? imgX : imgX + 3.94, y: 0, w: 0.06, h: 5.63, fill: { color: ac } });
           }
 
           const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false, { x: contentX, w: contentW });
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
-          slide.addText(parsedText, { x: contentX, y: contentStartY + 0.05, w: contentW, h: 4.7 - contentStartY, valign: 'top', align: 'left', lineSpacing: 24, ...shrink });
+          slide.addText(parsedText, { x: contentX, y: contentStartY + 0.05, w: contentW, h: 5.05 - contentStartY, valign: 'top', align: 'left', lineSpacing: 24, ...shrink });
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_CONTENT_TOP') {
           slide.background = { color: bg };
-          const contentStartY = addHeader(slide, kicker, slideData.data.title || '', false);
+          // Compact header starting higher so the image panel is larger (matches preview proportions)
+          const ctHasKick = !!(kicker && kicker.trim());
+          const ctKickerY = 0.34;
+          const ctTitleY = ctHasKick ? ctKickerY + 0.28 : ctKickerY;
+          if (ctHasKick) slide.addText(kicker!.toUpperCase(), { x: LEFT, y: ctKickerY, w: 9.0 - LEFT, h: 0.26, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
+          slide.addText(slideData.data.title || '', { x: LEFT, y: ctTitleY, w: 9.0 - LEFT, h: 0.62, fontSize: 30, color: INK, bold: true, fontFace: FONT_T, valign: 'top', ...shrink });
+          slide.addShape(pres.ShapeType.rect, { x: LEFT, y: ctTitleY + 0.58, w: 0.9, h: 0.055, fill: { color: ac } });
+          const ctBodyY = ctTitleY + 0.70;
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
-          slide.addText(parsedText, { x: LEFT, y: contentStartY, w: 9.0 - LEFT, h: 2.85 - contentStartY, valign: 'top', align: 'left', lineSpacing: 22, ...shrink });
+          slide.addText(parsedText, { x: LEFT, y: ctBodyY, w: 9.0 - LEFT, h: 1.05, valign: 'top', align: 'left', lineSpacing: 22, ...shrink });
+          const ctImgY = ctBodyY + 1.15;
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: LEFT, y: 2.95, w: 9.0 - LEFT, h: 2.05, sizing: { type: 'cover', w: 9.0 - LEFT, h: 2.05 }, shadow: imgShadow });
+            const ctImgH = 5.22 - ctImgY;
+            addSlideImage(slide, slideData.data.imageUrl, { x: LEFT, y: ctImgY, w: 9.0 - LEFT, h: ctImgH, sizing: { type: 'cover', w: 9.0 - LEFT, h: ctImgH }, shadow: imgShadow });
           }
           addFooter(slide, si + 1);
 
@@ -2862,7 +2876,7 @@ const PlannerScreen = ({
             const totalW = 9.0 - LEFT - 0.15;
             const colW = (totalW - gap * (cols - 1)) / cols;
             const cardY = Math.max(startY + 0.05, 1.55);
-            const cardH = 5.0 - cardY;
+            const cardH = 5.22 - cardY;
             items.forEach((topic: any, i: number) => {
               const xPos = LEFT + i * (colW + gap);
               // Card with soft shadow, no harsh border
@@ -2884,8 +2898,8 @@ const PlannerScreen = ({
 
         } else if (slideData.layoutID === 'LAYOUT_REFERENCES') {
           slide.background = { color: pc };
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 5.5, fill: { color: pc } });
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.4, h: 5.5, fill: { color: ac } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 10, h: 5.63, fill: { color: pc } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.4, h: 5.63, fill: { color: ac } });
           // Decorative elements
           slide.addShape(pres.ShapeType.ellipse, { x: 7.5, y: 3.5, w: 3.5, h: 3.5, fill: { color: 'FFFFFF', transparency: 92 } });
           slide.addShape(pres.ShapeType.ellipse, { x: 8.5, y: -0.5, w: 2, h: 2, fill: { color: ac, transparency: 70 } });
@@ -2923,7 +2937,7 @@ const PlannerScreen = ({
           slide.background = { color: bg };
           const startY = addHeader(slide, kicker, slideData.data.title || '', false);
           const colY = Math.max(startY + 0.05, 1.5);
-          const colH = 4.9 - colY;
+          const colH = 5.22 - colY;
           const cardW = 4.32;
           // Two soft cards side by side
           [[LEFT, slideData.data.column1, '1'], [LEFT + cardW + 0.26, slideData.data.column2, '2']].forEach(([cx, content, num]: any, idx) => {
@@ -2952,13 +2966,13 @@ const PlannerScreen = ({
         } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
           slide.background = { color: '111111' };
           if (slideData.data.imageUrl) {
-            addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.5, sizing: { type: 'cover', w: 10, h: 5.5 } });
+            addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.63, sizing: { type: 'cover', w: 10, h: 5.63 } });
           }
           // Dark gradient overlay via semi-transparent rect
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.3, fill: { color: '000000', transparency: 25 } });
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 3.5, w: 10, h: 2.0, fill: { color: '000000', transparency: 10 } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.43, fill: { color: '000000', transparency: 25 } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 3.5, w: 10, h: 2.13, fill: { color: '000000', transparency: 10 } });
           // Left accent bar
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.12, h: 5.5, fill: { color: ac } });
+          slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.12, h: 5.63, fill: { color: ac } });
           // Eyebrow above title
           if (kicker) slide.addText(kicker.toUpperCase(), { x: 0.55, y: 2.95, w: 9, h: 0.3, fontSize: 11, color: 'FFFFFF', bold: true, charSpacing: 3, fontFace: FONT_B, shadow: { type: 'outer', blur: 4, offset: 1, angle: 45, color: '000000' } });
           // Accent line above title
@@ -2980,7 +2994,7 @@ const PlannerScreen = ({
           const totalW = 9.0 - LEFT - 0.15;
           const cardW = stats.length > 0 ? (totalW - gap * (stats.length - 1)) / stats.length : 2.2;
           const cardY = Math.max(startY + 0.1, 1.6);
-          const cardH = 5.0 - cardY;
+          const cardH = 5.22 - cardY;
           stats.forEach((s: any, i: number) => {
             const xPos = LEFT + i * (cardW + gap);
             const isDark = i % 2 === 0;
