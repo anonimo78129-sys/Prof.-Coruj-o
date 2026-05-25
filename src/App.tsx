@@ -6174,6 +6174,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .markdown-body table { border-collapse:collapse; width:100%; margin:8px 0; }
     .markdown-body th, .markdown-body td { border:1px solid #d1d5db; padding:5px 8px; text-align:left; font-size:11px; }
     .markdown-body th { background:var(--ac,#4338ca); color:white; font-weight:800; }
+    /* Images: centred block, never wider than column, never overlapping text */
+    .markdown-body img { display:block; max-width:55%; max-height:200px; object-fit:cover; border-radius:10px; margin:10px auto 14px; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
 
     /* ── SECTION DIVIDER ──────────────────────────────────── */
     .section-divider { display:flex; align-items:center; gap:10px; margin:18px 0 14px; opacity:0.7; }
@@ -6502,6 +6504,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       }
 
       // ── BOA SORTE line + SCORE TRACKER ───────────────────
+      // For Campanha Narrativa the tracker is embedded in the character-card page (see below).
       var akPage = document.querySelector('.answer-key-page');
       var boaSorte = document.createElement('div');
       boaSorte.className = 'boa-sorte';
@@ -6513,13 +6516,17 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
         + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
 
-      if (akPage) {
-        akPage.before(boaSorte);
-        akPage.before(tracker);
-      } else {
-        var footer = document.querySelector('.page-footer');
-        document.body.insertBefore(boaSorte, footer);
-        document.body.insertBefore(tracker, footer);
+      // Only inject standalone tracker for non-storytelling activities.
+      // For 'Campanha Narrativa' the tracker is bundled with the character-card page.
+      if (label !== 'Campanha Narrativa') {
+        if (akPage) {
+          akPage.before(boaSorte);
+          akPage.before(tracker);
+        } else {
+          var footer = document.querySelector('.page-footer');
+          document.body.insertBefore(boaSorte, footer);
+          document.body.insertBefore(tracker, footer);
+        }
       }
 
       // ── ANSWER KEY header with pixel-art trophy ──────────
@@ -6539,26 +6546,64 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       }
 
       // ── STORY: character card page ────────────────────────
+      // ── STORY: last page = score tracker + character cards ─
       if (label === 'Campanha Narrativa') {
-        var h2s = document.querySelectorAll('h2');
-        var classesH2 = null;
-        h2s.forEach(function(h) { if (h.textContent && h.textContent.indexOf('Classes') !== -1) classesH2 = h; });
-        if (classesH2) {
-          var cardPage = document.createElement('div');
-          cardPage.style.cssText = 'page-break-before:always;padding-top:12px;';
-          cardPage.innerHTML = '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;">🎭 Fichas dos Personagens</div>'
-            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-            + ['🧙 Personagem 1', '⚔️ Personagem 2', '🏹 Personagem 3', '🛡️ Personagem 4'].map(function(name) {
-              return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;padding:12px;min-height:120px;">'
-                + '<div style="font-weight:900;font-size:12px;color:var(--ac,#4338ca);margin-bottom:8px;">' + name + '</div>'
-                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">NOME DO ALUNO: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
-                + '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">CLASSE: <div style="border-bottom:1.5px solid #d1d5db;margin-top:4px;"></div></div>'
-                + '<div style="font-size:9px;font-weight:700;color:var(--ac,#4338ca);margin-top:8px;">XP</div>'
-                + '<div style="display:flex;gap:4px;margin-top:4px;">' + Array(10).fill('<div style="width:18px;height:14px;border:1.5px solid var(--ac,#4338ca);border-radius:3px;"></div>').join('') + '</div>'
-                + '</div>';
-            }).join('') + '</div>';
-          document.body.appendChild(cardPage);
-        }
+        var xpBoxes = Array(10).fill('<div style="width:22px;height:18px;border:2px solid var(--ac,#4338ca);border-radius:4px;background:white;flex-shrink:0;"></div>').join('');
+        var missionBoxes = ['M1','M2','M3'].map(function(m){
+          return '<div style="display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;color:var(--ac,#4338ca);">'
+            + '<div style="width:17px;height:17px;border:2px solid var(--ac,#4338ca);border-radius:3px;flex-shrink:0;"></div>'
+            + m + '</div>';
+        }).join('');
+        var charDefs = [
+          { emoji:'🧙', label:'Personagem 1' },
+          { emoji:'⚔️', label:'Personagem 2' },
+          { emoji:'🏹', label:'Personagem 3' },
+          { emoji:'🛡️', label:'Personagem 4' }
+        ];
+        var cards = charDefs.map(function(ch){
+          return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">'
+            + '<div style="background:var(--ac,#4338ca);padding:9px 14px;display:flex;align-items:center;gap:8px;">'
+            + '<span style="font-size:18px;">' + ch.emoji + '</span>'
+            + '<span style="font-weight:900;font-size:12px;color:white;letter-spacing:0.3px;">' + ch.label + '</span>'
+            + '</div>'
+            + '<div style="padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:9px;">'
+            // Nome
+            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">NOME DO ALUNO</div>'
+            + '<div style="border-bottom:1.5px solid #d1d5db;min-height:20px;"></div></div>'
+            // Classe
+            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">CLASSE</div>'
+            + '<div style="border-bottom:1.5px solid #d1d5db;min-height:20px;"></div></div>'
+            // XP
+            + '<div><div style="font-size:7.5px;color:var(--ac,#4338ca);font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">XP GANHO</div>'
+            + '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + xpBoxes + '</div></div>'
+            // Missões
+            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">MISSÕES CONCLUÍDAS</div>'
+            + '<div style="display:flex;gap:14px;">' + missionBoxes + '</div></div>'
+            // Anotações
+            + '<div style="flex:1;display:flex;flex-direction:column;">'
+            + '<div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">ANOTAÇÕES</div>'
+            + '<div style="flex:1;border:1.5px dashed #d1d5db;border-radius:7px;min-height:44px;background:#fafafa;"></div>'
+            + '</div>'
+            + '</div>'
+            + '</div>';
+        }).join('');
+
+        var cardPage = document.createElement('div');
+        cardPage.style.cssText = 'page-break-before:always;padding:14px;';
+        cardPage.innerHTML =
+          // ── Compact score tracker at the top ──
+          '<div class="score-tracker" style="margin:0 0 16px;">'
+          + '<div class="score-header"><div class="score-px-star">' + pxStar + '</div><div class="score-title">Minha Pontuação</div><div class="score-px-star">' + pxStar + '</div></div>'
+          + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
+          + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>'
+          + '</div>'
+          // ── Characters section header ──
+          + '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;letter-spacing:0.3px;">🎭 Fichas dos Personagens</div>'
+          // ── 2×2 grid — cards fill the remaining page space ──
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;min-height:420px;">'
+          + cards
+          + '</div>';
+        document.body.appendChild(cardPage);
       }
 
       setTimeout(function(){ window.print(); }, 600);
