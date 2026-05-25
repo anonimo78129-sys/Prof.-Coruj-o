@@ -7116,7 +7116,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
     memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', desc: 'Pares de conceito e definição para combinar' },
   };
 
-  const smallActivities: GameMode[] = ['escape', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
+  const smallActivities: GameMode[] = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
@@ -7126,24 +7126,24 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
         <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {/* STORYTELLING — destaque */}
+      {/* ESCAPE ROOM — destaque */}
       <button
-        onClick={() => setActiveMode('story')}
-        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 active:scale-[0.98] transition-transform"
+        onClick={() => setActiveMode('escape')}
+        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-rose-600 via-red-600 to-orange-500 active:scale-[0.98] transition-transform"
       >
         <div className="absolute -top-6 -right-6 opacity-20">
-          <ScrollText size={130} className="text-white" />
+          <KeyRound size={130} className="text-white" />
         </div>
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[10px] font-black tracking-widest uppercase text-yellow-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Principal</span>
           </div>
-          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Storytelling</h2>
-          <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
-            Crie uma campanha narrativa completa: cenário, personagens, missões e boss final para gamificar toda a aula.
+          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Escape Room</h2>
+          <p className="text-sm text-rose-100 max-w-[80%] leading-relaxed mb-4">
+            Crie enigmas encadeados temáticos para imprimir e jogar em sala — desafio a resolver em equipe.
           </p>
-          <div className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-4 py-2 rounded-full text-sm">
-            <Wand2 size={16} /> Criar campanha
+          <div className="inline-flex items-center gap-2 bg-white text-rose-700 font-bold px-4 py-2 rounded-full text-sm">
+            <KeyRound size={16} /> Criar escape room
           </div>
         </div>
       </button>
