@@ -1455,15 +1455,15 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
 
   const titleStyle = { color: isCover || isRef ? '#ffffff' : theme.primaryColor, fontFamily: FONT_T, fontWeight: 800 };
 
-  // Cabeçalho editável: eyebrow (kicker) + título + traço de acento.
+  // Cabeçalho editável: eyebrow (kicker) + título.
   // Title uses INK (dark slate) on light-bg slides for reliable readability regardless of chosen primary colour.
+  // Accent bar removed — it overlapped the 2nd title line in the PPTX export.
   const EditableHeader = ({ darkBg = false }: { darkBg?: boolean }) => (
     <div style={{ marginBottom: 14 }}>
       <input value={slide.data.kicker || ''} onChange={e => onUpdate({ kicker: e.target.value })} placeholder="RÓTULO"
         style={{ fontSize: 12, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: theme.accentColor, background: 'transparent', border: 'none', outline: 'none', width: '100%', display: 'block', marginBottom: 6, fontFamily: FONT_B }} />
       <input value={slide.data.title || ''} onChange={e => onUpdate({ title: e.target.value })} placeholder="Título"
-        style={{ ...titleStyle, color: darkBg ? '#fff' : INK, fontSize: 30, lineHeight: 1.18, background: 'transparent', border: 'none', width: '100%', outline: 'none', display: 'block' }} />
-      <div style={{ width: 54, height: 4, backgroundColor: theme.accentColor, borderRadius: 2, marginTop: 10 }} />
+        style={{ ...titleStyle, color: darkBg ? '#fff' : INK, fontSize: 30, lineHeight: 1.18, background: 'transparent', border: 'none', width: '100%', outline: 'none', display: 'block', marginBottom: 10 }} />
     </div>
   );
 
@@ -2829,10 +2829,8 @@ const PlannerScreen = ({
         // Use high-contrast INK for light-background slides; white for dark-background slides
         const titleColor = darkBg ? 'FFFFFF' : INK;
         slide.addText(title || '', { x: hx, y: titleY, w: hw, h: 0.85, fontSize: 30, color: titleColor, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
-        // Bar placed BELOW the title box (not inside it) — avoids "lines over text"
-        // when the title wraps to 2 lines. Box ends at titleY+0.85; bar at +0.90.
-        slide.addShape(pres.ShapeType.rect, { x: hx, y: titleY + 0.90, w: 0.9, h: 0.055, fill: { color: ac } });
-        return titleY + 1.04; // y onde o conteúdo pode começar (bar ends at +0.955)
+        // Accent bar removed — it overlapped the 2nd title line when title wrapped.
+        return titleY + 0.96; // y onde o conteúdo pode começar
       };
       const imgShadow = { type: 'outer' as const, blur: 10, offset: 3, angle: 90, color: '94A3B8', opacity: 0.45 };
 
@@ -2900,9 +2898,8 @@ const PlannerScreen = ({
           const ctTitleY = ctHasKick ? ctKickerY + 0.28 : ctKickerY;
           if (ctHasKick) slide.addText(kicker!.toUpperCase(), { x: LEFT, y: ctKickerY, w: 9.0 - LEFT, h: 0.26, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
           slide.addText(slideData.data.title || '', { x: LEFT, y: ctTitleY, w: 9.0 - LEFT, h: 0.62, fontSize: 30, color: INK, bold: true, fontFace: FONT_T, valign: 'top', ...shrink });
-          // Bar BELOW the 0.62" title box (ends at ctTitleY+0.62); 0.04" gap before bar
-          slide.addShape(pres.ShapeType.rect, { x: LEFT, y: ctTitleY + 0.66, w: 0.9, h: 0.055, fill: { color: ac } });
-          const ctBodyY = ctTitleY + 0.80; // 0.14" after bar end
+          // Accent bar removed — no bar between header and body in this layout.
+          const ctBodyY = ctTitleY + 0.70; // content starts 0.08" after title box end
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
           slide.addText(parsedText, { x: LEFT, y: ctBodyY, w: 9.0 - LEFT, h: 1.05, valign: 'top', align: 'left', lineSpacing: 22, ...shrink });
           const ctImgY = ctBodyY + 1.15;
