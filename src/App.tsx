@@ -6214,16 +6214,12 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .answer-key-subtitle { font-size:9px; color:#7f1d1d; font-weight:700; letter-spacing:1.5px; margin-top:4px; }
     .answer-key-item { font-size:11px; margin-bottom:6px; padding:7px 12px; background:white; border-radius:8px; border-left:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
 
-    /* ── FOOTER ───────────────────────────────────────────── */
-    .page-footer { position:fixed; bottom:0.5cm; right:0.3cm; font-size:8px; color:#9ca3af; letter-spacing:1px; opacity:0.8; }
-
     /* ── UTIL ─────────────────────────────────────────────── */
     .hide-on-screen { display:block; }
     button { display:none; }
   </style></head><body>
     ${headerHtml}
     ${node.innerHTML}
-    <div class="page-footer">Gerado por Prof. Corujao • ${todayStr}</div>
     <script>
     (function(){
       var label = "${opts.activityLabel}";
@@ -6608,6 +6604,12 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         document.body.appendChild(cardPage);
       }
 
+      // ── marca d'água: injetada após TODO o conteúdo dinâmico ──
+      var _wm = document.createElement('div');
+      _wm.textContent = 'Prof. Corujão';
+      _wm.style.cssText = 'position:fixed;bottom:3mm;right:4mm;font-size:7px;color:#9ca3af;letter-spacing:0.5px;opacity:0.55;font-style:italic;pointer-events:none;z-index:9999;';
+      document.body.appendChild(_wm);
+
       setTimeout(function(){ window.print(); }, 600);
     })();
     </script>
@@ -6868,7 +6870,15 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
     </div>
   </section>
 
-  <script>setTimeout(function(){ window.print(); }, 800);</script>
+  <script>
+    (function(){
+      var _wm = document.createElement('div');
+      _wm.textContent = 'Prof. Corujão';
+      _wm.style.cssText = 'position:fixed;bottom:3mm;right:4mm;font-size:7px;color:#9ca3af;letter-spacing:0.5px;opacity:0.55;font-style:italic;pointer-events:none;z-index:9999;';
+      document.body.appendChild(_wm);
+      setTimeout(function(){ window.print(); }, 800);
+    })();
+  </script>
   </body></html>`);
   w.document.close();
 };
@@ -7107,7 +7117,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
   };
 
   const modeMeta: Record<GameMode, { title: string, icon: any, color: string, bg: string, desc: string }> = {
-    story: { title: 'Storytelling', icon: ScrollText, color: 'text-white', bg: 'from-indigo-600 to-purple-600', desc: 'Campanha narrativa com missões e personagens' },
+    story: { title: 'Storytelling', icon: ScrollText, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200', desc: 'Campanha narrativa com missões e personagens' },
     quiz: { title: 'Quiz', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', desc: 'Perguntas de múltipla escolha ou V/F' },
     wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', desc: 'Grade com palavras escondidas para achar' },
     crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', desc: 'Grade cruzada com pistas e definições' },
