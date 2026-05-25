@@ -1313,8 +1313,11 @@ const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, acce
 
   // Remove any stray markdown markers left in a plain-text fragment (malformed
   // bold like "** texto", leftover backticks, lone asterisks/hashes).
+  // NOTE: do NOT call .trim() here — the surrounding whitespace between tokens
+  // (e.g. the space in "text **bold** more") must be preserved so that pptxgenjs
+  // renders "text bold more" (with spaces) instead of "textboldmore".
   const stripStray = (s: string): string =>
-    s.replace(/\*+/g, '').replace(/`+/g, '').replace(/^#+\s*/, '').trim();
+    s.replace(/\*+/g, '').replace(/`+/g, '').replace(/^#+\s*/, '');
 
   // Inline patterns — triple/double asterisk, highlight, primary, icon token
   const INLINE = /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|==[^=\n]+==|\[\[[^\]\n]+\]\]|\{[A-Za-z0-9]+\})/g;
@@ -1340,6 +1343,8 @@ const parseRichMarkdown = (text: any, baseOpts: any, primaryColor?: string, acce
         runs.push({ text: '◆ ', options: { ...baseOpts, bold: true, color: ac } });
       } else {
         const clean = stripStray(part);
+        // Keep space-only strings (word separators between markup tokens);
+        // skip truly empty strings produced by stripping stray markers.
         if (clean) runs.push({ text: clean, options: { ...baseOpts } });
       }
     });
@@ -1539,8 +1544,9 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
             </div>
             <input value={t.title || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, title: e.target.value } : t2) })} placeholder="Tópico"
               style={{ fontSize: 15, fontWeight: 800, color: theme.primaryColor, background: 'transparent', border: 'none', width: '100%', outline: 'none', textAlign: 'center', marginBottom: 8, fontFamily: FONT_T }} />
-            <textarea value={t.content || ''} onChange={e => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, content: e.target.value } : t2) })} placeholder="Conteúdo"
-              style={{ fontSize: 12.5, color: INK_SOFT, lineHeight: 1.55, background: 'transparent', border: 'none', width: '100%', outline: 'none', resize: 'none', flex: 1, fontFamily: FONT_B, textAlign: 'center' }} />
+            <RichBody value={t.content || ''} onChange={v => onUpdate({ topics: slide.data.topics.map((t2: any, j: number) => j === i ? { ...t2, content: v } : t2) })}
+              primaryColor={theme.primaryColor} accentColor={theme.accentColor} rows={4}
+              style={{ fontSize: 12.5, color: INK_SOFT, lineHeight: 1.55, flex: 1, textAlign: 'center', minHeight: 40 }} />
           </div>
         ))}
       </div>
@@ -2823,8 +2829,10 @@ const PlannerScreen = ({
         // Use high-contrast INK for light-background slides; white for dark-background slides
         const titleColor = darkBg ? 'FFFFFF' : INK;
         slide.addText(title || '', { x: hx, y: titleY, w: hw, h: 0.85, fontSize: 30, color: titleColor, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
-        slide.addShape(pres.ShapeType.rect, { x: hx, y: titleY + 0.78, w: 0.9, h: 0.055, fill: { color: ac } });
-        return titleY + 0.95; // y onde o conteúdo pode começar
+        // Bar placed BELOW the title box (not inside it) — avoids "lines over text"
+        // when the title wraps to 2 lines. Box ends at titleY+0.85; bar at +0.90.
+        slide.addShape(pres.ShapeType.rect, { x: hx, y: titleY + 0.90, w: 0.9, h: 0.055, fill: { color: ac } });
+        return titleY + 1.04; // y onde o conteúdo pode começar (bar ends at +0.955)
       };
       const imgShadow = { type: 'outer' as const, blur: 10, offset: 3, angle: 90, color: '94A3B8', opacity: 0.45 };
 
@@ -2847,25 +2855,17 @@ const PlannerScreen = ({
 
           // Eyebrow / kicker — positioned high to match the in-app preview layout
           slide.addText((kicker || 'Apresentação').toUpperCase(), { x: 0.55, y: 0.50, w: 4.6, h: 0.28, fontSize: 11, fontFace: FONT_B, color: 'FFFFFF', bold: true, charSpacing: 3, transparency: 25 });
-          // Smart title: if very long, split near midpoint so font stays readable
+          // Title: single box at fontSize 36, valign:top, fit:shrink.
+          // coverBarY is estimated from char count so the bar never overlaps the title text.
+          // At 36pt in 4.7" width, roughly 18 chars fit per line; each line ≈ 0.62" tall.
           const rawCoverTitle = (slideData.data.title || '').trim();
-          const coverWords = rawCoverTitle.split(/\s+/);
-          // coverBarY: where the accent bar and subtitle will be anchored
-          let coverBarY: number;
-          if (rawCoverTitle.length > 38 && coverWords.length >= 4) {
-            const mid = Math.ceil(coverWords.length / 2);
-            const titlePart1 = coverWords.slice(0, mid).join(' ');
-            const titlePart2 = coverWords.slice(mid).join(' ');
-            slide.addText(titlePart1, { x: 0.5, y: 0.86, w: 4.7, h: 0.68, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
-            slide.addText(titlePart2, { x: 0.5, y: 1.58, w: 4.7, h: 0.68, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
-            coverBarY = 2.34;
-          } else {
-            // valign:'top' so text anchors to the top of the box; bar/subtitle follow immediately
-            slide.addText(rawCoverTitle, { x: 0.5, y: 0.86, w: 4.7, h: 0.92, fontSize: 40, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
-            coverBarY = 1.84;
-          }
+          const ctEstLines = Math.max(1, Math.min(Math.ceil(rawCoverTitle.length / 18), 4));
+          const ctLineH = 0.62; // 36pt × 1.2 line-spacing / 72pt-per-inch ≈ 0.60"
+          const ctTitleBoxH = ctEstLines * ctLineH + 0.06; // small buffer so shrink stays slight
+          const coverBarY = parseFloat((0.86 + ctTitleBoxH + 0.08).toFixed(2)); // 0.08" gap after box
+          slide.addText(rawCoverTitle, { x: 0.5, y: 0.86, w: 4.7, h: ctTitleBoxH, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
           slide.addShape(pres.ShapeType.rect, { x: 0.55, y: coverBarY, w: 1.2, h: 0.06, fill: { color: ac } });
-          slide.addText(slideData.data.subtitle || '', { x: 0.55, y: coverBarY + 0.18, w: 4.6, h: 0.55, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
+          slide.addText(slideData.data.subtitle || '', { x: 0.55, y: coverBarY + 0.16, w: 4.6, h: 0.55, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
           slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.55, y: 5.05, w: 4.6, h: 0.35, fontSize: 9, fontFace: FONT_B, color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
@@ -2900,8 +2900,9 @@ const PlannerScreen = ({
           const ctTitleY = ctHasKick ? ctKickerY + 0.28 : ctKickerY;
           if (ctHasKick) slide.addText(kicker!.toUpperCase(), { x: LEFT, y: ctKickerY, w: 9.0 - LEFT, h: 0.26, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
           slide.addText(slideData.data.title || '', { x: LEFT, y: ctTitleY, w: 9.0 - LEFT, h: 0.62, fontSize: 30, color: INK, bold: true, fontFace: FONT_T, valign: 'top', ...shrink });
-          slide.addShape(pres.ShapeType.rect, { x: LEFT, y: ctTitleY + 0.58, w: 0.9, h: 0.055, fill: { color: ac } });
-          const ctBodyY = ctTitleY + 0.70;
+          // Bar BELOW the 0.62" title box (ends at ctTitleY+0.62); 0.04" gap before bar
+          slide.addShape(pres.ShapeType.rect, { x: LEFT, y: ctTitleY + 0.66, w: 0.9, h: 0.055, fill: { color: ac } });
+          const ctBodyY = ctTitleY + 0.80; // 0.14" after bar end
           const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
           slide.addText(parsedText, { x: LEFT, y: ctBodyY, w: 9.0 - LEFT, h: 1.05, valign: 'top', align: 'left', lineSpacing: 22, ...shrink });
           const ctImgY = ctBodyY + 1.15;
