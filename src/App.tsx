@@ -15,7 +15,7 @@ import {
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { auth, db, storage, logOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
+import { auth, db, storage, logOut, getFcmToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -8844,14 +8844,43 @@ function AppInner() {
         const title = 'Aula em 30 minutos';
         const body = `${sched.subject ? `${sched.subject} — ` : ''}${sched.name} às ${sched.time}`;
         const icon = 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png';
+        // Mesma tag usada pela Cloud Function (FCM) — evita notificação duplicada:
+        // o sistema substitui em vez de empilhar quando local e push coincidem.
+        const tag = `aula-${sched.id}-${dateStr}`;
         try {
           const reg = await navigator.serviceWorker.ready;
-          await reg.showNotification(title, { body, icon, tag: key, requireInteraction: false });
+          await reg.showNotification(title, { body, icon, tag, requireInteraction: false });
         } catch { new Notification(title, { body, icon }); }
       }, msUntil));
     });
 
     return () => timers.forEach(clearTimeout);
+  }, [user, schedules]);
+
+  // ── Registro do token FCM (push com app fechado) ──────────────────────────
+  // Salva o token do dispositivo no Firestore para a Cloud Function enviar os
+  // lembretes de aula mesmo quando o app não está aberto.
+  useEffect(() => {
+    if (!user || !('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!('serviceWorker' in navigator)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const token = await getFcmToken(reg);
+        if (!token || cancelled) return;
+        await setDoc(doc(db, `users/${user.uid}/fcmTokens/${token}`), {
+          token,
+          uid: user.uid,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
+          platform: navigator.userAgent.slice(0, 200),
+          updatedAt: Date.now(),
+        }, { merge: true });
+      } catch (e) {
+        console.error('Falha ao registrar token FCM:', e);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [user, schedules]);
 
   // ── Onboarding ────────────────────────────────────────────────────────────
