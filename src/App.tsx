@@ -10,7 +10,7 @@ import {
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
-  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock
+  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -499,10 +499,11 @@ interface UserProfile {
 interface ClassSchedule {
   id: string;
   name: string;
-  days: number[]; // 0-6 (Sun-Sat)
-  time: string;
-  numberOfClasses?: number; // Legacy global
-  periodsPerDay?: Record<number, number[]>; // dayIndex -> array of selected periods (e.g. 1st, 2nd)
+  days: number[];                            // 0-6 (Dom-Sáb)
+  time: string;                              // Legacy fallback time
+  dayTimes?: Record<number, string>;         // dayIndex → 'HH:MM' (horário real por dia)
+  numberOfClasses?: number;                  // Legacy global
+  periodsPerDay?: Record<number, number[]>;  // Legacy periods
   color?: string;
   level?: string;
   classProfile?: string;
@@ -4269,11 +4270,13 @@ const ProfileScreen = ({
   onResetAccount?: () => void,
   onDeleteAccount?: () => Promise<void>
 }) => {
-  const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
-  const [showScheduleConfig, setShowScheduleConfig] = useState(false);
-  const [showAddClassModal, setShowAddClassModal] = useState(false);
-  const [newClassData, setNewClassData] = useState({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
+  type ClassFormData = { name: string; subject: string; level: string; shift: string; school: string; profile: string; color: string; days: number[]; dayTimes: Record<number, string> };
+  const emptyClassForm: ClassFormData = { name: '', subject: '', level: 'Ensino Fundamental II', shift: 'Manhã', school: '', profile: '', color: '#4F46E5', days: [], dayTimes: {} };
+  const [editingClass, setEditingClass] = useState<null | 'new' | ClassSchedule>(null);
+  const [classForm, setClassForm] = useState<ClassFormData>(emptyClassForm);
   const [classFormError, setClassFormError] = useState<string | null>(null);
+  const [showAdvancedClass, setShowAdvancedClass] = useState(false);
+  const [deleteConfirmClassId, setDeleteConfirmClassId] = useState<string | null>(null);
   const classColors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -4284,72 +4287,72 @@ const ProfileScreen = ({
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [importStatus, setImportStatus] = useState<{message: string, type: 'success' | 'info'} | null>(null);
+  const [showDangerZone, setShowDangerZone] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scheduleRef = useRef<HTMLDivElement>(null);
   const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-  useEffect(() => {
-    if (showScheduleConfig && scheduleRef.current) {
-      setTimeout(() => {
-        scheduleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-    }
-  }, [showScheduleConfig]);
-
-  const handleSaveNewClass = () => {
+  const openAddClass = () => {
+    setClassForm(emptyClassForm);
     setClassFormError(null);
-    if (!newClassData.name.trim()) {
-      setClassFormError('Por favor, preencha o nome da turma.');
-      return;
-    }
-    const newClass: ClassSchedule = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newClassData.name,
-      days: [1, 2, 3, 4, 5],
-      time: '08:00',
-      color: newClassData.color,
-      level: newClassData.level,
-      subject: newClassData.subject || undefined,
-      school: newClassData.school || undefined,
-      shift: newClassData.shift || undefined,
-      classProfile: newClassData.profile
+    setShowAdvancedClass(false);
+    setEditingClass('new');
+  };
+
+  const openEditClass = (s: ClassSchedule) => {
+    // Para turmas legadas sem dayTimes, popula com o campo time para todos os dias
+    const legacyDayTimes = s.time ? Object.fromEntries((s.days || []).map(d => [d, s.time])) : {};
+    setClassForm({
+      name: s.name,
+      subject: s.subject || '',
+      level: s.level || 'Ensino Fundamental II',
+      shift: s.shift || 'Manhã',
+      school: s.school || '',
+      profile: s.classProfile || '',
+      color: s.color || '#4F46E5',
+      days: s.days || [],
+      dayTimes: s.dayTimes || legacyDayTimes,
+    });
+    setClassFormError(null);
+    setShowAdvancedClass(false);
+    setEditingClass(s);
+  };
+
+  const handleSaveClass = () => {
+    setClassFormError(null);
+    if (!classForm.name.trim()) { setClassFormError('Informe o nome da turma.'); return; }
+    const firstTime = classForm.dayTimes[classForm.days[0]] || '08:00';
+    const classData = {
+      name: classForm.name.trim(),
+      days: classForm.days,
+      time: firstTime,
+      dayTimes: classForm.dayTimes,
+      color: classForm.color,
+      level: classForm.level,
+      subject: classForm.subject || undefined,
+      school: classForm.school || undefined,
+      shift: classForm.shift || undefined,
+      classProfile: classForm.profile || undefined,
     };
-    onAddClass(newClass);
-    setShowAddClassModal(false);
-    setNewClassData({ name: '', level: 'Ensino Fundamental II', subject: '', school: '', shift: 'Manhã', profile: '', color: '#4F46E5' });
+    if (editingClass === 'new') {
+      onAddClass({ id: Math.random().toString(36).substr(2, 9), ...classData });
+    } else if (editingClass && typeof editingClass !== 'string') {
+      setSchedules(schedules.map(s => s.id === (editingClass as ClassSchedule).id ? { ...s, ...classData } : s));
+    }
+    setEditingClass(null);
   };
 
-  const deleteClass = (id: string) => {
-    setSchedules(schedules.filter(s => s.id !== id));
-  };
-
-  const toggleDay = (scheduleId: string, dayIndex: number) => {
-    setSchedules(schedules.map(s => {
-      if (s.id === scheduleId) {
-        const newDays = s.days.includes(dayIndex) 
-          ? s.days.filter(d => d !== dayIndex)
-          : [...s.days, dayIndex];
-        return { ...s, days: newDays };
-      }
-      return s;
-    }));
-  };
-
-  const togglePeriod = (scheduleId: string, dayIndex: number, period: number) => {
-    setSchedules(schedules.map(sch => {
-      if (sch.id === scheduleId) {
-        const pdMap = sch.periodsPerDay || {};
-        const pds = pdMap[dayIndex] || [];
-        const newPds = pds.includes(period) ? pds.filter(p => p !== period) : [...pds, period].sort();
-        return { ...sch, periodsPerDay: { ...pdMap, [dayIndex]: newPds } };
-      }
-      return sch;
-    }));
+  const toggleFormDay = (dayIndex: number) => {
+    setClassForm(f => {
+      const newDays = f.days.includes(dayIndex)
+        ? f.days.filter(d => d !== dayIndex)
+        : [...f.days, dayIndex].sort((a, b) => a - b);
+      return { ...f, days: newDays };
+    });
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -4530,253 +4533,276 @@ const ProfileScreen = ({
         ))}
       </div>
 
+      {/* ── Gestão de Turmas ─────────────────────────────────── */}
       <div className="space-y-3">
-        <h3 className="text-lg font-bold text-gray-900 mb-4 px-2">Gestão de Turmas</h3>
-        
-        {schedules.length > 0 ? (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-2 flex items-center gap-4">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shrink-0">
-              <Users size={20} />
-            </div>
-            <div>
-              <p className="font-bold text-indigo-900 text-sm">{schedules.length} turma{schedules.length !== 1 ? 's' : ''} ativa{schedules.length !== 1 ? 's' : ''}</p>
-              <p className="text-xs text-indigo-400 mt-0.5">
-                {schedules.slice(0, 3).map(s => s.name).join(' · ')}{schedules.length > 3 ? ` +${schedules.length - 3}` : ''}
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center justify-between px-1 mb-1">
+          <h3 className="text-lg font-bold text-gray-900">Gestão de Turmas</h3>
+          <button
+            onClick={openAddClass}
+            className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-sm active:scale-95 transition-transform"
+          >
+            <Plus size={15} /> Nova Turma
+          </button>
+        </div>
+
+        {schedules.length === 0 ? (
+          <button
+            onClick={openAddClass}
+            className="w-full bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl p-6 flex flex-col items-center gap-2 text-indigo-400 active:scale-[0.98] transition-transform"
+          >
+            <Plus size={28} strokeWidth={1.5} />
+            <span className="font-bold text-sm">Adicionar primeira turma</span>
+            <span className="text-xs opacity-70">Nome, disciplina, dias e horários</span>
+          </button>
         ) : (
-          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mb-2 text-center">
-            <p className="text-sm text-gray-400">Nenhuma turma cadastrada ainda.</p>
+          <div className="space-y-2">
+            {schedules.map(s => {
+              const schedSummary = [...s.days].sort((a, b) => a - b).map(d => {
+                const t = s.dayTimes?.[d] || s.time;
+                return t ? `${daysOfWeek[d]} ${t}` : daysOfWeek[d];
+              }).join(' · ');
+              return (
+                <div key={s.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="h-1.5 w-full" style={{ backgroundColor: s.color || '#4F46E5' }} />
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-gray-900 text-sm">{s.name}</h4>
+                      {s.subject && <p className="text-xs font-semibold mt-0.5" style={{ color: s.color || '#4F46E5' }}>{s.subject}</p>}
+                      {schedSummary ? (
+                        <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Clock size={10} strokeWidth={2.5} />{schedSummary}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-300 mt-0.5 italic">Sem horário definido</p>
+                      )}
+                      {(s.level || s.shift) && (
+                        <p className="text-xs text-gray-300 mt-0.5">{[s.level, s.shift].filter(Boolean).join(' · ')}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => openEditClass(s)}
+                        className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 active:scale-90 transition-transform"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      {deleteConfirmClassId === s.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => { setSchedules(schedules.filter(x => x.id !== s.id)); setDeleteConfirmClassId(null); }}
+                            className="px-2.5 py-1.5 bg-red-500 text-white text-xs font-bold rounded-xl"
+                          >Excluir</button>
+                          <button
+                            onClick={() => setDeleteConfirmClassId(null)}
+                            className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-xl"
+                          >Não</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmClassId(s.id)}
+                          className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-red-300 active:scale-90 transition-transform"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        <button 
-          onClick={() => setShowScheduleConfig(!showScheduleConfig)}
-          className="w-full bg-white rounded-2xl p-4 border-2 border-gray-50 shadow-sm flex items-center gap-4"
-        >
-          <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
-            <Clock size={24} />
-          </div>
-          <span className="font-bold text-gray-900 text-base flex-1 text-left">Horário Semanal</span>
-          <ChevronRight size={20} className={`text-gray-300 transition-transform ${showScheduleConfig ? 'rotate-90' : ''}`} />
-        </button>
-
-        <AnimatePresence>
-          {showScheduleConfig && (
-            <motion.div 
-              ref={scheduleRef}
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden space-y-3"
+        {/* ── Modal Adicionar / Editar Turma ── */}
+        {editingClass !== null && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setEditingClass(null); }}>
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="bg-white rounded-t-3xl w-full max-w-lg shadow-2xl flex flex-col"
+              style={{ maxHeight: '92dvh' }}
             >
-              <button 
-                onClick={() => setShowAddClassModal(true)}
-                className="w-full bg-indigo-50 text-indigo-600 p-4 rounded-2xl mb-2 font-bold flex items-center justify-center gap-2"
-              >
-                <Plus size={20} />
-                Adicionar Nova Turma
-              </button>
+              {/* Alça + Header */}
+              <div className="flex flex-col items-center pt-3 pb-2 border-b border-gray-100 px-5">
+                <div className="w-10 h-1 bg-gray-200 rounded-full mb-3" />
+                <div className="flex items-center justify-between w-full">
+                  <h2 className="text-lg font-black text-gray-900">
+                    {editingClass === 'new' ? '+ Nova Turma' : 'Editar Turma'}
+                  </h2>
+                  <button onClick={() => setEditingClass(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
 
-              {showAddClassModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6">
-                  <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
-                    <h2 className="text-xl font-bold mb-4">Configurar Nova Turma</h2>
-                    
-                    {classFormError && (
-                      <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100">
-                        {classFormError}
-                      </div>
-                    )}
+              {/* Corpo do formulário */}
+              <div className="overflow-y-auto flex-1 p-5 space-y-5">
+                {classFormError && (
+                  <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100 font-medium">{classFormError}</div>
+                )}
 
-                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                {/* Nome */}
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Nome da Turma *</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 8º Ano A, Turma 3C, Noturno..."
+                    value={classForm.name}
+                    onChange={e => setClassForm(f => ({ ...f, name: e.target.value }))}
+                    autoFocus
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold text-gray-900 text-base"
+                  />
+                </div>
+
+                {/* Disciplina */}
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Disciplina</label>
+                  <select
+                    value={classForm.subject}
+                    onChange={e => setClassForm(f => ({ ...f, subject: e.target.value }))}
+                    className={`w-full p-3 rounded-xl focus:outline-none transition-all ${classForm.subject ? 'bg-indigo-600 text-white font-bold border-none shadow-sm' : 'border border-gray-200 text-gray-500'}`}
+                  >
+                    <option value="">Selecione a disciplina</option>
+                    {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                {/* Dias + Horários */}
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Dias e Horários de Aula</label>
+                  {/* Botões de dias */}
+                  <div className="flex gap-1 mb-3">
+                    {daysOfWeek.map((day, i) => (
+                      <button
+                        key={day}
+                        onClick={() => toggleFormDay(i)}
+                        className={`flex-1 h-9 rounded-xl text-xs font-bold transition-all ${classForm.days.includes(i) ? 'text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
+                        style={classForm.days.includes(i) ? { backgroundColor: classForm.color } : {}}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Horário por dia */}
+                  {classForm.days.length > 0 ? (
+                    <div className="space-y-2">
+                      {[...classForm.days].sort((a, b) => a - b).map(dayIdx => (
+                        <div key={dayIdx} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black text-white shrink-0"
+                            style={{ backgroundColor: classForm.color }}
+                          >
+                            {daysOfWeek[dayIdx]}
+                          </div>
+                          <span className="text-sm text-gray-500 flex-1">Início</span>
+                          <input
+                            type="time"
+                            value={classForm.dayTimes[dayIdx] || ''}
+                            onChange={e => setClassForm(f => ({ ...f, dayTimes: { ...f.dayTimes, [dayIdx]: e.target.value } }))}
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-indigo-700 focus:outline-none focus:border-indigo-500 bg-white"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-300 text-center py-3 italic">Toque nos dias acima para selecionar</p>
+                  )}
+                </div>
+
+                {/* Seção avançada (colapsável) */}
+                <div>
+                  <button
+                    onClick={() => setShowAdvancedClass(!showAdvancedClass)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase"
+                  >
+                    <ChevronRight size={13} className={`transition-transform ${showAdvancedClass ? 'rotate-90' : ''}`} />
+                    Informações Adicionais
+                  </button>
+
+                  {showAdvancedClass && (
+                    <div className="space-y-4 mt-4">
+                      {/* Nível */}
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Turma *</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: 8º Ano A"
-                          value={newClassData.name}
-                          onChange={(e) => setNewClassData({...newClassData, name: e.target.value})}
-                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Disciplina *</label>
+                        <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Nível de Ensino</label>
                         <select
-                          value={newClassData.subject}
-                          onChange={(e) => setNewClassData({...newClassData, subject: e.target.value})}
-                          className={`w-full p-3 mt-1 rounded-xl focus:outline-none transition-all ${
-                            newClassData.subject
-                              ? 'bg-indigo-600 text-white font-bold border-none shadow-sm'
-                              : 'bg-white text-gray-700 border border-gray-200'
-                          }`}
+                          value={classForm.level}
+                          onChange={e => setClassForm(f => ({ ...f, level: e.target.value }))}
+                          className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-gray-700"
                         >
-                          <option value="">Selecione a disciplina</option>
-                          {SUBJECT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Ensino</label>
-                        <select
-                          value={newClassData.level}
-                          onChange={(e) => setNewClassData({...newClassData, level: e.target.value})}
-                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 bg-white text-gray-700"
-                        >
+                          <option value="Educação Infantil">Educação Infantil</option>
                           <option value="Ensino Fundamental I">Ensino Fundamental I</option>
                           <option value="Ensino Fundamental II">Ensino Fundamental II</option>
                           <option value="Ensino Médio">Ensino Médio</option>
                           <option value="EJA">EJA</option>
                         </select>
                       </div>
-
+                      {/* Turno */}
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
-                        <div className="flex gap-2 mt-1">
-                          {['Manhã', 'Tarde', 'Noite'].map(s => (
+                        <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Turno</label>
+                        <div className="flex gap-2">
+                          {['Manhã', 'Tarde', 'Noite'].map(shift => (
                             <button
-                              key={s}
-                              onClick={() => setNewClassData({...newClassData, shift: s})}
-                              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${newClassData.shift === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}
-                            >
-                              {s}
-                            </button>
+                              key={shift}
+                              onClick={() => setClassForm(f => ({ ...f, shift }))}
+                              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${classForm.shift === shift ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                            >{shift}</button>
                           ))}
                         </div>
                       </div>
-
+                      {/* Escola */}
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome da Escola</label>
+                        <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Nome da Escola</label>
                         <input
                           type="text"
-                          placeholder="Ex: Escola Estadual João Silva"
-                          value={newClassData.school}
-                          onChange={(e) => setNewClassData({...newClassData, school: e.target.value})}
-                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
+                          placeholder="Ex: EE João Silva"
+                          value={classForm.school}
+                          onChange={e => setClassForm(f => ({ ...f, school: e.target.value }))}
+                          className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-sm"
                         />
                       </div>
-
+                      {/* Perfil */}
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Perfil da Turma (Opcional)</label>
+                        <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Perfil da Turma</label>
                         <textarea
-                          placeholder="Ex: Turma agitada, prefere aulas práticas. 2 alunos com TDAH."
-                          value={newClassData.profile}
-                          onChange={(e) => setNewClassData({...newClassData, profile: e.target.value})}
-                          className="w-full p-3 mt-1 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-16 text-sm"
+                          placeholder="Ex: Turma participativa, 2 alunos com TDAH, prefere aulas práticas."
+                          value={classForm.profile}
+                          onChange={e => setClassForm(f => ({ ...f, profile: e.target.value }))}
+                          className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-16 text-sm"
                         />
                       </div>
-
+                      {/* Cor */}
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-2 block">Cor de Identificação</label>
-                        <div className="flex gap-2 justify-between">
+                        <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Cor de Identificação</label>
+                        <div className="flex gap-2.5">
                           {classColors.map(color => (
                             <button
                               key={color}
-                              onClick={() => setNewClassData({...newClassData, color})}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform ${newClassData.color === color ? 'scale-110 ring-2 ring-offset-2 ring-gray-400' : ''}`}
+                              onClick={() => setClassForm(f => ({ ...f, color }))}
+                              className={`w-9 h-9 rounded-full flex items-center justify-center transition-transform ${classForm.color === color ? 'scale-110 ring-2 ring-offset-2 ring-gray-400' : ''}`}
                               style={{ backgroundColor: color }}
                             >
-                              {newClassData.color === color && <CheckCircle2 size={16} className="text-white" />}
+                              {classForm.color === color && <CheckCircle2 size={16} className="text-white" />}
                             </button>
                           ))}
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex gap-4 mt-6">
-                      <button onClick={() => setShowAddClassModal(false)} className="flex-1 p-3 rounded-xl bg-gray-100 font-bold">Cancelar</button>
-                      <button onClick={handleSaveNewClass} className="flex-1 p-3 rounded-xl bg-indigo-600 text-white font-bold">Salvar Turma</button>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {schedules.map(s => {
-                const isExpanded = expandedClassId === s.id;
-                return (
-                  <div key={s.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: s.color || '#4F46E5' }} />
-                    <button 
-                      onClick={() => setExpandedClassId(isExpanded ? null : s.id)}
-                      className="w-full flex justify-between items-center mb-1 pl-2 text-left"
-                    >
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-900">{s.name}</h4>
-                        <p className="text-xs text-gray-400">
-                          {[s.subject, s.level, s.shift].filter(Boolean).join(' · ')}
-                        </p>
-                        {s.school && <p className="text-xs text-indigo-400 font-medium truncate">{s.school}</p>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          onClick={(e) => { e.stopPropagation(); deleteClass(s.id); }}
-                          className="text-red-400 p-2 rounded-full hover:bg-red-50 transition-colors"
-                        >
-                          <Plus size={18} className="rotate-45" />
-                        </div>
-                        <ChevronRight size={20} className={`text-gray-300 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                      </div>
-                    </button>
-                    
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden pt-3 border-t border-gray-50 mt-2"
-                        >
-                          <div className="flex justify-between mb-3">
-                            {daysOfWeek.map((day, i) => (
-                              <button
-                                key={day}
-                                onClick={() => toggleDay(s.id, i)}
-                                className={`w-9 h-9 rounded-lg text-xs font-bold transition-colors ${
-                                  s.days.includes(i) ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-400'
-                                }`}
-                              >
-                                {day}
-                              </button>
-                            ))}
-                          </div>
-
-                          {s.days.length > 0 && (
-                            <div className="space-y-2 mt-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                              <span className="text-xs font-bold text-gray-500 uppercase">Aulas por Dia</span>
-                              {s.days.sort((a,b) => a-b).map(dayIndex => (
-                                <div key={dayIndex} className="flex flex-col gap-2 bg-white p-2 rounded-lg border border-gray-50 shadow-sm">
-                                  <span className="text-sm font-bold text-gray-700">{daysOfWeek[dayIndex]}</span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {[1, 2, 3, 4, 5, 6].map(period => {
-                                      const isSelected = (s.periodsPerDay?.[dayIndex] || []).includes(period);
-                                      return (
-                                        <button
-                                          key={period}
-                                          onClick={() => togglePeriod(s.id, dayIndex, period)}
-                                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                                            isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                                          }`}
-                                        >
-                                          {period}ª
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
+              {/* Rodapé */}
+              <div className="p-5 pt-3 border-t border-gray-100 flex gap-3">
+                <button onClick={() => setEditingClass(null)} className="flex-1 p-3.5 rounded-2xl bg-gray-100 font-bold text-gray-600">
+                  Cancelar
+                </button>
+                <button onClick={handleSaveClass} className="flex-[2] p-3.5 rounded-2xl bg-indigo-600 text-white font-black text-base shadow-sm active:scale-[0.98] transition-transform">
+                  {editingClass === 'new' ? 'Criar Turma' : 'Salvar Alterações'}
+                </button>
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Histórico do App */}
@@ -4900,39 +4926,59 @@ const ProfileScreen = ({
         </div>
       </div>
 
-      {/* Zona de Perigo */}
-      <div className="bg-red-50 border-2 border-red-100 rounded-[2rem] p-6 mb-8 mt-4">
-        <p className="text-xs font-black text-red-400 uppercase tracking-widest mb-4">⚠️ Zona de Perigo</p>
+      {/* Zona de Perigo — colapsável */}
+      <div className="mb-8 mt-4">
         <button
-          onClick={() => setShowResetConfirm(true)}
-          className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-red-100 shadow-sm hover:bg-red-50 transition-colors mb-3"
+          onClick={() => setShowDangerZone(!showDangerZone)}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-red-50 border border-red-100 active:scale-[0.98] transition-transform"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
-              <Trash2 size={20} />
-            </div>
-            <div className="text-left">
-              <h3 className="font-bold text-red-700">Resetar Conta</h3>
-              <p className="text-xs text-red-400">Apaga todos os seus dados permanentemente</p>
-            </div>
-          </div>
-          <ChevronRight size={20} className="text-red-300" />
+          <span className="text-xs font-black text-red-400 uppercase tracking-widest">⚠️ Zona de Perigo</span>
+          <ChevronRight size={16} className={`text-red-300 transition-transform ${showDangerZone ? 'rotate-90' : ''}`} />
         </button>
-        <button
-          onClick={() => { setDeleteConfirmText(''); setShowDeleteConfirm(true); }}
-          className="w-full flex items-center justify-between p-4 rounded-2xl bg-red-600 border border-red-700 shadow-sm active:scale-[0.98] transition-transform"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center text-white">
-              <X size={20} />
-            </div>
-            <div className="text-left">
-              <h3 className="font-bold text-white">Excluir minha conta</h3>
-              <p className="text-xs text-red-200">Remove sua conta e todos os dados do app</p>
-            </div>
-          </div>
-          <ChevronRight size={20} className="text-red-300" />
-        </button>
+
+        <AnimatePresence>
+          {showDangerZone && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-red-50 border border-red-100 rounded-b-2xl px-4 pb-4 pt-2 space-y-3 border-t-0">
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-red-100 shadow-sm hover:bg-red-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+                      <Trash2 size={20} />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-bold text-red-700">Resetar Conta</h3>
+                      <p className="text-xs text-red-400">Apaga todos os seus dados permanentemente</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={20} className="text-red-300" />
+                </button>
+                <button
+                  onClick={() => { setDeleteConfirmText(''); setShowDeleteConfirm(true); }}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-red-600 border border-red-700 shadow-sm active:scale-[0.98] transition-transform"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center text-white">
+                      <X size={20} />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-bold text-white">Excluir minha conta</h3>
+                      <p className="text-xs text-red-200">Remove sua conta e todos os dados do app</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={20} className="text-red-300" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <AnimatePresence>
@@ -8830,11 +8876,14 @@ function AppInner() {
     const dateStr = today.toDateString();
 
     schedules.forEach(sched => {
-      if (!sched.days.includes(todayDay) || !sched.time) return;
+      if (!sched.days.includes(todayDay)) return;
+      // Usa horário real do dia (dayTimes) com fallback para o campo legado time
+      const classTimeStr = sched.dayTimes?.[todayDay] || sched.time;
+      if (!classTimeStr) return;
       const key = `${sched.id}-${dateStr}`;
       if (scheduledNotifsRef.current.has(key)) return;
 
-      const [h, m] = sched.time.split(':').map(Number);
+      const [h, m] = classTimeStr.split(':').map(Number);
       const classTime = new Date(); classTime.setHours(h, m, 0, 0);
       const msUntil = classTime.getTime() - 30 * 60 * 1000 - Date.now();
       if (msUntil <= 0 || msUntil > 24 * 60 * 60 * 1000) return;
