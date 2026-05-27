@@ -102,6 +102,12 @@ service cloud.firestore {
         allow update: if isOwner(userId) && uidUnchanged();
         allow delete: if isOwner(userId);
       }
+      match /fcmTokens/{token} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && uidUnchanged();
+        allow update: if isOwner(userId) && uidUnchanged();
+        allow delete: if isOwner(userId);
+      }
     }
   }
 }
