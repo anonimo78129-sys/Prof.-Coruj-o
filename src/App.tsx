@@ -4288,7 +4288,6 @@ const ProfileScreen = ({
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [importStatus, setImportStatus] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [showDangerZone, setShowDangerZone] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -4816,57 +4815,6 @@ const ProfileScreen = ({
         )}
       </div>
 
-
-
-      {/* Calendário Escolar */}
-      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-            <CalendarIcon size={20} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Calendário Escolar</h2>
-            <p className="text-sm text-gray-400">Feriados nacionais e datas comemorativas</p>
-          </div>
-        </div>
-        <button
-          onClick={() => {
-            const currentYear = new Date().getFullYear();
-            const holidays = getDefaultHolidays(currentYear);
-
-            holidays.push({
-              id: `recesso-${currentYear}`,
-              title: 'Recesso Escolar (Fim de Ano)',
-              date: `${currentYear}-12-20 00:00`,
-              type: 'holiday' as const
-            });
-
-            const newEvents = holidays.filter(h =>
-              !customEvents.some(ce => ce.title === h.title)
-            );
-
-            if (newEvents.length > 0) {
-              setCustomEvents([...customEvents, ...newEvents]);
-              const nat = newEvents.filter(h => h.type === 'holiday').length;
-              const com = newEvents.filter(h => h.type === 'commemorative').length;
-              setImportStatus({ message: `${nat} feriados nacionais e ${com} datas comemorativas importados!`, type: 'success' });
-            } else {
-              setImportStatus({ message: "O calendário já está atualizado com os feriados deste ano.", type: 'info' });
-            }
-            
-            setTimeout(() => setImportStatus(null), 5000);
-          }}
-          className="w-full bg-[#F8F9FE] text-indigo-600 px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
-        >
-          <Download size={18} />
-          Importar Calendário Nacional
-        </button>
-        {importStatus && (
-          <div className={`mt-4 p-3 rounded-xl text-sm font-medium text-center ${importStatus.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'}`}>
-            {importStatus.message}
-          </div>
-        )}
-      </div>
 
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8 mt-8">
         <div className="flex items-center justify-between mb-6">
