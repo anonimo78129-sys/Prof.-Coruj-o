@@ -4805,35 +4805,7 @@ const ProfileScreen = ({
         )}
       </div>
 
-      {/* Histórico do App */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-gray-900 !pt-[12px]">Histórico de Criações</h2>
-          <button onClick={() => setScreen('biblioteca')} className="text-indigo-600 text-sm font-bold">Ver tudo</button>
-        </div>
-        <div className="space-y-3">
-          {savedResources.length > 0 ? (
-            savedResources.slice(0, 2).map(resource => (
-              <div key={resource.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm flex items-center gap-4 cursor-pointer" onClick={() => setScreen('biblioteca')}>
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 ${
-                  resource.type === 'slides' ? 'bg-indigo-500' : resource.type === 'activities' ? 'bg-amber-500' : resource.type === 'plan' ? 'bg-cyan-500' : 'bg-emerald-500'
-                }`}>
-                  {resource.type === 'slides' ? <Presentation size={20} /> : resource.type === 'activities' ? <FileText size={20} /> : resource.type === 'plan' ? <BookOpen size={20} /> : <FileQuestion size={20} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-gray-900 truncate text-sm">{resource.title}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">{new Date(resource.date).toLocaleDateString()}</p>
-                </div>
-                <ChevronRight size={16} className="text-gray-300" />
-              </div>
-            ))
-          ) : (
-            <div className="bg-white rounded-2xl p-6 border border-gray-50 shadow-sm text-center">
-              <p className="text-sm text-gray-400">Nenhum material criado ainda.</p>
-            </div>
-          )}
-        </div>
-      </div>
+
 
       {/* Calendário Escolar */}
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8">
