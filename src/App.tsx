@@ -4399,7 +4399,7 @@ const ProfileScreen = ({
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
       
-      <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
+      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 mb-6 flex flex-col items-center text-center">
         <div className="relative inline-block mb-4">
           <div className="w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
@@ -4474,16 +4474,16 @@ const ProfileScreen = ({
 
         <button
           onClick={() => isEditingProfile ? saveProfile() : setIsEditingProfile(true)}
-          className="mt-6 bg-[#F8F9FE] text-indigo-600 px-6 py-2.5 rounded-full text-base font-bold w-full"
+          className={`mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold w-full active:scale-[0.98] transition-transform ${isEditingProfile ? 'bg-indigo-600 text-white shadow-sm' : 'bg-indigo-50 text-indigo-600'}`}
         >
-          {isEditingProfile ? 'Salvar' : 'Editar Perfil'}
+          {isEditingProfile ? <><CheckCircle2 size={16} /> Salvar alterações</> : <><Pencil size={16} /> Editar Perfil</>}
         </button>
       </div>
 
       {/* Pro Status Card */}
       {profile.isPro || profile.role === 'admin' ? (
-        <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-5 shadow-lg mb-4 flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0 text-3xl">⭐</div>
+        <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-5 shadow-lg mb-6 flex items-center gap-4">
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0"><Sparkles size={26} className="text-white" /></div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="bg-white text-orange-600 text-xs font-black px-2 py-0.5 rounded-full tracking-wider uppercase">PRO</span>
@@ -4494,9 +4494,9 @@ const ProfileScreen = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-[2rem] p-5 shadow-sm border-2 border-gray-100 mb-4">
+        <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 mb-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-xl">🔒</div>
+            <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500"><Lock size={18} /></div>
             <div>
               <p className="font-bold text-gray-900 text-sm">Modo Gratuito</p>
               <p className="text-xs text-gray-400">{profile.generationsUsed ?? 0} de 10 gerações usadas</p>
@@ -4520,22 +4520,24 @@ const ProfileScreen = ({
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-8 grid grid-cols-3 divide-x divide-gray-100">
         {[
-          { label: 'Turmas', value: schedules.length, emoji: '👥' },
-          { label: 'Materiais', value: savedResources.length, emoji: '📄' },
-          { label: 'Gerações', value: profile.generationsUsed ?? 0, emoji: '✨' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 text-center">
-            <div className="text-2xl mb-1">{stat.emoji}</div>
-            <div className="text-xl font-black text-gray-900">{stat.value}</div>
-            <div className="text-xs text-gray-400 font-medium">{stat.label}</div>
+          { label: 'Turmas', value: schedules.length, Icon: Users, color: '#4F46E5' },
+          { label: 'Materiais', value: savedResources.length, Icon: FileText, color: '#F59E0B' },
+          { label: 'Gerações', value: profile.generationsUsed ?? 0, Icon: Sparkles, color: '#10B981' },
+        ].map(({ label, value, Icon, color }) => (
+          <div key={label} className="flex flex-col items-center py-5 px-2">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: color + '18', color }}>
+              <Icon size={18} />
+            </div>
+            <div className="text-2xl font-black text-gray-900 leading-none">{value}</div>
+            <div className="text-[11px] text-gray-400 font-semibold mt-1 uppercase tracking-wide">{label}</div>
           </div>
         ))}
       </div>
 
       {/* ── Gestão de Turmas ─────────────────────────────────── */}
-      <div className="space-y-3">
+      <div className="space-y-3 mb-8">
         <div className="flex items-center justify-between px-1 mb-1">
           <h3 className="text-lg font-bold text-gray-900">Gestão de Turmas</h3>
           <button
@@ -4816,12 +4818,12 @@ const ProfileScreen = ({
       </div>
 
 
-      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8 mt-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 mb-6">
+        <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-gray-900">Configurações</h2>
         </div>
-        
-        <div className="space-y-4">
+
+        <div className="space-y-3">
           <button 
             onClick={() => setShowFeedbackModal(true)}
             className="w-full flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -4858,12 +4860,12 @@ const ProfileScreen = ({
       </div>
 
       {/* Zona de Perigo — colapsável */}
-      <div className="mb-8 mt-4">
+      <div className="mb-8">
         <button
           onClick={() => setShowDangerZone(!showDangerZone)}
           className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-red-50 border border-red-100 active:scale-[0.98] transition-transform"
         >
-          <span className="text-xs font-black text-red-400 uppercase tracking-widest">⚠️ Zona de Perigo</span>
+          <span className="text-xs font-black text-red-400 uppercase tracking-widest flex items-center gap-1.5"><AlertCircle size={13} /> Zona de Perigo</span>
           <ChevronRight size={16} className={`text-red-300 transition-transform ${showDangerZone ? 'rotate-90' : ''}`} />
         </button>
 
