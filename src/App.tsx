@@ -4253,7 +4253,8 @@ const ProfileScreen = ({
   notifications,
   setNotifications,
   onResetAccount,
-  onDeleteAccount
+  onDeleteAccount,
+  onImportSyllabus
 }: {
   user: any,
   schedules: ClassSchedule[],
@@ -4268,7 +4269,8 @@ const ProfileScreen = ({
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   onResetAccount?: () => void,
-  onDeleteAccount?: () => Promise<void>
+  onDeleteAccount?: () => Promise<void>,
+  onImportSyllabus?: (cls: ClassSchedule) => void
 }) => {
   type ClassFormData = { name: string; subject: string; level: string; shift: string; school: string; profile: string; color: string; days: number[]; dayTimes: Record<number, string> };
   const emptyClassForm: ClassFormData = { name: '', subject: '', level: 'Ensino Fundamental II', shift: 'Manhã', school: '', profile: '', color: '#4F46E5', days: [], dayTimes: {} };
@@ -4580,6 +4582,15 @@ const ProfileScreen = ({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {onImportSyllabus && (
+                        <button
+                          onClick={() => onImportSyllabus(s)}
+                          className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-indigo-400 active:scale-90 transition-transform"
+                          title="Importar ementa (PDF)"
+                        >
+                          <FileUp size={15} />
+                        </button>
+                      )}
                       <button
                         onClick={() => openEditClass(s)}
                         className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 active:scale-90 transition-transform"
@@ -5401,8 +5412,411 @@ const DayDetailScreen = ({
   );
 };
 
-const CalendarScreen = ({ 
-  classes, 
+// ═══════════════════════════════════════════════════════════════════
+// IMPORTAÇÃO POR PDF — Calendário Letivo & Ementa
+// ═══════════════════════════════════════════════════════════════════
+
+const MONTH_ABBR_IMPORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+const IMPORT_EVENT_TYPES = [
+  { key: 'holiday' as const,       label: 'Feriado/Recesso', color: '#EAB308' },
+  { key: 'admin' as const,         label: 'Administrativo',  color: '#F59E0B' },
+  { key: 'commemorative' as const, label: 'Comemorativa',    color: '#A855F7' },
+  { key: 'prep' as const,          label: 'Pedagógico',      color: '#10B981' },
+];
+
+type ImportEventType = 'holiday' | 'admin' | 'prep' | 'commemorative';
+interface ImportedEvent { title: string; date: string; type: ImportEventType }
+interface ImportedModule { title: string; topics: string[]; estimatedClasses: number }
+interface SyllabusRow extends ImportedModule { startDate: string }
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+const toISODate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const extractAcademicCalendar = async (file: File, year: number): Promise<ImportedEvent[]> => {
+  const base64 = await fileToBase64(file);
+  const response = await generateContentWithRetry({
+    model: AI_MODEL,
+    contents: [{ role: 'user', parts: [
+      { inlineData: { data: base64, mimeType: file.type } },
+      { text: `Este é um calendário escolar/letivo brasileiro referente ao ano ${year}. Extraia TODOS os eventos com data: feriados, recessos, férias, início e fim de bimestres/trimestres, reuniões pedagógicas, conselhos de classe, entrega de notas, formação de professores (HTPC), datas comemorativas e eventos escolares. Para cada evento retorne: um título curto e claro, a data no formato YYYY-MM-DD (use o ano ${year}), e o tipo. Regras de classificação do tipo: "holiday" para feriados, recessos e férias; "admin" para reuniões, conselhos, entrega de notas e formação; "prep" para eventos pedagógicos e planejamento; "commemorative" para datas comemorativas. Se um evento durar vários dias, registre apenas o dia de início. Ignore qualquer texto que não seja um evento com data.` }
+    ]}],
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          events: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                date: { type: Type.STRING, description: 'YYYY-MM-DD' },
+                type: { type: Type.STRING, enum: ['holiday', 'admin', 'prep', 'commemorative'] },
+              },
+              required: ['title', 'date', 'type'],
+            },
+          },
+        },
+        required: ['events'],
+      },
+    },
+  });
+  const parsed = JSON.parse(response.text || '{}');
+  return (parsed.events || [])
+    .filter((e: any) => e && e.title && /^\d{4}-\d{2}-\d{2}$/.test(e.date))
+    .map((e: any) => ({
+      title: String(e.title).slice(0, 80),
+      date: e.date,
+      type: (['holiday', 'admin', 'prep', 'commemorative'].includes(e.type) ? e.type : 'admin') as ImportEventType,
+    }));
+};
+
+const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
+  const base64 = await fileToBase64(file);
+  const response = await generateContentWithRetry({
+    model: AI_MODEL,
+    contents: [{ role: 'user', parts: [
+      { inlineData: { data: base64, mimeType: file.type } },
+      { text: `Esta é uma ementa / plano de curso de uma disciplina escolar brasileira. Extraia a lista de módulos ou unidades temáticas na ordem em que aparecem no documento. Para cada módulo retorne: o título do módulo, a lista de tópicos/conteúdos abordados nele, e uma estimativa de quantas aulas são necessárias (estimatedClasses) com base na quantidade de conteúdo. Se o documento não indicar a carga horária, estime entre 2 e 8 aulas por módulo conforme a densidade do conteúdo. Mantenha a ordem original dos módulos.` }
+    ]}],
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          modules: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                topics: { type: Type.ARRAY, items: { type: Type.STRING } },
+                estimatedClasses: { type: Type.NUMBER },
+              },
+              required: ['title', 'estimatedClasses'],
+            },
+          },
+        },
+        required: ['modules'],
+      },
+    },
+  });
+  const parsed = JSON.parse(response.text || '{}');
+  return (parsed.modules || [])
+    .filter((m: any) => m && m.title)
+    .map((m: any) => ({
+      title: String(m.title).slice(0, 80),
+      topics: Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : [],
+      estimatedClasses: Math.max(1, Math.min(40, Math.round(Number(m.estimatedClasses) || 4))),
+    }));
+};
+
+// Calcula datas de início sequenciais (cada módulo começa após o anterior terminar)
+const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selectedClass?: ClassSchedule): SyllabusRow[] => {
+  const days = selectedClass?.days?.length ? selectedClass.days : [1, 2, 3, 4, 5];
+  const [y, m, d] = startISO.split('-').map(Number);
+  let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
+  const result: SyllabusRow[] = [];
+  for (const mod of mods) {
+    let guard = 730;
+    while (!days.includes(cur.getDay()) && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
+    result.push({ ...mod, startDate: toISODate(cur) });
+    let scheduled = 0; guard = 730;
+    while (scheduled < mod.estimatedClasses && guard > 0) {
+      if (days.includes(cur.getDay())) scheduled++;
+      cur.setDate(cur.getDate() + 1);
+      guard--;
+    }
+  }
+  return result;
+};
+
+// Distribui os módulos em ClassItems no calendário, respeitando os dias da turma
+const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): ClassItem[] => {
+  const items: ClassItem[] = [];
+  const usedDays = new Set<string>();
+  const days = selectedClass.days?.length ? selectedClass.days : [1, 2, 3, 4, 5];
+  for (const mod of rows) {
+    if (!mod.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(mod.startDate)) continue;
+    const [y, m, d] = mod.startDate.split('-').map(Number);
+    let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
+    let done = 0; let guard = 730;
+    while (done < mod.estimatedClasses && guard > 0) {
+      const key = toISODate(cur);
+      if (days.includes(cur.getDay()) && !usedDays.has(key)) {
+        usedDays.add(key);
+        items.push({
+          id: Math.random().toString(36).substr(2, 9),
+          title: mod.estimatedClasses > 1 ? `${mod.title} — Aula ${done + 1}` : mod.title,
+          date: `${cur.getDate()} ${MONTH_ABBR_IMPORT[cur.getMonth()]}`,
+          status: 'pending',
+          className: selectedClass.name,
+          timestamp: cur.getTime(),
+        });
+        done++;
+      }
+      cur.setDate(cur.getDate() + 1);
+      guard--;
+    }
+  }
+  return items.sort((a, b) => a.timestamp - b.timestamp);
+};
+
+const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustomEvents, onAddClassItems }: {
+  mode: 'calendar' | 'syllabus';
+  targetClass?: ClassSchedule;
+  year: number;
+  onClose: () => void;
+  customEvents: { id: string, title: string, date: string, type: ImportEventType, status?: 'pending' | 'done' }[];
+  setCustomEvents: (c: any[]) => void;
+  onAddClassItems: (items: ClassItem[]) => void;
+}) => {
+  const [phase, setPhase] = useState<'upload' | 'loading' | 'review' | 'error'>('upload');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [events, setEvents] = useState<ImportedEvent[]>([]);
+  const [rows, setRows] = useState<SyllabusRow[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const todayISO = toISODate(new Date());
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = '';
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setErrorMsg('Arquivo muito grande. O limite é 10 MB.'); setPhase('error'); return; }
+    setErrorMsg(''); setPhase('loading');
+    try {
+      if (mode === 'calendar') {
+        const ev = await extractAcademicCalendar(file, year);
+        if (!ev.length) { setErrorMsg('Não encontrei eventos com data neste arquivo. Tente um PDF mais legível ou outro formato.'); setPhase('error'); return; }
+        setEvents(ev.sort((a, b) => a.date.localeCompare(b.date)));
+        setPhase('review');
+      } else {
+        const mods = await extractSyllabus(file);
+        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa. Verifique se o arquivo contém a lista de conteúdos.'); setPhase('error'); return; }
+        setRows(computeSequentialStarts(mods, todayISO, targetClass));
+        setPhase('review');
+      }
+    } catch (err) {
+      setErrorMsg(formatApiError(err, 'Não consegui processar este arquivo. Tente novamente.'));
+      setPhase('error');
+    }
+  };
+
+  const confirmCalendar = () => {
+    const additions = events
+      .filter(e => !customEvents.some(ce => ce.title === e.title && ce.date.split(' ')[0] === e.date))
+      .map(e => ({
+        id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+        title: e.title,
+        date: `${e.date} 00:00`,
+        type: e.type,
+      }));
+    if (additions.length === 0) { toast.info('Esses eventos já estão no calendário.'); onClose(); return; }
+    setCustomEvents([...customEvents, ...additions]);
+    toast.success(`${additions.length} evento${additions.length !== 1 ? 's' : ''} adicionado${additions.length !== 1 ? 's' : ''} ao calendário!`);
+    onClose();
+  };
+
+  const confirmSyllabus = () => {
+    if (!targetClass) return;
+    const items = distributeSyllabus(rows, targetClass);
+    if (!items.length) { toast.error('Nenhuma aula foi gerada. Verifique as datas e os dias da turma.'); return; }
+    onAddClassItems(items);
+    toast.success(`${items.length} aulas distribuídas no calendário de ${targetClass.name}!`);
+    onClose();
+  };
+
+  const totalLessons = rows.reduce((sum, r) => sum + (r.estimatedClasses || 0), 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[110] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        className="bg-white rounded-t-3xl w-full max-w-lg shadow-2xl flex flex-col"
+        style={{ maxHeight: '92dvh' }}
+      >
+        <div className="flex flex-col items-center pt-3 pb-2 border-b border-gray-100 px-5">
+          <div className="w-10 h-1 bg-gray-200 rounded-full mb-3" />
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              {mode === 'calendar' ? <CalendarIcon size={18} className="text-indigo-600" /> : <BookOpen size={18} className="text-indigo-600" />}
+              <h2 className="text-lg font-black text-gray-900">
+                {mode === 'calendar' ? 'Importar Calendário Letivo' : `Importar Ementa${targetClass ? ` · ${targetClass.name}` : ''}`}
+              </h2>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500"><X size={18} /></button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5">
+          {/* UPLOAD */}
+          {phase === 'upload' && (
+            <div className="text-center py-4">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 flex items-center justify-center mb-4">
+                <FileUp size={30} className="text-indigo-500" />
+              </div>
+              <p className="text-sm text-gray-600 font-medium mb-1">
+                {mode === 'calendar'
+                  ? 'Envie o PDF do calendário letivo da sua escola.'
+                  : 'Envie o PDF da ementa / plano de curso da disciplina.'}
+              </p>
+              <p className="text-xs text-gray-400 mb-5">
+                {mode === 'calendar'
+                  ? 'A IA vai extrair feriados, recessos, reuniões e datas importantes.'
+                  : 'A IA vai extrair os módulos e você define quando cada um começa.'}
+              </p>
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="w-full bg-indigo-600 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              >
+                <Upload size={18} /> Escolher arquivo (PDF, imagem)
+              </button>
+              <p className="text-[11px] text-gray-300 mt-3">Máximo 10 MB · PDF, JPG ou PNG</p>
+              <input ref={fileRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFile} />
+            </div>
+          )}
+
+          {/* LOADING */}
+          {phase === 'loading' && (
+            <div className="text-center py-12">
+              <Loader2 size={36} className="mx-auto mb-4 animate-spin text-indigo-500" />
+              <p className="text-sm font-bold text-gray-700">Lendo o documento...</p>
+              <p className="text-xs text-gray-400 mt-1">A IA está extraindo as informações. Pode levar alguns segundos.</p>
+            </div>
+          )}
+
+          {/* ERROR */}
+          {phase === 'error' && (
+            <div className="text-center py-10">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+                <AlertCircle size={28} className="text-red-400" />
+              </div>
+              <p className="text-sm font-bold text-gray-700 mb-1">Não deu certo</p>
+              <p className="text-xs text-gray-400 mb-5 px-4">{errorMsg}</p>
+              <button onClick={() => setPhase('upload')} className="bg-gray-100 text-gray-700 rounded-2xl py-3 px-6 font-bold text-sm">Tentar outro arquivo</button>
+            </div>
+          )}
+
+          {/* REVIEW — CALENDAR */}
+          {phase === 'review' && mode === 'calendar' && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 bg-indigo-50 rounded-xl p-3 mb-1">
+                <Sparkles size={15} className="text-indigo-500 shrink-0" />
+                <p className="text-xs text-indigo-700 font-medium">Revise os {events.length} eventos extraídos. Ajuste o tipo, a data ou remova o que não quiser antes de confirmar.</p>
+              </div>
+              {events.map((ev, i) => {
+                const meta = IMPORT_EVENT_TYPES.find(t => t.key === ev.type) || IMPORT_EVENT_TYPES[1];
+                return (
+                  <div key={i} className="bg-gray-50 rounded-xl p-3 flex flex-col gap-2">
+                    <div className="flex items-start gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: meta.color }} />
+                      <input
+                        value={ev.title}
+                        onChange={e => setEvents(prev => prev.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
+                        className="flex-1 bg-transparent text-sm font-bold text-gray-800 focus:outline-none border-b border-transparent focus:border-gray-300 min-w-0"
+                      />
+                      <button onClick={() => setEvents(prev => prev.filter((_, j) => j !== i))} className="text-red-300 shrink-0"><Trash2 size={15} /></button>
+                    </div>
+                    <div className="flex items-center gap-2 pl-5">
+                      <input
+                        type="date"
+                        value={ev.date}
+                        onChange={e => setEvents(prev => prev.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-gray-600 bg-white focus:outline-none"
+                      />
+                      <select
+                        value={ev.type}
+                        onChange={e => setEvents(prev => prev.map((x, j) => j === i ? { ...x, type: e.target.value as ImportEventType } : x))}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold bg-white focus:outline-none"
+                        style={{ color: meta.color }}
+                      >
+                        {IMPORT_EVENT_TYPES.map(t => <option key={t.key} value={t.key} style={{ color: '#374151' }}>{t.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* REVIEW — SYLLABUS */}
+          {phase === 'review' && mode === 'syllabus' && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 bg-indigo-50 rounded-xl p-3">
+                <Sparkles size={15} className="text-indigo-500 shrink-0" />
+                <p className="text-xs text-indigo-700 font-medium">Encontrei {rows.length} módulos. Ajuste o nº de aulas e <b>quando cada módulo começou nesta turma</b>. As aulas serão distribuídas nos dias da turma ({(targetClass?.days?.length ? targetClass!.days : [1,2,3,4,5]).map(d => ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(', ')}).</p>
+              </div>
+              <button
+                onClick={() => setRows(prev => computeSequentialStarts(prev, prev[0]?.startDate || todayISO, targetClass))}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2"
+              >
+                <RefreshCw size={13} /> Distribuir em sequência a partir do 1º módulo
+              </button>
+              {rows.map((mod, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    <input
+                      value={mod.title}
+                      onChange={e => setRows(prev => prev.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
+                      className="flex-1 bg-transparent text-sm font-bold text-gray-800 focus:outline-none border-b border-transparent focus:border-gray-300 min-w-0"
+                    />
+                    <button onClick={() => setRows(prev => prev.filter((_, j) => j !== i))} className="text-red-300 shrink-0"><Trash2 size={15} /></button>
+                  </div>
+                  {mod.topics.length > 0 && (
+                    <p className="text-[11px] text-gray-400 pl-8 line-clamp-2">{mod.topics.join(' · ')}</p>
+                  )}
+                  <div className="flex items-center gap-2 pl-8">
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1">
+                      <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.max(1, x.estimatedClasses - 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">−</button>
+                      <span className="text-xs font-bold text-gray-700 w-12 text-center">{mod.estimatedClasses} aula{mod.estimatedClasses !== 1 ? 's' : ''}</span>
+                      <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.min(40, x.estimatedClasses + 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">+</button>
+                    </div>
+                    <input
+                      type="date"
+                      value={mod.startDate}
+                      onChange={e => setRows(prev => prev.map((x, j) => j === i ? { ...x, startDate: e.target.value } : x))}
+                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-semibold text-indigo-700 bg-white focus:outline-none flex-1"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {phase === 'review' && (
+          <div className="p-5 pt-3 border-t border-gray-100 flex gap-3 items-center">
+            {mode === 'syllabus' && <span className="text-xs text-gray-400 font-medium shrink-0">{totalLessons} aulas</span>}
+            <button onClick={onClose} className="flex-1 p-3.5 rounded-2xl bg-gray-100 font-bold text-gray-600">Cancelar</button>
+            <button
+              onClick={mode === 'calendar' ? confirmCalendar : confirmSyllabus}
+              disabled={mode === 'calendar' ? events.length === 0 : rows.length === 0}
+              className="flex-[2] p-3.5 rounded-2xl bg-indigo-600 text-white font-black text-base shadow-sm active:scale-[0.98] transition-transform disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={18} />
+              {mode === 'calendar' ? 'Adicionar ao calendário' : 'Distribuir no calendário'}
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+};
+
+const CalendarScreen = ({
+  classes,
   setClasses,
   schedules,
   profile,
@@ -5417,9 +5831,10 @@ const CalendarScreen = ({
   setCurrentYear,
   setScreen,
   notifications,
-  setNotifications
-}: { 
-  classes: ClassItem[], 
+  setNotifications,
+  onImport
+}: {
+  classes: ClassItem[],
   setClasses: (c: ClassItem[]) => void,
   schedules: ClassSchedule[],
   profile: UserProfile,
@@ -5434,7 +5849,8 @@ const CalendarScreen = ({
   setCurrentYear: (y: number) => void,
   setScreen: (s: Screen) => void,
   notifications?: any[],
-  setNotifications?: (n: any[]) => void
+  setNotifications?: (n: any[]) => void,
+  onImport?: () => void
 }) => {
   const [filter, setFilter] = useState('Todas');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -5620,12 +6036,23 @@ const CalendarScreen = ({
         setNotifications={setNotifications}
         bannerImage="https://i.ibb.co/x8t6Wmp7/20260419-204249-0002.png"
       >
-        <button 
-          onClick={() => setIsModalOpen(true)} 
-          className="w-10 h-10 bg-indigo-600 text-white rounded-xl shadow-sm flex items-center justify-center shrink-0"
-        >
-          <Plus size={24} />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {onImport && (
+            <button
+              onClick={onImport}
+              className="w-10 h-10 bg-white border border-indigo-100 text-indigo-600 rounded-xl shadow-sm flex items-center justify-center"
+              title="Importar calendário letivo (PDF)"
+            >
+              <FileUp size={20} />
+            </button>
+          )}
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="w-10 h-10 bg-indigo-600 text-white rounded-xl shadow-sm flex items-center justify-center"
+          >
+            <Plus size={24} />
+          </button>
+        </div>
       </Header>
       
       {isModalOpen && (
@@ -8690,7 +9117,10 @@ function AppInner() {
   const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  
+
+  // PDF Import (calendário letivo / ementa) — estado compartilhado
+  const [importRequest, setImportRequest] = useState<null | { mode: 'calendar' | 'syllabus', targetClass?: ClassSchedule }>(null);
+
   // Background Task Management
   const [activeTasks, setActiveTasks] = useState<Record<string, BackgroundTask>>({});
   const [studioReopenTaskId, setStudioReopenTaskId] = useState<string | null>(null);
@@ -8905,9 +9335,10 @@ function AppInner() {
   }, [user, schedules]);
 
   // ── Onboarding ────────────────────────────────────────────────────────────
-  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2>(0);
+  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
   const [onboardingName, setOnboardingName] = useState('');
   const [onboardingClass, setOnboardingClass] = useState({ name: '', subject: '', school: '', shift: 'Manhã', level: 'Ensino Fundamental II' });
+  const [onboardingCreatedClass, setOnboardingCreatedClass] = useState<ClassSchedule | null>(null);
 
   // localStorage key is per-user so switching accounts on the same device doesn't bleed over
   const onboardingLsKey = user ? `prof-coruja-onboarded-${user.uid}` : null;
@@ -8923,24 +9354,35 @@ function AppInner() {
     }
   }, [onboardingLsKey, profileLoaded, profile.onboarded]);
 
+  const buildOnboardingClass = (): ClassSchedule => ({
+    id: Math.random().toString(36).substr(2, 9),
+    name: onboardingClass.name,
+    days: [1, 2, 3, 4, 5],
+    time: '08:00',
+    subject: onboardingClass.subject || undefined,
+    school: onboardingClass.school || undefined,
+    shift: onboardingClass.shift || undefined,
+    level: onboardingClass.level,
+  });
+
+  // Cria a turma e avança para o passo de configuração do ano letivo (importações)
+  const goToYearSetup = () => {
+    if (onboardingClass.name.trim() && !onboardingCreatedClass) {
+      const newClass = buildOnboardingClass();
+      setSchedules([...schedules, newClass]);
+      setOnboardingCreatedClass(newClass);
+    }
+    setOnboardingStep(3);
+  };
+
   const finishOnboarding = async (skipClass = false) => {
     const newName = onboardingName.trim() || 'Professor';
-    const updates: Partial<UserProfile> = { name: newName, onboarded: true };
-    setProfile({ ...profile, ...updates } as UserProfile);
+    setProfile({ ...profile, name: newName, onboarded: true } as UserProfile);
     try { if (onboardingLsKey) localStorage.setItem(onboardingLsKey, 'true'); } catch {}
-    if (!skipClass && onboardingClass.name.trim()) {
-      const newClass: ClassSchedule = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: onboardingClass.name,
-        days: [1, 2, 3, 4, 5],
-        time: '08:00',
-        subject: onboardingClass.subject || undefined,
-        school: onboardingClass.school || undefined,
-        shift: onboardingClass.shift || undefined,
-        level: onboardingClass.level,
-      };
-      setSchedules([...schedules, newClass]);
+    if (!skipClass && onboardingClass.name.trim() && !onboardingCreatedClass) {
+      setSchedules([...schedules, buildOnboardingClass()]);
     }
+    setOnboardingCreatedClass(null);
     setOnboardingStep(0);
   };
   const [studioMessages, setStudioMessages] = useFirestoreSync<{ id: string; role: 'user' | 'model'; text: string; date: number }>('studioMessages', user, [
@@ -9880,7 +10322,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                     <span className="text-3xl">🦉</span>
                   </div>
                   <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
-                  <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em 2 passos rápidos.</p>
+                  <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em poucos passos.</p>
                 </div>
                 <div className="mb-5">
                   <label className="text-xs font-bold text-gray-400 uppercase ml-1">Qual é o seu nome?</label>
@@ -9970,18 +10412,77 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                     Pular
                   </button>
                   <button
-                    onClick={() => finishOnboarding(false)}
+                    onClick={goToYearSetup}
                     disabled={!onboardingClass.name.trim() || !onboardingClass.subject}
                     className="flex-[2] bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold disabled:opacity-40"
                   >
-                    Começar →
+                    Continuar →
                   </button>
                 </div>
+              </>
+            )}
+
+            {onboardingStep === 3 && (
+              <>
+                <div className="flex flex-col items-center text-center mb-5">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
+                    <CalendarIcon size={28} className="text-indigo-600" />
+                  </div>
+                  <h2 className="text-xl font-black text-gray-900">Configurar Ano Letivo</h2>
+                  <p className="text-sm text-gray-500 mt-1">Tem o PDF do calendário da escola ou a ementa? A IA preenche tudo pra você. (Opcional — dá pra fazer depois.)</p>
+                </div>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setImportRequest({ mode: 'calendar' })}
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-gray-100 active:scale-[0.98] transition-transform text-left"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0"><CalendarIcon size={22} /></div>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-sm">Importar calendário letivo</p>
+                      <p className="text-xs text-gray-400">Feriados, recessos, reuniões e provas</p>
+                    </div>
+                    <ChevronRight size={18} className="text-gray-300" />
+                  </button>
+                  {onboardingCreatedClass && (
+                    <button
+                      onClick={() => setImportRequest({ mode: 'syllabus', targetClass: onboardingCreatedClass })}
+                      className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-gray-100 active:scale-[0.98] transition-transform text-left"
+                    >
+                      <div className="w-11 h-11 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0"><BookOpen size={22} /></div>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-sm">Importar ementa de {onboardingCreatedClass.name}</p>
+                        <p className="text-xs text-gray-400">Distribui os módulos no calendário</p>
+                      </div>
+                      <ChevronRight size={18} className="text-gray-300" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => finishOnboarding(true)}
+                  className="w-full bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold mt-5 active:scale-[0.98] transition-transform"
+                >
+                  Concluir →
+                </button>
               </>
             )}
           </div>
         </div>
       )}
+
+      {/* ── Modal de Importação (calendário letivo / ementa) ── */}
+      <AnimatePresence>
+        {importRequest && (
+          <ImportModal
+            mode={importRequest.mode}
+            targetClass={importRequest.targetClass}
+            year={currentYear}
+            onClose={() => setImportRequest(null)}
+            customEvents={customEvents as any}
+            setCustomEvents={setCustomEvents as any}
+            onAddClassItems={addClassItems}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
@@ -10091,7 +10592,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerMode={setPlannerMode}
             getScheduleBuffer={getScheduleBuffer}
           />}
-          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
+          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} onImport={() => setImportRequest({ mode: 'calendar' })} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail" 
             schedules={schedules} 
             selectedDate={selectedDate} 
@@ -10131,7 +10632,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                 toast.error('Erro ao excluir conta. Tente novamente.');
               }
             }
-          }} />}
+          }} onImportSyllabus={(cls) => setImportRequest({ mode: 'syllabus', targetClass: cls })} />}
           {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
