@@ -4625,7 +4625,7 @@ const ProfileScreen = ({
 
         {/* ── Modal Adicionar / Editar Turma ── */}
         {editingClass !== null && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setEditingClass(null); }}>
+          <div className="fixed inset-0 bg-black/60 z-[120] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setEditingClass(null); }}>
             <motion.div
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
@@ -4802,7 +4802,7 @@ const ProfileScreen = ({
               </div>
 
               {/* Rodapé */}
-              <div className="p-5 pt-3 border-t border-gray-100 flex gap-3">
+              <div className="p-5 pt-3 border-t border-gray-100 flex gap-3" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
                 <button onClick={() => setEditingClass(null)} className="flex-1 p-3.5 rounded-2xl bg-gray-100 font-bold text-gray-600">
                   Cancelar
                 </button>
@@ -4918,7 +4918,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-6"
             onClick={() => setShowFeedbackModal(false)}
           >
             <motion.div 
@@ -4992,7 +4992,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-6"
             onClick={() => setShowLogoutConfirm(false)}
           >
             <motion.div 
@@ -5034,7 +5034,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-[120] flex items-center justify-center p-6"
             onClick={() => setShowResetConfirm(false)}
           >
             <motion.div
@@ -5085,7 +5085,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-[120] flex items-center justify-center p-6"
             onClick={() => setShowDeleteConfirm(false)}
           >
             <motion.div
@@ -5587,7 +5587,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
   const totalLessons = rows.reduce((sum, r) => sum + (r.estimatedClasses || 0), 0);
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[110] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 bg-black/60 z-[120] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
@@ -5745,7 +5745,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
         </div>
 
         {phase === 'review' && (
-          <div className="p-5 pt-3 border-t border-gray-100 flex gap-3 items-center">
+          <div className="p-5 pt-3 border-t border-gray-100 flex gap-3 items-center" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
             {mode === 'syllabus' && <span className="text-xs text-gray-400 font-medium shrink-0">{totalLessons} aulas</span>}
             <button onClick={onClose} className="flex-1 p-3.5 rounded-2xl bg-gray-100 font-bold text-gray-600">Cancelar</button>
             <button
@@ -6004,7 +6004,7 @@ const CalendarScreen = ({
       </Header>
       
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 z-[120] flex items-center justify-center p-6" onClick={() => setIsModalOpen(false)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-1">Novo Evento</h2>
             <p className="text-sm text-gray-400 mb-4">{selectedDate} de {monthAbbrNames[currentMonth]}</p>
