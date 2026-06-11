@@ -685,14 +685,12 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
         </AnimatePresence>
       </button>
       {rightAction !== undefined ? rightAction : (
-        <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-gray-200 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
-          <img
-            src={profile.photo || 'https://i.ibb.co/67chNLnZ/20260521-122245-0000.png'}
-            alt="Profile"
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://i.ibb.co/67chNLnZ/20260521-122245-0000.png'; }}
-          />
+        <button onClick={() => setScreen?.('profile')} className={`w-10 h-10 p-0 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center ${profile.photo ? 'bg-gray-200' : 'bg-indigo-600'}`}>
+          {profile.photo ? (
+            <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          ) : (
+            <User size={20} className="text-white" />
+          )}
         </button>
       )}
 
@@ -12218,7 +12216,7 @@ function AppInner() {
     {
       name: 'Prof. Silva',
       subject: 'História • Ensino Fundamental II',
-      photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png'
+      photo: ''
     }
   );
   
@@ -12319,7 +12317,7 @@ function AppInner() {
       timers.push(setTimeout(async () => {
         const title = 'Aula em 30 minutos';
         const body = `${sched.subject ? `${sched.subject} — ` : ''}${sched.name} às ${sched.time}`;
-        const icon = 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png';
+        const icon = '/icon-512.png';
         // Mesma tag usada pela Cloud Function (FCM) — evita notificação duplicada:
         // o sistema substitui em vez de empilhar quando local e push coincidem.
         const tag = `aula-${sched.id}-${dateStr}`;
@@ -13662,7 +13660,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setSavedResources([]);
             setNotifications([]);
             setInboxMessages([{ id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }]);
-            setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
+            setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: '' });
             setEstudioContext('');
           }} onDeleteAccount={async () => {
             if (!user) return;
