@@ -7513,9 +7513,9 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
       if (localGenActiveRef.current) setResult(finalResult);
     } catch (err: any) {
       console.error('[Gamification] error:', err);
-      const msg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
-      updateTask(taskId, { status: 'error', error: msg || 'Falha ao gerar.' });
-      if (localGenActiveRef.current) toast.error(msg || 'A IA travou nessa. Aguarde um instante e tente de novo.');
+      const friendlyMsg = formatApiError(err, 'A IA travou nessa. Aguarde um instante e tente de novo.');
+      updateTask(taskId, { status: 'error', error: friendlyMsg });
+      if (localGenActiveRef.current) toast.error(friendlyMsg);
     }
     if (localGenActiveRef.current) setIsGenerating(false);
     localGenActiveRef.current = false;
@@ -11168,7 +11168,7 @@ const TaskCard = ({ task, onTaskClick }: { task: BackgroundTask, onTaskClick?: (
           <p className="text-[10px] text-gray-500 font-bold truncate">
             {task.status === 'processing' ? (rotatingMsg || 'Iniciando...') :
              task.status === 'completed' ? 'Pronto! Toque para abrir.' :
-             'Erro ao processar'}
+             task.error || 'Erro ao processar'}
           </p>
         </div>
       </div>
@@ -11491,7 +11491,7 @@ const AdminScreen = () => {
       await deleteDoc(doc(db, 'library', item.id));
       await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(-item.fileSizeBytes) }, { merge: true });
       setStorageUsed(p => Math.max(0, p - item.fileSizeBytes));
-    } catch (e: any) { toast.error(e?.message || 'Algo deu errado. Tente de novo.'); }
+    } catch (e: any) { toast.error(formatApiError(e, 'Algo deu errado. Tente de novo.')); }
   };
   // ─────────────────────────────────────────────────────────────────────────
 
