@@ -107,7 +107,7 @@ const formatApiError = (error: any, defaultMsg: string): string => {
   }
 
   if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
-    return 'Muita gente usando a IA agora. Já estou tentando de novo — se continuar, aguarde 1 minuto.';
+    return 'Muita gente usando a IA agora. Já estou tentando de novo. Se continuar, aguarde 1 minuto.';
   }
   if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
     return 'Calma, professor! Muitas perguntas de uma vez. Aguarde alguns segundos e tente de novo.';
@@ -248,7 +248,7 @@ function useFirestoreSync<T extends { id: string }>(
     } catch (err) {
       console.error(`Error in useFirestoreSync for ${collectionName}:`, err);
       setData(previousData);
-      toast.error("A internet cochilou. Suas mudanças não foram salvas — tente de novo.");
+      toast.error("A internet cochilou. Suas mudanças não foram salvas. Tente de novo.");
     }
   };
 
@@ -287,7 +287,7 @@ function useFirestoreDoc<T>(
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
-      toast.error("A internet cochilou. Suas mudanças não foram salvas — tente de novo.");
+      toast.error("A internet cochilou. Suas mudanças não foram salvas. Tente de novo.");
     }
   };
 
@@ -315,7 +315,7 @@ class ErrorBoundary extends React.Component<
               <span className="text-3xl">🦉</span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
-            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem — só recarregue a página.</p>
+            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem. Só recarregue a página.</p>
             <p className="text-xs text-red-500 mb-6 bg-red-50 p-2 rounded-xl font-mono break-all">{this.state.error?.message}</p>
             <button
               onClick={() => window.location.reload()}
@@ -985,7 +985,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
                 <p className="text-indigo-700 text-sm leading-snug">
                   {todayCount > 0
                     ? `Você tem ${todayCount} aula${todayCount > 1 ? 's' : ''} hoje. Tudo preparado?`
-                    : `Próxima aula: ${nextClass.title}${nextClass.className ? ` — ${nextClass.className}` : ''} (${dayLabel(nextClass.timestamp)}).`
+                    : `Próxima aula: ${nextClass.title}${nextClass.className ? ` (${nextClass.className})` : ''} (${dayLabel(nextClass.timestamp)}).`
                   }
                 </p>
               </motion.div>
@@ -5020,7 +5020,7 @@ const ProfileScreen = ({
                 </div>
                 <h2 className="text-xl font-black text-gray-900 mb-1">Eita... tá certo disso?</h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  Isso vai apagar <span className="font-bold text-gray-700">tudo</span> — turmas, materiais, notas...
+                  Isso vai apagar <span className="font-bold text-gray-700">tudo</span>: turmas, materiais, notas...
                   até aquela atividade incrível que você fez às 23h.
                 </p>
                 <p className="text-xs text-red-400 font-bold mt-3 bg-red-50 rounded-xl py-2 px-3">
@@ -5482,7 +5482,7 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): 
         usedDays.add(key);
         items.push({
           id: Math.random().toString(36).substr(2, 9),
-          title: mod.estimatedClasses > 1 ? `${mod.title} — Aula ${done + 1}` : mod.title,
+          title: mod.estimatedClasses > 1 ? `${mod.title}: Aula ${done + 1}` : mod.title,
           date: `${cur.getDate()} ${MONTH_ABBR_IMPORT[cur.getMonth()]}`,
           status: 'pending',
           className: selectedClass.name,
@@ -6150,7 +6150,7 @@ const CalendarScreen = ({
                       <div key={e.id} className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getEventColorInternal(e) }} />
                         <span className={`text-sm ${e.status === 'done' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                          {e.type === 'class' ? `${e.className}${e.topic ? ` — ${e.topic}` : ''}` : e.title}
+                          {e.type === 'class' ? `${e.className}${e.topic ? `: ${e.topic}` : ''}` : e.title}
                         </span>
                       </div>
                     ))}
@@ -6724,7 +6724,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         var cellCount = card.querySelectorAll('.bingo-cell:not(.free)').length;
         var calling = document.createElement('div');
         calling.className = 'bingo-calling';
-        calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados — marque abaixo:</div><div class="bingo-calling-circles">'
+        calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados. Marque abaixo:</div><div class="bingo-calling-circles">'
           + Array(cellCount).fill('<span class="bingo-circle"></span>').join('') + '</div>';
         card.appendChild(calling);
       });
@@ -6952,7 +6952,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
           + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>'
           + '</div>'
           // ── Header da folha do aluno ──
-          + '<div style="background:var(--ac,#c026d3);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:6px;letter-spacing:0.3px;">🗺️ Mapa da Metáfora — Missão do Detetive</div>'
+          + '<div style="background:var(--ac,#c026d3);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:6px;letter-spacing:0.3px;">🗺️ Mapa da Metáfora: Missão do Detetive</div>'
           + '<div style="font-size:10px;color:#6b7280;margin-bottom:12px;line-height:1.5;">Durante a história, descubra quem é quem: anote o personagem, o conceito real que ele representa e o momento da história que entregou a conexão. Cada descoberta certa vale ponto!</div>'
           // ── 2×2 grid — cards fill the remaining page space ──
           + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;min-height:420px;">'
@@ -7091,7 +7091,7 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
         <div class="answer-line"></div>
       </div>
       <div class="hint-block">
-        <div class="hint-label">💡 DICA — USE APENAS SE PRECISAR</div>
+        <div class="hint-label">💡 DICA: USE APENAS SE PRECISAR</div>
         <p class="hint-text">${en.hint}</p>
       </div>
       <footer class="page-footer">
@@ -7557,7 +7557,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
           </div>
           <h2 className="text-3xl font-black text-white mb-2 leading-tight">Escape Room</h2>
           <p className="text-sm text-rose-100 max-w-[80%] leading-relaxed mb-4">
-            Crie enigmas encadeados temáticos para imprimir e jogar em sala — desafio a resolver em equipe.
+            Crie enigmas encadeados temáticos para imprimir e jogar em sala. Desafio a resolver em equipe.
           </p>
           <div className="inline-flex items-center gap-2 bg-white text-rose-700 font-bold px-4 py-2 rounded-full text-sm">
             <KeyRound size={16} /> Criar escape room
@@ -7605,7 +7605,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                 </div>
                 <button
                   onClick={closeModal}
-                  title={isGenerating ? 'Fechar — a geração continua em segundo plano' : 'Fechar'}
+                  title={isGenerating ? 'Fechar (a geração continua em segundo plano)' : 'Fechar'}
                   className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
                 >
                   <X size={18} />
@@ -7614,7 +7614,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
               {isGenerating && (
                 <div className="px-5 pt-3 -mb-1 flex items-center gap-2 text-[11px] text-indigo-500 font-semibold">
                   <Loader2 size={12} className="animate-spin" />
-                  <span>Pode fechar — a geração continua em segundo plano.</span>
+                  <span>Pode fechar. A geração continua em segundo plano.</span>
                 </div>
               )}
 
@@ -7637,7 +7637,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                   {activeMode === 'story' && (
                     <>
                       <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-3.5">
-                        <p className="text-xs text-fuchsia-800 leading-relaxed"><b>Como funciona:</b> seu conteúdo vira uma história no universo que a turma ama — cada personagem representa um conceito real. Vem com guia de leitura, pausas para discutir, atividade e desafio final.</p>
+                        <p className="text-xs text-fuchsia-800 leading-relaxed"><b>Como funciona:</b> seu conteúdo vira uma história no universo que a turma ama. Cada personagem representa um conceito real. Vem com guia de leitura, pausas para discutir, atividade e desafio final.</p>
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Universo pop da história *</label>
@@ -7920,14 +7920,14 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                                   <p key={j} className="quiz-opt"><b>{String.fromCharCode(65 + j)})</b> {opt}</p>
                                 ))}
                               </div>
-                              <p className="quiz-answer text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</p>
+                              <p className="quiz-answer text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)}: {q.explain}</p>
                             </div>
                           ))}
                         </div>
                         <div className="answer-key-page">
                           <h2 className="answer-key-title">Gabarito</h2>
                           {result.questions.map((q: any, i: number) => (
-                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</div>
+                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {String.fromCharCode(65 + q.correct)}: {q.explain}</div>
                           ))}
                         </div>
                       </>
@@ -7945,14 +7945,14 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                         </div>
                         <h2>Palavras para encontrar</h2>
                         <ul className="clue-list">
-                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b> — {w.hint}</li>)}
+                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b>: {w.hint}</li>)}
                         </ul>
                       </>
                     )}
 
                     {activeMode === 'crossword' && result.words && (
                       <>
-                        <div className="instructions"><b>Instruções:</b> Leia cada definição e preencha as palavras na grade — uma letra por quadrado.</div>
+                        <div className="instructions"><b>Instruções:</b> Leia cada definição e preencha as palavras na grade, uma letra por quadrado.</div>
                         {result.crossword ? (
                           <>
                             <div className="overflow-x-auto">
@@ -8021,7 +8021,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
                     {activeMode === 'bingo' && result.cards && (
                       <>
-                        <div className="instructions"><b>Como jogar:</b> Distribua uma cartela para cada aluno. O professor sorteia os termos da lista — quem marcar uma linha, coluna ou diagonal completa grita BINGO!</div>
+                        <div className="instructions"><b>Como jogar:</b> Distribua uma cartela para cada aluno. O professor sorteia os termos da lista. Quem marcar uma linha, coluna ou diagonal completa grita BINGO!</div>
                         {result.cards.map((card: string[][], i: number) => (
                           <div key={i} className="bingo-card">
                             <div className="bingo-card-title">BINGO</div>
@@ -8087,7 +8087,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
                     {activeMode === 'flashcard' && result.cards && (
                       <>
-                        <div className="instructions"><b>Como usar:</b> Imprima, recorte pelas linhas tracejadas e dobre cada cartão ao meio — a pergunta fica na frente e a resposta no verso. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
+                        <div className="instructions"><b>Como usar:</b> Imprima, recorte pelas linhas tracejadas e dobre cada cartão ao meio. A pergunta fica na frente e a resposta no verso. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
                         <div className="memory-grid">
                           {result.cards.map((c: any, i: number) => (
                             <React.Fragment key={i}>
@@ -8181,7 +8181,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     </div>
   </div>
   <div class="content">${htmlContent}</div>
-  <div class="footer">Prof. Corujão — Material gerado por IA · Revise antes de usar</div>
+  <div class="footer">Prof. Corujão | Material gerado por IA · Revise antes de usar</div>
   <script>window.onload = () => { window.print(); }<\/script>
   </body></html>`);
   w.document.close();
@@ -8425,7 +8425,7 @@ const GAMI_EVENTS: { text: string; emoji: string; quick?: number }[] = [
   { text: 'Toda a turma chegou no horário? Pontos para todos!', emoji: '⏰', quick: 1 },
   { text: 'Hoje quem lê em voz alta ganha ponto de coragem.', emoji: '📖' },
   { text: 'Modo Espião: o professor vai observar em segredo quem mais colabora hoje.', emoji: '🕵️' },
-  { text: 'Dia da Dupla: trabalhem em duplas — as duplas que terminarem juntas ganham pontos.', emoji: '👥' },
+  { text: 'Dia da Dupla: trabalhem em duplas. As duplas que terminarem juntas ganham pontos.', emoji: '👥' },
   { text: 'Energia positiva: a equipe mais animada (sem bagunça!) ganha pontos no fim da aula.', emoji: '🎉' },
   { text: 'Quem usar a palavra mágica do dia em uma frase correta ganha ponto!', emoji: '🪄' },
   { text: 'Recorde da turma: superem o número de participações da última aula e todos ganham!', emoji: '🏆' },
@@ -8856,7 +8856,7 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
           </div>
           {!challenge && (
             <div className="space-y-2">
-              <p className="text-xs font-bold text-gray-400 uppercase text-center">Desafio do Silêncio — turma fica abaixo da linha e ganha pontos</p>
+              <p className="text-xs font-bold text-gray-400 uppercase text-center">Desafio do Silêncio: turma fica abaixo da linha e ganha pontos</p>
               <div className="grid grid-cols-3 gap-2">
                 {[3, 5, 10].map(m => (
                   <button key={m} onClick={() => setChallenge({ left: m * 60, total: m * 60, strikes: 0, status: 'on' })} className="bg-indigo-600 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform">{m} min</button>
@@ -9112,7 +9112,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}
       {phase === 'setup' && (
         <div className="space-y-4">
           <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-            <p className="text-sm text-indigo-800 leading-relaxed"><b>Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe — o placar é automático. Kahoot sem precisar de celular dos alunos!</p>
+            <p className="text-sm text-indigo-800 leading-relaxed"><b>Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe. O placar é automático. Kahoot sem precisar de celular dos alunos!</p>
           </div>
           {error && <p className="text-sm text-red-500 font-medium bg-red-50 rounded-xl p-3">{error}</p>}
           <div>
@@ -9567,7 +9567,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
       <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} />
 
       <div className="px-1 mb-6">
-        <p className="text-sm text-gray-500 leading-relaxed">Pareceres, adaptações, rubricas e comunicação com as famílias — o trabalho invisível do professor, resolvido em minutos.</p>
+        <p className="text-sm text-gray-500 leading-relaxed">Pareceres, adaptações, rubricas e comunicação com as famílias. O trabalho invisível do professor, resolvido em minutos.</p>
       </div>
 
       {/* Diário de Classe — destaque */}
@@ -9584,7 +9584,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
           </div>
           <h2 className="text-3xl font-black text-white mb-2 leading-tight">Diário de Classe</h2>
           <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
-            Chamada, anotações e notas do dia — rápido, offline e sincronizado com sua turma gamificada.
+            Chamada, anotações e notas do dia. Rápido, offline e sincronizado com sua turma gamificada.
           </p>
           <div className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-4 py-2 rounded-full text-sm">
             <NotebookPen size={16} /> Abrir diário
@@ -9791,7 +9791,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
                     <div className="markdown-body prose prose-sm max-w-none bg-gray-50 border border-gray-100 rounded-2xl p-4 max-h-[48vh] overflow-y-auto">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
                     </div>
-                    <p className="text-[11px] text-gray-400 text-center">Material gerado por IA — revise antes de usar.</p>
+                    <p className="text-[11px] text-gray-400 text-center">Material gerado por IA. Revise antes de usar.</p>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={copyResult} className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-2xl py-3 text-sm font-bold active:scale-[0.98] transition-transform">
                         <Copy size={15} /> Copiar
@@ -9904,7 +9904,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen }: {
       '',
       entry?.note ? `## Anotações do dia\n${entry.note}` : '',
     ].join('\n');
-    printPlannerContent(`Diário de Classe — ${dateBr}`, lines, 'Diário de Classe', profile.name, profile.schoolName);
+    printPlannerContent(`Diário de Classe: ${dateBr}`, lines, 'Diário de Classe', profile.name, profile.schoolName);
   };
 
   const attStyle = (a?: 'P' | 'F' | 'A') =>
@@ -9953,7 +9953,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen }: {
             <div className="text-center">
               <span className="text-5xl">🦉</span>
               <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
-              <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo — um nome por linha. Funciona nas duas telas.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo, um nome por linha. Funciona nas duas telas.</p>
             </div>
             <textarea
               value={diarioBulkNames}
@@ -10439,7 +10439,7 @@ const GamificacaoScreen = ({
                 })()}
                 {currentCls.students.some(s => !s.teamId) && (
                   <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100">
-                    <p className="text-xs font-bold text-amber-700 mb-2">Sem equipe — toque para atribuir:</p>
+                    <p className="text-xs font-bold text-amber-700 mb-2">Sem equipe. Toque para atribuir:</p>
                     <div className="flex flex-wrap gap-1">
                       {currentCls.students.filter(s => !s.teamId).map(s => (
                         <button key={s.id} onClick={() => setTeamStudentId(s.id)} className="bg-white text-gray-700 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-200 active:scale-95 transition-transform">
@@ -10687,7 +10687,7 @@ const GamificacaoScreen = ({
                       value={bulkNames}
                       onChange={e => setBulkNames(e.target.value)}
                       rows={8}
-                      placeholder={"Cole ou escreva os nomes — um por linha:\n\nAna Beatriz\nCarlos Eduardo\nMariana\nPedro Henrique\n..."}
+                      placeholder={"Cole ou escreva os nomes, um por linha:\n\nAna Beatriz\nCarlos Eduardo\nMariana\nPedro Henrique\n..."}
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 resize-none bg-white"
                     />
                     {(() => {
@@ -10728,7 +10728,7 @@ const GamificacaoScreen = ({
                   <p className="text-center text-gray-400 text-sm py-4">Adicione alunos para começar a gamificação.</p>
                 )}
                 {currentCls.students.length > 0 && (
-                  <p className="text-[11px] text-gray-400 px-1">{currentCls.students.length} aluno{currentCls.students.length !== 1 ? 's' : ''} cadastrado{currentCls.students.length !== 1 ? 's' : ''} — ficam salvos automaticamente.</p>
+                  <p className="text-[11px] text-gray-400 px-1">{currentCls.students.length} aluno{currentCls.students.length !== 1 ? 's' : ''} cadastrado{currentCls.students.length !== 1 ? 's' : ''}. Ficam salvos automaticamente.</p>
                 )}
                 {currentCls.students.map(s => (
                   <div key={s.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm border border-gray-100">
@@ -11693,7 +11693,7 @@ const AdminScreen = () => {
               />
             </div>
             {storageUsed / LIBRARY_LIMIT_BYTES > 0.85 && (
-              <p className="text-xs text-red-500 font-medium mt-1">⚠ Espaço quase esgotado — apague materiais antigos</p>
+              <p className="text-xs text-red-500 font-medium mt-1">⚠ Espaço quase esgotado. Apague materiais antigos.</p>
             )}
           </div>
 
