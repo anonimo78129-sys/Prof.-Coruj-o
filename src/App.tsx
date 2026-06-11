@@ -10,7 +10,9 @@ import {
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
-  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil
+  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
+  Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand,
+  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -105,7 +107,7 @@ const formatApiError = (error: any, defaultMsg: string): string => {
   }
 
   if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
-    return 'Muita gente usando a IA agora. Ja estou tentando de novo — se continuar, aguarde 1 minuto.';
+    return 'Muita gente usando a IA agora. Já estou tentando de novo — se continuar, aguarde 1 minuto.';
   }
   if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
     return 'Calma, professor! Muitas perguntas de uma vez. Aguarde alguns segundos e tente de novo.';
@@ -246,7 +248,7 @@ function useFirestoreSync<T extends { id: string }>(
     } catch (err) {
       console.error(`Error in useFirestoreSync for ${collectionName}:`, err);
       setData(previousData);
-      toast.error("A internet cochilou. Suas mudancas nao foram salvas — tente de novo.");
+      toast.error("A internet cochilou. Suas mudanças não foram salvas — tente de novo.");
     }
   };
 
@@ -285,7 +287,7 @@ function useFirestoreDoc<T>(
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
-      toast.error("A internet cochilou. Suas mudancas nao foram salvas — tente de novo.");
+      toast.error("A internet cochilou. Suas mudanças não foram salvas — tente de novo.");
     }
   };
 
@@ -313,7 +315,7 @@ class ErrorBoundary extends React.Component<
               <span className="text-3xl">🦉</span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
-            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estao salvos na nuvem — so recarregue a pagina.</p>
+            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem — só recarregue a página.</p>
             <p className="text-xs text-red-500 mb-6 bg-red-50 p-2 rounded-xl font-mono break-all">{this.state.error?.message}</p>
             <button
               onClick={() => window.location.reload()}
@@ -432,7 +434,7 @@ const fetchPixabayImage = async (query: string | undefined, width: number, heigh
 };
 
 // --- Types ---
-type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin';
+type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin' | 'gamificacao' | 'ferramentas' | 'acervo';
 type PlannerMode = 'plan' | 'activities' | 'slides' | 'exam';
 
 interface PresentationTheme {
@@ -480,7 +482,7 @@ interface BackgroundTask {
   meta?: Record<string, any>;
 }
 
-const STUDIO_TASK_TYPES = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'escape', 'memory'] as const;
+const STUDIO_TASK_TYPES = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'escape', 'memory', 'sequencia', 'flashcard'] as const;
 const isStudioTaskType = (t: string) => (STUDIO_TASK_TYPES as readonly string[]).includes(t);
 
 interface UserProfile {
@@ -585,7 +587,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
     { id: 'planner', icon: BookOpen, label: 'Planejar' },
     { id: 'chat', icon: MessageSquare, label: 'Assistente' },
     { id: 'calendar', icon: CalendarIcon, label: 'Agenda' },
-    { id: 'biblioteca', icon: FolderOpen, label: 'Biblioteca' },
+    { id: 'gamificacao', icon: Trophy, label: 'Turma' },
   ];
 
   if (isAdmin) {
@@ -860,11 +862,14 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
   );
 };
 
-const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void }) => {
-  const quickActions = [
-    { title: 'Gamificação', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
+const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate, openFerramenta }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void }) => {
+  const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
+    { title: 'Estúdio', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
+    { title: 'Kit IA', icon: Wand2, action: () => openFerramenta?.(null) },
+    { title: 'Diário', icon: NotebookPen, action: () => openFerramenta?.('diario') },
+    { title: 'Biblioteca', icon: FolderOpen, action: () => setScreen('biblioteca') },
   ];
 
   const currentHour = new Date().getHours();
@@ -904,16 +909,14 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
       <div className="mb-8">
         <h2 className="text-lg font-bold text-gray-900 mb-4 pl-0 pr-[9px] !pt-[12px] pb-0">Ações Rápidas</h2>
         <div className="grid grid-cols-3 gap-4">
-          {quickActions.map((action, index) => (
+          {quickActions.map((action) => (
             <button key={action.title} onClick={action.action} className="flex flex-col items-center gap-3 relative group">
               <div className={`w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-sm bg-white border-[1.5px] border-indigo-600 flex flex-col items-center justify-center relative`}>
-                {action.illustration.includes('dicebear') ? (
-                  <div className="w-full h-full border-2 border-emerald-500 bg-emerald-100 flex flex-col items-center justify-center">
-                    <span className="text-emerald-700 font-black text-[10px] leading-tight text-center">IMAGEM<br/>Ação {index + 1}</span>
-                  </div>
-                ) : (
+                {action.illustration ? (
                   <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                )}
+                ) : action.icon ? (
+                  <action.icon size={26} className="text-indigo-600" strokeWidth={2.2} />
+                ) : null}
               </div>
               <span className="text-sm font-medium text-gray-600 text-center leading-tight">{action.title}</span>
             </button>
@@ -2526,77 +2529,12 @@ const PlannerScreen = ({
 
   const loadingMessage = useFunnyLoadingMessage(loading, 'planner');
 
-  const getSlidesPrompt = (topicText: string, className: string, tone: string, complexity: string, focus: string, groundingContent: string, slideCount: number) => `Você é um Diretor de Arte Sênior. Sua tarefa é analisar o conteúdo do usuário e transformá-lo em uma apresentação de ${slideCount} slides sobre "${topicText}". 
-        Turma: "${className}"
-        Tom: ${tone}
-        Complexidade: ${complexity}
-        Foco: ${focus}
-        ${groundingContent ? `Conteúdo Base para Grounding: ${groundingContent}` : ''}
-        
-        Crie uma apresentação adaptada a estes parâmetros.
-        
-        LAYOUTS DISPONÍVEIS — escolha o mais adequado para cada slide:
-        1. LAYOUT_COVER: Capa. Título à esquerda, subtítulo abaixo, imagem à direita. Campos: title, subtitle, illustrationQuery.
-        2. LAYOUT_CONTENT_LEFT: Conteúdo com imagem. Título + texto à esquerda, imagem à direita. Campos: title, text, illustrationQuery.
-        3. LAYOUT_CONTENT_RIGHT: Conteúdo invertido. Imagem à esquerda, título + texto à direita. Campos: title, text, illustrationQuery.
-        4. LAYOUT_CONTENT_TOP: Horizontal. Título + texto no topo, imagem larga embaixo. Campos: title, text, illustrationQuery.
-        5. LAYOUT_TOPICS: 3 colunas de tópicos com ícone Lucide, título e texto curto. Campos: title, topics[{title,content,icon}].
-        6. LAYOUT_REFERENCES: Referências com fundo na cor primária. Campos: title, references[].
-        7. LAYOUT_QUOTE: Citação impactante centralizada com aspas gigantes. Ideal para abrir ou fechar seções. Campos: title, quote, author.
-        8. LAYOUT_TWO_COLUMNS: Dois blocos de texto lado a lado. Ideal para comparação, prós/contras, causa/efeito. Campos: title, column1, column2.
-        9. LAYOUT_FULL_IMAGE: Imagem em tela cheia com sobreposição de gradiente escuro e título em destaque. Máximo impacto visual. Campos: title, subtitle, illustrationQuery.
-        10. LAYOUT_STATS: 3 ou 4 cards de estatísticas/dados com valor em destaque, rótulo e ícone. Ideal para dados numéricos. Campos: title, stats[{value,label,icon}].
-        11. LAYOUT_TIMELINE: Linha do tempo horizontal com 3 a 5 eventos. Ideal para cronologias e processos. Campos: title, events[{year,title,description}].
-
-        REGRAS DE DESIGN:
-        - Use pelo menos 4 layouts diferentes para variar o ritmo visual.
-        - Use LAYOUT_QUOTE, LAYOUT_FULL_IMAGE ou LAYOUT_STATS para criar momentos de impacto.
-        - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
-        - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
-        - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
-        - KICKER (obrigatório em TODO slide): campo "kicker" com um rótulo editorial curto de 1-2 palavras em MAIÚSCULAS que aparece acima do título (ex: "CONCEITO", "CONTEXTO", "EXEMPLO", "APLICAÇÃO", "RESUMO", "DEFINIÇÃO"). Deve resumir o papel do slide.
-        - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
-        - CONCISÃO (REGRA CRÍTICA — slide NÃO é documento):
-            • Campo "text" (LAYOUT_CONTENT_*): no MÁXIMO 4 a 5 linhas curtas OU ~60 palavras. Frases curtas e diretas, nunca parágrafos longos.
-            • Cada "topics[].content": 1 frase curta, no máximo 12 palavras.
-            • Colunas (column1/column2): no máximo 4 linhas curtas cada, além do título da coluna.
-            • Prefira listas curtas a texto corrido. Cada linha = uma ideia. Não encha o slide.
-            • É melhor cortar conteúdo e criar mais slides do que espremer texto demais em um só.
-        - FORMATAÇÃO DE TEXTO RICA (use com MODERAÇÃO nos campos "text", "column1", "column2"):
-            **palavra** → negrito para termos-chave (feche SEMPRE com **; sem espaço logo após o ** de abertura)
-            ==palavra== → termo em destaque com cor de acento (use em definições e conceitos centrais)
-            [[palavra]] → palavra-chave colorida em destaque primário (2-3 por slide máximo)
-            {IconName} → ícone Lucide inline antes de tópicos (ex: {Target} Objetivo, {Brain} Conceito)
-            ## Subtítulo → use no MÁXIMO 1 vez por slide, só para separar dois blocos
-            - item → listas: comece a linha com "- " (hífen e espaço). Uma ideia por linha.
-        - Combine as marcações: ex: {Target} **[[Objetivo]]**: ==aprender a== estrutura...
-        - NUNCA use emojis. NUNCA coloque nomes de ícones entre parênteses no texto (ERRADO: "(CheckCircle) Título", "(User) Pessoas", "(Nature) Natureza"). Use APENAS a sintaxe {IconName}. NUNCA use ### ou mais de dois # para títulos.
-        - LAYOUT_TWO_COLUMNS — IMPORTANTE: a PRIMEIRA linha de column1 e column2 é tratada como título da coluna (renderizado em destaque). Coloque o título da coluna na primeira linha, depois uma quebra de linha (\n), depois o conteúdo. Ex: column1: "Título da Coluna 1\n\nConteúdo detalhado com **marcações**..."
-        - illustrationQuery: 2-3 palavras-chave em inglês (ex: 'science lab', 'ancient rome').
-
-        SAÍDA: JSON estrito (sem Markdown ao redor):
-        {
-          "presentationTitle": "...",
-          "theme": { "primaryColor": "#hex", "accentColor": "#hex", "backgroundColor": "#hex", "fontTitle": "...", "fontBody": "..." },
-          "slides": [
-            { "layoutID": "LAYOUT_COVER",        "data": { "kicker": "APRESENTAÇÃO", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_QUOTE",         "data": { "kicker": "REFLEXÃO", "title": "...", "quote": "...", "author": "..." } },
-            { "layoutID": "LAYOUT_TWO_COLUMNS",   "data": { "kicker": "COMPARAÇÃO", "title": "...", "column1": "Título Coluna A\n\nConteúdo com **marcações**...", "column2": "Título Coluna B\n\nConteúdo com **marcações**..." } },
-            { "layoutID": "LAYOUT_FULL_IMAGE",    "data": { "kicker": "VISUAL", "title": "...", "subtitle": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_STATS",         "data": { "kicker": "DADOS", "title": "...", "stats": [{ "value": "...", "label": "...", "icon": "TrendingUp" }] } },
-            { "layoutID": "LAYOUT_TIMELINE",      "data": { "kicker": "HISTÓRIA", "title": "...", "events": [{ "year": "...", "title": "...", "description": "..." }] } },
-            { "layoutID": "LAYOUT_TOPICS",        "data": { "kicker": "ESTRUTURA", "title": "...", "topics": [{ "title": "...", "content": "...", "icon": "BookOpen" }] } },
-            { "layoutID": "LAYOUT_CONTENT_LEFT",  "data": { "kicker": "CONCEITO", "title": "...", "text": "...", "illustrationQuery": "..." } },
-            { "layoutID": "LAYOUT_REFERENCES",    "data": { "kicker": "FONTES", "title": "Referências", "references": ["..."] } }
-          ]
-        }`;
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Arquivo pesado demais! O limite e 10 MB.');
+      toast.error('Arquivo pesado demais! O limite é 10 MB.');
       e.target.value = '';
       return;
     }
@@ -2624,7 +2562,7 @@ const PlannerScreen = ({
           setTopic(prev => prev + (prev ? '\n\n' : '') + text);
         } catch (error) {
           console.error("Error extracting text from file:", error);
-          toast.error(formatApiError(error, "Nao consegui ler esse arquivo. Tente outro formato."));
+          toast.error(formatApiError(error, "Não consegui ler esse arquivo. Tente outro formato."));
         }
       };
       reader.readAsDataURL(file);
@@ -3413,39 +3351,57 @@ const PlannerScreen = ({
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
                   </div>
                 </div>
-                <button
-                    onClick={async () => {
-                      if (preparingDoc !== null) return;
-                      setPreparingDoc('main');
-                      try {
-                        const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
-                        const blob = await buildDocx(currentResult as string, docType, {
-                          school: selectedClass?.school || profileSchoolName || '',
-                          teacher: profileName || '',
-                          subject: selectedClass?.subject || profile.subject || '',
-                          topic,
-                          className: selectedClass?.name || '',
-                          duration,
-                          lessonTime,
-                          turn,
-                          examValue,
-                          examDuration,
-                        });
-                        const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
-                        const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                        downloadBlob(blob, filename);
-                      } catch (e) {
-                        console.error('Erro ao exportar Word:', e);
-                        toast.error('O documento Word fugiu! Tenta gerar de novo.');
-                      } finally {
-                        setPreparingDoc(null);
-                      }
+                <div className="flex gap-2">
+                  <button
+                      onClick={async () => {
+                        if (preparingDoc !== null) return;
+                        setPreparingDoc('main');
+                        try {
+                          const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
+                          const blob = await buildDocx(currentResult as string, docType, {
+                            school: selectedClass?.school || profileSchoolName || '',
+                            teacher: profileName || '',
+                            subject: selectedClass?.subject || profile.subject || '',
+                            topic,
+                            className: selectedClass?.name || '',
+                            duration,
+                            lessonTime,
+                            turn,
+                            examValue,
+                            examDuration,
+                          });
+                          const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
+                          const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
+                          downloadBlob(blob, filename);
+                        } catch (e) {
+                          console.error('Erro ao exportar Word:', e);
+                          toast.error('O documento Word fugiu! Tenta gerar de novo.');
+                        } finally {
+                          setPreparingDoc(null);
+                        }
+                      }}
+                      disabled={preparingDoc !== null}
+                      className="flex-1 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      {preparingDoc === 'main' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
+                    </button>
+                  <button
+                    onClick={() => {
+                      const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
+                      printPlannerContent(
+                        topic || 'Material',
+                        currentResult as string,
+                        docType,
+                        profileName,
+                        selectedClass?.school || profileSchoolName
+                      );
                     }}
-                    disabled={preparingDoc !== null}
-                    className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                    className="px-4 bg-gray-100 text-gray-700 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                    title="Imprimir / PDF"
                   >
-                    {preparingDoc === 'main' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
+                    <FileText size={16} /> PDF
                   </button>
+                </div>
               </motion.div>
             )}
 
@@ -3695,7 +3651,7 @@ const ChatScreen = ({
   };
   const cancelLongPress = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current); };
 
-  const SUGGESTIONS = ['Como montar uma aula?', 'Me dê ideias para atividades', 'Crie um plano de aula', 'Avaliações criativas'];
+  const SUGGESTIONS = ['Como montar uma aula?', 'Me dê ideias para atividades', 'Minha turma está agitada, o que fazer?', 'Como adaptar para aluno com TDAH?', 'Escreva um bilhete para os pais', 'Avaliações criativas'];
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -3770,8 +3726,8 @@ const ChatScreen = ({
 
       const turmas = schedules.map(s => s.name).join(', ') || 'Nenhuma turma cadastrada';
 
-      const basePrompt = `Você é o "Prof. Corujão", o assistente pessoal definitivo para professores.
-      Você atua como um CONTROLE REMOTO total do aplicativo. Você pode navegar entre telas, criar materiais, agendar aulas e atualizar o perfil.
+      const basePrompt = `Você é o "Prof. Corujão", assistente pedagógico pessoal e parceiro de sala de aula do professor.
+      Você atua como um CONTROLE REMOTO total do aplicativo (navegar entre telas, criar materiais, agendar aulas, atualizar perfil) E como um coordenador pedagógico experiente, sempre disponível para apoiar o dia a dia da docência.
 
       Hoje é: ${today}.
 
@@ -3787,11 +3743,19 @@ const ChatScreen = ({
       ${acervoSummary}
       - Conteúdo do Estúdio: ${estudioContext ? `${estudioContext.substring(0, 300)}...` : 'Vazio'}
 
-      Suas Capacidades (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
+      Suas Capacidades no App (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
       1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca'.
       2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais ficam disponíveis no histórico ao concluir.
       3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
+
+      Sua Expertise Pedagógica (responda diretamente no chat, sem funções):
+      - GESTÃO DE SALA: estratégias práticas para indisciplina, turmas agitadas, conflitos entre alunos, engajamento.
+      - INCLUSÃO: adaptações para alunos com TDAH, TEA, dislexia e outras necessidades; sugestões alinhadas ao PEI.
+      - DIDÁTICA: metodologias ativas, avaliação formativa, recuperação de aprendizagem, dúvidas sobre BNCC.
+      - COMUNICAÇÃO: redigir bilhetes e comunicados para famílias, devolutivas de avaliação, relatórios de aluno.
+      - CONTEÚDO: explicar qualquer conteúdo escolar, sugerir analogias e exemplos para usar em aula.
+      Ao dar conselhos pedagógicos, seja concreto e acionável: passos numerados, frases prontas para usar, exemplos reais. Considere o nível de ensino das turmas do professor.
 
       Regras de Comportamento:
       1. Seja proativo, conciso e profissional.
@@ -3799,6 +3763,7 @@ const ChatScreen = ({
       3. Se o usuário pedir algo genérico como "Gere um material sobre X", pergunte se ele quer Slides, Plano, Atividades ou Prova, ou sugira um deles.
       4. Quando usar uma função de geração, informe que o material ficará disponível no histórico ao concluir.
       5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo.
+      6. Se o professor desabafar sobre dificuldades em sala, acolha brevemente e ofereça 2-3 estratégias práticas imediatas.
 
       Histórico:
       ${sortedHistory.slice(-20).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
@@ -3840,10 +3805,10 @@ const ChatScreen = ({
                 parameters: {
                   type: Type.OBJECT,
                   properties: {
-                    screen: { 
-                      type: Type.STRING, 
-                      enum: ['home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca'],
-                      description: 'Nome da tela de destino'
+                    screen: {
+                      type: Type.STRING,
+                      enum: ['home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca', 'gamificacao', 'ferramentas', 'acervo'],
+                      description: 'Nome da tela de destino. gamificacao = Turma Gamificada (pontos, equipes, sorteador, timer); ferramentas = Kit do Professor (pareceres, rubricas, adaptações de inclusão, diário de classe); acervo = Histórico de materiais gerados'
                     }
                   },
                   required: ['screen']
@@ -4399,7 +4364,7 @@ const ProfileScreen = ({
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
       
-      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 mb-6 flex flex-col items-center text-center">
+      <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative inline-block mb-4">
           <div className="w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
@@ -4474,16 +4439,16 @@ const ProfileScreen = ({
 
         <button
           onClick={() => isEditingProfile ? saveProfile() : setIsEditingProfile(true)}
-          className={`mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold w-full active:scale-[0.98] transition-transform ${isEditingProfile ? 'bg-indigo-600 text-white shadow-sm' : 'bg-indigo-50 text-indigo-600'}`}
+          className="mt-6 bg-[#F8F9FE] text-indigo-600 px-6 py-2.5 rounded-full text-base font-bold w-full"
         >
-          {isEditingProfile ? <><CheckCircle2 size={16} /> Salvar alterações</> : <><Pencil size={16} /> Editar Perfil</>}
+          {isEditingProfile ? 'Salvar' : 'Editar Perfil'}
         </button>
       </div>
 
       {/* Pro Status Card */}
       {profile.isPro || profile.role === 'admin' ? (
-        <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-5 shadow-lg mb-6 flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0"><Sparkles size={26} className="text-white" /></div>
+        <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-5 shadow-lg mb-4 flex items-center gap-4">
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0 text-3xl">⭐</div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="bg-white text-orange-600 text-xs font-black px-2 py-0.5 rounded-full tracking-wider uppercase">PRO</span>
@@ -4494,9 +4459,9 @@ const ProfileScreen = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 mb-6">
+        <div className="bg-white rounded-[2rem] p-5 shadow-sm border-2 border-gray-100 mb-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500"><Lock size={18} /></div>
+            <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-xl">🔒</div>
             <div>
               <p className="font-bold text-gray-900 text-sm">Modo Gratuito</p>
               <p className="text-xs text-gray-400">{profile.generationsUsed ?? 0} de 10 gerações usadas</p>
@@ -4520,24 +4485,27 @@ const ProfileScreen = ({
       )}
 
       {/* Quick Stats */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-8 grid grid-cols-3 divide-x divide-gray-100">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Turmas', value: schedules.length, Icon: Users, color: '#4F46E5' },
-          { label: 'Materiais', value: savedResources.length, Icon: FileText, color: '#F59E0B' },
-          { label: 'Gerações', value: profile.generationsUsed ?? 0, Icon: Sparkles, color: '#10B981' },
-        ].map(({ label, value, Icon, color }) => (
-          <div key={label} className="flex flex-col items-center py-5 px-2">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: color + '18', color }}>
-              <Icon size={18} />
-            </div>
-            <div className="text-2xl font-black text-gray-900 leading-none">{value}</div>
-            <div className="text-[11px] text-gray-400 font-semibold mt-1 uppercase tracking-wide">{label}</div>
-          </div>
+          { label: 'Turmas', value: schedules.length, emoji: '👥' },
+          { label: 'Materiais', value: savedResources.length, emoji: '📄', action: () => setScreen('acervo') },
+          { label: 'Gerações', value: profile.generationsUsed ?? 0, emoji: '✨' },
+        ].map(stat => (
+          <button
+            key={stat.label}
+            onClick={stat.action}
+            disabled={!stat.action}
+            className={`bg-white rounded-2xl p-4 shadow-sm border border-gray-50 text-center ${stat.action ? 'active:scale-95 transition-transform' : 'cursor-default'}`}
+          >
+            <div className="text-2xl mb-1">{stat.emoji}</div>
+            <div className="text-xl font-black text-gray-900">{stat.value}</div>
+            <div className="text-xs text-gray-400 font-medium">{stat.label}{stat.action ? ' →' : ''}</div>
+          </button>
         ))}
       </div>
 
       {/* ── Gestão de Turmas ─────────────────────────────────── */}
-      <div className="space-y-3 mb-8">
+      <div className="space-y-3">
         <div className="flex items-center justify-between px-1 mb-1">
           <h3 className="text-lg font-bold text-gray-900">Gestão de Turmas</h3>
           <button
@@ -4627,7 +4595,7 @@ const ProfileScreen = ({
 
         {/* ── Modal Adicionar / Editar Turma ── */}
         {editingClass !== null && (
-          <div className="fixed inset-0 bg-black/60 z-[120] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setEditingClass(null); }}>
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setEditingClass(null); }}>
             <motion.div
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
@@ -4804,7 +4772,7 @@ const ProfileScreen = ({
               </div>
 
               {/* Rodapé */}
-              <div className="p-5 pt-3 border-t border-gray-100 flex gap-3" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+              <div className="p-5 pt-3 border-t border-gray-100 flex gap-3">
                 <button onClick={() => setEditingClass(null)} className="flex-1 p-3.5 rounded-2xl bg-gray-100 font-bold text-gray-600">
                   Cancelar
                 </button>
@@ -4818,12 +4786,12 @@ const ProfileScreen = ({
       </div>
 
 
-      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 mb-6">
-        <div className="flex items-center justify-between mb-5">
+      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8 mt-8">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-gray-900">Configurações</h2>
         </div>
-
-        <div className="space-y-3">
+        
+        <div className="space-y-4">
           <button 
             onClick={() => setShowFeedbackModal(true)}
             className="w-full flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -4860,12 +4828,12 @@ const ProfileScreen = ({
       </div>
 
       {/* Zona de Perigo — colapsável */}
-      <div className="mb-8">
+      <div className="mb-8 mt-4">
         <button
           onClick={() => setShowDangerZone(!showDangerZone)}
           className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-red-50 border border-red-100 active:scale-[0.98] transition-transform"
         >
-          <span className="text-xs font-black text-red-400 uppercase tracking-widest flex items-center gap-1.5"><AlertCircle size={13} /> Zona de Perigo</span>
+          <span className="text-xs font-black text-red-400 uppercase tracking-widest">⚠️ Zona de Perigo</span>
           <ChevronRight size={16} className={`text-red-300 transition-transform ${showDangerZone ? 'rotate-90' : ''}`} />
         </button>
 
@@ -4920,7 +4888,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6"
             onClick={() => setShowFeedbackModal(false)}
           >
             <motion.div 
@@ -4994,7 +4962,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6"
             onClick={() => setShowLogoutConfirm(false)}
           >
             <motion.div 
@@ -5036,7 +5004,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-[120] flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
             onClick={() => setShowResetConfirm(false)}
           >
             <motion.div
@@ -5087,7 +5055,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-[120] flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
             onClick={() => setShowDeleteConfirm(false)}
           >
             <motion.div
@@ -5421,14 +5389,18 @@ const extractAcademicCalendar = async (file: File, year: number): Promise<Import
       },
     },
   });
-  const parsed = JSON.parse(response.text || '{}');
-  return (parsed.events || [])
-    .filter((e: any) => e && e.title && /^\d{4}-\d{2}-\d{2}$/.test(e.date))
-    .map((e: any) => ({
-      title: String(e.title).slice(0, 80),
-      date: e.date,
-      type: (['holiday', 'admin', 'prep', 'commemorative'].includes(e.type) ? e.type : 'admin') as ImportEventType,
-    }));
+  try {
+    const parsed = JSON.parse(response.text || '{}');
+    return (parsed.events || [])
+      .filter((e: any) => e && e.title && /^\d{4}-\d{2}-\d{2}$/.test(e.date))
+      .map((e: any) => ({
+        title: String(e.title).slice(0, 80),
+        date: e.date,
+        type: (['holiday', 'admin', 'prep', 'commemorative'].includes(e.type) ? e.type : 'admin') as ImportEventType,
+      }));
+  } catch {
+    return [];
+  }
 };
 
 const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
@@ -5461,14 +5433,18 @@ const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
       },
     },
   });
-  const parsed = JSON.parse(response.text || '{}');
-  return (parsed.modules || [])
-    .filter((m: any) => m && m.title)
-    .map((m: any) => ({
-      title: String(m.title).slice(0, 80),
-      topics: Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : [],
-      estimatedClasses: Math.max(1, Math.min(40, Math.round(Number(m.estimatedClasses) || 4))),
-    }));
+  try {
+    const parsed = JSON.parse(response.text || '{}');
+    return (parsed.modules || [])
+      .filter((m: any) => m && m.title)
+      .map((m: any) => ({
+        title: String(m.title).slice(0, 80),
+        topics: Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : [],
+        estimatedClasses: Math.max(1, Math.min(40, Math.round(Number(m.estimatedClasses) || 4))),
+      }));
+  } catch {
+    return [];
+  }
 };
 
 // Calcula datas de início sequenciais (cada módulo começa após o anterior terminar)
@@ -5589,7 +5565,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
   const totalLessons = rows.reduce((sum, r) => sum + (r.estimatedClasses || 0), 0);
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[120] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 bg-black/60 z-[110] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
@@ -5747,7 +5723,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
         </div>
 
         {phase === 'review' && (
-          <div className="p-5 pt-3 border-t border-gray-100 flex gap-3 items-center" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+          <div className="p-5 pt-3 border-t border-gray-100 flex gap-3 items-center">
             {mode === 'syllabus' && <span className="text-xs text-gray-400 font-medium shrink-0">{totalLessons} aulas</span>}
             <button onClick={onClose} className="flex-1 p-3.5 rounded-2xl bg-gray-100 font-bold text-gray-600">Cancelar</button>
             <button
@@ -6006,7 +5982,7 @@ const CalendarScreen = ({
       </Header>
       
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[120] flex items-center justify-center p-6" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={() => setIsModalOpen(false)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-1">Novo Evento</h2>
             <p className="text-sm text-gray-400 mb-4">{selectedDate} de {monthAbbrNames[currentMonth]}</p>
@@ -6204,7 +6180,7 @@ const CalendarScreen = ({
   );
 };
 
-type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'escape' | 'memory';
+type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'escape' | 'memory' | 'sequencia' | 'flashcard';
 type EscapeTheme = 'medieval' | 'lab' | 'detective' | 'space';
 
 const buildWordSearchGrid = (rawWords: string[], size = 15): { grid: string[][], placements: {word: string, row: number, col: number, dir: string}[] } => {
@@ -6359,15 +6335,15 @@ const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
   return {grid: trimmed, cellNumbers: Object.fromEntries(cellNum), across, down};
 };
 
-const STORY_SECTIONS = ['🌍 Cenário', '👥 Classes de Personagens', '⚔️ Missões', '🏆 Sistema de Pontos', '👑 Boss Final', '📋 Roteiro do Professor'];
+const STORY_SECTIONS = ['🗺️ Quem é Quem', '📖 A História', '🎬 Atividade'];
 
-const generateStoryImages = async (topic: string, genre: string): Promise<Record<string, string>> => {
+const generateStoryImages = async (topic: string, popTheme: string): Promise<Record<string, string>> => {
   const apiKey = process.env.PIXABAY_API_KEY;
   if (!apiKey) return {};
   try {
-    const keywordPrompt = `For a gamified storytelling campaign about "${topic}" (genre: ${genre}), generate one short English search keyword (2-4 words) per section to find an illustration on Pixabay.
+    const keywordPrompt = `For an educational narrative-metaphor story that teaches "${topic}" set in the pop-culture universe of "${popTheme}", generate one short English search keyword (2-4 words) per section to find an illustration on Pixabay.
 Return ONLY valid JSON with these exact keys:
-{"🌍 Cenário":"...","👥 Classes de Personagens":"...","⚔️ Missões":"...","🏆 Sistema de Pontos":"...","👑 Boss Final":"...","📋 Roteiro do Professor":"..."}`;
+{"🗺️ Quem é Quem":"...","📖 A História":"...","🎬 Atividade":"..."}`;
     const response = await generateContentWithRetry({ model: AI_MODEL, contents: keywordPrompt });
     const raw = response.text || '';
     const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -6403,7 +6379,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
   const node = document.getElementById('game-print-area');
   if (!node) return;
   const w = window.open('', '_blank', 'width=900,height=700');
-  if (!w) return;
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
   const todayStr = new Date().toLocaleDateString('pt-BR');
   const owlSvg = `<svg width="84" height="84" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:0.88;flex-shrink:0">
     <ellipse cx="30" cy="43" rx="19" ry="16" fill="rgba(255,255,255,0.18)"/>
@@ -6619,7 +6595,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     (function(){
       var label = "${opts.activityLabel}";
       var themes = {
-        'Campanha Narrativa':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📖' },
+        'Metafora Narrativa':    { ac:'#c026d3', light:'#fdf4ff', emoji:'📖' },
         'Quiz Avaliativo':       { ac:'#ea580c', light:'#fff7ed', emoji:'⚡' },
         'Caca-Palavras':         { ac:'#2563eb', light:'#eff6ff', emoji:'🔍' },
         'Palavras Cruzadas':     { ac:'#0d9488', light:'#f0fdfa', emoji:'✏️' },
@@ -6627,7 +6603,9 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         'Trilha do Conhecimento':{ ac:'#16a34a', light:'#f0fdf4', emoji:'🎲' },
         'Jogo da Memoria':       { ac:'#db2777', light:'#fdf2f8', emoji:'🃏' }
       };
-      var t = themes[label] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
+      // labels chegam acentuados; keys do objeto são sem acento — normaliza para casar
+      var norm = function(s){ return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); };
+      var t = themes[norm(label)] || { ac:'#4338ca', light:'#eef2ff', emoji:'🎮' };
       document.documentElement.style.setProperty('--ac', t.ac);
       document.documentElement.style.setProperty('--ac-light', t.light);
       document.documentElement.style.setProperty('--bingo-dim', '${opts.bingoDim || 5}');
@@ -6697,16 +6675,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
           + '<rect x="8" y="8" width="2" height="2" fill="#ccfbf1"/>'
           + '<rect x="11" y="10" width="2" height="1" fill="#f59e0b"/><rect x="12" y="11" width="2" height="1" fill="#f59e0b"/><rect x="13" y="12" width="2" height="1" fill="#f59e0b"/><rect x="14" y="13" width="1" height="2" fill="#451a03"/>'
           + '</svg>',
-        'Campanha Narrativa': '<svg viewBox="0 0 16 16"' + SR + '>'
-          + '<rect x="2" y="2" width="12" height="1" fill="#3730a3"/><rect x="2" y="3" width="1" height="10" fill="#3730a3"/><rect x="13" y="3" width="1" height="10" fill="#3730a3"/><rect x="2" y="13" width="12" height="1" fill="#3730a3"/>'
+        'Metafora Narrativa': '<svg viewBox="0 0 16 16"' + SR + '>'
+          + '<rect x="2" y="2" width="12" height="1" fill="#86198f"/><rect x="2" y="3" width="1" height="10" fill="#86198f"/><rect x="13" y="3" width="1" height="10" fill="#86198f"/><rect x="2" y="13" width="12" height="1" fill="#86198f"/>'
           + '<rect x="3" y="3" width="10" height="10" fill="#fef3c7"/>'
-          + '<rect x="7" y="3" width="2" height="10" fill="#3730a3"/>'
+          + '<rect x="7" y="3" width="2" height="10" fill="#86198f"/>'
           + '<rect x="4" y="5" width="3" height="1" fill="#92400e"/><rect x="4" y="7" width="3" height="1" fill="#92400e"/><rect x="4" y="9" width="3" height="1" fill="#92400e"/><rect x="4" y="11" width="2" height="1" fill="#92400e"/>'
           + '<rect x="9" y="5" width="3" height="1" fill="#92400e"/><rect x="9" y="7" width="3" height="1" fill="#92400e"/><rect x="9" y="9" width="3" height="1" fill="#92400e"/><rect x="9" y="11" width="2" height="1" fill="#92400e"/>'
           + '<rect x="10" y="3" width="1" height="1" fill="#fbbf24"/><rect x="9" y="4" width="3" height="1" fill="#fbbf24"/><rect x="10" y="5" width="1" height="1" fill="#fbbf24"/>'
           + '</svg>'
       };
-      var pxArt = pixelArts[label] || '<div style="font-size:34px;text-align:center;line-height:52px">🎮</div>';
+      var pxArt = pixelArts[norm(label)] || '<div style="font-size:34px;text-align:center;line-height:52px">🎮</div>';
 
       // ── Instructions box: pixel art + title ─────────────
       var instr = document.querySelector('.instructions');
@@ -6897,7 +6875,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       }
 
       // ── BOA SORTE line + SCORE TRACKER ───────────────────
-      // For Campanha Narrativa the tracker is embedded in the character-card page (see below).
+      // For Metafora Narrativa the tracker is embedded in the Mapa da Metafora page (see below).
       var akPage = document.querySelector('.answer-key-page');
       var boaSorte = document.createElement('div');
       boaSorte.className = 'boa-sorte';
@@ -6910,8 +6888,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>';
 
       // Only inject standalone tracker for non-storytelling activities.
-      // For 'Campanha Narrativa' the tracker is bundled with the character-card page.
-      if (label !== 'Campanha Narrativa') {
+      // For 'Metafora Narrativa' the tracker is bundled with the Mapa da Metafora page.
+      if (norm(label) !== 'Metafora Narrativa') {
         if (akPage) {
           akPage.before(boaSorte);
           akPage.before(tracker);
@@ -6938,65 +6916,50 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         akTitle.replaceWith(wrap);
       }
 
-      // ── STORY: character card page ────────────────────────
-      // ── STORY: last page = score tracker + character cards ─
-      if (label === 'Campanha Narrativa') {
-        var xpBoxes = Array(10).fill('<div style="width:22px;height:18px;border:2px solid var(--ac,#4338ca);border-radius:4px;background:white;flex-shrink:0;"></div>').join('');
-        var missionBoxes = ['M1','M2','M3'].map(function(m){
-          return '<div style="display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;color:var(--ac,#4338ca);">'
-            + '<div style="width:17px;height:17px;border:2px solid var(--ac,#4338ca);border-radius:3px;flex-shrink:0;"></div>'
-            + m + '</div>';
-        }).join('');
-        var charDefs = [
-          { emoji:'🧙', label:'Personagem 1' },
-          { emoji:'⚔️', label:'Personagem 2' },
-          { emoji:'🏹', label:'Personagem 3' },
-          { emoji:'🛡️', label:'Personagem 4' }
-        ];
-        var cards = charDefs.map(function(ch){
-          return '<div style="border:2.5px solid var(--ac,#4338ca);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">'
-            + '<div style="background:var(--ac,#4338ca);padding:9px 14px;display:flex;align-items:center;gap:8px;">'
-            + '<span style="font-size:18px;">' + ch.emoji + '</span>'
-            + '<span style="font-weight:900;font-size:12px;color:white;letter-spacing:0.3px;">' + ch.label + '</span>'
+      // ── STORY: last page = score tracker + Mapa da Metafora ─
+      // Folha do aluno: decodificar a metáfora durante a leitura
+      // (personagem → conceito real → pista da história que entrega a conexão)
+      if (norm(label) === 'Metafora Narrativa') {
+        var detEmojis = ['🧭','🔮','⭐','🗝️'];
+        var detCards = detEmojis.map(function(em, i){
+          return '<div style="border:2.5px solid var(--ac,#c026d3);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">'
+            + '<div style="background:var(--ac,#c026d3);padding:9px 14px;display:flex;align-items:center;gap:8px;">'
+            + '<span style="font-size:18px;">' + em + '</span>'
+            + '<span style="font-weight:900;font-size:12px;color:white;letter-spacing:0.3px;">Descoberta ' + (i + 1) + '</span>'
             + '</div>'
             + '<div style="padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:9px;">'
-            // Nome
-            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">NOME DO ALUNO</div>'
+            // Personagem
+            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">PERSONAGEM OU ELEMENTO DA HISTÓRIA</div>'
             + '<div style="border-bottom:1.5px solid #d1d5db;min-height:20px;"></div></div>'
-            // Classe
-            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">CLASSE</div>'
-            + '<div style="border-bottom:1.5px solid #d1d5db;min-height:20px;"></div></div>'
-            // XP
-            + '<div><div style="font-size:7.5px;color:var(--ac,#4338ca);font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">XP GANHO</div>'
-            + '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + xpBoxes + '</div></div>'
-            // Missões
-            + '<div><div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">MISSÕES CONCLUÍDAS</div>'
-            + '<div style="display:flex;gap:14px;">' + missionBoxes + '</div></div>'
-            // Anotações
+            // Conceito real
+            + '<div><div style="font-size:7.5px;color:var(--ac,#c026d3);font-weight:800;letter-spacing:1.2px;margin-bottom:4px;">REPRESENTA NA VIDA REAL</div>'
+            + '<div style="border-bottom:1.5px solid var(--ac,#c026d3);min-height:20px;"></div></div>'
+            // Pista
             + '<div style="flex:1;display:flex;flex-direction:column;">'
-            + '<div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">ANOTAÇÕES</div>'
-            + '<div style="flex:1;border:1.5px dashed #d1d5db;border-radius:7px;min-height:44px;background:#fafafa;"></div>'
+            + '<div style="font-size:7.5px;color:#6b7280;font-weight:800;letter-spacing:1.2px;margin-bottom:5px;">A PISTA: QUE MOMENTO DA HISTÓRIA ENTREGOU A CONEXÃO?</div>'
+            + '<div style="flex:1;border:1.5px dashed #d1d5db;border-radius:7px;min-height:52px;background:#fafafa;"></div>'
             + '</div>'
             + '</div>'
             + '</div>';
         }).join('');
 
-        var cardPage = document.createElement('div');
-        cardPage.style.cssText = 'page-break-before:always;padding:14px;';
-        cardPage.innerHTML =
+        var mapPage = document.createElement('div');
+        mapPage.style.cssText = 'page-break-before:always;padding:14px;';
+        mapPage.innerHTML =
           // ── Compact score tracker at the top ──
           '<div class="score-tracker" style="margin:0 0 16px;">'
           + '<div class="score-header"><div class="score-px-star">' + pxStar + '</div><div class="score-title">Minha Pontuação</div><div class="score-px-star">' + pxStar + '</div></div>'
           + '<div class="score-stars">&#11088; &#11088; &#11088; &#11088; &#11088;</div>'
           + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>'
           + '</div>'
-          // ── Characters section header ──
-          + '<div style="background:var(--ac,#4338ca);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:14px;letter-spacing:0.3px;">🎭 Fichas dos Personagens</div>'
+          // ── Header da folha do aluno ──
+          + '<div style="background:var(--ac,#c026d3);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:6px;letter-spacing:0.3px;">🗺️ Mapa da Metáfora — Missão do Detetive</div>'
+          + '<div style="font-size:10px;color:#6b7280;margin-bottom:12px;line-height:1.5;">Durante a história, descubra quem é quem: anote o personagem, o conceito real que ele representa e o momento da história que entregou a conexão. Cada descoberta certa vale ponto!</div>'
           // ── 2×2 grid — cards fill the remaining page space ──
           + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;min-height:420px;">'
-          + cards
+          + detCards
           + '</div>';
-        document.body.appendChild(cardPage);
+        document.body.appendChild(mapPage);
       }
 
       // ── marca d'água: injetada após TODO o conteúdo dinâmico ──
@@ -7106,7 +7069,7 @@ const ESCAPE_THEMES: Record<EscapeTheme, {
 const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teacherName?: string; schoolName?: string; subject?: string; level?: string }) => {
   const theme = ESCAPE_THEMES[data.theme];
   const w = window.open('', '_blank', 'width=900,height=700');
-  if (!w) return;
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
   const todayStr = new Date().toLocaleDateString('pt-BR');
   const enigmaPages = data.enigmas.map((en, i) => `
     <section class="page enigma-page">
@@ -7319,7 +7282,9 @@ const EstudioScreen = ({
   const [classId, setClassId] = useState<string>('');
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState<'fácil' | 'média' | 'difícil'>('média');
-  const [genre, setGenre] = useState('aventura');
+  const [popTheme, setPopTheme] = useState('');
+  const [chapterCount, setChapterCount] = useState<3 | 4 | 5>(4);
+  const [storyActivity, setStoryActivity] = useState<'surpresa' | 'reescrever' | 'inverter' | 'ilustrar' | 'debate'>('surpresa');
   const [duration, setDuration] = useState('1 aula');
   const [count, setCount] = useState(10);
   const [quizType, setQuizType] = useState<'multipla' | 'misto'>('multipla');
@@ -7339,64 +7304,75 @@ const EstudioScreen = ({
 
   const closeModal = () => {
     localGenActiveRef.current = false;
-    setActiveMode(null); setResult(null); setTopic(''); setIsGenerating(false);
+    setActiveMode(null); setResult(null); setTopic(''); setPopTheme(''); setIsGenerating(false);
   };
 
   useEffect(() => {
     if (!studioReopenTaskId) return;
     const task = activeTasks[studioReopenTaskId];
     if (!task || task.status !== 'completed' || !task.meta) return;
-    const meta = task.meta as { mode?: GameMode; topic?: string; classId?: string; escapeTheme?: EscapeTheme; bingoSize?: 3 | 5 };
+    const meta = task.meta as { mode?: GameMode; topic?: string; classId?: string; escapeTheme?: EscapeTheme; bingoSize?: 3 | 5; popTheme?: string };
     if (meta.mode) setActiveMode(meta.mode);
     if (meta.topic) setTopic(meta.topic);
     if (meta.classId !== undefined) setClassId(meta.classId);
     if (meta.escapeTheme) setEscapeTheme(meta.escapeTheme);
+    if (meta.popTheme) setPopTheme(meta.popTheme);
     setResult(task.result);
     removeTask(studioReopenTaskId);
     setStudioReopenTaskId(null);
   }, [studioReopenTaskId, activeTasks, removeTask, setStudioReopenTaskId]);
 
   const generate = async () => {
-    if (!topic.trim()) { toast.error('Qual e o tema? O Corujao precisa saber para criar!'); return; }
+    if (!topic.trim()) { toast.error('Qual é o tema? O Corujão precisa saber para criar!'); return; }
     if (!activeMode) return;
+    if (activeMode === 'story' && !popTheme.trim()) { toast.error('Escolha o universo pop que vai dar vida à história!'); return; }
     setIsGenerating(true);
     setResult(null);
     localGenActiveRef.current = true;
-    const modeLabels: Record<GameMode, string> = { story: 'Storytelling', quiz: 'Quiz', wordsearch: 'Caça-Palavras', crossword: 'Cruzadas', bingo: 'Bingo', escape: 'Escape Room', memory: 'Memória' };
+    const modeLabels: Record<GameMode, string> = { story: 'Storytelling', quiz: 'Quiz', wordsearch: 'Caça-Palavras', crossword: 'Cruzadas', bingo: 'Bingo', escape: 'Escape Room', memory: 'Memória', sequencia: 'Sequência Didática', flashcard: 'Flashcards' };
     const taskId = addTask({
       type: activeMode,
       title: `${modeLabels[activeMode]}: ${topic.trim().slice(0, 40)}`,
-      meta: { mode: activeMode, topic, classId, escapeTheme, bingoSize, bingoFreeText, bingoCardCount, wsGridSize, escapeEnigmaCount, difficulty, genre, duration, count, quizType },
+      meta: { mode: activeMode, topic, classId, escapeTheme, bingoSize, bingoFreeText, bingoCardCount, wsGridSize, escapeEnigmaCount, difficulty, popTheme, chapterCount, storyActivity, duration, count, quizType },
     });
     try {
       const context = `Disciplina: ${defaultSubject || 'Geral'} | Nível: ${defaultLevel}${selectedClass ? ` | Turma: ${selectedClass.name}` : ''} | Tema: ${topic}`;
       let prompt = '';
       if (activeMode === 'story') {
-        prompt = `Você é um designer de jogos educacionais. Crie uma CAMPANHA narrativa gamificada completa para gamificar aulas.
+        const storyActivityBriefs: Record<typeof storyActivity, string> = {
+          surpresa: 'Escolha VOCÊ o formato mais potente para este conteúdo (reescrita criativa, cenário invertido, cena para ilustrar ou debate guiado) e nomeie-o na primeira linha em negrito.',
+          reescrever: '**Capítulo do Aluno** (reescrita criativa): o aluno escreve o próximo capítulo introduzindo UM conceito novo do conteúdo como um novo personagem. Dê a instrução completa, sugira 2 conceitos candidatos, 3 critérios de avaliação observáveis e 1 frase de exemplo para começar.',
+          inverter: '**E se...?** (cenário invertido): descreva em 1 parágrafo o que teria acontecido se a decisão-chave da história fosse a oposta, e proponha 3 perguntas para a turma discutir as consequências REAIS do conceito nessa inversão.',
+          ilustrar: '**Cena Ilustrada**: roteiro de 1 cena marcante para o aluno desenhar, listando os elementos obrigatórios da cena, com a regra de ouro: a legenda do desenho deve explicar qual conceito real cada elemento representa.',
+          debate: '**Debate Guiado**: 1 questão polêmica nascida da história, 2 posições possíveis com argumento inicial de cada lado, e a fala de fechamento do professor conectando tudo ao conteúdo real.',
+        };
+        prompt = `Você é um mestre em storytelling pedagógico. Crie uma METÁFORA NARRATIVA: uma história ambientada no universo de "${popTheme.trim()}" em que cada personagem ou elemento representa um conceito real do conteúdo estudado.
 ${context}
-Gênero: ${genre} | Duração: ${duration}
 
-Retorne em Markdown brasileiro com EXATAMENTE as seções abaixo:
+Retorne em Markdown brasileiro com EXATAMENTE estas seções (títulos h2 idênticos aos abaixo):
 
-## 🌍 Cenário
-(2 parágrafos imersivos onde os alunos são protagonistas. Inclua ambientação, conflito central e papel dos alunos.)
+## 🗺️ Quem é Quem
+(Tabela Markdown com colunas: Personagem/Elemento | Conceito real | Por que a metáfora funciona. 4 a 6 linhas. Personagens inspirados no universo de "${popTheme.trim()}". É o guia que o professor segue durante a leitura.)
 
-## 👥 Classes de Personagens
-(4 classes que os alunos podem escolher, com nome criativo, descrição curta e habilidade especial em 1 frase. Use lista.)
+## 📖 A História
+(${chapterCount} capítulos, cada um com "### Capítulo N — Título". 2-3 parágrafos por capítulo, narrativa envolvente em que as AÇÕES dos personagens espelham fielmente como os conceitos reais se comportam — a lógica do conteúdo deve estar correta dentro da metáfora. Encerre CADA capítulo com:
+> ⏸️ **Pausa pedagógica:** [pergunta oral curta que faz a turma conectar a cena ao conceito real antes de continuar]
+)
 
-## ⚔️ Missões
-(${duration === '1 aula' ? '3' : duration.includes('semana') ? '5' : '8'} missões em sequência, cada uma com: **Missão N — Nome**, narrativa de abertura curta (3-4 linhas), desafio (relacionado ao conteúdo "${topic}"), recompensa em XP/moedas.)
+## 🎬 Atividade
+(${storyActivityBriefs[storyActivity]})
 
-## 🏆 Sistema de Pontos
-(Tabela: ação → XP/moedas ganhos. Inclua: participar, acertar resposta, completar missão, ajudar colega.)
+## 🧠 Desafio do Conhecimento
+(3 questões de múltipla escolha com 4 alternativas A-D, uma de cada tipo, neste formato:
+**1. [Compreensão]** — sobre o que aconteceu na história
+**2. [Conexão]** — sobre o que determinado personagem/elemento representa
+**3. [Aplicação]** — aplica o conceito real a uma situação nova, fora da história
+Depois das questões, um bloco "**Gabarito comentado:**" com a letra correta e 1 frase de justificativa para cada.)
 
-## 👑 Boss Final
-(Desafio épico de encerramento, narrativa de 2-3 linhas + descrição da prova/trabalho final tematizada.)
+## 💡 Síntese da Metáfora
+(1 parágrafo que desmonta a metáfora explicitamente: "Na história, X representava Y porque...; na vida real, isso significa que...". É o fechamento que garante que toda a turma captou a simbologia.)
 
-## 📋 Roteiro do Professor
-(Lista numerada de 5 passos práticos para conduzir essa campanha em sala.)
-
-NÃO use código, NÃO use emojis fora dos títulos. Português brasileiro natural.`;
+REGRAS: fidelidade conceitual absoluta — a metáfora NUNCA pode ensinar o conceito errado; linguagem adequada ao nível da turma, envolvente sem infantilizar; NÃO copie diálogos nem trechos de obras — inspire-se no universo e crie cenas originais. Português brasileiro natural.`;
       } else if (activeMode === 'quiz') {
         if (quizType === 'misto') {
           const mc = Math.ceil(count * 0.65), vf = count - Math.ceil(count * 0.65);
@@ -7446,14 +7422,49 @@ Retorne APENAS JSON válido (sem markdown):
         prompt = `Gere ${count} pares conceito↔definição sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para jogo da memória.
 Cada conceito: 1-3 palavras. Cada definição: 1 frase curta (max 12 palavras). Inclua 1 emoji representando o conceito.
 Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"...","emoji":"🎯"}]}`;
+      } else if (activeMode === 'sequencia') {
+        prompt = `Você é um pedagogo especialista em metodologias ativas. Crie uma SEQUÊNCIA DIDÁTICA completa e profissional sobre "${topic}".
+${context}
+Duração: ${duration}
+
+Retorne em Markdown brasileiro com EXATAMENTE as seções abaixo (substitua [ ] por conteúdo real, sem introduções nem comentários fora da estrutura):
+
+## 🎯 Objetivos de Aprendizagem
+[3-5 objetivos com verbos de ação alinhados à BNCC]
+
+## 📋 Conhecimentos Prévios
+[O que os alunos precisam saber antes + 1 estratégia rápida de diagnóstico inicial]
+
+## 🗺️ Etapas da Sequência
+[${duration === '1 aula' ? '3' : duration.includes('semana') ? '5' : '8'} etapas numeradas. Para CADA etapa: **Etapa N — Nome** (tempo estimado), objetivo da etapa, descrição detalhada da atividade com metodologia ativa, papel do professor e papel do aluno.]
+
+## 🧩 Diferenciação e Inclusão
+[2-3 adaptações concretas para alunos com dificuldades e 1-2 desafios extras para alunos avançados]
+
+## 📊 Avaliação ao Longo da Sequência
+[Instrumentos de avaliação formativa por etapa + critérios de êxito observáveis]
+
+## 📦 Materiais Necessários
+[Lista de materiais por etapa, priorizando recursos simples e acessíveis]
+
+NÃO use código nem tabelas Markdown. Português brasileiro natural.`;
+      } else if (activeMode === 'flashcard') {
+        prompt = `Gere ${count} flashcards de estudo sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para revisão de conteúdo.
+FRENTE: pergunta curta, termo ou conceito-chave (máx. 12 palavras).
+VERSO: resposta/explicação clara e completa em 1-2 frases (máx. 30 palavras).
+Varie os tipos: definição, "o que é", causa/efeito, exemplo, comparação.
+Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji":"💡"}]}`;
       }
       let finalResult: any = null;
       if (activeMode === 'story') {
         const [response, sectionImages] = await Promise.all([
           generateContentWithRetry({ model: AI_MODEL, contents: prompt }),
-          generateStoryImages(topic, genre)
+          generateStoryImages(topic, popTheme)
         ]);
         finalResult = { markdown: response.text || '', sectionImages };
+      } else if (activeMode === 'sequencia') {
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+        finalResult = { markdown: response.text || '', title: `Sequência Didática: ${topic}` };
       } else if (activeMode === 'escape') {
         const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const raw = response.text || '';
@@ -7512,23 +7523,25 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
   };
 
   const modeMeta: Record<GameMode, { title: string, icon: any, color: string, bg: string, desc: string }> = {
-    story: { title: 'Storytelling', icon: ScrollText, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200', desc: 'Campanha narrativa com missões e personagens' },
+    story: { title: 'Storytelling', icon: ScrollText, color: 'text-fuchsia-600', bg: 'bg-fuchsia-50 border-fuchsia-200', desc: 'A matéria vira história: personagens da cultura pop são os conceitos' },
     quiz: { title: 'Quiz', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', desc: 'Perguntas de múltipla escolha ou V/F' },
     wordsearch: { title: 'Caça-Palavras', icon: Grid3x3, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', desc: 'Grade com palavras escondidas para achar' },
     crossword: { title: 'Palavras Cruzadas', icon: Puzzle, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', desc: 'Grade cruzada com pistas e definições' },
     bingo: { title: 'Bingo Educativo', icon: Dice5, color: 'text-pink-600', bg: 'bg-pink-50 border-pink-200', desc: 'Cartelas com termos do conteúdo da aula' },
     escape: { title: 'Escape Room', icon: KeyRound, color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200', desc: 'Enigmas encadeados temáticos para imprimir' },
     memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', desc: 'Pares de conceito e definição para combinar' },
+    sequencia: { title: 'Sequência Didática', icon: ClipboardList, color: 'text-violet-600', bg: 'bg-violet-50 border-violet-200', desc: 'Passo a passo completo com etapas, inclusão e avaliação' },
+    flashcard: { title: 'Flashcards', icon: Layers, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', desc: 'Cartões de revisão frente e verso para imprimir' },
   };
 
-  const smallActivities: GameMode[] = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
+  const smallActivities: GameMode[] = ['sequencia', 'flashcard', 'story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Estúdio" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
 
       <div className="px-1 mb-6">
-        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em atividades gamificadas que prendem a atenção da turma.</p>
+        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em sequências didáticas, flashcards e atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
       {/* ESCAPE ROOM — destaque */}
@@ -7588,7 +7601,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
             >
               <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
-                  {(() => { const Icon = modeMeta[activeMode].icon; return <Icon size={22} className={activeMode === 'story' ? 'text-indigo-600' : modeMeta[activeMode].color} />; })()}
+                  {(() => { const Icon = modeMeta[activeMode].icon; return <Icon size={22} className={modeMeta[activeMode].color} />; })()}
                   <h3 className="font-bold text-lg text-gray-900">{modeMeta[activeMode].title}</h3>
                 </div>
                 <button
@@ -7624,26 +7637,65 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
                   {activeMode === 'story' && (
                     <>
-                      <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Gênero narrativo</label>
-                        <select value={genre} onChange={e => setGenre(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
-                          <option value="aventura">Aventura</option>
-                          <option value="mistério">Mistério / Detetive</option>
-                          <option value="ficção científica">Ficção Científica</option>
-                          <option value="fantasia medieval">Fantasia Medieval</option>
-                          <option value="exploração espacial">Exploração Espacial</option>
-                          <option value="época histórica">Época Histórica</option>
-                          <option value="apocalíptico">Pós-apocalíptico</option>
-                          <option value="terror leve">Terror leve / Suspense</option>
-                        </select>
+                      <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-3.5">
+                        <p className="text-xs text-fuchsia-800 leading-relaxed"><b>Como funciona:</b> seu conteúdo vira uma história no universo que a turma ama — cada personagem representa um conceito real. Vem com guia de leitura, pausas para discutir, atividade e desafio final.</p>
                       </div>
                       <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Duração</label>
-                        <select value={duration} onChange={e => setDuration(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
-                          <option value="1 aula">1 aula (3 missões)</option>
-                          <option value="1 semana">1 semana (5 missões)</option>
-                          <option value="1 bimestre">1 bimestre (8 missões)</option>
-                        </select>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Universo pop da história *</label>
+                        <input value={popTheme} onChange={e => setPopTheme(e.target.value)} placeholder="Ex: Harry Potter, Minecraft, futebol, Naruto..." className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-fuchsia-400" />
+                        <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-1">
+                          {['🧙 Harry Potter', '⛏️ Minecraft', '⚽ Futebol', '🦸 Super-heróis', '🍥 Naruto', '🎮 Videogame', '🚀 Star Wars', '🏴‍☠️ Piratas'].map(t => {
+                            const value = t.slice(t.indexOf(' ') + 1);
+                            return (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setPopTheme(value)}
+                                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 ${popTheme === value ? 'bg-fuchsia-600 text-white border-fuchsia-600' : 'bg-white text-gray-500 border-gray-200'}`}
+                              >
+                                {t}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Capítulos</label>
+                        <div className="grid grid-cols-3 gap-2 mt-1">
+                          {([3, 4, 5] as const).map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setChapterCount(n)}
+                              className={`py-2.5 rounded-2xl border-2 text-center transition-colors ${chapterCount === n ? 'border-fuchsia-500 bg-fuchsia-50' : 'border-gray-200 bg-white'}`}
+                            >
+                              <p className={`text-sm font-black ${chapterCount === n ? 'text-fuchsia-700' : 'text-gray-600'}`}>{n}</p>
+                              <p className="text-[10px] text-gray-400">{n === 3 ? 'história curta' : n === 4 ? 'equilibrado' : 'saga completa'}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Atividade da história</label>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          {([
+                            { v: 'surpresa', label: '🦉 Corujão decide', sub: 'A IA escolhe a melhor' },
+                            { v: 'reescrever', label: '✍️ Capítulo do aluno', sub: 'Turma escreve a sequência' },
+                            { v: 'inverter', label: '🔄 E se...?', sub: 'Cenário invertido p/ discutir' },
+                            { v: 'ilustrar', label: '🎨 Cena ilustrada', sub: 'Desenho com legenda conceitual' },
+                            { v: 'debate', label: '🗣️ Debate guiado', sub: 'Questão polêmica da história' },
+                          ] as { v: typeof storyActivity; label: string; sub: string }[]).map(a => (
+                            <button
+                              key={a.v}
+                              type="button"
+                              onClick={() => setStoryActivity(a.v)}
+                              className={`p-3 rounded-2xl border-2 text-left transition-colors ${storyActivity === a.v ? 'border-fuchsia-500 bg-fuchsia-50' : 'border-gray-200 bg-white'} ${a.v === 'surpresa' ? 'col-span-2' : ''}`}
+                            >
+                              <p className={`text-sm font-bold ${storyActivity === a.v ? 'text-fuchsia-700' : 'text-gray-700'}`}>{a.label}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">{a.sub}</p>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </>
                   )}
@@ -7693,12 +7745,23 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                       </div>
                     </>
                   )}
-                  {(activeMode === 'crossword' || activeMode === 'memory') && (
+                  {(activeMode === 'crossword' || activeMode === 'memory' || activeMode === 'flashcard') && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        {activeMode === 'memory' ? 'Quantidade de pares' : 'Quantidade de palavras'}
+                        {activeMode === 'memory' ? 'Quantidade de pares' : activeMode === 'flashcard' ? 'Quantidade de cartões' : 'Quantidade de palavras'}
                       </label>
                       <input type="number" min={5} max={20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                    </div>
+                  )}
+
+                  {activeMode === 'sequencia' && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Duração</label>
+                      <select value={duration} onChange={e => setDuration(e.target.value)} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm">
+                        <option value="1 aula">1 aula (3 etapas)</option>
+                        <option value="1 semana">1 semana (5 etapas)</option>
+                        <option value="1 bimestre">1 bimestre (8 etapas)</option>
+                      </select>
                     </div>
                   )}
 
@@ -7783,8 +7846,9 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
               {result && (() => {
                 const activityLabels: Record<GameMode, string> = {
-                  story: 'Campanha Narrativa', quiz: 'Quiz Avaliativo', wordsearch: 'Caca-Palavras',
-                  crossword: 'Palavras Cruzadas', bingo: 'Bingo Educativo', escape: 'Escape Room', memory: 'Jogo da Memoria'
+                  story: 'Metáfora Narrativa', quiz: 'Quiz Avaliativo', wordsearch: 'Caça-Palavras',
+                  crossword: 'Palavras Cruzadas', bingo: 'Bingo Educativo', escape: 'Escape Room', memory: 'Jogo da Memória',
+                  sequencia: 'Sequência Didática', flashcard: 'Flashcards'
                 };
                 const printOpts = {
                   title: result.title || topic,
@@ -7794,7 +7858,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                   teacherName: profile.name,
                   schoolName: profile.schoolName || selectedClass?.school,
                   activityLabel: activityLabels[activeMode!],
-                  genre: activeMode === 'story' ? genre : undefined,
+                  genre: activeMode === 'story' ? popTheme : undefined,
                   topic: activeMode === 'story' ? topic : undefined,
                   bingoDim: result.bingoSize || 5,
                 };
@@ -7847,7 +7911,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
                     {activeMode === 'quiz' && result.questions && (
                       <>
-                        <div className="instructions"><b>Instrucoes:</b> Leia cada questao com atencao e marque a alternativa correta.</div>
+                        <div className="instructions"><b>Instruções:</b> Leia cada questão com atenção e marque a alternativa correta.</div>
                         <div className="space-y-3">
                           {result.questions.map((q: any, i: number) => (
                             <div key={i} className="quiz-q">
@@ -7872,7 +7936,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
                     {activeMode === 'wordsearch' && result.grid && (
                       <>
-                        <div className="instructions"><b>Instrucoes:</b> Encontre todas as palavras da lista escondidas na grade. Elas podem aparecer na horizontal, vertical ou diagonal.</div>
+                        <div className="instructions"><b>Instruções:</b> Encontre todas as palavras da lista escondidas na grade. Elas podem aparecer na horizontal, vertical ou diagonal.</div>
                         <div className="ws-wrapper">
                           <div className="ws-grid" style={{ gridTemplateColumns: `repeat(${result.grid.length}, 24px)` }}>
                             {result.grid.flatMap((row: string[], r: number) => row.map((cell: string, c: number) => (
@@ -7889,7 +7953,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
                     {activeMode === 'crossword' && result.words && (
                       <>
-                        <div className="instructions"><b>Instrucoes:</b> Leia cada definição e preencha as palavras na grade — uma letra por quadrado.</div>
+                        <div className="instructions"><b>Instruções:</b> Leia cada definição e preencha as palavras na grade — uma letra por quadrado.</div>
                         {result.crossword ? (
                           <>
                             <div className="overflow-x-auto">
@@ -8003,7 +8067,7 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
 
                     {activeMode === 'memory' && result.pairs && (
                       <>
-                        <div className="instructions"><b>Como jogar:</b> Imprima, recorte pelas linhas tracejadas e embaralhe as cartas. Cada aluno (ou dupla) tenta encontrar os pares conceito-definicao virando duas cartas por vez.</div>
+                        <div className="instructions"><b>Como jogar:</b> Imprima, recorte pelas linhas tracejadas e embaralhe as cartas. Cada aluno (ou dupla) tenta encontrar os pares conceito-definição virando duas cartas por vez.</div>
                         <div className="memory-grid">
                           {result.pairs.flatMap((p: any, i: number) => [
                             <div key={`c-${i}`} className="memory-pair concept">
@@ -8012,6 +8076,33 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
                             </div>,
                             <div key={`d-${i}`} className="memory-pair">{p.definition}</div>
                           ])}
+                        </div>
+                      </>
+                    )}
+
+                    {activeMode === 'sequencia' && result.markdown && (
+                      <div className="markdown-body prose prose-sm max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.markdown}</ReactMarkdown>
+                      </div>
+                    )}
+
+                    {activeMode === 'flashcard' && result.cards && (
+                      <>
+                        <div className="instructions"><b>Como usar:</b> Imprima, recorte pelas linhas tracejadas e dobre cada cartão ao meio — a pergunta fica na frente e a resposta no verso. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
+                        <div className="memory-grid">
+                          {result.cards.map((c: any, i: number) => (
+                            <React.Fragment key={i}>
+                              <div className="memory-pair concept">
+                                {c.emoji && <span style={{fontSize:18,display:'block',marginBottom:2}}>{c.emoji}</span>}
+                                <span style={{fontSize:9,display:'block',opacity:0.6,marginBottom:2,letterSpacing:1}}>FRENTE · {i + 1}</span>
+                                {c.front}
+                              </div>
+                              <div className="memory-pair">
+                                <span style={{fontSize:9,display:'block',opacity:0.6,marginBottom:2,letterSpacing:1}}>VERSO · {i + 1}</span>
+                                {c.back}
+                              </div>
+                            </React.Fragment>
+                          ))}
                         </div>
                       </>
                     )}
@@ -8027,34 +8118,3016 @@ Retorne APENAS JSON: {"title":"...","pairs":[{"concept":"...","definition":"..."
   );
 };
 
+const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string) => {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
+  const typeLabel = ({ plan: 'Plano de Aula', activities: 'Atividades', exam: 'Avaliação' } as Record<string, string>)[type] || type;
+  const today = new Date().toLocaleDateString('pt-BR');
+  const htmlContent = content
+    // Tabelas markdown (GFM) → <table>
+    .replace(/(^\|.+\|[ \t]*\n\|[-:| \t]+\|[ \t]*\n(?:^\|.+\|[ \t]*\n?)*)/gm, (tbl) => {
+      const rows = tbl.trim().split('\n').filter(r => r.trim().startsWith('|'));
+      if (rows.length < 2) return tbl;
+      const cells = (r: string) => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim().replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'));
+      const head = cells(rows[0]);
+      const body = rows.slice(2).map(cells);
+      return '<table><thead><tr>' + head.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' +
+        body.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>\n';
+    })
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^---$/gm, '<hr>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
+    .replace(/\n/g, '<br>');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
+    @page { size: A4; margin: 2cm; }
+    * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.6; margin: 0; font-size: 12px; }
+    .header { background: #4338ca; color: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .header-left h1 { margin: 0 0 4px; font-size: 20px; font-weight: 900; }
+    .header-left .tag { background: rgba(255,255,255,0.2); border-radius: 20px; padding: 3px 10px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; display: inline-block; margin-bottom: 8px; }
+    .header-meta { font-size: 9px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-top: 8px; }
+    .field { border-bottom: 1px solid rgba(255,255,255,0.4); padding-bottom: 2px; }
+    .field-label { font-size: 7.5px; font-weight: 700; color: rgba(255,255,255,0.6); letter-spacing: 1px; text-transform: uppercase; }
+    .field-val { font-size: 10px; color: white; font-weight: 600; min-height: 14px; }
+    h1 { font-size: 16px; font-weight: 900; color: #1e293b; margin: 20px 0 6px; border-left: 4px solid #4338ca; padding-left: 10px; }
+    h2 { font-size: 13px; font-weight: 900; color: white; background: #4338ca; padding: 4px 12px; border-radius: 6px; display: inline-block; margin: 14px 0 6px; }
+    h3 { font-size: 12px; font-weight: 700; color: #334155; margin: 10px 0 4px; }
+    p, li { margin: 4px 0; font-size: 11.5px; }
+    ul { padding-left: 20px; margin: 4px 0; }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
+    strong { font-weight: 800; color: #0f172a; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10.5px; }
+    th { background: #4338ca; color: white; font-weight: 800; padding: 6px 8px; text-align: left; border: 1px solid #4338ca; }
+    td { padding: 6px 8px; border: 1px solid #e2e8f0; vertical-align: top; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
+  </style></head><body>
+  <div class="header">
+    <div class="header-left">
+      <div class="tag">${typeLabel}</div>
+      <h1>${title}</h1>
+      <div class="header-meta">Gerado pelo Prof. Corujão · ${today}</div>
+      <div class="fields">
+        <div class="field"><div class="field-label">PROFESSOR(A)</div><div class="field-val">${teacherName || ''}</div></div>
+        <div class="field"><div class="field-label">DATA</div><div class="field-val"></div></div>
+        <div class="field"><div class="field-label">ESCOLA</div><div class="field-val">${schoolName || ''}</div></div>
+        <div class="field"><div class="field-label">TURMA</div><div class="field-val"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="content">${htmlContent}</div>
+  <div class="footer">Prof. Corujão — Material gerado por IA · Revise antes de usar</div>
+  <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`);
+  w.document.close();
+};
+
 const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, notifications, setNotifications }: { savedResources: SavedResource[], setSavedResources: (r: SavedResource[]) => void, profile: UserProfile, setScreen: (s: Screen) => void, notifications?: any[], setNotifications?: (n: any[]) => void }) => {
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const typeMeta: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
+    slides:     { color: 'bg-indigo-500',  label: 'Slides',     icon: <Presentation size={18} /> },
+    activities: { color: 'bg-amber-500',   label: 'Atividades', icon: <FileText size={18} /> },
+    exam:       { color: 'bg-emerald-500', label: 'Prova',      icon: <FileQuestion size={18} /> },
+    plan:       { color: 'bg-cyan-500',    label: 'Plano',      icon: <BookOpen size={18} /> },
+  };
+
+  const filtered = savedResources
+    .filter(r => typeFilter === 'all' || r.type === typeFilter)
+    .filter(r => !search.trim() || r.title.toLowerCase().includes(search.trim().toLowerCase()))
+    .sort((a, b) => b.date - a.date);
+
+  const handleDelete = (id: string) => {
+    setSavedResources(savedResources.filter(r => r.id !== id));
+    setDeleteConfirmId(null);
+  };
+
+  const handlePrint = (resource: SavedResource) => {
+    const content = typeof resource.content === 'string' ? resource.content : '';
+    if (!content) { toast.info('Esse material não tem conteúdo de texto para imprimir.'); return; }
+    printPlannerContent(resource.title, content, resource.type as 'plan' | 'activities' | 'exam', profile.name, profile.schoolName);
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Histórico" subtitle="Materiais gerados recentemente" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+
+      {savedResources.length > 0 && (
+        <>
+          {/* Search */}
+          <div className="relative mb-3">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por título..."
+              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-2xl focus:outline-none focus:border-indigo-400 bg-white"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Type filter chips */}
+          <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
+            {[['all','Todos'], ['slides','Slides'], ['activities','Atividades'], ['exam','Provas'], ['plan','Planos']].map(([v, l]) => (
+              <button key={v} onClick={() => setTypeFilter(v)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex-shrink-0 transition-colors ${typeFilter === v ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Count */}
+          <p className="text-xs text-gray-400 font-medium mb-3 px-1">
+            {filtered.length} {filtered.length === 1 ? 'material' : 'materiais'}{typeFilter !== 'all' || search ? ' encontrados' : ' no total'}
+          </p>
+        </>
+      )}
+
       {savedResources.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Archive size={44} className="mx-auto mb-3 opacity-20" />
           <p className="text-sm font-medium">Nenhum material salvo</p>
           <button onClick={() => setScreen('planner')} className="mt-4 bg-indigo-600 text-white px-6 py-2.5 rounded-full text-sm font-bold">Criar Material</button>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <Search size={36} className="mx-auto mb-3 opacity-20" />
+          <p className="text-sm font-medium">Nenhum material encontrado</p>
+          <button onClick={() => { setSearch(''); setTypeFilter('all'); }} className="mt-3 text-indigo-600 text-sm font-bold">Limpar filtros</button>
+        </div>
       ) : (
-        <div className="space-y-4">
-          {savedResources.map(resource => (
-            <div key={resource.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 ${resource.type === 'slides' ? 'bg-indigo-500' : resource.type === 'activities' ? 'bg-amber-500' : resource.type === 'plan' ? 'bg-cyan-500' : 'bg-emerald-500'}`}>
-                {resource.type === 'slides' ? <Presentation size={20} /> : resource.type === 'activities' ? <FileText size={20} /> : resource.type === 'plan' ? <BookOpen size={20} /> : <FileQuestion size={20} />}
+        <div className="space-y-3">
+          {filtered.map(resource => {
+            const meta = typeMeta[resource.type] || typeMeta.plan;
+            const hasTextContent = typeof resource.content === 'string' && !!resource.content;
+            return (
+              <div key={resource.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0 ${meta.color}`}>
+                    {meta.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{resource.title}</h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${meta.color}`}>{meta.label}</span>
+                      <span className="text-[10px] text-gray-400">{new Date(resource.date).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {hasTextContent && (
+                      <button
+                        onClick={() => handlePrint(resource)}
+                        className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-indigo-400 active:scale-90 transition-transform"
+                        title="Imprimir / PDF"
+                      >
+                        <Download size={15} />
+                      </button>
+                    )}
+                    {deleteConfirmId === resource.id ? (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleDelete(resource.id)} className="px-2.5 py-1.5 bg-red-500 text-white text-xs font-bold rounded-xl">Excluir</button>
+                        <button onClick={() => setDeleteConfirmId(null)} className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-xl">Não</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setDeleteConfirmId(resource.id)}
+                        className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-red-300 active:scale-90 transition-transform"
+                        title="Excluir"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-900 truncate">{resource.title}</h3>
-                <span className="text-xs text-gray-400">{new Date(resource.date).toLocaleDateString()}</span>
-              </div>
-              <button onClick={() => setSavedResources(savedResources.filter(r => r.id !== resource.id))} className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-colors">
-                <Plus size={20} className="rotate-45" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+    </motion.div>
+  );
+};
+
+// ─── Gamificação de Turma ─────────────────────────────────────────────────────
+interface GamiBehavior { id: string; label: string; points: number; emoji: string; }
+interface GamiReward { id: string; label: string; cost: number; emoji: string; }
+interface GamiTeam { id: string; name: string; emoji: string; color: string; }
+interface GamiStudent {
+  id: string;
+  name: string;
+  xp: number;          // XP da temporada (zera por bimestre)
+  totalXp: number;     // XP acumulado de toda a vida — nunca diminui, define o nível
+  weekXp: number;      // XP da semana corrente
+  coins: number;       // moedas gastáveis na loja
+  teamId?: string;
+  badges: string[];
+  streak: number;
+  lastPointDay?: string;
+  participatedDay?: string;
+}
+interface GamiLogEntry { id: string; studentIds: string[]; label: string; emoji: string; points: number; coins?: number; kind?: 'award' | 'purchase'; date: number; }
+interface GamiMission { goal: number; reward: string; progress: number; weekKey: string; }
+interface GamiHallEntry { season: number; date: number; top: { name: string; xp: number }[]; }
+interface ClassGamification {
+  id: string;          // == id da turma (ClassSchedule)
+  students: GamiStudent[];
+  teams: GamiTeam[];
+  behaviors: GamiBehavior[];
+  rewards: GamiReward[];
+  log: GamiLogEntry[];
+  season: number;
+  weekKey: string;
+  hallOfFame: GamiHallEntry[];
+  mission?: GamiMission | null;
+  missionDoneWeek?: string;
+  customEvents?: string[];
+  skin: 'coruja' | 'emblema';
+  soundOn: boolean;
+}
+
+const GAMI_LEVELS = [
+  { min: 0,   name: 'Aprendiz' },
+  { min: 40,  name: 'Explorador' },
+  { min: 100, name: 'Estudioso' },
+  { min: 200, name: 'Sábio' },
+  { min: 320, name: 'Mestre' },
+  { min: 480, name: 'Lenda' },
+];
+const GAMI_SKINS: Record<'coruja' | 'emblema', string[]> = {
+  coruja:  ['🥚', '🐣', '🦉', '🌟', '🎓', '👑'],
+  emblema: ['🛡️', '🥉', '🥈', '🥇', '💎', '👑'],
+};
+const gamiLevel = (totalXp: number) => {
+  let idx = 0;
+  GAMI_LEVELS.forEach((l, i) => { if (totalXp >= l.min) idx = i; });
+  return idx;
+};
+const gamiLevelProgress = (totalXp: number) => {
+  const idx = gamiLevel(totalXp);
+  if (idx >= GAMI_LEVELS.length - 1) return 1;
+  const cur = GAMI_LEVELS[idx].min, next = GAMI_LEVELS[idx + 1].min;
+  return Math.min(1, (totalXp - cur) / (next - cur));
+};
+
+const GAMI_BADGES: { id: string; name: string; emoji: string; desc: string; check: (s: GamiStudent) => boolean }[] = [
+  { id: 'primeiro',  name: 'Primeiro Passo',  emoji: '🌱', desc: 'Ganhou o primeiro ponto',        check: s => s.totalXp >= 1 },
+  { id: 'chamas',    name: 'Em Chamas',       emoji: '🔥', desc: '3 dias seguidos ganhando pontos', check: s => (s.streak || 0) >= 3 },
+  { id: 'semana',    name: 'Semana Perfeita', emoji: '⚡', desc: '5 dias seguidos ganhando pontos', check: s => (s.streak || 0) >= 5 },
+  { id: 'centuriao', name: 'Centurião',       emoji: '💯', desc: 'Alcançou 100 XP',                 check: s => s.totalXp >= 100 },
+  { id: 'foguete',   name: 'Foguete',         emoji: '🚀', desc: 'Alcançou 250 XP',                 check: s => s.totalXp >= 250 },
+  { id: 'lenda',     name: 'Lenda Viva',      emoji: '👑', desc: 'Alcançou 480 XP',                 check: s => s.totalXp >= 480 },
+];
+
+const GAMI_DEFAULT_BEHAVIORS: GamiBehavior[] = [
+  { id: 'gb1', label: 'Participou da aula', points: 1,  emoji: '🙋' },
+  { id: 'gb2', label: 'Ajudou um colega',   points: 2,  emoji: '🤝' },
+  { id: 'gb3', label: 'Tarefa completa',    points: 2,  emoji: '📘' },
+  { id: 'gb4', label: 'Esforço extra',      points: 2,  emoji: '💪' },
+  { id: 'gb5', label: 'Gentileza',          points: 1,  emoji: '💜' },
+  { id: 'gb6', label: 'Atrapalhou a aula',  points: -1, emoji: '🔇' },
+  { id: 'gb7', label: 'Sem tarefa',         points: -1, emoji: '📕' },
+];
+const GAMI_DEFAULT_REWARDS: GamiReward[] = [
+  { id: 'gr1', label: 'Ajudante do dia',              cost: 10, emoji: '⭐' },
+  { id: 'gr2', label: 'Primeiro da fila',             cost: 10, emoji: '🚶' },
+  { id: 'gr3', label: 'Sentar onde quiser (1 dia)',   cost: 15, emoji: '🪑' },
+  { id: 'gr4', label: 'Escolher a música/brincadeira', cost: 20, emoji: '🎵' },
+  { id: 'gr5', label: 'Mensagem positiva para casa',  cost: 25, emoji: '💌' },
+  { id: 'gr6', label: '+1 dia no prazo da tarefa',    cost: 30, emoji: '📅' },
+];
+const GAMI_TEAM_PRESETS = [
+  { name: 'Corujas',  emoji: '🦉', color: '#6366f1' },
+  { name: 'Fênix',    emoji: '🔥', color: '#ef4444' },
+  { name: 'Dragões',  emoji: '🐉', color: '#10b981' },
+  { name: 'Tubarões', emoji: '🦈', color: '#0ea5e9' },
+  { name: 'Águias',   emoji: '🦅', color: '#f59e0b' },
+  { name: 'Lobos',    emoji: '🐺', color: '#8b5cf6' },
+];
+const GAMI_EVENTS: { text: string; emoji: string; quick?: number }[] = [
+  { text: 'Dia da Gentileza: pontos em dobro para quem ajudar um colega hoje!', emoji: '💜' },
+  { text: 'Quem trouxe todo o material hoje ganha pontos!', emoji: '🎒', quick: 2 },
+  { text: 'Desafio do Silêncio: 10 minutos de trabalho concentrado valem pontos para a turma toda.', emoji: '🤫' },
+  { text: 'Hoje é dia de elogiar: cada elogio sincero a um colega vale ponto extra.', emoji: '🌟' },
+  { text: 'Mesa organizada no fim da aula = pontos para a equipe!', emoji: '🧹' },
+  { text: 'Pergunta de Ouro: quem fizer a melhor pergunta da aula ganha pontos em dobro.', emoji: '❓' },
+  { text: 'Dia do Capricho: trabalhos com capricho extra valem pontos a mais.', emoji: '✍️' },
+  { text: 'Toda a turma chegou no horário? Pontos para todos!', emoji: '⏰', quick: 1 },
+  { text: 'Hoje quem lê em voz alta ganha ponto de coragem.', emoji: '📖' },
+  { text: 'Modo Espião: o professor vai observar em segredo quem mais colabora hoje.', emoji: '🕵️' },
+  { text: 'Dia da Dupla: trabalhem em duplas — as duplas que terminarem juntas ganham pontos.', emoji: '👥' },
+  { text: 'Energia positiva: a equipe mais animada (sem bagunça!) ganha pontos no fim da aula.', emoji: '🎉' },
+  { text: 'Quem usar a palavra mágica do dia em uma frase correta ganha ponto!', emoji: '🪄' },
+  { text: 'Recorde da turma: superem o número de participações da última aula e todos ganham!', emoji: '🏆' },
+  { text: 'Dia do Mestre Ajudante: quem explicar algo para um colega ganha pontos de mestre.', emoji: '🎓' },
+  { text: 'Sorteio surpresa no fim da aula entre quem completou tudo!', emoji: '🎁' },
+];
+
+const gamiRid = () => Math.random().toString(36).slice(2, 10);
+const gamiWeekKey = () => {
+  const d = new Date();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+};
+const gamiTodayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const gamiYesterdayKey = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const playChime = (positive = true) => {
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(positive ? 880 : 330, ctx.currentTime);
+    if (positive) o.frequency.exponentialRampToValueAtTime(1318, ctx.currentTime + 0.12);
+    g.gain.setValueAtTime(0.10, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+    o.start();
+    o.stop(ctx.currentTime + 0.4);
+    setTimeout(() => { try { ctx.close(); } catch {} }, 600);
+  } catch { /* sem áudio disponível */ }
+};
+
+const gamiDefaultClass = (classId: string): ClassGamification => ({
+  id: classId,
+  students: [],
+  teams: [],
+  behaviors: GAMI_DEFAULT_BEHAVIORS,
+  rewards: GAMI_DEFAULT_REWARDS,
+  log: [],
+  season: 1,
+  weekKey: gamiWeekKey(),
+  hallOfFame: [],
+  mission: null,
+  customEvents: [],
+  skin: 'coruja',
+  soundOn: true,
+});
+
+// ─── Ferramentas ao vivo (overlay em tela cheia, ideais para projetar) ────────
+const GamiToolShell = ({ title, emoji, onClose, children, dark }: { title: string; emoji: string; onClose: () => void; children: React.ReactNode; dark?: boolean }) => (
+  <motion.div
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    className={`fixed inset-0 z-[130] flex flex-col ${dark ? 'bg-gray-900' : 'bg-[#F8F9FE]'}`}
+  >
+    <div className={`flex items-center justify-between px-5 pt-5 pb-3 ${dark ? 'text-white' : 'text-gray-900'}`}>
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">{emoji}</span>
+        <h2 className="text-lg font-black">{title}</h2>
+      </div>
+      <button onClick={onClose} className={`w-9 h-9 rounded-full flex items-center justify-center ${dark ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-500'}`}>
+        <X size={18} />
+      </button>
+    </div>
+    <div className="flex-1 overflow-y-auto px-5 pb-8 flex flex-col">{children}</div>
+  </motion.div>
+);
+
+const GamiSorteio = ({ students, onClose, onAwardParticipation }: { students: GamiStudent[]; onClose: () => void; onAwardParticipation: (id: string) => void }) => {
+  const [fair, setFair] = useState(true);
+  const [drawn, setDrawn] = useState<string[]>([]);
+  const [winner, setWinner] = useState<GamiStudent | null>(null);
+  const [spinning, setSpinning] = useState(false);
+  const [display, setDisplay] = useState('');
+  const [awarded, setAwarded] = useState(false);
+
+  const pool = students.filter(s => !fair || !drawn.includes(s.id));
+
+  const spin = () => {
+    if (pool.length === 0 || spinning) return;
+    setSpinning(true); setWinner(null); setAwarded(false);
+    const total = 20 + Math.floor(Math.random() * 8);
+    const tick = (n: number) => {
+      setDisplay(pool[Math.floor(Math.random() * pool.length)].name);
+      if (n >= total) {
+        const w = pool[Math.floor(Math.random() * pool.length)];
+        setWinner(w); setDisplay(w.name);
+        setDrawn(d => [...d, w.id]);
+        setSpinning(false);
+        return;
+      }
+      setTimeout(() => tick(n + 1), 35 + n * 9);
+    };
+    tick(0);
+  };
+
+  return (
+    <GamiToolShell title="Sorteador" emoji="🎯" onClose={onClose}>
+      <div className="flex-1 flex flex-col items-center justify-center gap-6">
+        <motion.div
+          key={display}
+          initial={{ scale: 0.96, opacity: 0.7 }} animate={{ scale: 1, opacity: 1 }}
+          className={`w-full max-w-md rounded-[2rem] py-14 px-6 text-center shadow-xl border-2 ${winner ? 'bg-indigo-600 border-indigo-700' : 'bg-white border-indigo-100'}`}
+        >
+          <p className={`text-3xl sm:text-4xl font-black break-words ${winner ? 'text-white' : 'text-gray-900'}`}>
+            {display || (pool.length === 0 ? 'Todos já foram sorteados! 🎉' : 'Toque em Sortear')}
+          </p>
+          {winner && <p className="text-indigo-200 text-sm font-bold mt-3">✨ Sorteado!</p>}
+        </motion.div>
+        {winner && !awarded && (
+          <button
+            onClick={() => { onAwardParticipation(winner.id); setAwarded(true); }}
+            className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 active:scale-95 transition-transform"
+          >
+            🙋 +1 Participação para {winner.name.split(' ')[0]}
+          </button>
+        )}
+        {awarded && <p className="text-emerald-600 text-sm font-bold">Ponto registrado! ✓</p>}
+      </div>
+      <div className="space-y-3">
+        <label className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm">
+          <span className="text-sm font-bold text-gray-700">Modo justo (não repete sorteados)</span>
+          <input type="checkbox" checked={fair} onChange={e => setFair(e.target.checked)} className="w-5 h-5 accent-indigo-600" />
+        </label>
+        {fair && drawn.length > 0 && (
+          <div className="flex items-center justify-between text-xs text-gray-400 px-1">
+            <span>{drawn.length} de {students.length} já sorteados</span>
+            <button onClick={() => setDrawn([])} className="text-indigo-500 font-bold">Reiniciar rodada</button>
+          </div>
+        )}
+        <button
+          onClick={spin}
+          disabled={spinning || pool.length === 0}
+          className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-50 active:scale-[0.98] transition-transform"
+        >
+          {spinning ? 'Sorteando…' : '🎲 Sortear'}
+        </button>
+      </div>
+    </GamiToolShell>
+  );
+};
+
+const GamiTimer = ({ onClose }: { onClose: () => void }) => {
+  const [totalSecs, setTotalSecs] = useState(0);
+  const [left, setLeft] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [customMin, setCustomMin] = useState('');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!running) { if (intervalRef.current) clearInterval(intervalRef.current); return; }
+    intervalRef.current = setInterval(() => {
+      setLeft(l => {
+        if (l <= 1) {
+          setRunning(false);
+          playChime(true); setTimeout(() => playChime(true), 350); setTimeout(() => playChime(true), 700);
+          return 0;
+        }
+        return l - 1;
+      });
+    }, 1000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [running]);
+
+  const start = (mins: number) => {
+    const s = Math.max(1, Math.round(mins * 60));
+    setTotalSecs(s); setLeft(s); setRunning(true);
+  };
+  const mm = String(Math.floor(left / 60)).padStart(2, '0');
+  const ss = String(left % 60).padStart(2, '0');
+  const pct = totalSecs > 0 ? left / totalSecs : 0;
+  const urgent = left > 0 && left <= 10;
+  const warn = left > 10 && left <= 60;
+  const owl = left === 0 && totalSecs > 0 ? '⏰' : urgent ? '😱' : warn ? '🦉' : '😴';
+
+  return (
+    <GamiToolShell title="Timer" emoji="⏱️" onClose={onClose} dark>
+      <div className="flex-1 flex flex-col items-center justify-center gap-6">
+        <span className="text-6xl">{owl}</span>
+        <p className={`font-black tabular-nums tracking-tight ${urgent ? 'text-red-400' : warn ? 'text-amber-300' : 'text-white'}`} style={{ fontSize: 'min(26vw, 9rem)', lineHeight: 1 }}>
+          {mm}:{ss}
+        </p>
+        {totalSecs > 0 && (
+          <div className="w-full max-w-md h-3 bg-white/10 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all duration-1000 ${urgent ? 'bg-red-500' : warn ? 'bg-amber-400' : 'bg-indigo-500'}`} style={{ width: `${pct * 100}%` }} />
+          </div>
+        )}
+        {left === 0 && totalSecs > 0 && <p className="text-amber-300 font-black text-xl">Tempo esgotado!</p>}
+      </div>
+      <div className="space-y-3">
+        <div className="grid grid-cols-4 gap-2">
+          {[1, 2, 5, 10].map(m => (
+            <button key={m} onClick={() => start(m)} className="bg-white/10 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform">{m} min</button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="number" min={1} max={120} value={customMin} onChange={e => setCustomMin(e.target.value)}
+            placeholder="Minutos…" className="flex-1 bg-white/10 text-white placeholder-white/40 rounded-2xl px-4 py-3 font-bold focus:outline-none"
+          />
+          <button onClick={() => { const m = parseInt(customMin, 10); if (m > 0) start(Math.min(m, 120)); }} className="bg-indigo-600 text-white font-bold px-5 rounded-2xl">Iniciar</button>
+        </div>
+        {totalSecs > 0 && (
+          <div className="flex gap-2">
+            <button onClick={() => setRunning(r => !r)} disabled={left === 0} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-40">
+              {running ? <><Pause size={16} /> Pausar</> : <><Play size={16} /> Continuar</>}
+            </button>
+            <button onClick={() => { setRunning(false); setLeft(totalSecs); }} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+              <RotateCcw size={16} /> Reiniciar
+            </button>
+          </div>
+        )}
+      </div>
+    </GamiToolShell>
+  );
+};
+
+const GamiGrupos = ({ students, onClose }: { students: GamiStudent[]; onClose: () => void }) => {
+  const [groupSize, setGroupSize] = useState(4);
+  const [separations, setSeparations] = useState<[string, string][]>([]);
+  const [selA, setSelA] = useState('');
+  const [selB, setSelB] = useState('');
+  const [groups, setGroups] = useState<GamiStudent[][] | null>(null);
+
+  const violates = (gs: GamiStudent[][]) =>
+    separations.some(([a, b]) => gs.some(g => g.some(s => s.id === a) && g.some(s => s.id === b)));
+
+  const generate = () => {
+    if (students.length === 0) return;
+    let best: GamiStudent[][] | null = null;
+    for (let attempt = 0; attempt < 250; attempt++) {
+      const shuffled = [...students].sort(() => Math.random() - 0.5);
+      const count = Math.max(1, Math.ceil(shuffled.length / groupSize));
+      const gs: GamiStudent[][] = Array.from({ length: count }, () => []);
+      shuffled.forEach((s, i) => gs[i % count].push(s));
+      if (!violates(gs)) { best = gs; break; }
+      if (!best) best = gs;
+    }
+    setGroups(best);
+  };
+
+  return (
+    <GamiToolShell title="Gerador de Grupos" emoji="👥" onClose={onClose}>
+      {!groups ? (
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Alunos por grupo</label>
+            <div className="grid grid-cols-4 gap-2">
+              {[2, 3, 4, 5].map(n => (
+                <button key={n} onClick={() => setGroupSize(n)} className={`py-3 rounded-2xl font-bold border-2 transition-colors ${groupSize === n ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500 bg-white'}`}>{n}</button>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Separar alunos (opcional)</p>
+            <div className="flex gap-2 items-center">
+              <select value={selA} onChange={e => setSelA(e.target.value)} className="flex-1 border border-gray-200 rounded-xl px-2 py-2 text-sm bg-white min-w-0">
+                <option value="">Aluno…</option>
+                {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <span className="text-gray-300 font-black shrink-0">✕</span>
+              <select value={selB} onChange={e => setSelB(e.target.value)} className="flex-1 border border-gray-200 rounded-xl px-2 py-2 text-sm bg-white min-w-0">
+                <option value="">Aluno…</option>
+                {students.filter(s => s.id !== selA).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <button
+                onClick={() => { if (selA && selB) { setSeparations(p => [...p, [selA, selB]]); setSelA(''); setSelB(''); } }}
+                disabled={!selA || !selB}
+                className="bg-indigo-600 text-white w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40 shrink-0"
+              ><Plus size={16} /></button>
+            </div>
+            {separations.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {separations.map(([a, b], i) => (
+                  <div key={i} className="flex items-center justify-between bg-red-50 rounded-xl px-3 py-1.5 text-xs">
+                    <span className="text-red-600 font-medium">{students.find(s => s.id === a)?.name} ✕ {students.find(s => s.id === b)?.name}</span>
+                    <button onClick={() => setSeparations(p => p.filter((_, j) => j !== i))} className="text-red-400"><X size={13} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={generate} disabled={students.length === 0} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-50">
+            <Shuffle size={18} className="inline mr-2 -mt-1" />Sortear grupos
+          </button>
+          {students.length === 0 && <p className="text-center text-sm text-gray-400">Cadastre os alunos da turma primeiro.</p>}
+        </div>
+      ) : (
+        <div className="flex flex-col flex-1">
+          <div className="grid grid-cols-2 gap-3 flex-1 content-start">
+            {groups.map((g, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <p className="text-xs font-black text-indigo-500 uppercase tracking-wider mb-2">Grupo {i + 1}</p>
+                {g.map(s => <p key={s.id} className="text-sm font-bold text-gray-800 leading-relaxed">{s.name}</p>)}
+              </motion.div>
+            ))}
+          </div>
+          <button onClick={generate} className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl mt-4 flex items-center justify-center gap-2">
+            <Shuffle size={16} /> Sortear de novo
+          </button>
+        </div>
+      )}
+    </GamiToolShell>
+  );
+};
+
+const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onRewardClass: (points: number) => void }) => {
+  const [level, setLevel] = useState(0);
+  const [err, setErr] = useState('');
+  const [challenge, setChallenge] = useState<{ left: number; total: number; strikes: number; status: 'on' | 'win' | 'fail' } | null>(null);
+  const levelRef = useRef(0);
+  const rafRef = useRef(0);
+  const streamRef = useRef<MediaStream | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new Ctx();
+        ctxRef.current = ctx;
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        src.connect(analyser);
+        const data = new Uint8Array(analyser.fftSize);
+        const loop = () => {
+          if (cancelled) return;
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
+          const rms = Math.sqrt(sum / data.length);
+          const next = Math.min(1, levelRef.current * 0.82 + rms * 3.2 * 0.18);
+          levelRef.current = next;
+          setLevel(next);
+          rafRef.current = requestAnimationFrame(loop);
+        };
+        loop();
+      } catch {
+        if (!cancelled) setErr('Não consegui acessar o microfone. Verifique a permissão do navegador.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      try { ctxRef.current?.close(); } catch {}
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!challenge || challenge.status !== 'on') return;
+    const id = setInterval(() => {
+      setChallenge(c => {
+        if (!c || c.status !== 'on') return c;
+        const noisy = levelRef.current > 0.5;
+        const strikes = noisy ? c.strikes + 1 : c.strikes;
+        if (strikes > 12) { playChime(false); return { ...c, strikes, status: 'fail' }; }
+        if (c.left <= 1) { playChime(true); setTimeout(() => playChime(true), 300); return { ...c, left: 0, status: 'win' }; }
+        return { ...c, left: c.left - 1, strikes };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [challenge?.status]);
+
+  const owl = level < 0.25 ? '😴' : level < 0.5 ? '🦉' : level < 0.75 ? '😯' : '🙀';
+  const zoneLabel = level < 0.25 ? 'Silêncio perfeito' : level < 0.5 ? 'Murmúrio de trabalho' : level < 0.75 ? 'Está ficando alto…' : 'MUITO BARULHO!';
+  const zoneColor = level < 0.5 ? 'text-emerald-600' : level < 0.75 ? 'text-amber-500' : 'text-red-500';
+
+  return (
+    <GamiToolShell title="Medidor de Barulho" emoji="🔊" onClose={onClose}>
+      {err ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+          <Volume2 size={40} className="text-gray-300" />
+          <p className="text-sm text-gray-500 max-w-xs">{err}</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 flex flex-col items-center justify-center gap-5">
+            <motion.span animate={{ scale: 1 + level * 0.5 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="text-7xl">{owl}</motion.span>
+            <p className={`font-black text-xl ${zoneColor}`}>{zoneLabel}</p>
+            <div className="w-full max-w-md h-7 bg-gray-100 rounded-full overflow-hidden relative border border-gray-200">
+              <div
+                className={`h-full rounded-full transition-all duration-150 ${level < 0.5 ? 'bg-emerald-400' : level < 0.75 ? 'bg-amber-400' : 'bg-red-500'}`}
+                style={{ width: `${level * 100}%` }}
+              />
+              <div className="absolute top-0 bottom-0 w-0.5 bg-gray-400/70" style={{ left: '50%' }} />
+            </div>
+            {challenge && (
+              <div className={`w-full max-w-md rounded-2xl p-4 text-center border-2 ${challenge.status === 'win' ? 'bg-emerald-50 border-emerald-300' : challenge.status === 'fail' ? 'bg-red-50 border-red-200' : 'bg-white border-indigo-200'}`}>
+                {challenge.status === 'on' && (
+                  <>
+                    <p className="text-4xl font-black text-indigo-700 tabular-nums">{String(Math.floor(challenge.left / 60)).padStart(2, '0')}:{String(challenge.left % 60).padStart(2, '0')}</p>
+                    <p className="text-xs text-gray-500 font-bold mt-1">Desafio do Silêncio em andamento · avisos: {challenge.strikes}/12</p>
+                  </>
+                )}
+                {challenge.status === 'win' && (
+                  <>
+                    <p className="text-lg font-black text-emerald-700">🎉 A turma venceu o desafio!</p>
+                    <button
+                      onClick={() => { onRewardClass(2); setChallenge(null); }}
+                      className="mt-3 bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-2xl"
+                    >Dar +2 pontos para todos</button>
+                  </>
+                )}
+                {challenge.status === 'fail' && (
+                  <>
+                    <p className="text-lg font-black text-red-600">O barulho venceu desta vez… 😅</p>
+                    <button onClick={() => setChallenge(null)} className="mt-3 bg-gray-200 text-gray-700 font-bold px-5 py-2.5 rounded-2xl">Fechar desafio</button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          {!challenge && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-gray-400 uppercase text-center">Desafio do Silêncio — turma fica abaixo da linha e ganha pontos</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[3, 5, 10].map(m => (
+                  <button key={m} onClick={() => setChallenge({ left: m * 60, total: m * 60, strikes: 0, status: 'on' })} className="bg-indigo-600 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform">{m} min</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </GamiToolShell>
+  );
+};
+
+const GamiSemaforo = ({ onClose }: { onClose: () => void }) => {
+  const [state, setState] = useState<0 | 1 | 2>(0);
+  const meta = [
+    { bg: 'bg-emerald-500', emoji: '🟢', label: 'PODE CONVERSAR', sub: 'Trabalho em grupo liberado' },
+    { bg: 'bg-amber-400',   emoji: '🟡', label: 'VOZ BAIXA',       sub: 'Só murmúrio de trabalho' },
+    { bg: 'bg-red-500',     emoji: '🔴', label: 'SILÊNCIO',        sub: 'Atenção total ao professor' },
+  ][state];
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className={`fixed inset-0 z-[130] flex flex-col items-center justify-center ${meta.bg} transition-colors duration-500 cursor-pointer select-none`}
+      onClick={() => setState(s => ((s + 1) % 3) as 0 | 1 | 2)}
+    >
+      <button onClick={e => { e.stopPropagation(); onClose(); }} className="absolute top-5 right-5 w-10 h-10 rounded-full bg-black/20 text-white flex items-center justify-center"><X size={20} /></button>
+      <span className="text-8xl mb-6">{meta.emoji}</span>
+      <p className="text-white font-black text-5xl sm:text-6xl text-center px-6 drop-shadow-md">{meta.label}</p>
+      <p className="text-white/85 font-bold text-lg mt-3">{meta.sub}</p>
+      <p className="text-white/60 text-xs font-bold mt-10 uppercase tracking-widest">Toque na tela para mudar</p>
+    </motion.div>
+  );
+};
+
+const GamiDado = ({ onClose }: { onClose: () => void }) => {
+  const [faces, setFaces] = useState(6);
+  const [value, setValue] = useState<number | null>(null);
+  const [rolling, setRolling] = useState(false);
+  const roll = () => {
+    if (rolling) return;
+    setRolling(true);
+    let n = 0;
+    const tick = () => {
+      setValue(1 + Math.floor(Math.random() * faces));
+      n++;
+      if (n >= 14) { setRolling(false); return; }
+      setTimeout(tick, 40 + n * 14);
+    };
+    tick();
+  };
+  return (
+    <GamiToolShell title="Dado" emoji="🎲" onClose={onClose} dark>
+      <div className="flex-1 flex flex-col items-center justify-center gap-8">
+        <motion.div
+          key={`${value}-${rolling}`}
+          initial={{ rotate: rolling ? -8 : 0, scale: 0.94 }} animate={{ rotate: 0, scale: 1 }}
+          className="w-52 h-52 bg-white rounded-[2.5rem] shadow-2xl flex items-center justify-center"
+        >
+          <span className="text-8xl font-black text-indigo-700 tabular-nums">{value ?? '?'}</span>
+        </motion.div>
+        <div className="flex gap-2">
+          {[6, 10, 20].map(f => (
+            <button key={f} onClick={() => { setFaces(f); setValue(null); }} className={`px-5 py-2.5 rounded-2xl font-bold ${faces === f ? 'bg-indigo-600 text-white' : 'bg-white/10 text-white'}`}>D{f}</button>
+          ))}
+        </div>
+      </div>
+      <button onClick={roll} disabled={rolling} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60">🎲 Rolar dado</button>
+    </GamiToolShell>
+  );
+};
+
+const GamiPlacar = ({ teams, onClose }: { teams: GamiTeam[]; onClose: () => void }) => {
+  const initial = (teams.length >= 2 ? teams.slice(0, 4).map(t => `${t.emoji} ${t.name}`) : ['Time A', 'Time B']);
+  const [names, setNames] = useState<string[]>(initial);
+  const [scores, setScores] = useState<number[]>(initial.map(() => 0));
+  const colors = ['bg-indigo-600', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500'];
+  return (
+    <GamiToolShell title="Placar Rápido" emoji="🏆" onClose={onClose} dark>
+      <div className={`flex-1 grid gap-3 content-center ${names.length <= 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+        {names.map((n, i) => (
+          <div key={i} className={`${colors[i % colors.length]} rounded-[2rem] p-5 flex flex-col items-center justify-center gap-3 shadow-xl`}>
+            <input
+              value={n}
+              onChange={e => setNames(p => p.map((x, j) => j === i ? e.target.value : x))}
+              className="bg-transparent text-white font-black text-center text-sm w-full focus:outline-none placeholder-white/50"
+            />
+            <p className="text-white font-black tabular-nums" style={{ fontSize: 'min(16vw, 5.5rem)', lineHeight: 1 }}>{scores[i]}</p>
+            <div className="flex gap-2">
+              <button onClick={() => setScores(p => p.map((s, j) => j === i ? Math.max(0, s - 1) : s))} className="w-11 h-11 bg-black/20 text-white rounded-full flex items-center justify-center"><Minus size={18} /></button>
+              <button onClick={() => setScores(p => p.map((s, j) => j === i ? s + 1 : s))} className="w-11 h-11 bg-white/25 text-white rounded-full flex items-center justify-center"><Plus size={18} /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-4">
+        {names.length < 4 && (
+          <button onClick={() => { setNames(p => [...p, `Time ${String.fromCharCode(65 + p.length)}`]); setScores(p => [...p, 0]); }} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl">+ Time</button>
+        )}
+        {names.length > 2 && (
+          <button onClick={() => { setNames(p => p.slice(0, -1)); setScores(p => p.slice(0, -1)); }} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl">− Time</button>
+        )}
+        <button onClick={() => setScores(p => p.map(() => 0))} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl">Zerar</button>
+      </div>
+    </GamiToolShell>
+  );
+};
+
+const GamiEvento = ({ customEvents, onClose, onQuickAward }: { customEvents: string[]; onClose: () => void; onQuickAward: (points: number, label: string) => void }) => {
+  const bank = [...GAMI_EVENTS, ...customEvents.map(text => ({ text, emoji: '🎲' as string, quick: undefined as number | undefined }))];
+  const [result, setResult] = useState<{ text: string; emoji: string; quick?: number } | null>(null);
+  const [spinning, setSpinning] = useState(false);
+  const [display, setDisplay] = useState<{ text: string; emoji: string } | null>(null);
+  const [applied, setApplied] = useState(false);
+  const spin = () => {
+    if (spinning) return;
+    setSpinning(true); setResult(null); setApplied(false);
+    let n = 0;
+    const tick = () => {
+      setDisplay(bank[Math.floor(Math.random() * bank.length)]);
+      n++;
+      if (n >= 16) {
+        const r = bank[Math.floor(Math.random() * bank.length)];
+        setDisplay(r); setResult(r); setSpinning(false); playChime(true);
+        return;
+      }
+      setTimeout(tick, 50 + n * 14);
+    };
+    tick();
+  };
+  return (
+    <GamiToolShell title="Evento do Dia" emoji="🎲" onClose={onClose}>
+      <div className="flex-1 flex flex-col items-center justify-center gap-6">
+        <motion.div
+          key={display?.text || 'empty'}
+          initial={{ scale: 0.95, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }}
+          className={`w-full max-w-md rounded-[2rem] p-8 text-center shadow-xl border-2 min-h-[180px] flex flex-col items-center justify-center gap-3 ${result ? 'bg-gradient-to-br from-indigo-600 to-purple-600 border-indigo-700' : 'bg-white border-indigo-100'}`}
+        >
+          <span className="text-5xl">{display?.emoji || '🦉'}</span>
+          <p className={`text-lg font-black leading-snug ${result ? 'text-white' : 'text-gray-700'}`}>
+            {display?.text || 'Sorteie o evento que abre a aula de hoje!'}
+          </p>
+        </motion.div>
+        {result?.quick !== undefined && !applied && (
+          <button
+            onClick={() => { onQuickAward(result.quick!, result.text); setApplied(true); }}
+            className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl active:scale-95 transition-transform"
+          >✨ Aplicar +{result.quick} para a turma toda</button>
+        )}
+        {applied && <p className="text-emerald-600 text-sm font-bold">Pontos aplicados! ✓</p>}
+      </div>
+      <button onClick={spin} disabled={spinning} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60">
+        {spinning ? 'Sorteando…' : '🎲 Sortear evento'}
+      </button>
+    </GamiToolShell>
+  );
+};
+
+const GamiParticipacao = ({ students, onToggle, onClose }: { students: GamiStudent[]; onToggle: (id: string) => void; onClose: () => void }) => {
+  const today = gamiTodayKey();
+  const done = students.filter(s => s.participatedDay === today);
+  return (
+    <GamiToolShell title="Participação de Hoje" emoji="✋" onClose={onClose}>
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 flex items-center justify-between">
+        <p className="text-sm font-bold text-gray-700">{done.length} de {students.length} participaram</p>
+        <div className="w-28 h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${students.length ? (done.length / students.length) * 100 : 0}%` }} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        {students.map(s => {
+          const did = s.participatedDay === today;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onToggle(s.id)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-colors ${did ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-100'}`}
+            >
+              <span className={`text-sm font-bold ${did ? 'text-emerald-700' : 'text-gray-700'}`}>{s.name}</span>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center ${did ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-300'}`}>
+                <CheckCircle2 size={15} />
+              </span>
+            </button>
+          );
+        })}
+        {students.length === 0 && <p className="text-center text-sm text-gray-400 py-8">Cadastre os alunos da turma primeiro.</p>}
+      </div>
+      <p className="text-[11px] text-gray-400 text-center mt-4">Dica: marque quem participa e dê voz a quem ainda está em branco. A lista zera todo dia.</p>
+    </GamiToolShell>
+  );
+};
+
+const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: {
+  teams: GamiTeam[];
+  students: GamiStudent[];
+  subject: string;
+  level: string;
+  onClose: () => void;
+  onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
+}) => {
+  const hasRealTeams = teams.length >= 2;
+  const battleTeams = hasRealTeams ? teams.slice(0, 4).map(t => `${t.emoji} ${t.name}`) : ['🔵 Time A', '🔴 Time B'];
+  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
+  const [topic, setTopic] = useState('');
+  const [count, setCount] = useState(10);
+  const [difficulty, setDifficulty] = useState('média');
+  const [questions, setQuestions] = useState<{ q: string; a: string }[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [turn, setTurn] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const [scores, setScores] = useState<number[]>(battleTeams.map(() => 0));
+  const [error, setError] = useState('');
+  const [awarded, setAwarded] = useState(false);
+  const colors = ['bg-indigo-600', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500'];
+
+  const generate = async () => {
+    if (!topic.trim()) { setError('Informe o tema da revisão.'); return; }
+    setError(''); setPhase('loading');
+    try {
+      const prompt = `Gere ${count} perguntas CURTAS de revisão oral sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade ${difficulty}.
+Cada pergunta deve ser respondível em voz alta em até 10 segundos, com resposta curta e objetiva (1 a 6 palavras).
+Varie os tipos: definição, complete a frase, verdadeiro ou falso, qual é, quem foi.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}]}`;
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+      const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+      const parsed = JSON.parse(raw);
+      if (!parsed.questions?.length) throw new Error('sem perguntas');
+      setQuestions(parsed.questions);
+      setIdx(0); setTurn(0); setRevealed(false); setScores(battleTeams.map(() => 0));
+      setPhase('play');
+    } catch {
+      setError('Não consegui gerar as perguntas. Tente novamente.');
+      setPhase('setup');
+    }
+  };
+
+  const next = (hit: boolean) => {
+    if (hit) { setScores(p => p.map((s, i) => i === turn ? s + 1 : s)); playChime(true); }
+    setRevealed(false);
+    if (idx + 1 >= questions.length) { setPhase('end'); return; }
+    setIdx(idx + 1);
+    setTurn((turn + 1) % battleTeams.length);
+  };
+
+  const maxScore = Math.max(...scores);
+  const winners = scores.map((s, i) => ({ s, i })).filter(x => x.s === maxScore);
+  const winnerNames = (ti: number) => hasRealTeams
+    ? students.filter(s => s.teamId === teams[ti]?.id).map(s => s.id)
+    : [];
+
+  return (
+    <GamiToolShell title="Batalha de Revisão" emoji="⚔️" onClose={onClose} dark={phase === 'play'}>
+      {phase === 'setup' && (
+        <div className="space-y-4">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+            <p className="text-sm text-indigo-800 leading-relaxed"><b>Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe — o placar é automático. Kahoot sem precisar de celular dos alunos!</p>
+          </div>
+          {error && <p className="text-sm text-red-500 font-medium bg-red-50 rounded-xl p-3">{error}</p>}
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Tema da revisão</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Frações, Era Vargas, Sistema Solar…" className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Perguntas</label>
+              <div className="flex gap-1.5">
+                {[6, 10, 14].map(n => (
+                  <button key={n} onClick={() => setCount(n)} className={`flex-1 py-2.5 rounded-xl font-bold text-sm border-2 ${count === n ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500 bg-white'}`}>{n}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Dificuldade</label>
+              <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                <option value="fácil">Fácil</option>
+                <option value="média">Média</option>
+                <option value="difícil">Difícil</option>
+              </select>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Equipes da batalha</p>
+            <div className="flex flex-wrap gap-2">
+              {battleTeams.map((t, i) => (
+                <span key={i} className={`${colors[i % colors.length]} text-white text-xs font-bold px-3 py-1.5 rounded-full`}>{t}</span>
+              ))}
+            </div>
+            {!hasRealTeams && <p className="text-[11px] text-gray-400 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP aos vencedores.</p>}
+          </div>
+          <button onClick={generate} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2">
+            <Swords size={20} /> Começar batalha
+          </button>
+        </div>
+      )}
+      {phase === 'loading' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+          <Loader2 size={40} className="animate-spin text-indigo-600" />
+          <p className="text-sm font-bold text-gray-500">Preparando as perguntas da batalha…</p>
+        </div>
+      )}
+      {phase === 'play' && questions[idx] && (
+        <div className="flex-1 flex flex-col">
+          <div className="flex gap-2 mb-4">
+            {battleTeams.map((t, i) => (
+              <div key={i} className={`flex-1 rounded-2xl px-2 py-2.5 text-center transition-all ${i === turn ? colors[i % colors.length] + ' shadow-lg scale-[1.03]' : 'bg-white/10'}`}>
+                <p className="text-[10px] font-black text-white/90 truncate">{t}</p>
+                <p className="text-2xl font-black text-white tabular-nums">{scores[i]}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-white/60 text-xs font-bold uppercase tracking-widest mb-2">Pergunta {idx + 1} de {questions.length} · vez de {battleTeams[turn]}</p>
+          <div className="flex-1 flex flex-col items-center justify-center gap-5">
+            <motion.div key={idx} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[2rem] p-7 w-full max-w-md text-center shadow-2xl">
+              <p className="text-xl sm:text-2xl font-black text-gray-900 leading-snug">{questions[idx].q}</p>
+              {revealed && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 text-lg font-black text-emerald-600 bg-emerald-50 rounded-2xl py-3 px-4">
+                  {questions[idx].a}
+                </motion.p>
+              )}
+            </motion.div>
+            {!revealed ? (
+              <button onClick={() => setRevealed(true)} className="bg-white/15 text-white font-bold px-8 py-3.5 rounded-2xl">👁 Mostrar resposta</button>
+            ) : (
+              <div className="flex gap-3 w-full max-w-md">
+                <button onClick={() => next(true)} className="flex-1 bg-emerald-500 text-white font-black py-4 rounded-2xl">✓ Acertou (+1)</button>
+                <button onClick={() => next(false)} className="flex-1 bg-white/15 text-white font-bold py-4 rounded-2xl">Passou</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {phase === 'end' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-6">
+          <span className="text-6xl">🏆</span>
+          <h3 className="text-2xl font-black text-gray-900 text-center">
+            {winners.length === 1 ? `${battleTeams[winners[0].i]} venceu!` : 'Empate épico!'}
+          </h3>
+          <div className="w-full max-w-sm space-y-2">
+            {scores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s).map(({ s, i }, pos) => (
+              <div key={i} className={`flex items-center justify-between px-4 py-3 rounded-2xl ${pos === 0 ? 'bg-amber-50 border-2 border-amber-300' : 'bg-white border border-gray-100'}`}>
+                <span className="font-bold text-gray-800 text-sm">{pos === 0 ? '🥇' : pos === 1 ? '🥈' : pos === 2 ? '🥉' : '·'} {battleTeams[i]}</span>
+                <span className="font-black text-gray-900 tabular-nums">{s} pts</span>
+              </div>
+            ))}
+          </div>
+          {hasRealTeams && winners.length >= 1 && !awarded && winnerNames(winners[0].i).length > 0 && (
+            <button
+              onClick={() => { winners.forEach(w => onAwardTeam(w.i, winnerNames(w.i), 3)); setAwarded(true); }}
+              className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl"
+            >⚡ Dar +3 XP {winners.length > 1 ? 'às equipes vencedoras' : 'à equipe vencedora'}</button>
+          )}
+          {awarded && <p className="text-emerald-600 text-sm font-bold">XP entregue! ✓</p>}
+          <button onClick={() => setPhase('setup')} className="text-indigo-600 font-bold text-sm">↻ Nova batalha</button>
+        </div>
+      )}
+    </GamiToolShell>
+  );
+};
+
+const GamiProjetor = ({ cls, schedule, onClose }: { cls: ClassGamification; schedule?: ClassSchedule; onClose: () => void }) => {
+  const wk = gamiWeekKey();
+  const weekXpOf = (s: GamiStudent) => cls.weekKey === wk ? (s.weekXp || 0) : 0;
+  const skin = GAMI_SKINS[cls.skin || 'coruja'];
+  const teamTotals = cls.teams.map(t => ({
+    team: t,
+    xp: cls.students.filter(s => s.teamId === t.id).reduce((a, s) => a + s.xp, 0),
+    week: cls.students.filter(s => s.teamId === t.id).reduce((a, s) => a + weekXpOf(s), 0),
+  })).sort((a, b) => b.week - a.week || b.xp - a.xp);
+  const maxTeam = Math.max(1, ...teamTotals.map(t => t.week));
+  const topWeek = [...cls.students].sort((a, b) => weekXpOf(b) - weekXpOf(a)).slice(0, 3).filter(s => weekXpOf(s) > 0);
+  const missionProgress = cls.mission ? (cls.mission.weekKey === wk ? cls.mission.progress : 0) : 0;
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] bg-gradient-to-br from-indigo-700 via-indigo-600 to-purple-700 flex flex-col overflow-y-auto">
+      <div className="flex items-center justify-between px-6 pt-6">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">🦉</span>
+          <div>
+            <h2 className="text-white font-black text-xl leading-tight">{schedule?.name || 'Turma'}</h2>
+            <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Temporada {cls.season}</p>
+          </div>
+        </div>
+        <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center"><X size={20} /></button>
+      </div>
+      <div className="flex-1 px-6 py-6 space-y-5 max-w-2xl w-full mx-auto">
+        {cls.mission && (
+          <div className="bg-white/10 backdrop-blur rounded-[2rem] p-5 border border-white/15">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-white font-black text-sm">🎯 Missão da Semana: {cls.mission.reward}</p>
+              <p className="text-indigo-100 font-black text-sm tabular-nums">{Math.min(missionProgress, cls.mission.goal)} / {cls.mission.goal}</p>
+            </div>
+            <div className="h-4 bg-white/15 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${missionProgress >= cls.mission.goal ? 'bg-emerald-400' : 'bg-amber-300'}`} style={{ width: `${Math.min(100, (missionProgress / cls.mission.goal) * 100)}%` }} />
+            </div>
+            {missionProgress >= cls.mission.goal && <p className="text-emerald-300 font-black text-center mt-2 text-sm">🎉 MISSÃO CONCLUÍDA!</p>}
+          </div>
+        )}
+        {teamTotals.length > 0 && (
+          <div className="bg-white/10 backdrop-blur rounded-[2rem] p-5 border border-white/15">
+            <p className="text-white font-black text-sm mb-4">🏆 Pódio das Equipes (semana)</p>
+            <div className="space-y-3">
+              {teamTotals.map((t, i) => (
+                <div key={t.team.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-white font-bold text-sm">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '·'} {t.team.emoji} {t.team.name}</span>
+                    <span className="text-indigo-100 font-black text-sm tabular-nums">{t.week} XP</span>
+                  </div>
+                  <div className="h-3.5 bg-white/15 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(t.week / maxTeam) * 100}%`, backgroundColor: t.team.color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="bg-white/10 backdrop-blur rounded-[2rem] p-5 border border-white/15">
+          <p className="text-white font-black text-sm mb-4">⚡ Destaques da Semana</p>
+          {topWeek.length === 0 ? (
+            <p className="text-indigo-200 text-sm text-center py-3">Os destaques aparecem aqui conforme a turma ganha pontos!</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {topWeek.map((s, i) => (
+                <div key={s.id} className={`rounded-2xl p-3 text-center ${i === 0 ? 'bg-amber-300/25 border border-amber-300/40' : 'bg-white/10'}`}>
+                  <span className="text-3xl">{skin[gamiLevel(s.totalXp)]}</span>
+                  <p className="text-white font-bold text-xs mt-1 truncate">{s.name}</p>
+                  <p className="text-indigo-100 font-black text-sm">+{weekXpOf(s)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="text-center text-indigo-200/70 text-[11px] font-bold uppercase tracking-widest pb-4">Prof. Corujão · Turma Gamificada</p>
+      </div>
+    </motion.div>
+  );
+};
+
+// ─── Kit do Professor (ferramentas de IA + diário de classe) ──────────────────
+type FerramentaId = 'parecer' | 'inclusao' | 'rubrica' | 'nivelador' | 'familia' | 'video' | 'pdf';
+
+interface DiarioEntry {
+  id: string;            // `${classId}_${date}`
+  classId: string;
+  date: string;          // YYYY-MM-DD
+  att: Record<string, 'P' | 'F' | 'A'>;
+  note?: string;
+  grades?: Record<string, string>;
+}
+
+const FERRAMENTAS_META: { id: FerramentaId; title: string; icon: any; color: string; bg: string; desc: string }[] = [
+  { id: 'parecer',   title: 'Parecer Descritivo',     icon: GraduationCap,  color: 'text-indigo-600',  bg: 'bg-indigo-50 border-indigo-200',   desc: 'Comentários de boletim e pareceres individuais' },
+  { id: 'inclusao',  title: 'Adaptação Inclusiva',    icon: Accessibility,  color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', desc: 'Adapte atividades para TEA, TDAH, dislexia e mais' },
+  { id: 'rubrica',   title: 'Rubrica de Avaliação',   icon: ListChecks,     color: 'text-amber-600',   bg: 'bg-amber-50 border-amber-200',     desc: 'Critérios e níveis prontos para qualquer trabalho' },
+  { id: 'nivelador', title: 'Nivelador de Texto',     icon: BookOpen,       color: 'text-blue-600',    bg: 'bg-blue-50 border-blue-200',       desc: 'Reescreva textos no nível de leitura da turma' },
+  { id: 'familia',   title: 'Comunicação c/ Famílias', icon: HeartHandshake, color: 'text-rose-600',    bg: 'bg-rose-50 border-rose-200',       desc: 'Bilhetes, comunicados e mensagens de WhatsApp' },
+  { id: 'video',     title: 'Material de Vídeo',      icon: Youtube,        color: 'text-red-600',     bg: 'bg-red-50 border-red-200',         desc: 'Transforme vídeos do YouTube em aula e atividades' },
+  { id: 'pdf',       title: 'Material do meu PDF',    icon: FileUp,         color: 'text-violet-600',  bg: 'bg-violet-50 border-violet-200',   desc: 'Gere materiais a partir do seu livro ou apostila' },
+];
+
+const FerramentaChips = ({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) => (
+  <div className="flex flex-wrap gap-1.5">
+    {options.map(o => (
+      <button key={o} type="button" onClick={() => onChange(o)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${value === o ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+        {o}
+      </button>
+    ))}
+  </div>
+);
+
+const FerramentasScreen = ({
+  profile,
+  schedules,
+  user,
+  setScreen,
+  notifications,
+  setNotifications,
+  initialTool,
+  clearInitialTool,
+}: {
+  profile: UserProfile;
+  schedules: ClassSchedule[];
+  user: any;
+  setScreen: (s: Screen) => void;
+  notifications?: any[];
+  setNotifications?: (n: any[]) => void;
+  initialTool?: string | null;
+  clearInitialTool?: () => void;
+}) => {
+  const [activeTool, setActiveTool] = useState<FerramentaId | null>(null);
+  const [showDiario, setShowDiario] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [result, setResult] = useState('');
+  const loadingMsg = useFunnyLoadingMessage(isGenerating, 'studio');
+
+  // Campos do formulário (compartilhados entre ferramentas)
+  const [classId, setClassId] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [period, setPeriod] = useState('1º bimestre');
+  const [strengths, setStrengths] = useState('');
+  const [struggles, setStruggles] = useState('');
+  const [observations, setObservations] = useState('');
+  const [tone, setTone] = useState('acolhedor');
+  const [need, setNeed] = useState('TDAH');
+  const [originalActivity, setOriginalActivity] = useState('');
+  const [taskDesc, setTaskDesc] = useState('');
+  const [criteriaCount, setCriteriaCount] = useState(4);
+  const [levelsCount, setLevelsCount] = useState(4);
+  const [originalText, setOriginalText] = useState('');
+  const [targetLevel, setTargetLevel] = useState('3º a 5º ano');
+  const [msgType, setMsgType] = useState('Bilhete na agenda');
+  const [msgContext, setMsgContext] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoGoal, setVideoGoal] = useState('Roteiro de aula');
+  const [pdfGoal, setPdfGoal] = useState('Atividade com questões');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+
+  const selectedClass = schedules.find(s => s.id === classId);
+  const ctxLevel = selectedClass?.level || 'Ensino Fundamental';
+  const ctxSubject = selectedClass?.subject || profile.subject || 'Geral';
+
+  useEffect(() => {
+    if (!initialTool) return;
+    if (initialTool === 'diario') setShowDiario(true);
+    else if (FERRAMENTAS_META.some(t => t.id === initialTool)) setActiveTool(initialTool as FerramentaId);
+    clearInitialTool?.();
+  }, [initialTool, clearInitialTool]);
+
+  const closeTool = () => {
+    setActiveTool(null); setResult(''); setIsGenerating(false); setPdfFile(null);
+  };
+
+  const runGeneration = async (prompt: string, extraParts?: any[]) => {
+    setIsGenerating(true);
+    setResult('');
+    try {
+      const parts: any[] = [...(extraParts || []), { text: prompt }];
+      const response = await generateContentWithRetry({
+        model: AI_MODEL,
+        contents: [{ role: 'user', parts }],
+      });
+      const text = response.text || '';
+      if (!text.trim()) throw new Error('Resposta vazia');
+      setResult(text.trim());
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'A geração não saiu dessa vez. Tente de novo.'));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generate = async () => {
+    if (!activeTool) return;
+    const baseCtx = `Disciplina: ${ctxSubject} | Nível: ${ctxLevel}${selectedClass ? ` | Turma: ${selectedClass.name}` : ''}`;
+
+    if (activeTool === 'parecer') {
+      if (!studentName.trim()) { toast.error('Informe o nome do aluno.'); return; }
+      await runGeneration(`Você é um professor brasileiro experiente escrevendo um PARECER DESCRITIVO individual para o boletim.
+${baseCtx} | Período: ${period} | Aluno(a): ${studentName.trim()}
+Pontos fortes observados: ${strengths.trim() || 'não informados — infira com cautela a partir do contexto'}
+Dificuldades observadas: ${struggles.trim() || 'não informadas'}
+Outras observações: ${observations.trim() || 'nenhuma'}
+Tom desejado: ${tone}
+
+Escreva o parecer em 3 a 4 parágrafos, em português brasileiro natural:
+1. Desenvolvimento cognitivo e aprendizagem (com exemplos concretos do que foi informado)
+2. Aspectos socioemocionais e convivência
+3. Evolução no período e participação
+4. Encaminhamentos e sugestões para o próximo período (parceria com a família)
+
+REGRAS: linguagem respeitosa e construtiva, NUNCA rotule a criança, descreva comportamentos e não julgamentos, evite jargão pedagógico excessivo. Comece direto no texto do parecer, sem título nem preâmbulo. NÃO invente fatos específicos que não foram informados.`);
+    } else if (activeTool === 'inclusao') {
+      if (!originalActivity.trim()) { toast.error('Descreva a atividade ou conteúdo a adaptar.'); return; }
+      await runGeneration(`Você é um especialista em educação inclusiva brasileira (AEE).
+${baseCtx}
+Necessidade do aluno: ${need}
+Atividade/conteúdo original: ${originalActivity.trim()}
+
+Crie uma ADAPTAÇÃO completa em Markdown com as seções:
+
+## 🎯 Objetivo Flexibilizado
+(o mesmo objetivo de aprendizagem, com critério de sucesso adequado)
+
+## ✂️ Atividade Adaptada
+(versão pronta para aplicar, passo a passo, com os ajustes específicos para ${need})
+
+## 🛠️ Recursos e Apoios
+(materiais concretos, apoios visuais, tecnologia assistiva de baixo custo)
+
+## 🧭 Estratégias de Mediação
+(4-5 dicas práticas de manejo durante a atividade, específicas para ${need})
+
+## 📋 Avaliação Adaptada
+(como avaliar o mesmo objetivo por outros meios)
+
+REGRAS: baseie-se em práticas reconhecidas (DUA - Desenho Universal para Aprendizagem), seja concreto e aplicável amanhã de manhã, sem teoria longa. Português brasileiro.`);
+    } else if (activeTool === 'rubrica') {
+      if (!taskDesc.trim()) { toast.error('Descreva o trabalho ou atividade a avaliar.'); return; }
+      const levelNames = levelsCount === 3 ? 'Iniciante | Em desenvolvimento | Proficiente' : 'Iniciante | Em desenvolvimento | Proficiente | Avançado';
+      await runGeneration(`Você é um especialista em avaliação educacional. Crie uma RUBRICA DE AVALIAÇÃO em Markdown.
+${baseCtx}
+Trabalho/atividade avaliada: ${taskDesc.trim()}
+Número de critérios: ${criteriaCount} | Níveis de desempenho: ${levelNames}
+
+Formato EXATO:
+1. Título curto da rubrica (linha com ##)
+2. Uma TABELA Markdown: primeira coluna "Critério" (com peso sugerido em %), demais colunas os níveis (${levelNames}). Cada célula descreve de forma OBSERVÁVEL o que o aluno demonstra naquele nível (1-2 frases).
+3. Após a tabela, seção "## Como usar" com 3 dicas rápidas de aplicação e devolutiva.
+
+REGRAS: critérios relevantes para a atividade descrita, descrições paralelas entre níveis (mesma dimensão, intensidade crescente), linguagem que o próprio aluno entenda. Português brasileiro.`);
+    } else if (activeTool === 'nivelador') {
+      if (!originalText.trim()) { toast.error('Cole o texto que deseja adaptar.'); return; }
+      await runGeneration(`Você é um especialista em leiturabilidade e alfabetização no Brasil.
+Reescreva o texto abaixo para o nível de leitura: ${targetLevel}.
+
+TEXTO ORIGINAL:
+"""
+${originalText.trim()}
+"""
+
+Retorne em Markdown:
+
+## 📖 Texto Adaptado
+(o texto reescrito: vocabulário, tamanho de frases e complexidade sintática adequados a ${targetLevel}; preserve TODAS as informações essenciais e o sentido original)
+
+## 🔤 Glossário
+(4-6 palavras que permaneceram desafiadoras, com definição simples de 1 linha)
+
+## 💬 Perguntas de Compreensão
+(3 perguntas sobre o texto adaptado, em ordem crescente de complexidade)
+
+REGRAS: não infantilize além do necessário, não adicione informações novas, mantenha o gênero textual. Português brasileiro.`);
+    } else if (activeTool === 'familia') {
+      if (!msgContext.trim()) { toast.error('Descreva o assunto da mensagem.'); return; }
+      await runGeneration(`Você é um professor brasileiro experiente em comunicação com famílias.
+Escreva: ${msgType}
+Contexto/assunto: ${msgContext.trim()}
+${selectedClass ? `Turma: ${selectedClass.name}` : ''} | Tom: ${tone}
+
+REGRAS:
+- ${msgType.includes('WhatsApp') ? 'Mensagem curta de WhatsApp (máx. 6 linhas), pode usar 1-2 emojis discretos' : 'Texto pronto para copiar, com saudação e despedida'}
+- Linguagem ${tone === 'formal' ? 'formal e institucional' : 'acolhedora, próxima e respeitosa'}
+- Se o assunto for delicado (comportamento, dificuldade), use abordagem construtiva: comece com algo positivo, descreva o fato sem julgamento, proponha parceria
+- NUNCA exponha ou compare a criança
+- Inclua espaço [NOME] onde o nome do aluno deve entrar, se aplicável
+- Comece direto na mensagem, sem título nem explicações antes ou depois. Português brasileiro.`);
+    } else if (activeTool === 'video') {
+      const url = videoUrl.trim();
+      if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(url)) { toast.error('Cole um link válido do YouTube.'); return; }
+      await runGeneration(`Você é um designer instrucional brasileiro. Assista ao vídeo e crie: ${videoGoal}.
+${baseCtx}
+
+Formato em Markdown conforme o tipo:
+- "Resumo para a turma": ## Resumo (linguagem adequada ao nível) + ## Pontos-chave (lista) + ## Vocabulário novo
+- "Roteiro de aula": ## Antes do vídeo (ativação, 2-3 min) + ## Durante (3 pausas estratégicas com minutagem e pergunta) + ## Depois (atividade de consolidação de 10 min)
+- "Atividade com questões": ## Atividade sobre o vídeo com 6 questões variadas (compreensão, análise, opinião) + gabarito comentado no final
+- "Debate guiado": ## Pergunta disparadora + ## 4 perguntas de aprofundamento + ## Posições possíveis + ## Fechamento
+
+Cite minutagens do vídeo quando relevante. Português brasileiro.`, [{ fileData: { fileUri: url } }]);
+    } else if (activeTool === 'pdf') {
+      if (!pdfFile) { toast.error('Selecione um arquivo PDF primeiro.'); return; }
+      if (pdfFile.size > 15 * 1024 * 1024) { toast.error('PDF pesado demais! O limite é 15 MB.'); return; }
+      setIsGenerating(true);
+      try {
+        const base64 = await fileToBase64(pdfFile);
+        await runGeneration(`Você é um designer instrucional brasileiro. Com base EXCLUSIVAMENTE no conteúdo do PDF anexado (livro/apostila do professor), crie: ${pdfGoal}.
+${baseCtx}
+
+Formato em Markdown conforme o tipo:
+- "Resumo do capítulo": ## Resumo + ## Conceitos-chave + ## O que cai na prova
+- "Atividade com questões": ## Atividade com 8 questões baseadas no material (cite a página quando possível) + gabarito no final
+- "Prova rápida": ## Avaliação com 5 questões objetivas + 2 dissertativas + gabarito
+- "Plano de aula": plano completo de 1 aula usando o material como base (objetivos, momentos da aula com tempos, avaliação)
+- "Slides em tópicos": ## estrutura de 8-10 slides, cada um com título + 3-4 bullets prontos
+
+REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Português brasileiro.`, [{ inlineData: { data: base64, mimeType: pdfFile.type || 'application/pdf' } }]);
+      } catch (e: any) {
+        toast.error('Não consegui ler esse PDF. Tente outro arquivo.');
+        setIsGenerating(false);
+      }
+    }
+  };
+
+  const copyResult = () => {
+    navigator.clipboard.writeText(result).then(() => toast.success('Copiado!')).catch(() => toast.error('Não foi possível copiar.'));
+  };
+
+  const toolTitle = activeTool ? FERRAMENTAS_META.find(t => t.id === activeTool)!.title : '';
+
+  const printResult = () => {
+    if (!result) return;
+    printPlannerContent(toolTitle, result, toolTitle, profile.name, profile.schoolName);
+  };
+
+  const classSelectorEl = schedules.length > 0 ? (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">Turma (opcional)</label>
+      <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm">
+        <option value="">Sem turma específica</option>
+        {schedules.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+    </div>
+  ) : null;
+
+  const Chips = FerramentaChips;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
+      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+
+      <div className="px-1 mb-6">
+        <p className="text-sm text-gray-500 leading-relaxed">Pareceres, adaptações, rubricas e comunicação com as famílias — o trabalho invisível do professor, resolvido em minutos.</p>
+      </div>
+
+      {/* Diário de Classe — destaque */}
+      <button
+        onClick={() => setShowDiario(true)}
+        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-indigo-600 to-indigo-800 active:scale-[0.98] transition-transform"
+      >
+        <div className="absolute -top-6 -right-6 opacity-20">
+          <NotebookPen size={130} className="text-white" />
+        </div>
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] font-black tracking-widest uppercase text-amber-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Dia a dia</span>
+          </div>
+          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Diário de Classe</h2>
+          <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
+            Chamada, anotações e notas do dia — rápido, offline e sincronizado com sua turma gamificada.
+          </p>
+          <div className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-4 py-2 rounded-full text-sm">
+            <NotebookPen size={16} /> Abrir diário
+          </div>
+        </div>
+      </button>
+
+      {/* Ferramentas de IA */}
+      <div className="grid grid-cols-2 gap-3 mb-8">
+        {FERRAMENTAS_META.map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTool(t.id)}
+              className={`relative rounded-3xl p-4 text-left shadow-sm border-2 ${t.bg} active:scale-[0.97] transition-transform`}
+            >
+              <Icon size={28} className={`${t.color} mb-2`} />
+              <h3 className={`font-bold text-sm ${t.color}`}>{t.title}</h3>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{t.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* MODAL de ferramenta */}
+      <AnimatePresence>
+        {activeTool && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => { if (!isGenerating) closeTool(); }}
+          >
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="bg-white w-full sm:max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between z-10">
+                <div className="flex items-center gap-3">
+                  {(() => { const meta = FERRAMENTAS_META.find(t => t.id === activeTool)!; const Icon = meta.icon; return <Icon size={22} className={meta.color} />; })()}
+                  <h3 className="font-bold text-lg text-gray-900">{toolTitle}</h3>
+                </div>
+                <button onClick={closeTool} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {!result && !isGenerating && (
+                  <>
+                    {classSelectorEl}
+
+                    {activeTool === 'parecer' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Nome do aluno *</label>
+                          <input value={studentName} onChange={e => setStudentName(e.target.value)} maxLength={80} placeholder="Ex: Maria Clara" className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Período</label>
+                          <Chips options={['1º bimestre', '2º bimestre', '3º bimestre', '4º bimestre', '1º semestre', '2º semestre']} value={period} onChange={setPeriod} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Pontos fortes observados</label>
+                          <textarea value={strengths} onChange={e => setStrengths(e.target.value)} rows={2} maxLength={1500} placeholder="Ex: participa bastante, ajuda os colegas, evoluiu na leitura..." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Dificuldades observadas</label>
+                          <textarea value={struggles} onChange={e => setStruggles(e.target.value)} rows={2} maxLength={1500} placeholder="Ex: dispersa com facilidade, dificuldade em frações..." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Outras observações (opcional)</label>
+                          <textarea value={observations} onChange={e => setObservations(e.target.value)} rows={2} maxLength={1500} placeholder="Contexto familiar, saúde, episódios marcantes..." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Tom</label>
+                          <Chips options={['acolhedor', 'formal', 'objetivo']} value={tone} onChange={setTone} />
+                        </div>
+                      </>
+                    )}
+
+                    {activeTool === 'inclusao' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Necessidade do aluno</label>
+                          <Chips options={['TDAH', 'TEA (autismo)', 'Dislexia', 'Deficiência intelectual', 'Baixa visão', 'Surdez', 'Altas habilidades', 'Dificuldade de aprendizagem']} value={need} onChange={setNeed} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Atividade ou conteúdo original *</label>
+                          <textarea value={originalActivity} onChange={e => setOriginalActivity(e.target.value)} rows={4} maxLength={4000} placeholder="Descreva ou cole a atividade que será adaptada..." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm resize-none" />
+                        </div>
+                      </>
+                    )}
+
+                    {activeTool === 'rubrica' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Trabalho ou atividade avaliada *</label>
+                          <textarea value={taskDesc} onChange={e => setTaskDesc(e.target.value)} rows={3} maxLength={2000} placeholder="Ex: Seminário em grupo sobre biomas brasileiros, com cartaz e apresentação oral de 10 min" className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm resize-none" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Critérios</label>
+                            <select value={criteriaCount} onChange={e => setCriteriaCount(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm">
+                              {[3, 4, 5, 6].map(n => <option key={n} value={n}>{n} critérios</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Níveis</label>
+                            <select value={levelsCount} onChange={e => setLevelsCount(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm">
+                              <option value={3}>3 níveis</option>
+                              <option value={4}>4 níveis</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {activeTool === 'nivelador' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Texto original *</label>
+                          <textarea value={originalText} onChange={e => setOriginalText(e.target.value)} rows={6} maxLength={12000} placeholder="Cole aqui o texto do livro, notícia ou material que deseja simplificar (ou sofisticar)..." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Nível de leitura alvo</label>
+                          <Chips options={['1º e 2º ano', '3º a 5º ano', '6º e 7º ano', '8º e 9º ano', 'Ensino Médio', 'EJA']} value={targetLevel} onChange={setTargetLevel} />
+                        </div>
+                      </>
+                    )}
+
+                    {activeTool === 'familia' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de mensagem</label>
+                          <Chips options={['Bilhete na agenda', 'Mensagem de WhatsApp', 'Comunicado geral', 'Convite para reunião', 'Elogio ao aluno', 'Alerta construtivo']} value={msgType} onChange={setMsgType} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Assunto / contexto *</label>
+                          <textarea value={msgContext} onChange={e => setMsgContext(e.target.value)} rows={3} maxLength={2000} placeholder="Ex: festa junina dia 20/06, trazer prato típico. Ou: aluno melhorou muito em matemática este mês." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Tom</label>
+                          <Chips options={['acolhedor', 'formal']} value={tone} onChange={setTone} />
+                        </div>
+                      </>
+                    )}
+
+                    {activeTool === 'video' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Link do vídeo (YouTube) *</label>
+                          <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." inputMode="url" className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm" />
+                          <p className="text-[11px] text-gray-400 mt-1">A IA assiste ao vídeo e gera o material com base no conteúdo real.</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">O que gerar</label>
+                          <Chips options={['Roteiro de aula', 'Resumo para a turma', 'Atividade com questões', 'Debate guiado']} value={videoGoal} onChange={setVideoGoal} />
+                        </div>
+                      </>
+                    )}
+
+                    {activeTool === 'pdf' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Seu material (PDF, máx. 15 MB) *</label>
+                          <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-2xl p-6 cursor-pointer transition-colors ${pdfFile ? 'border-violet-300 bg-violet-50' : 'border-gray-200 bg-gray-50'}`}>
+                            <FileUp size={28} className={pdfFile ? 'text-violet-500' : 'text-gray-300'} />
+                            <span className={`text-sm font-bold ${pdfFile ? 'text-violet-700' : 'text-gray-400'}`}>
+                              {pdfFile ? pdfFile.name : 'Toque para escolher o PDF'}
+                            </span>
+                            {pdfFile && <span className="text-[11px] text-violet-400">{fmtBytes(pdfFile.size)}</span>}
+                            <input type="file" accept="application/pdf" className="hidden" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+                          </label>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">O que gerar</label>
+                          <Chips options={['Atividade com questões', 'Resumo do capítulo', 'Prova rápida', 'Plano de aula', 'Slides em tópicos']} value={pdfGoal} onChange={setPdfGoal} />
+                        </div>
+                      </>
+                    )}
+
+                    <button
+                      onClick={generate}
+                      className="w-full bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                    >
+                      <Sparkles size={16} /> Gerar com o Corujão
+                    </button>
+                  </>
+                )}
+
+                {isGenerating && (
+                  <div className="flex flex-col items-center justify-center py-14 gap-4">
+                    <Loader2 size={36} className="animate-spin text-indigo-500" />
+                    <p className="text-sm text-gray-500 font-medium">{loadingMsg || 'Gerando...'}</p>
+                    {(activeTool === 'video' || activeTool === 'pdf') && <p className="text-[11px] text-gray-400 text-center max-w-[240px]">Analisar {activeTool === 'video' ? 'o vídeo' : 'o PDF'} pode levar um pouco mais de tempo.</p>}
+                  </div>
+                )}
+
+                {result && !isGenerating && (
+                  <>
+                    <div className="markdown-body prose prose-sm max-w-none bg-gray-50 border border-gray-100 rounded-2xl p-4 max-h-[48vh] overflow-y-auto">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
+                    </div>
+                    <p className="text-[11px] text-gray-400 text-center">Material gerado por IA — revise antes de usar.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={copyResult} className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-2xl py-3 text-sm font-bold active:scale-[0.98] transition-transform">
+                        <Copy size={15} /> Copiar
+                      </button>
+                      <button onClick={printResult} className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-2xl py-3 text-sm font-bold active:scale-[0.98] transition-transform">
+                        <Printer size={15} /> Imprimir
+                      </button>
+                      {activeTool === 'familia' && (
+                        <button
+                          onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(result)}`, '_blank')}
+                          className="col-span-2 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-2xl py-3 text-sm font-bold active:scale-[0.98] transition-transform"
+                        >
+                          <MessageCircle size={15} /> Enviar pelo WhatsApp
+                        </button>
+                      )}
+                      <button onClick={() => setResult('')} className="col-span-2 flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-2xl py-3 text-sm font-bold active:scale-[0.98] transition-transform">
+                        <RefreshCw size={15} /> Gerar outro
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* DIÁRIO DE CLASSE */}
+      <AnimatePresence>
+        {showDiario && (
+          <DiarioModal user={user} schedules={schedules} profile={profile} onClose={() => setShowDiario(false)} setScreen={setScreen} />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const DiarioModal = ({ user, schedules, profile, onClose, setScreen }: {
+  user: any; schedules: ClassSchedule[]; profile: UserProfile; onClose: () => void; setScreen: (s: Screen) => void;
+}) => {
+  const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
+  const [entries, setEntries] = useFirestoreSync<DiarioEntry>('diario', user, []);
+  const [classId, setClassId] = useState(schedules[0]?.id ?? '');
+  const [date, setDate] = useState(() => gamiTodayKey());
+
+  useEffect(() => {
+    if (schedules.length > 0 && (!classId || !schedules.some(s => s.id === classId))) {
+      setClassId(schedules[0].id);
+    }
+  }, [schedules, classId]);
+  const [showGrades, setShowGrades] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [diarioBulkNames, setDiarioBulkNames] = useState('');
+
+  const cls = gamiClasses.find(c => c.id === classId);
+  const students = useMemo(() => [...(cls?.students ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')), [cls]);
+  const entryId = `${classId}_${date}`;
+  const entry = entries.find(e => e.id === entryId);
+
+  const updateEntry = (updater: (prev: DiarioEntry) => DiarioEntry) => {
+    const prev: DiarioEntry = entry ?? { id: entryId, classId, date, att: {} };
+    const next = updater(prev);
+    setEntries(list => entry ? list.map(e => e.id === entryId ? next : e) : [...list, next]);
+  };
+
+  const cycleAtt = (studentId: string) => {
+    const order: ('P' | 'F' | 'A')[] = ['P', 'F', 'A'];
+    updateEntry(e => {
+      const cur = e.att[studentId];
+      const next = cur === undefined ? 'P' : order[(order.indexOf(cur) + 1) % 3];
+      return { ...e, att: { ...e.att, [studentId]: next } };
+    });
+  };
+
+  const markAll = (v: 'P' | 'F') => {
+    updateEntry(e => ({ ...e, att: Object.fromEntries(students.map(s => [s.id, v])) }));
+  };
+
+  const addStudent = () => {
+    const name = newStudentName.trim();
+    if (!name || !classId) return;
+    setGamiClasses(list => {
+      const existing = list.find(c => c.id === classId);
+      const newStudent: GamiStudent = { id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 };
+      if (existing) return list.map(c => c.id === classId ? { ...c, students: [...c.students, newStudent] } : c);
+      return [...list, { ...gamiDefaultClass(classId), students: [newStudent] }];
+    });
+    setNewStudentName('');
+  };
+
+  const presentCount = students.filter(s => entry?.att[s.id] === 'P').length;
+  const absentCount = students.filter(s => entry?.att[s.id] === 'F').length;
+  const lateCount = students.filter(s => entry?.att[s.id] === 'A').length;
+
+  const printDay = () => {
+    const schedule = schedules.find(s => s.id === classId);
+    const dateBr = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR');
+    const lines = [
+      `## Chamada — ${schedule?.name ?? 'Turma'} — ${dateBr}`,
+      '',
+      '| Nº | Aluno | Presença | Nota |',
+      '|---|---|---|---|',
+      ...students.map((s, i) => {
+        const a = entry?.att[s.id];
+        const label = a === 'P' ? 'Presente' : a === 'F' ? 'Falta' : a === 'A' ? 'Atraso' : '—';
+        return `| ${i + 1} | ${s.name} | ${label} | ${entry?.grades?.[s.id] ?? ''} |`;
+      }),
+      '',
+      `**Presentes:** ${presentCount} · **Faltas:** ${absentCount} · **Atrasos:** ${lateCount}`,
+      '',
+      entry?.note ? `## Anotações do dia\n${entry.note}` : '',
+    ].join('\n');
+    printPlannerContent(`Diário de Classe — ${dateBr}`, lines, 'Diário de Classe', profile.name, profile.schoolName);
+  };
+
+  const attStyle = (a?: 'P' | 'F' | 'A') =>
+    a === 'P' ? 'bg-emerald-500 text-white' :
+    a === 'F' ? 'bg-red-500 text-white' :
+    a === 'A' ? 'bg-amber-400 text-white' :
+    'bg-gray-100 text-gray-400';
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[120] bg-[#F8F9FE] flex flex-col">
+      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="flex items-center gap-2">
+          <NotebookPen size={22} className="text-indigo-600" />
+          <h2 className="text-lg font-black text-gray-900">Diário de Classe</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          {students.length > 0 && (
+            <button onClick={printDay} className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+              <Printer size={16} />
+            </button>
+          )}
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center">
+            <X size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 pb-10">
+        {/* Seletores */}
+        <div className="flex gap-2 mb-3">
+          <select value={classId} onChange={e => setClassId(e.target.value)} className="flex-1 bg-white border border-gray-200 rounded-xl py-2.5 px-3 text-sm font-bold min-w-0">
+            {schedules.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {schedules.length === 0 && <option value="">Sem turmas</option>}
+          </select>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white border border-gray-200 rounded-xl py-2.5 px-3 text-sm font-bold" />
+        </div>
+
+        {schedules.length === 0 ? (
+          <div className="text-center py-16">
+            <span className="text-5xl">📅</span>
+            <p className="text-gray-500 mt-3 text-sm font-bold">Cadastre suas turmas na Agenda primeiro.</p>
+            <button onClick={() => { onClose(); setScreen('calendar'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">Ir para a Agenda</button>
+          </div>
+        ) : students.length === 0 ? (
+          <div className="py-6 space-y-4">
+            <div className="text-center">
+              <span className="text-5xl">🦉</span>
+              <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo — um nome por linha. Funciona nas duas telas.</p>
+            </div>
+            <textarea
+              value={diarioBulkNames}
+              onChange={e => setDiarioBulkNames(e.target.value)}
+              rows={8}
+              placeholder={"Ana Beatriz\nCarlos Eduardo\nMariana Souza\nPedro Henrique\n..."}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 resize-none bg-white"
+            />
+            {(() => {
+              const names = diarioBulkNames.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+              return (
+                <button
+                  onClick={() => {
+                    if (names.length === 0 || !classId) return;
+                    const newStudents: GamiStudent[] = names.map(name => ({ id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }));
+                    setGamiClasses(list => {
+                      const existing = list.find(c => c.id === classId);
+                      if (existing) return list.map(c => c.id === classId ? { ...c, students: [...c.students, ...newStudents] } : c);
+                      return [...list, { ...gamiDefaultClass(classId), students: newStudents }];
+                    });
+                    setDiarioBulkNames('');
+                    toast.success(`${names.length} aluno${names.length > 1 ? 's' : ''} cadastrado${names.length > 1 ? 's' : ''}!`);
+                  }}
+                  disabled={diarioBulkNames.trim().length === 0}
+                  className="w-full bg-indigo-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform"
+                >
+                  {names.length > 0 ? `+ Cadastrar ${names.length} aluno${names.length > 1 ? 's' : ''}` : 'Digite os nomes acima'}
+                </button>
+              );
+            })()}
+          </div>
+        ) : (
+          <>
+            {/* Resumo + ações em massa */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex gap-3 text-xs font-bold">
+                <span className="text-emerald-600">{presentCount} P</span>
+                <span className="text-red-500">{absentCount} F</span>
+                <span className="text-amber-500">{lateCount} A</span>
+                <span className="text-gray-300">/ {students.length}</span>
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={() => markAll('P')} className="text-[11px] font-bold bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-200">Todos P</button>
+                <button onClick={() => markAll('F')} className="text-[11px] font-bold bg-red-50 text-red-500 px-2.5 py-1 rounded-full border border-red-200">Todos F</button>
+                <button onClick={() => setShowGrades(g => !g)} className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${showGrades ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>Notas</button>
+              </div>
+            </div>
+
+            {/* Lista de alunos */}
+            <div className="space-y-1.5 mb-4">
+              {students.map((s, i) => {
+                const a = entry?.att[s.id];
+                return (
+                  <div key={s.id} className="bg-white rounded-xl px-3 py-2 flex items-center gap-2.5 shadow-sm border border-gray-100">
+                    <span className="text-[10px] font-black text-gray-300 w-5 text-right shrink-0">{i + 1}</span>
+                    <p className="flex-1 text-sm font-bold text-gray-800 truncate">{s.name}</p>
+                    {showGrades && (
+                      <input
+                        value={entry?.grades?.[s.id] ?? ''}
+                        onChange={e => updateEntry(en => ({ ...en, grades: { ...(en.grades ?? {}), [s.id]: e.target.value } }))}
+                        placeholder="nota"
+                        className="w-14 text-center text-xs font-bold border border-gray-200 rounded-lg py-1.5 bg-gray-50"
+                      />
+                    )}
+                    <button
+                      onClick={() => cycleAtt(s.id)}
+                      className={`w-9 h-9 rounded-xl font-black text-sm shrink-0 transition-colors ${attStyle(a)}`}
+                    >
+                      {a ?? '·'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Adicionar aluno inline */}
+            {diarioBulkNames ? (
+              <div className="space-y-2 mb-4">
+                <textarea
+                  value={diarioBulkNames}
+                  onChange={e => setDiarioBulkNames(e.target.value)}
+                  rows={5}
+                  placeholder={"Um nome por linha:\nAna\nCarlos\n..."}
+                  className="w-full border border-indigo-300 rounded-xl px-3 py-2 text-sm focus:outline-none bg-white resize-none"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => setDiarioBulkNames('')} className="flex-1 bg-gray-100 text-gray-600 font-bold py-2 rounded-xl text-sm">Cancelar</button>
+                  <button
+                    onClick={() => {
+                      const names = diarioBulkNames.split('\n').map(n => n.trim()).filter(n => n.length > 0 && !cls?.students.some(s => s.name.toLowerCase() === n.toLowerCase()));
+                      if (names.length === 0 || !classId) { setDiarioBulkNames(''); return; }
+                      const newStudents: GamiStudent[] = names.map(name => ({ id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }));
+                      setGamiClasses(list => {
+                        const existing = list.find(c => c.id === classId);
+                        if (existing) return list.map(c => c.id === classId ? { ...c, students: [...c.students, ...newStudents] } : c);
+                        return [...list, { ...gamiDefaultClass(classId), students: newStudents }];
+                      });
+                      setDiarioBulkNames('');
+                      toast.success(`${names.length} aluno${names.length > 1 ? 's' : ''} adicionado${names.length > 1 ? 's' : ''}!`);
+                    }}
+                    className="flex-1 bg-indigo-600 text-white font-bold py-2 rounded-xl text-sm"
+                  >Adicionar lista</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 mb-4 items-center">
+                <input
+                  value={newStudentName}
+                  onChange={e => setNewStudentName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addStudent()}
+                  placeholder="+ Adicionar aluno"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                />
+                {newStudentName.trim() ? (
+                  <button onClick={addStudent} className="bg-indigo-600 text-white px-4 rounded-xl font-bold py-2"><Plus size={16} /></button>
+                ) : (
+                  <button onClick={() => setDiarioBulkNames(' ')} className="text-indigo-500 text-xs font-bold whitespace-nowrap px-1">Colar lista</button>
+                )}
+              </div>
+            )}
+
+            {/* Anotações do dia */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Anotações do dia</label>
+              <textarea
+                value={entry?.note ?? ''}
+                onChange={e => updateEntry(en => ({ ...en, note: e.target.value }))}
+                rows={3}
+                placeholder="Conteúdo dado, ocorrências, lembretes..."
+                className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 text-sm resize-none"
+              />
+            </div>
+            <p className="text-[11px] text-gray-400 text-center mt-2">P = presente · F = falta · A = atraso. Toque para alternar. Salva automaticamente.</p>
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+// ─── Gamificação de Turma ─────────────────────────────────────────────────────
+const GamificacaoScreen = ({
+  schedules,
+  user,
+  profile,
+  setScreen,
+}: {
+  schedules: ClassSchedule[];
+  user: any;
+  profile: UserProfile;
+  setScreen: (s: Screen) => void;
+}) => {
+  const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(schedules[0]?.id ?? null);
+  const [tab, setTab] = useState<'alunos' | 'equipes' | 'missao' | 'loja' | 'log' | 'config'>('alunos');
+  const [liveTool, setLiveTool] = useState<string | null>(null);
+  const [kitExpanded, setKitExpanded] = useState(false);
+  const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
+  const [shopStudentId, setShopStudentId] = useState<string | null>(null);
+  const [configSection, setConfigSection] = useState<'students' | 'behaviors' | 'rewards' | 'teams' | 'season'>('students');
+  const [newStudentName, setNewStudentName] = useState('');
+  const [showSeasonEnd, setShowSeasonEnd] = useState(false);
+  const [editingMission, setEditingMission] = useState(false);
+  const [missionGoal, setMissionGoal] = useState('50');
+  const [missionReward, setMissionReward] = useState('Recreio livre 5 min');
+  const [teamStudentId, setTeamStudentId] = useState<string | null>(null);
+  const [newBehaviorLabel, setNewBehaviorLabel] = useState('');
+  const [newBehaviorPoints, setNewBehaviorPoints] = useState('3');
+  const [newRewardLabel, setNewRewardLabel] = useState('');
+  const [newRewardCost, setNewRewardCost] = useState('15');
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkNames, setBulkNames] = useState('');
+
+  // Schedules chegam do Firestore de forma assíncrona: garante turma selecionada válida
+  useEffect(() => {
+    if (schedules.length === 0) return;
+    if (!selectedClassId || !schedules.some(s => s.id === selectedClassId)) {
+      setSelectedClassId(schedules[0].id);
+    }
+  }, [schedules, selectedClassId]);
+
+  const selectedSchedule = schedules.find(s => s.id === selectedClassId);
+  const wk = gamiWeekKey();
+
+  const currentCls = useMemo<ClassGamification | null>(() => {
+    if (!selectedClassId) return null;
+    return gamiClasses.find(c => c.id === selectedClassId) ?? gamiDefaultClass(selectedClassId);
+  }, [gamiClasses, selectedClassId]);
+
+  const weekXpOf = (s: GamiStudent) =>
+    currentCls?.weekKey === wk ? (s.weekXp ?? 0) : 0;
+
+  const skin = GAMI_SKINS[currentCls?.skin ?? 'coruja'];
+
+  const updateCls = (updater: (prev: ClassGamification) => ClassGamification) => {
+    if (!selectedClassId) return;
+    const existing = gamiClasses.find(c => c.id === selectedClassId);
+    const prev = existing ?? gamiDefaultClass(selectedClassId);
+    const next = updater(prev);
+    if (existing) {
+      setGamiClasses(list => list.map(c => c.id === selectedClassId ? next : c));
+    } else {
+      setGamiClasses(list => [...list, next]);
+    }
+  };
+
+  const checkBadges = (students: GamiStudent[], _cls: ClassGamification): GamiStudent[] => {
+    return students.map(s => {
+      const badges = [...s.badges];
+      GAMI_BADGES.forEach(b => {
+        if (!badges.includes(b.id) && b.check(s)) badges.push(b.id);
+      });
+      return { ...s, badges };
+    });
+  };
+
+  const awardPoints = (studentIds: string[], behavior: GamiBehavior) => {
+    const points = behavior.points;
+    const coins = points > 0 ? Math.max(1, Math.floor(points / 5)) : 0;
+    const today = gamiTodayKey();
+
+    updateCls(cls => {
+      const isNewWeek = cls.weekKey !== wk;
+      const students = cls.students.map(raw => {
+        // Virada de semana: zera o XP semanal de todos antes de acumular
+        const s = isNewWeek ? { ...raw, weekXp: 0 } : raw;
+        if (!studentIds.includes(s.id)) return s;
+        const newXp = Math.max(0, s.xp + points);
+        const newTotal = s.totalXp + (points > 0 ? points : 0);
+        const newWeekXp = (s.weekXp ?? 0) + (points > 0 ? points : 0);
+        const newCoins = Math.max(0, s.coins + coins);
+        const streak = points > 0
+          ? (s.lastPointDay === today ? s.streak : s.lastPointDay === gamiYesterdayKey() ? s.streak + 1 : 1)
+          : s.streak;
+        return { ...s, xp: newXp, totalXp: newTotal, weekXp: newWeekXp, coins: newCoins, streak, lastPointDay: points > 0 ? today : s.lastPointDay };
+      });
+      const checked = checkBadges(students, { ...cls, weekKey: wk, students });
+      let mission = cls.mission;
+      if (mission && mission.weekKey === wk && points > 0) {
+        mission = { ...mission, progress: mission.progress + points * studentIds.length };
+      }
+      const logEntry: GamiLogEntry = { id: gamiRid(), studentIds, label: behavior.label, emoji: behavior.emoji, points, coins, kind: 'award', date: Date.now() };
+      return { ...cls, students: checked, weekKey: wk, log: [logEntry, ...cls.log].slice(0, 200), mission };
+    });
+
+    if (currentCls?.soundOn !== false) playChime();
+    setAwardingStudentId(null);
+  };
+
+  const purchaseReward = (studentId: string, reward: GamiReward) => {
+    let ok = true;
+    updateCls(cls => {
+      const s = cls.students.find(x => x.id === studentId);
+      if (!s || s.coins < reward.cost) { ok = false; return cls; }
+      const students = cls.students.map(x => x.id === studentId ? { ...x, coins: x.coins - reward.cost } : x);
+      const logEntry: GamiLogEntry = { id: gamiRid(), studentIds: [studentId], label: reward.label, emoji: reward.emoji, points: 0, coins: -reward.cost, kind: 'purchase', date: Date.now() };
+      return { ...cls, students, log: [logEntry, ...cls.log].slice(0, 200) };
+    });
+    if (!ok) { toast.error('Corujinhas insuficientes!'); return; }
+    toast.success(`${reward.emoji} ${reward.label} resgatada!`);
+    setShopStudentId(null);
+  };
+
+  const addStudent = () => {
+    const name = newStudentName.trim();
+    if (!name) return;
+    updateCls(cls => ({ ...cls, students: [...cls.students, { id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }] }));
+    setNewStudentName('');
+  };
+
+  const removeStudent = (id: string) => {
+    updateCls(cls => ({ ...cls, students: cls.students.filter(s => s.id !== id) }));
+  };
+
+  const endSeason = () => {
+    if (!currentCls) return;
+    const top = [...currentCls.students].sort((a, b) => b.totalXp - a.totalXp).slice(0, 5);
+    const entry: GamiHallEntry = { season: currentCls.season, date: Date.now(), top: top.map(s => ({ name: s.name, xp: s.totalXp })) };
+    updateCls(cls => ({
+      ...cls,
+      season: cls.season + 1,
+      hallOfFame: [...(cls.hallOfFame ?? []), entry],
+      students: cls.students.map(s => ({ ...s, xp: 0, totalXp: 0, weekXp: 0, coins: 0, streak: 0, lastPointDay: undefined, participatedDay: undefined })),
+      log: [],
+      mission: null,
+      weekKey: gamiWeekKey(),
+    }));
+    setShowSeasonEnd(false);
+    toast.success('🏆 Nova temporada iniciada!');
+  };
+
+  const LIVE_TOOLS = [
+    { id: 'sorteio', emoji: '🎲', label: 'Sorteador' },
+    { id: 'timer', emoji: '⏱️', label: 'Timer' },
+    { id: 'grupos', emoji: '👥', label: 'Grupos' },
+    { id: 'barulho', emoji: '🔊', label: 'Barulho' },
+    { id: 'semaforo', emoji: '🚦', label: 'Semáforo' },
+    { id: 'dado', emoji: '🎯', label: 'Dado' },
+    { id: 'placar', emoji: '📊', label: 'Placar' },
+    { id: 'evento', emoji: '⚡', label: 'Evento' },
+    { id: 'participacao', emoji: '✋', label: 'Chamada' },
+    { id: 'batalha', emoji: '⚔️', label: 'Batalha' },
+    { id: 'projetor', emoji: '📽️', label: 'Projetar' },
+  ];
+
+  if (schedules.length === 0) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center min-h-[70vh] gap-6 px-6 text-center">
+        <span className="text-6xl">🦉</span>
+        <div>
+          <h2 className="text-xl font-black text-gray-900 mb-2">Nenhuma turma cadastrada</h2>
+          <p className="text-gray-500 text-sm">Cadastre suas turmas na Agenda para ativar a gamificação.</p>
+        </div>
+        <button onClick={() => setScreen('calendar')} className="bg-indigo-600 text-white font-bold px-6 py-3 rounded-2xl text-sm">
+          Ir para a Agenda
+        </button>
+      </motion.div>
+    );
+  }
+
+  if (!currentCls) return null;
+
+  const awardingStudent = currentCls.students.find(s => s.id === awardingStudentId) ?? null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-44">
+      {/* Header */}
+      <div className="pt-2 pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-black text-gray-900">🦉 Turma Gamificada</h1>
+            <p className="text-[11px] text-indigo-500 font-bold uppercase tracking-widest">Temporada {currentCls.season}</p>
+          </div>
+          <button
+            onClick={() => updateCls(c => ({ ...c, soundOn: c.soundOn === false ? true : false }))}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${currentCls.soundOn !== false ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-400'}`}
+          >
+            <Volume2 size={16} />
+          </button>
+        </div>
+        {schedules.length > 1 && (
+          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
+            {schedules.map(s => (
+              <button
+                key={s.id}
+                onClick={() => { setSelectedClassId(s.id); setTab('alunos'); }}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${selectedClassId === s.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="bg-indigo-50 rounded-2xl p-3 text-center">
+          <p className="text-xl font-black text-indigo-700">{currentCls.students.length}</p>
+          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Alunos</p>
+        </div>
+        <div className="bg-amber-50 rounded-2xl p-3 text-center">
+          <p className="text-xl font-black text-amber-600">{currentCls.students.reduce((a, s) => a + weekXpOf(s), 0)}</p>
+          <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wide">XP semana</p>
+        </div>
+        <div className="bg-emerald-50 rounded-2xl p-3 text-center">
+          <p className="text-xl font-black text-emerald-600">{currentCls.teams.length}</p>
+          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Equipes</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 overflow-x-auto no-scrollbar mb-4 -mx-1 px-1">
+        {([
+          { id: 'alunos', label: '👥 Alunos' },
+          { id: 'equipes', label: '🏆 Equipes' },
+          { id: 'missao', label: '🎯 Missão' },
+          { id: 'loja', label: '🛒 Loja' },
+          { id: 'log', label: '📜 Log' },
+          { id: 'config', label: '⚙️ Config' },
+        ] as const).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${tab === t.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <AnimatePresence mode="wait">
+
+        {/* ── Alunos ─────────────────────────────────────────────────────────── */}
+        {tab === 'alunos' && (
+          <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {currentCls.students.length === 0 ? (
+              <div className="text-center py-16">
+                <span className="text-5xl">🦉</span>
+                <p className="text-gray-500 mt-3 text-sm font-bold">Nenhum aluno ainda</p>
+                <p className="text-gray-400 text-xs mt-1">Adicione alunos em ⚙️ Config → Alunos</p>
+                <button onClick={() => { setTab('config'); setConfigSection('students'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">
+                  + Adicionar alunos
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {[...currentCls.students].sort((a, b) => b.totalXp - a.totalXp).map(s => {
+                  const lvl = gamiLevel(s.totalXp);
+                  const pct = gamiLevelProgress(s.totalXp) * 100;
+                  const sWXp = weekXpOf(s);
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setAwardingStudentId(s.id)}
+                      className="bg-white rounded-2xl p-3 text-center shadow-sm border border-gray-100 active:scale-95 transition-transform"
+                    >
+                      <div className="relative mx-auto w-10 h-10 mb-1.5 flex items-center justify-center">
+                        <span className="text-[30px] leading-none">{skin[lvl]}</span>
+                        {s.streak >= 3 && (
+                          <span className="absolute -top-1 -right-1 text-[9px] bg-orange-400 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none">🔥</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] font-bold text-gray-800 truncate leading-tight">{s.name}</p>
+                      <p className="text-[9px] text-indigo-400 font-bold leading-tight">{GAMI_LEVELS[lvl].name}</p>
+                      <div className="h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
+                        <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                      {sWXp > 0 && <p className="text-[9px] text-amber-500 font-black mt-1">+{sWXp}</p>}
+                      {s.coins > 0 && <p className="text-[9px] text-yellow-500 font-bold">🪙{s.coins}</p>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Equipes ─────────────────────────────────────────────────────────── */}
+        {tab === 'equipes' && (
+          <motion.div key="equipes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+            {currentCls.teams.length === 0 ? (
+              <div className="text-center py-12">
+                <span className="text-4xl">🏆</span>
+                <p className="text-gray-500 mt-2 text-sm font-bold">Nenhuma equipe configurada</p>
+                <p className="text-gray-400 text-xs mt-1">Configure em ⚙️ Config → Equipes</p>
+                <button onClick={() => { setTab('config'); setConfigSection('teams'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">
+                  Criar equipes
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Ranking desta semana</p>
+                {(() => {
+                  const sorted = [...currentCls.teams].map(t => ({
+                    team: t,
+                    xp: currentCls.students.filter(s => s.teamId === t.id).reduce((a, s) => a + weekXpOf(s), 0),
+                    total: currentCls.students.filter(s => s.teamId === t.id).reduce((a, s) => a + s.totalXp, 0),
+                    count: currentCls.students.filter(s => s.teamId === t.id).length,
+                  })).sort((a, b) => b.xp - a.xp || b.total - a.total);
+                  const maxXp = Math.max(1, ...sorted.map(t => t.xp));
+                  return sorted.map((t, i) => (
+                    <div key={t.team.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-black text-gray-400">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}°`}</span>
+                          <span className="text-2xl">{t.team.emoji}</span>
+                          <span className="font-black text-gray-800">{t.team.name}</span>
+                        </div>
+                        <span className="font-black text-indigo-600 text-lg tabular-nums">{t.xp} <span className="text-xs font-bold text-indigo-300">XP</span></span>
+                      </div>
+                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(t.xp / maxXp) * 100}%`, backgroundColor: t.team.color }} />
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-[10px] text-gray-400">{t.count} aluno{t.count !== 1 ? 's' : ''}</p>
+                        <p className="text-[10px] text-gray-400">{t.total} XP total</p>
+                      </div>
+                    </div>
+                  ));
+                })()}
+                {currentCls.students.some(s => !s.teamId) && (
+                  <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100">
+                    <p className="text-xs font-bold text-amber-700 mb-2">Sem equipe — toque para atribuir:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {currentCls.students.filter(s => !s.teamId).map(s => (
+                        <button key={s.id} onClick={() => setTeamStudentId(s.id)} className="bg-white text-gray-700 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-200 active:scale-95 transition-transform">
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Missão ─────────────────────────────────────────────────────────── */}
+        {tab === 'missao' && (
+          <motion.div key="missao" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+            {currentCls.mission && currentCls.mission.weekKey === wk ? (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-start justify-between mb-1">
+                  <div>
+                    <p className="font-black text-gray-900">🎯 Missão da Semana</p>
+                    <p className="text-sm text-indigo-600 font-bold mt-0.5">{currentCls.mission.reward}</p>
+                  </div>
+                  <button onClick={() => updateCls(c => ({ ...c, mission: null }))} className="text-gray-300 hover:text-red-400 transition-colors p-1"><X size={16} /></button>
+                </div>
+                <div className="flex items-center justify-between mt-4 mb-2">
+                  <span className="text-xs font-bold text-gray-500">Progresso da turma</span>
+                  <span className="text-sm font-black text-gray-800 tabular-nums">{Math.min(currentCls.mission.progress, currentCls.mission.goal)} / {currentCls.mission.goal} XP</span>
+                </div>
+                <div className="h-5 bg-gray-100 rounded-full overflow-hidden">
+                  <motion.div
+                    className={`h-full rounded-full ${currentCls.mission.progress >= currentCls.mission.goal ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, (currentCls.mission.progress / currentCls.mission.goal) * 100)}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                  />
+                </div>
+                {currentCls.mission.progress >= currentCls.mission.goal && (
+                  <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-emerald-500 font-black text-center mt-3 text-sm">🎉 MISSÃO CONCLUÍDA! Parabéns à turma!</motion.p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-indigo-50 rounded-2xl p-5 text-center border border-indigo-100">
+                <p className="text-3xl mb-2">🎯</p>
+                <p className="text-sm font-bold text-gray-700">Nenhuma missão ativa esta semana</p>
+                <p className="text-xs text-gray-400 mt-1">Crie uma missão de grupo para motivar a turma</p>
+              </div>
+            )}
+
+            {!editingMission ? (
+              <button onClick={() => setEditingMission(true)} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl text-sm active:scale-[0.98] transition-transform">
+                {currentCls.mission && currentCls.mission.weekKey === wk ? 'Substituir missão' : '+ Nova Missão da Semana'}
+              </button>
+            ) : (
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+                <p className="font-black text-gray-900 text-sm">Nova Missão</p>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">Meta de XP coletivo</label>
+                  <input type="number" value={missionGoal} onChange={e => setMissionGoal(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-indigo-400" placeholder="50" min={1} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">Recompensa da turma</label>
+                  <input value={missionReward} onChange={e => setMissionReward(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400" placeholder="Ex: Aula livre 5 min" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingMission(false)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-2.5 rounded-xl text-sm">Cancelar</button>
+                  <button
+                    onClick={() => {
+                      const goal = parseInt(missionGoal);
+                      if (!goal || goal < 1 || !missionReward.trim()) return;
+                      updateCls(cls => ({ ...cls, mission: { goal, reward: missionReward.trim(), progress: 0, weekKey: wk } }));
+                      setEditingMission(false);
+                      toast.success('🎯 Missão criada!');
+                    }}
+                    className="flex-1 bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm"
+                  >
+                    Criar Missão
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(currentCls.hallOfFame ?? []).length > 0 && (
+              <div className="space-y-2 mt-2">
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">🏛️ Hall da Fama</p>
+                {[...(currentCls.hallOfFame ?? [])].reverse().map((entry, i) => (
+                  <div key={i} className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+                    <p className="text-xs font-bold text-amber-600 mb-2">Temporada {entry.season} · {new Date(entry.date).toLocaleDateString('pt-BR')}</p>
+                    {entry.top.map((t, j) => (
+                      <div key={j} className="flex items-center justify-between py-0.5">
+                        <span className="text-xs font-bold text-gray-700">{j === 0 ? '🥇' : j === 1 ? '🥈' : j === 2 ? '🥉' : `${j + 1}°`} {t.name}</span>
+                        <span className="text-xs font-black text-amber-600 tabular-nums">{t.xp} XP</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Loja ─────────────────────────────────────────────────────────── */}
+        {tab === 'loja' && (
+          <motion.div key="loja" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+            <p className="text-xs text-gray-400 font-medium">Alunos trocam 🪙 corujinhas por privilégios. Selecione um aluno e depois resgate.</p>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+              {currentCls.students.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setShopStudentId(shopStudentId === s.id ? null : s.id)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${shopStudentId === s.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}
+                >
+                  <span>{skin[gamiLevel(s.totalXp)]}</span>
+                  <span className="max-w-[60px] truncate">{s.name}</span>
+                  <span className={`font-black ${shopStudentId === s.id ? 'text-amber-300' : 'text-amber-500'}`}>🪙{s.coins}</span>
+                </button>
+              ))}
+              {currentCls.students.length === 0 && <p className="text-xs text-gray-400 py-1">Adicione alunos em Config.</p>}
+            </div>
+            {currentCls.rewards.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-sm">
+                <span className="text-3xl">🛒</span>
+                <p className="mt-2 font-bold">Sem recompensas configuradas</p>
+                <button onClick={() => { setTab('config'); setConfigSection('rewards'); }} className="mt-3 bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-xl">Configurar loja</button>
+              </div>
+            ) : (
+              currentCls.rewards.map(r => {
+                const buyer = shopStudentId ? currentCls.students.find(s => s.id === shopStudentId) : null;
+                const canAfford = buyer ? buyer.coins >= r.cost : false;
+                return (
+                  <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{r.emoji}</span>
+                      <div>
+                        <p className="font-bold text-gray-800 text-sm">{r.label}</p>
+                        <p className="text-xs text-amber-500 font-black">🪙 {r.cost} corujinhas</p>
+                      </div>
+                    </div>
+                    {shopStudentId ? (
+                      <button
+                        onClick={() => purchaseReward(shopStudentId, r)}
+                        disabled={!canAfford}
+                        className={`font-bold text-xs px-3 py-2 rounded-xl active:scale-95 transition-all ${canAfford ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                      >
+                        {canAfford ? 'Resgatar' : 'Sem saldo'}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-300 font-bold">↑ selecione</span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Log ─────────────────────────────────────────────────────────── */}
+        {tab === 'log' && (
+          <motion.div key="log" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-2">
+            {currentCls.log.length === 0 ? (
+              <div className="text-center py-16 text-gray-400">
+                <span className="text-4xl">📜</span>
+                <p className="mt-2 text-sm font-bold">Nenhuma ação registrada ainda</p>
+                <p className="text-xs mt-1">Pontue alunos na aba Alunos para começar.</p>
+              </div>
+            ) : (
+              <>
+                {currentCls.log.slice(0, 60).map(entry => {
+                  const names = entry.studentIds.map(id => currentCls.students.find(s => s.id === id)?.name ?? 'Aluno').join(', ');
+                  return (
+                    <div key={entry.id} className="bg-white rounded-xl p-3 flex items-center gap-3 shadow-sm border border-gray-100">
+                      <span className="text-xl shrink-0">{entry.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-800 truncate">{names}</p>
+                        <p className="text-xs text-gray-500 truncate">{entry.label}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {entry.kind !== 'purchase' && entry.points !== 0 && (
+                          <p className={`text-xs font-black tabular-nums ${entry.points > 0 ? 'text-emerald-500' : 'text-red-400'}`}>{entry.points > 0 ? '+' : ''}{entry.points} XP</p>
+                        )}
+                        {entry.kind === 'purchase' && (
+                          <p className="text-xs font-black text-amber-500 tabular-nums">-{Math.abs(entry.coins ?? 0)}🪙</p>
+                        )}
+                        <p className="text-[10px] text-gray-300">{new Date(entry.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {currentCls.log.length > 60 && <p className="text-center text-xs text-gray-300 pb-2">Mostrando últimas 60 ações</p>}
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Config ─────────────────────────────────────────────────────────── */}
+        {tab === 'config' && (
+          <motion.div key="config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+            <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-1 px-1">
+              {([
+                { id: 'students', label: 'Alunos' },
+                { id: 'teams', label: 'Equipes' },
+                { id: 'behaviors', label: 'Ações' },
+                { id: 'rewards', label: 'Loja' },
+                { id: 'season', label: 'Temporada' },
+              ] as const).map(cs => (
+                <button
+                  key={cs.id}
+                  onClick={() => setConfigSection(cs.id)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${configSection === cs.id ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`}
+                >
+                  {cs.label}
+                </button>
+              ))}
+            </div>
+
+            {configSection === 'students' && (
+              <div className="space-y-2">
+                {/* Modo individual vs. lista em lote */}
+                <div className="flex gap-2 mb-1">
+                  <button onClick={() => { setBulkMode(false); setBulkNames(''); }} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${!bulkMode ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                    Um por vez
+                  </button>
+                  <button onClick={() => setBulkMode(true)} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${bulkMode ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                    Lista em lote
+                  </button>
+                </div>
+
+                {!bulkMode ? (
+                  <div className="flex gap-2">
+                    <input
+                      value={newStudentName}
+                      onChange={e => setNewStudentName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addStudent()}
+                      placeholder="Nome do aluno (Enter para adicionar)"
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400"
+                    />
+                    <button onClick={addStudent} className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold">
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      value={bulkNames}
+                      onChange={e => setBulkNames(e.target.value)}
+                      rows={8}
+                      placeholder={"Cole ou escreva os nomes — um por linha:\n\nAna Beatriz\nCarlos Eduardo\nMariana\nPedro Henrique\n..."}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 resize-none bg-white"
+                    />
+                    {(() => {
+                      const names = bulkNames.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+                      const newNames = names.filter(n => !currentCls.students.some(s => s.name.toLowerCase() === n.toLowerCase()));
+                      return (
+                        <button
+                          onClick={() => {
+                            if (newNames.length === 0) return;
+                            updateCls(cls => ({
+                              ...cls,
+                              students: [
+                                ...cls.students,
+                                ...newNames.map(name => ({ id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }))
+                              ]
+                            }));
+                            setBulkNames('');
+                            setBulkMode(false);
+                            toast.success(`${newNames.length} aluno${newNames.length > 1 ? 's' : ''} adicionado${newNames.length > 1 ? 's' : ''}!`);
+                          }}
+                          disabled={newNames.length === 0}
+                          className="w-full bg-indigo-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform"
+                        >
+                          {newNames.length > 0 ? `+ Adicionar ${newNames.length} aluno${newNames.length > 1 ? 's' : ''}` : 'Digite nomes acima'}
+                        </button>
+                      );
+                    })()}
+                    {bulkNames.split('\n').some(n => {
+                      const t = n.trim();
+                      return t.length > 0 && currentCls.students.some(s => s.name.toLowerCase() === t.toLowerCase());
+                    }) && (
+                      <p className="text-[11px] text-amber-600 font-medium px-1">Nomes já cadastrados serão ignorados automaticamente.</p>
+                    )}
+                  </div>
+                )}
+
+                {currentCls.students.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-4">Adicione alunos para começar a gamificação.</p>
+                )}
+                {currentCls.students.length > 0 && (
+                  <p className="text-[11px] text-gray-400 px-1">{currentCls.students.length} aluno{currentCls.students.length !== 1 ? 's' : ''} cadastrado{currentCls.students.length !== 1 ? 's' : ''} — ficam salvos automaticamente.</p>
+                )}
+                {currentCls.students.map(s => (
+                  <div key={s.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{skin[gamiLevel(s.totalXp)]}</span>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">{s.name}</p>
+                        <p className="text-[10px] text-gray-400">{GAMI_LEVELS[gamiLevel(s.totalXp)].name} · {s.totalXp} XP · 🪙{s.coins}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => removeStudent(s.id)} className="text-red-300 hover:text-red-500 p-1.5 transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {configSection === 'teams' && (
+              <div className="space-y-3">
+                {currentCls.teams.length === 0 ? (
+                  <button onClick={() => updateCls(cls => ({ ...cls, teams: GAMI_TEAM_PRESETS.slice(0, 4).map(t => ({ ...t, id: gamiRid() })) }))} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform">
+                    + Criar 4 equipes padrão
+                  </button>
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    {GAMI_TEAM_PRESETS.filter(p => !currentCls.teams.some(t => t.name === p.name)).map(p => (
+                      <button
+                        key={p.name}
+                        onClick={() => updateCls(cls => ({ ...cls, teams: [...cls.teams, { ...p, id: gamiRid() }] }))}
+                        className="flex items-center gap-1 bg-white border border-gray-200 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95 transition-transform"
+                      >
+                        {p.emoji} + {p.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {currentCls.teams.map(team => {
+                  const members = currentCls.students.filter(s => s.teamId === team.id);
+                  return (
+                    <div key={team.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-black text-gray-800">{team.emoji} {team.name}</span>
+                        <button onClick={() => updateCls(cls => ({ ...cls, teams: cls.teams.filter(t => t.id !== team.id), students: cls.students.map(s => s.teamId === team.id ? { ...s, teamId: undefined } : s) }))} className="text-red-300 hover:text-red-500 transition-colors p-1">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {members.map(s => <span key={s.id} className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{s.name}</span>)}
+                        {members.length === 0 && <span className="text-xs text-gray-300 italic">Sem membros</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+                {currentCls.students.some(s => !s.teamId) && currentCls.teams.length > 0 && (
+                  <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100 space-y-2">
+                    <p className="text-xs font-bold text-amber-700">Atribuir equipe:</p>
+                    {currentCls.students.filter(s => !s.teamId).map(s => (
+                      <div key={s.id} className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-gray-700 shrink-0">{s.name}:</span>
+                        {currentCls.teams.map(t => (
+                          <button key={t.id} onClick={() => updateCls(cls => ({ ...cls, students: cls.students.map(x => x.id === s.id ? { ...x, teamId: t.id } : x) }))} className="text-xs bg-white font-bold px-2 py-0.5 rounded-full border border-amber-200 active:scale-95 transition-transform">
+                            {t.emoji} {t.name}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {configSection === 'behaviors' && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">Ações disponíveis ao pontuar alunos.</p>
+                {currentCls.behaviors.map(b => (
+                  <div key={b.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-3 shadow-sm border border-gray-100">
+                    <span className="text-xl">{b.emoji}</span>
+                    <span className="flex-1 text-sm font-bold text-gray-800">{b.label}</span>
+                    <span className={`text-sm font-black tabular-nums mr-1 ${b.points > 0 ? 'text-emerald-500' : 'text-red-400'}`}>{b.points > 0 ? '+' : ''}{b.points} XP</span>
+                    <button onClick={() => updateCls(cls => ({ ...cls, behaviors: cls.behaviors.filter(x => x.id !== b.id) }))} className="text-red-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+                {currentCls.behaviors.length === 0 && (
+                  <button onClick={() => updateCls(cls => ({ ...cls, behaviors: GAMI_DEFAULT_BEHAVIORS }))} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm">
+                    + Restaurar ações padrão
+                  </button>
+                )}
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-200">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Nova ação personalizada</p>
+                  <input value={newBehaviorLabel} onChange={e => setNewBehaviorLabel(e.target.value)} placeholder="Ex: Apresentou trabalho..." maxLength={60} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-bold text-gray-400 mb-0.5 block">Pontos (negativo = penalidade)</label>
+                      <input type="number" value={newBehaviorPoints} onChange={e => setNewBehaviorPoints(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const label = newBehaviorLabel.trim();
+                        const pts = parseInt(newBehaviorPoints) || 0;
+                        if (!label) return;
+                        const emoji = pts > 0 ? '⭐' : '⚠️';
+                        updateCls(cls => ({ ...cls, behaviors: [...cls.behaviors, { id: gamiRid(), label, points: pts, emoji }] }));
+                        setNewBehaviorLabel(''); setNewBehaviorPoints('3');
+                        toast.success('Ação adicionada!');
+                      }}
+                      className="self-end bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm"
+                    >+ Add</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {configSection === 'rewards' && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">Recompensas que alunos resgatam com 🪙 corujinhas.</p>
+                {currentCls.rewards.map(r => (
+                  <div key={r.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-3 shadow-sm border border-gray-100">
+                    <span className="text-xl">{r.emoji}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-gray-800">{r.label}</p>
+                      <p className="text-xs text-amber-500 font-black">🪙 {r.cost}</p>
+                    </div>
+                    <button onClick={() => updateCls(cls => ({ ...cls, rewards: cls.rewards.filter(x => x.id !== r.id) }))} className="text-red-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+                {currentCls.rewards.length === 0 && (
+                  <button onClick={() => updateCls(cls => ({ ...cls, rewards: GAMI_DEFAULT_REWARDS }))} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm">
+                    + Restaurar recompensas padrão
+                  </button>
+                )}
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-200">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Nova recompensa personalizada</p>
+                  <input value={newRewardLabel} onChange={e => setNewRewardLabel(e.target.value)} placeholder="Ex: Jogar jogo no computador..." maxLength={60} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-bold text-gray-400 mb-0.5 block">Custo em 🪙 corujinhas</label>
+                      <input type="number" value={newRewardCost} onChange={e => setNewRewardCost(e.target.value)} min={1} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const label = newRewardLabel.trim();
+                        const cost = parseInt(newRewardCost) || 1;
+                        if (!label) return;
+                        updateCls(cls => ({ ...cls, rewards: [...cls.rewards, { id: gamiRid(), label, cost, emoji: '🎁' }] }));
+                        setNewRewardLabel(''); setNewRewardCost('15');
+                        toast.success('Recompensa adicionada!');
+                      }}
+                      className="self-end bg-amber-500 text-white px-4 py-2 rounded-lg font-bold text-sm"
+                    >+ Add</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {configSection === 'season' && (
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <p className="font-black text-gray-900 mb-1">Temporada {currentCls.season}</p>
+                  <p className="text-xs text-gray-500 mb-4">Encerrar salva o pódio no Hall da Fama e zera XP e moedas de todos os alunos. Use no fim do bimestre.</p>
+                  <button onClick={() => setShowSeasonEnd(true)} className="w-full bg-red-500 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform">
+                    🏆 Encerrar Temporada {currentCls.season}
+                  </button>
+                </div>
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <p className="font-black text-gray-900 mb-3">Visual dos avatares</p>
+                  <div className="flex gap-3">
+                    {(Object.keys(GAMI_SKINS) as Array<keyof typeof GAMI_SKINS>).map(skinKey => (
+                      <button
+                        key={skinKey}
+                        onClick={() => updateCls(cls => ({ ...cls, skin: skinKey }))}
+                        className={`flex-1 p-3 rounded-xl border-2 text-center transition-all ${(currentCls.skin ?? 'coruja') === skinKey ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white'}`}
+                      >
+                        <div className="flex justify-center gap-0.5 mb-1">{GAMI_SKINS[skinKey].slice(0, 3).map((e, i) => <span key={i} className="text-base">{e}</span>)}</div>
+                        <p className="text-[10px] font-bold text-gray-600 capitalize">{skinKey}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Award modal ───────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {awardingStudent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-black/50 flex items-end justify-center"
+            onClick={e => { if (e.target === e.currentTarget) setAwardingStudentId(null); }}
+          >
+            <motion.div
+              initial={{ y: 60 }}
+              animate={{ y: 0 }}
+              exit={{ y: 60 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+              className="bg-white rounded-t-3xl w-full max-w-md px-4 pb-10 pt-4 max-h-[80vh] overflow-y-auto"
+            >
+              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-3xl">{skin[gamiLevel(awardingStudent.totalXp)]}</span>
+                <div>
+                  <p className="font-black text-gray-900 text-base">{awardingStudent.name}</p>
+                  <p className="text-xs text-indigo-400 font-bold">{GAMI_LEVELS[gamiLevel(awardingStudent.totalXp)].name} · {awardingStudent.totalXp} XP · 🪙{awardingStudent.coins}</p>
+                </div>
+                {awardingStudent.streak >= 3 && (
+                  <span className="ml-auto bg-orange-100 text-orange-500 text-xs font-black px-2 py-1 rounded-full">🔥 {awardingStudent.streak} dias</span>
+                )}
+              </div>
+              {awardingStudent.badges.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-4">
+                  {awardingStudent.badges.map(bid => {
+                    const badge = GAMI_BADGES.find(b => b.id === bid);
+                    return badge ? <span key={bid} className="bg-amber-50 text-amber-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">{badge.emoji} {badge.name}</span> : null;
+                  })}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                {currentCls.behaviors.map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => awardPoints([awardingStudent.id], b)}
+                    className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all active:scale-95 ${b.points > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-100 bg-red-50'}`}
+                  >
+                    <span className="text-xl">{b.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800 truncate">{b.label}</p>
+                      <p className={`text-xs font-black tabular-nums ${b.points > 0 ? 'text-emerald-600' : 'text-red-500'}`}>{b.points > 0 ? '+' : ''}{b.points} XP</p>
+                    </div>
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    const b = currentCls.behaviors.find(x => x.points > 0) ?? { id: 'all', label: 'Toda a turma', points: 5, emoji: '⭐' };
+                    awardPoints(currentCls.students.map(s => s.id), b);
+                    toast.success(`${b.emoji} +${b.points} XP para toda a turma!`);
+                  }}
+                  className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-indigo-200 bg-indigo-50 active:scale-95 transition-all"
+                >
+                  <Star size={16} className="text-indigo-500" />
+                  <span className="text-xs font-bold text-indigo-700">Pontuar toda a turma</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Season end confirmation ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSeasonEnd && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center px-6">
+            <motion.div initial={{ scale: 0.92 }} animate={{ scale: 1 }} exit={{ scale: 0.92 }} className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+              <p className="text-xl font-black text-gray-900 text-center mb-2">🏆 Encerrar Temporada {currentCls.season}?</p>
+              <p className="text-sm text-gray-500 text-center mb-6">O ranking será salvo no Hall da Fama e todos os XP e moedas serão zerados.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowSeasonEnd(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-2xl text-sm">Cancelar</button>
+                <button onClick={endSeason} className="flex-1 bg-red-500 text-white font-bold py-3 rounded-2xl text-sm">Encerrar</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Team assignment modal ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {teamStudentId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-black/50 flex items-end justify-center"
+            onClick={e => { if (e.target === e.currentTarget) setTeamStudentId(null); }}
+          >
+            <motion.div
+              initial={{ y: 40 }}
+              animate={{ y: 0 }}
+              exit={{ y: 40 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+              className="bg-white rounded-t-3xl w-full max-w-md px-4 pb-10 pt-4"
+            >
+              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+              <p className="font-black text-gray-900 mb-3">Equipe de {currentCls.students.find(s => s.id === teamStudentId)?.name}</p>
+              <div className="space-y-2">
+                {currentCls.teams.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => { updateCls(cls => ({ ...cls, students: cls.students.map(s => s.id === teamStudentId ? { ...s, teamId: t.id } : s) })); setTeamStudentId(null); }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 active:scale-[0.98] transition-transform"
+                  >
+                    <span className="text-2xl">{t.emoji}</span>
+                    <span className="font-bold text-gray-800">{t.name}</span>
+                  </button>
+                ))}
+                <button onClick={() => { updateCls(cls => ({ ...cls, students: cls.students.map(s => s.id === teamStudentId ? { ...s, teamId: undefined } : s) })); setTeamStudentId(null); }} className="w-full p-3 rounded-xl bg-gray-100 text-gray-500 font-bold text-sm">
+                  Sem equipe
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Kit ao Vivo dock ──────────────────────────────────────────────────── */}
+      <div className="fixed bottom-24 left-0 right-0 z-[60] px-4 max-w-md mx-auto">
+        <AnimatePresence>
+          {kitExpanded && (
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+              className="bg-white rounded-2xl p-3 mb-2 shadow-xl border border-gray-100 grid grid-cols-4 gap-2"
+            >
+              {LIVE_TOOLS.map(tool => (
+                <button
+                  key={tool.id}
+                  onClick={() => { setLiveTool(tool.id); setKitExpanded(false); }}
+                  className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-indigo-50 active:scale-90 transition-transform"
+                >
+                  <span className="text-xl leading-none">{tool.emoji}</span>
+                  <span className="text-[9px] font-bold text-indigo-600 leading-tight text-center">{tool.label}</span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <button
+          onClick={() => setKitExpanded(e => !e)}
+          className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-transform"
+        >
+          <Zap size={16} />
+          <span className="text-sm">Kit ao Vivo</span>
+          <ChevronUp size={14} className={`transition-transform duration-200 ${kitExpanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {/* ── Live tool overlays ────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {liveTool === 'sorteio' && (
+          <GamiSorteio
+            students={currentCls.students}
+            onClose={() => setLiveTool(null)}
+            onAwardParticipation={id => {
+              const b = currentCls.behaviors.find(x => x.label.toLowerCase().includes('particip')) ?? { id: 'part', label: 'Participação', points: 3, emoji: '✋' };
+              awardPoints([id], b);
+            }}
+          />
+        )}
+        {liveTool === 'timer' && <GamiTimer onClose={() => setLiveTool(null)} />}
+        {liveTool === 'grupos' && (
+          <GamiGrupos students={currentCls.students} onClose={() => setLiveTool(null)} />
+        )}
+        {liveTool === 'barulho' && (
+          <GamiBarulho
+            onClose={() => setLiveTool(null)}
+            onRewardClass={points => awardPoints(currentCls.students.map(s => s.id), { id: 'silencio', label: 'Desafio do Silêncio', points, emoji: '🤫' })}
+          />
+        )}
+        {liveTool === 'semaforo' && <GamiSemaforo onClose={() => setLiveTool(null)} />}
+        {liveTool === 'dado' && <GamiDado onClose={() => setLiveTool(null)} />}
+        {liveTool === 'placar' && <GamiPlacar teams={currentCls.teams} onClose={() => setLiveTool(null)} />}
+        {liveTool === 'evento' && (
+          <GamiEvento
+            customEvents={currentCls.customEvents ?? []}
+            onClose={() => setLiveTool(null)}
+            onQuickAward={(points, label) => awardPoints(currentCls.students.map(s => s.id), { id: 'event', label, points, emoji: '⚡' })}
+          />
+        )}
+        {liveTool === 'participacao' && (
+          <GamiParticipacao
+            students={currentCls.students}
+            onToggle={id => updateCls(cls => ({ ...cls, students: cls.students.map(s => s.id === id ? { ...s, participatedDay: s.participatedDay === gamiTodayKey() ? undefined : gamiTodayKey() } : s) }))}
+            onClose={() => setLiveTool(null)}
+          />
+        )}
+        {liveTool === 'batalha' && (
+          <GamiBatalha
+            teams={currentCls.teams}
+            students={currentCls.students}
+            subject={selectedSchedule?.subject ?? selectedSchedule?.name ?? 'Geral'}
+            level={selectedSchedule?.level ?? 'Fundamental'}
+            onClose={() => setLiveTool(null)}
+            onAwardTeam={(teamIdx, _names, points) => {
+              const team = currentCls.teams[teamIdx];
+              if (!team) return;
+              const ids = currentCls.students.filter(s => s.teamId === team.id).map(s => s.id);
+              if (ids.length === 0) return;
+              awardPoints(ids, { id: 'batalha', label: 'Batalha de Revisão', points, emoji: '⚔️' });
+            }}
+          />
+        )}
+        {liveTool === 'projetor' && (
+          <GamiProjetor cls={currentCls} schedule={selectedSchedule} onClose={() => setLiveTool(null)} />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -9064,6 +12137,7 @@ function AppInner() {
 
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
+  const [ferramentasTool, setFerramentasTool] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -9799,13 +12873,13 @@ function AppInner() {
     }]);
   };
 
-  const getSlidesPrompt = (topicText: string, className: string, tone: string, complexity: string, focus: string, groundingContent: string, slideCount: number) => `Você é um Diretor de Arte Sênior. Sua tarefa é analisar o conteúdo do usuário e transformá-lo em uma apresentação de ${slideCount} slides sobre "${topicText}". 
-        Turma: "${className}"
+  const getSlidesPrompt = (topicText: string, className: string, tone: string, complexity: string, focus: string, groundingContent: string, slideCount: number, level?: string) => `Você é um Diretor de Arte Sênior. Sua tarefa é analisar o conteúdo do usuário e transformá-lo em uma apresentação de ${slideCount} slides sobre "${topicText}".
+        Turma: "${className}"${level ? `\n        Nível de ensino: ${level}${level.toLowerCase().includes('infantil') ? ' — linguagem MUITO simples e lúdica, frases curtíssimas, priorize slides visuais (LAYOUT_FULL_IMAGE, LAYOUT_TOPICS com poucos itens), sem textos longos' : level.toLowerCase().includes('fundamental') ? ' — linguagem clara e acessível, exemplos do cotidiano' : level.toLowerCase().includes('médio') || level.toLowerCase().includes('medio') ? ' — pode aprofundar conceitos e usar vocabulário técnico com definições' : ''}` : ''}
         Tom: ${tone}
         Complexidade: ${complexity}
         Foco: ${focus}
         ${groundingContent ? `Conteúdo Base para Grounding: ${groundingContent}` : ''}
-        
+
         Crie uma apresentação adaptada a estes parâmetros.
         
         LAYOUTS DISPONÍVEIS — escolha o mais adequado para cada slide:
@@ -9953,22 +13027,46 @@ function AppInner() {
       const desenvolvimento = Math.round(plannerLessonTime * 0.65);
       const fechamento = plannerLessonTime - abertura - desenvolvimento;
 
+      const classLevel = selectedClass?.level || '';
+      const isEarlyChildhood = classLevel.toLowerCase().includes('infantil');
+      const isFundamental = classLevel.toLowerCase().includes('fundamental');
+      const isMedio = classLevel.toLowerCase().includes('médio') || classLevel.toLowerCase().includes('medio');
+
       // ── Solução 2: selecionar habilidades BNCC do banco local ──────────────
-      const bnccSkills = selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4);
+      const bnccSkills = isEarlyChildhood ? [] : selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4);
       const bnccBlock  = bnccSkills.length > 0
         ? bnccSkills.map(s => `- ${s.code} — ${s.desc}`).join('\n')
-        : '- [escolha habilidades BNCC reais para a disciplina e série]';
+        : isEarlyChildhood
+          ? '- [Campos de Experiências da BNCC-EI pertinentes]'
+          : '- [escolha habilidades BNCC reais para a disciplina e série]';
+
+      const levelContext = isEarlyChildhood
+        ? `NÍVEL: Educação Infantil — use linguagem lúdica, brincadeiras, histórias, músicas e atividades sensoriais. Foco no brincar, explorar e interagir. Evite avaliações formais.`
+        : isFundamental
+          ? `NÍVEL: Ensino Fundamental — equilibre teoria e prática, use exemplos do cotidiano, atividades em grupo e recursos visuais.`
+          : isMedio
+            ? `NÍVEL: Ensino Médio — aprofunde conceitos, estimule pensamento crítico, análise e produção textual. Conecte com ENEM e vestibular quando pertinente.`
+            : '';
+
+      const bnccSectionTitle = isEarlyChildhood ? 'CAMPOS DE EXPERIÊNCIAS (BNCC-EI)' : 'HABILIDADE (BNCC)';
+      const bnccSectionInstructions = isEarlyChildhood
+        ? 'Liste os Campos de Experiências da BNCC da Educação Infantil relacionados (ex: O eu, o outro e o nós; Corpo, gestos e movimentos; Traços, sons, cores e formas; Espaços, tempos, quantidades, relações e transformações; Escuta, fala, pensamento e imaginação).'
+        : 'USE OBRIGATORIAMENTE as habilidades abaixo (são códigos reais verificados). Copie os códigos exatamente:';
+
+      const avaliacaoBlock = isEarlyChildhood
+        ? '## AVALIAÇÃO / REGISTRO\n[Formas de registro e observação — ex: portfólio, registros fotográficos, roda de conversa, observação sistemática. SEM provas ou notas na Ed. Infantil.]'
+        : `## AVALIAÇÃO\n[Instrumento de avaliação e critérios — ex: observação, exercícios, portfólio, rubricas]`;
 
       // ── Solução 1: injetar habilidades reais no prompt ──────────────────
       const prompt = `Você é um pedagogo especialista. Gere um PLANO DE AULA completo e profissional.
-Tópico: "${targetTopic}" | Turma: "${className}" | Turno: ${plannerTurn.charAt(0).toUpperCase() + plannerTurn.slice(1)} | Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]}
+${levelContext ? levelContext + '\n' : ''}Tópico: "${targetTopic}" | Turma: "${className}" | Turno: ${plannerTurn.charAt(0).toUpperCase() + plannerTurn.slice(1)} | Tom: ${toneMap[plannerTone]} | Complexidade: ${complexityMap[plannerComplexity]} | Foco: ${focusMap[plannerFocus]}
 Quantidade de aulas: ${plannerDuration} | Duração por aula: ${plannerLessonTime} min (abertura: ${abertura}min · desenvolvimento: ${desenvolvimento}min · fechamento: ${fechamento}min)
 
 Responda SOMENTE com as seções abaixo em Markdown, substituindo todos os campos [ ] por conteúdo real e pertinente.
 PROIBIDO: introduções, saudações, comentários, tabelas Markdown (| coluna |) ou qualquer texto fora da estrutura abaixo.
 
 ## ÁREA DE CONHECIMENTO
-[Área — ex: Ciências da Natureza, Linguagens, Matemática, Ciências Humanas, Ensino Religioso]
+[Área — ex: Ciências da Natureza, Linguagens, Matemática, Ciências Humanas${isEarlyChildhood ? ', Educação Infantil' : ''}]
 
 ## EIXO/UNIDADE TEMÁTICA
 [Eixo temático ou unidade curricular que abrange "${targetTopic}"]
@@ -9976,30 +13074,29 @@ PROIBIDO: introduções, saudações, comentários, tabelas Markdown (| coluna |
 ## CONTEÚDO
 [Lista dos conteúdos a serem trabalhados na(s) aula(s)]
 
-## OBJETIVOS
-[Lista de objetivos de aprendizagem em verbos de ação — identificar, analisar, comparar, produzir, etc.]
+## OBJETIVOS${isEarlyChildhood ? ' DE APRENDIZAGEM E DESENVOLVIMENTO' : ''}
+[Lista de objetivos em verbos de ação — ${isEarlyChildhood ? 'explorar, criar, expressar, interagir, investigar, brincar, desenvolver' : 'identificar, analisar, comparar, produzir, argumentar, resolver'}]
 
 ## PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM
-[2 ou 3 perguntas que orientam e motivam a aprendizagem sobre "${targetTopic}"]
+[2 ou 3 perguntas que orientam e motivam a aprendizagem sobre "${targetTopic}"${isEarlyChildhood ? ' — linguagem acessível e lúdica para crianças' : ''}]
 
 ## METODOLOGIA
 [Sequência didática detalhada:
-• Abertura (${abertura}min): estratégia de motivação ou levantamento de conhecimentos prévios
-• Desenvolvimento (${desenvolvimento}min): sequência de atividades com metodologia ativa, explicação e fixação
-• Fechamento (${fechamento}min): síntese, avaliação formativa e consolidação]
+• Abertura (${abertura}min): ${isEarlyChildhood ? 'roda de conversa, música, história ou brincadeira de apresentação do tema' : 'estratégia de motivação ou levantamento de conhecimentos prévios'}
+• Desenvolvimento (${desenvolvimento}min): ${isEarlyChildhood ? 'atividades lúdicas, exploração sensorial, brincadeiras dirigidas, arte e expressão corporal relacionadas ao tema' : 'sequência de atividades com metodologia ativa, explicação e fixação'}
+• Fechamento (${fechamento}min): ${isEarlyChildhood ? 'roda de socialização, registro expressivo (desenho, colagem), cantinho da descoberta' : 'síntese, avaliação formativa e consolidação'}]
 
-## Habilidade (BNCC)
-USE OBRIGATORIAMENTE as habilidades abaixo (são códigos reais verificados). Copie os códigos exatamente:
+## ${bnccSectionTitle}
+${bnccSectionInstructions}
 ${bnccBlock}
 
 ## RECURSOS DIDÁTICOS
-[Lista de recursos necessários — ex: quadro branco, projetor, materiais manipulativos, textos]
+[Lista de recursos — ${isEarlyChildhood ? 'ex: livros ilustrados, fantasias, tintas, massinha, instrumentos musicais, natureza, fantoches, blocos, jogos simbólicos' : 'ex: quadro branco, projetor, materiais manipulativos, textos'}]
 
-## AVALIAÇÃO
-[Instrumento de avaliação e critérios — ex: observação, lista de exercícios, portfólio, rubricas]
+${avaliacaoBlock}
 
 ## REFERÊNCIAS
-[2 ou 3 referências bibliográficas em formato ABNT]`;
+[2 ou 3 referências bibliográficas em formato ABNT${isEarlyChildhood ? ' — inclua documentos BNCC e Referencial Curricular Nacional para Educação Infantil (RCNEI)' : ''}]`;
 
       const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const planDraft = response.text || '';
@@ -10026,7 +13123,7 @@ ${bnccBlock}
       updateTask(taskId, { status: 'completed', result: planResult });
       recordGeneration();
     } catch (error) {
-      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Nao consegui montar o plano dessa vez. Tente novamente.') });
+      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Não consegui montar o plano dessa vez. Tente novamente.') });
     }
   };
 
@@ -10042,7 +13139,7 @@ ${bnccBlock}
       const className = selectedClass ? selectedClass.name : 'Geral';
 
       if (type === 'slides') {
-        const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount);
+        const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount, selectedClass?.level);
         const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
@@ -10086,13 +13183,17 @@ ${bnccBlock}
         const professorStr = profile.name || '_________________';
         const disciplinaStr = selectedClass?.subject || profile.subject || '_________________';
         
+        const resClassLevel = selectedClass?.level || '';
+        const resIsEarlyChildhood = resClassLevel.toLowerCase().includes('infantil');
         const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
         const mcPts  = parseFloat((plannerExamValue / 10).toFixed(1));
         const dissPts = parseFloat((plannerExamValue / 4).toFixed(1));
         const examDurStr = plannerExamDuration < 60 ? `${plannerExamDuration} min` : plannerExamDuration === 60 ? '1 hora' : `${Math.floor(plannerExamDuration/60)}h${plannerExamDuration%60 > 0 ? plannerExamDuration%60+'min' : ''}`;
 
         const qtLabel: Record<string, string> = { mista: 'Varie os tipos entre as questões: múltipla escolha, completar lacunas, V/F com justificativa, relacionar colunas, produção textual ou resolução de problema.', multipla_escolha: 'Todas as questões são de MÚLTIPLA ESCOLHA com 4 alternativas (A, B, C, D), apenas uma correta.', dissertativa: 'Todas as questões são DISSERTATIVAS (resposta aberta), com 5 linhas de resposta.' };
-        const qtInstruction = qtLabel[plannerQuestionType] || qtLabel.mista;
+        const qtInstruction = resIsEarlyChildhood
+          ? 'Use atividades LÚDICAS e visuais adequadas à Ed. Infantil: colorir, ligar com setas, identificar figuras, completar com desenho, circular a resposta correta com imagens. SEM leitura extensa ou escrita formal.'
+          : qtLabel[plannerQuestionType] || qtLabel.mista;
 
         const prompt = type === 'exam'
           ? `Você é um professor especialista. Gere uma AVALIAÇÃO FORMAL sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
@@ -10211,7 +13312,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         recordGeneration();
       }
     } catch (error) {
-      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Esse material nao saiu como esperado. Tente novamente.') });
+      updateTask(taskId, { status: 'error', error: formatApiError(error, 'Esse material não saiu como esperado. Tente novamente.') });
     }
   };
 
@@ -10436,7 +13537,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
 
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
-          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} setSelectedDate={(d: Date) => {
+          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} setSelectedDate={(d: Date) => {
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
@@ -10566,7 +13667,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             if (!user) return;
             const uid = user.uid;
             try {
-              const subcols = ['schedules', 'classes', 'events', 'resources', 'notifications', 'messages', 'studioMessages'];
+              const subcols = ['schedules', 'classes', 'events', 'resources', 'notifications', 'messages', 'studioMessages', 'gamification', 'diario', 'fcmTokens'];
               for (const col of subcols) {
                 const snap = await getDocs(collection(db, `users/${uid}/${col}`));
                 const batch = writeBatch(db);
@@ -10585,6 +13686,9 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
           }} onImportSyllabus={(cls) => setImportRequest({ mode: 'syllabus', targetClass: cls })} />}
           {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
+          {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} />}
+          {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} />}
+          {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
 
