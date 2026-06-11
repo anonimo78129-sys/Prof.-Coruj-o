@@ -66,43 +66,10 @@ service cloud.firestore {
       
       allow delete: if isOwner(userId) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
       
-      match /schedules/{scheduleId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && uidUnchanged();
-        allow update: if isOwner(userId) && uidUnchanged();
-        allow delete: if isOwner(userId);
-      }
-      match /classes/{classId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && uidUnchanged();
-        allow update: if isOwner(userId) && uidUnchanged();
-        allow delete: if isOwner(userId);
-      }
-      match /resources/{resourceId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && uidUnchanged();
-        allow update: if isOwner(userId) && uidUnchanged();
-        allow delete: if isOwner(userId);
-      }
-      match /events/{eventId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && uidUnchanged();
-        allow update: if isOwner(userId) && uidUnchanged();
-        allow delete: if isOwner(userId);
-      }
-      match /messages/{messageId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && uidUnchanged();
-        allow update: if isOwner(userId) && uidUnchanged();
-        allow delete: if isOwner(userId);
-      }
-      match /notifications/{notificationId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && uidUnchanged();
-        allow update: if isOwner(userId) && uidUnchanged();
-        allow delete: if isOwner(userId);
-      }
-      match /fcmTokens/{token} {
+      // Todas as subcoleções de dados do próprio usuário (schedules, classes,
+      // resources, events, messages, studioMessages, notifications, fcmTokens,
+      // gamification, diario, ...). O dono lê e escreve; ninguém mais acessa.
+      match /{subcollection}/{docId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && uidUnchanged();
         allow update: if isOwner(userId) && uidUnchanged();
