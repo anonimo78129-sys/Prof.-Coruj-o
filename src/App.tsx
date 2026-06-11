@@ -685,12 +685,13 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
         </AnimatePresence>
       </button>
       {rightAction !== undefined ? rightAction : (
-        <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-indigo-600 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
+        <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-gray-200 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
           <img
             src={profile.photo || 'https://i.ibb.co/67chNLnZ/20260521-122245-0000.png'}
             alt="Profile"
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://i.ibb.co/67chNLnZ/20260521-122245-0000.png'; }}
           />
         </button>
       )}
@@ -4366,9 +4367,9 @@ const ProfileScreen = ({
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative inline-block mb-4">
-          <div className="w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
+          <div className={`w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer flex items-center justify-center ${profile.photo ? 'bg-gray-200' : 'bg-indigo-600'}`} onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
-              <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { setProfile({ ...profile, photo: '' }); }} />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white">
                 <User size={48} />
