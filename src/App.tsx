@@ -5358,92 +5358,199 @@ const fileToBase64 = (file: File): Promise<string> =>
 const toISODate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// file.type pode vir vazio em alguns Androids; deduz pela extensão
+const guessMimeType = (file: File): string => {
+  if (file.type) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'webp') return 'image/webp';
+  return 'application/pdf';
+};
+
+const MONTH_NAME_TO_NUM: Record<string, number> = {
+  janeiro: 1, jan: 1, fevereiro: 2, fev: 2, marco: 3, março: 3, mar: 3, abril: 4, abr: 4,
+  maio: 5, mai: 5, junho: 6, jun: 6, julho: 7, jul: 7, agosto: 8, ago: 8,
+  setembro: 9, set: 9, outubro: 10, out: 10, novembro: 11, nov: 11, dezembro: 12, dez: 12,
+};
+
+// Normaliza datas em vários formatos para YYYY-MM-DD; null se irrecuperável
+const normalizeImportDate = (raw: any, year: number): string | null => {
+  if (!raw) return null;
+  let s = String(raw).trim();
+  // Já em ISO (com ou sem hora)
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    const mo = Number(iso[2]), da = Number(iso[3]);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) return `${iso[1]}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+    return null;
+  }
+  // DD/MM/YYYY ou DD-MM-YYYY ou DD.MM.YYYY
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) {
+    const da = Number(m[1]), mo = Number(m[2]);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) return `${m[3]}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+    return null;
+  }
+  // DD/MM ou DD-MM (sem ano)
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+  if (m) {
+    const da = Number(m[1]), mo = Number(m[2]);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) return `${year}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+    return null;
+  }
+  // "12 de maio", "12 de maio de 2026", "12 maio"
+  m = s.toLowerCase().match(/^(\d{1,2})\s*(?:de\s+)?([a-zç]+)(?:\s*(?:de\s+)?(\d{4}))?$/);
+  if (m) {
+    const da = Number(m[1]);
+    const mo = MONTH_NAME_TO_NUM[m[2]];
+    const yr = m[3] ? Number(m[3]) : year;
+    if (mo && da >= 1 && da <= 31) return `${yr}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+  }
+  return null;
+};
+
+const CALENDAR_EXTRACT_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    events: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          date: { type: Type.STRING, description: 'YYYY-MM-DD' },
+          type: { type: Type.STRING, enum: ['holiday', 'admin', 'prep', 'commemorative'] },
+        },
+        required: ['title', 'date', 'type'],
+      },
+    },
+  },
+  required: ['events'],
+};
+
+const parseCalendarEvents = (text: string, year: number): ImportedEvent[] => {
+  let raw = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  let parsed: any;
+  try { parsed = JSON.parse(raw || '{}'); } catch { return []; }
+  const list = Array.isArray(parsed) ? parsed : (parsed.events || []);
+  return list
+    .map((e: any) => {
+      if (!e || !e.title) return null;
+      const date = normalizeImportDate(e.date, year);
+      if (!date) return null;
+      return {
+        title: String(e.title).slice(0, 80),
+        date,
+        type: (['holiday', 'admin', 'prep', 'commemorative'].includes(e.type) ? e.type : 'admin') as ImportEventType,
+      };
+    })
+    .filter(Boolean) as ImportedEvent[];
+};
+
 const extractAcademicCalendar = async (file: File, year: number): Promise<ImportedEvent[]> => {
   const base64 = await fileToBase64(file);
+  const mimeType = guessMimeType(file);
+  const basePrompt = `Este documento é um calendário escolar/letivo brasileiro referente ao ano ${year}. Ele pode estar em vários formatos: texto corrido, tabela, grade mensal (calendário visual onde os dias são numerados em quadrados e os eventos são marcados por cores, círculos ou legendas), documento escaneado ou foto. Leia com atenção, incluindo legendas de cores e rodapés.
+
+Extraia TODOS os eventos com data: feriados, recessos, férias, início e fim de bimestres/trimestres/semestres, reuniões pedagógicas, conselhos de classe, entrega de notas, formação de professores (HTPC), sábados letivos, datas comemorativas e eventos escolares.
+
+Para cada evento retorne: um título curto e claro, a data no formato YYYY-MM-DD (se o ano não aparecer no documento, use ${year}), e o tipo. Regras do tipo: "holiday" para feriados, recessos e férias; "admin" para reuniões, conselhos, entrega de notas e formação; "prep" para eventos pedagógicos e planejamento; "commemorative" para datas comemorativas.
+
+Se um evento durar vários dias (ex: "12 a 16/05"), registre apenas o dia de início. Se a grade mensal usar cores ou símbolos com legenda, use a legenda para identificar o que cada dia marcado significa. Ignore texto que não seja um evento com data.`;
+
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType: file.type } },
-      { text: `Este é um calendário escolar/letivo brasileiro referente ao ano ${year}. Extraia TODOS os eventos com data: feriados, recessos, férias, início e fim de bimestres/trimestres, reuniões pedagógicas, conselhos de classe, entrega de notas, formação de professores (HTPC), datas comemorativas e eventos escolares. Para cada evento retorne: um título curto e claro, a data no formato YYYY-MM-DD (use o ano ${year}), e o tipo. Regras de classificação do tipo: "holiday" para feriados, recessos e férias; "admin" para reuniões, conselhos, entrega de notas e formação; "prep" para eventos pedagógicos e planejamento; "commemorative" para datas comemorativas. Se um evento durar vários dias, registre apenas o dia de início. Ignore qualquer texto que não seja um evento com data.` }
+      { inlineData: { data: base64, mimeType } },
+      { text: basePrompt }
     ]}],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
+    config: { responseMimeType: 'application/json', responseSchema: CALENDAR_EXTRACT_SCHEMA },
+  });
+  let events = parseCalendarEvents(response.text || '', year);
+  if (events.length) return events;
+
+  // 2ª tentativa: transcrição primeiro, sem schema rígido. Ajuda em documentos
+  // escaneados, fotos e grades visuais em que a 1ª passada não achou nada.
+  const retryResponse = await generateContentWithRetry({
+    model: AI_MODEL,
+    contents: [{ role: 'user', parts: [
+      { inlineData: { data: base64, mimeType } },
+      { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é um calendário escolar brasileiro de ${year}), incluindo tabelas, grades mensais, legendas de cores e anotações. Depois, liste cada evento datado que encontrar.
+
+Responda APENAS com JSON válido no formato:
+{"events":[{"title":"...","date":"YYYY-MM-DD","type":"holiday|admin|prep|commemorative"}]}
+
+Datas sem ano: use ${year}. Períodos (ex: 12 a 16/05): use o dia de início. Se um dia está apenas marcado com cor/símbolo, use a legenda para nomear o evento. Extraia o máximo possível, mesmo eventos pequenos.` }
+    ]}],
+  });
+  events = parseCalendarEvents(retryResponse.text || '', year);
+  return events;
+};
+
+const SYLLABUS_EXTRACT_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    modules: {
+      type: Type.ARRAY,
+      items: {
         type: Type.OBJECT,
         properties: {
-          events: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                date: { type: Type.STRING, description: 'YYYY-MM-DD' },
-                type: { type: Type.STRING, enum: ['holiday', 'admin', 'prep', 'commemorative'] },
-              },
-              required: ['title', 'date', 'type'],
-            },
-          },
+          title: { type: Type.STRING },
+          topics: { type: Type.ARRAY, items: { type: Type.STRING } },
+          estimatedClasses: { type: Type.NUMBER },
         },
-        required: ['events'],
+        required: ['title', 'estimatedClasses'],
       },
     },
-  });
-  try {
-    const parsed = JSON.parse(response.text || '{}');
-    return (parsed.events || [])
-      .filter((e: any) => e && e.title && /^\d{4}-\d{2}-\d{2}$/.test(e.date))
-      .map((e: any) => ({
-        title: String(e.title).slice(0, 80),
-        date: e.date,
-        type: (['holiday', 'admin', 'prep', 'commemorative'].includes(e.type) ? e.type : 'admin') as ImportEventType,
-      }));
-  } catch {
-    return [];
-  }
+  },
+  required: ['modules'],
+};
+
+const parseSyllabusModules = (text: string): ImportedModule[] => {
+  let raw = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  let parsed: any;
+  try { parsed = JSON.parse(raw || '{}'); } catch { return []; }
+  const list = Array.isArray(parsed) ? parsed : (parsed.modules || []);
+  return list
+    .filter((m: any) => m && m.title)
+    .map((m: any) => ({
+      title: String(m.title).slice(0, 80),
+      topics: Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : [],
+      estimatedClasses: Math.max(1, Math.min(40, Math.round(Number(m.estimatedClasses) || 4))),
+    }));
 };
 
 const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
   const base64 = await fileToBase64(file);
+  const mimeType = guessMimeType(file);
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType: file.type } },
-      { text: `Esta é uma ementa / plano de curso de uma disciplina escolar brasileira. Extraia a lista de módulos ou unidades temáticas na ordem em que aparecem no documento. Para cada módulo retorne: o título do módulo, a lista de tópicos/conteúdos abordados nele, e uma estimativa de quantas aulas são necessárias (estimatedClasses) com base na quantidade de conteúdo. Se o documento não indicar a carga horária, estime entre 2 e 8 aulas por módulo conforme a densidade do conteúdo. Mantenha a ordem original dos módulos.` }
+      { inlineData: { data: base64, mimeType } },
+      { text: `Este documento é uma ementa / plano de curso / plano de ensino de uma disciplina escolar brasileira. Pode estar em texto corrido, tabela, documento escaneado ou foto. Extraia a lista de módulos ou unidades temáticas na ordem em que aparecem. Para cada módulo retorne: o título do módulo, a lista de tópicos/conteúdos abordados nele, e uma estimativa de quantas aulas são necessárias (estimatedClasses) com base na quantidade de conteúdo. Se o documento não indicar a carga horária, estime entre 2 e 8 aulas por módulo conforme a densidade do conteúdo. Mantenha a ordem original dos módulos.` }
     ]}],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          modules: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                topics: { type: Type.ARRAY, items: { type: Type.STRING } },
-                estimatedClasses: { type: Type.NUMBER },
-              },
-              required: ['title', 'estimatedClasses'],
-            },
-          },
-        },
-        required: ['modules'],
-      },
-    },
+    config: { responseMimeType: 'application/json', responseSchema: SYLLABUS_EXTRACT_SCHEMA },
   });
-  try {
-    const parsed = JSON.parse(response.text || '{}');
-    return (parsed.modules || [])
-      .filter((m: any) => m && m.title)
-      .map((m: any) => ({
-        title: String(m.title).slice(0, 80),
-        topics: Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : [],
-        estimatedClasses: Math.max(1, Math.min(40, Math.round(Number(m.estimatedClasses) || 4))),
-      }));
-  } catch {
-    return [];
-  }
+  let modules = parseSyllabusModules(response.text || '');
+  if (modules.length) return modules;
+
+  // 2ª tentativa: transcrição primeiro, sem schema rígido (documentos escaneados/fotos)
+  const retryResponse = await generateContentWithRetry({
+    model: AI_MODEL,
+    contents: [{ role: 'user', parts: [
+      { inlineData: { data: base64, mimeType } },
+      { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é uma ementa ou plano de curso escolar brasileiro), incluindo tabelas e listas. Depois, identifique os módulos/unidades de conteúdo na ordem do documento.
+
+Responda APENAS com JSON válido no formato:
+{"modules":[{"title":"...","topics":["...","..."],"estimatedClasses":4}]}
+
+Se a carga horária não aparecer, estime entre 2 e 8 aulas por módulo. Extraia o máximo possível.` }
+    ]}],
+  });
+  modules = parseSyllabusModules(retryResponse.text || '');
+  return modules;
 };
 
 // Calcula datas de início sequenciais (cada módulo começa após o anterior terminar)
@@ -5522,12 +5629,12 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
     try {
       if (mode === 'calendar') {
         const ev = await extractAcademicCalendar(file, year);
-        if (!ev.length) { setErrorMsg('Não encontrei eventos com data neste arquivo. Tente um PDF mais legível ou outro formato.'); setPhase('error'); return; }
+        if (!ev.length) { setErrorMsg('Não encontrei eventos com data neste arquivo, mesmo tentando duas vezes. Se for um documento escaneado, tente uma foto mais nítida ou um PDF com texto selecionável.'); setPhase('error'); return; }
         setEvents(ev.sort((a, b) => a.date.localeCompare(b.date)));
         setPhase('review');
       } else {
         const mods = await extractSyllabus(file);
-        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa. Verifique se o arquivo contém a lista de conteúdos.'); setPhase('error'); return; }
+        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Verifique se o arquivo contém a lista de conteúdos ou tente uma versão mais legível.'); setPhase('error'); return; }
         setRows(computeSequentialStarts(mods, todayISO, targetClass));
         setPhase('review');
       }
