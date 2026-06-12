@@ -13487,28 +13487,37 @@ function AppInner() {
 
   const seedAdminData = () => {
     const holidayISOs = buildHolidayISOs(customEvents as any);
-    const t1Id = 'seed-t1'; const t2Id = 'seed-t2'; const t3Id = 'seed-t3';
-    const t4Id = 'seed-t4'; const t5Id = 'seed-t5';
-    const existingNames = new Set(schedules.map(s => s.name));
-    const newSchedules: ClassSchedule[] = [];
-    if (!existingNames.has('Turma 1')) newSchedules.push({ id: t1Id, name: 'Turma 1', days: [6], subject: 'Informática', time: '08:00', color: '#4F46E5' });
-    if (!existingNames.has('Turma 2')) newSchedules.push({ id: t2Id, name: 'Turma 2', days: [6], subject: 'Informática', time: '10:00', color: '#7C3AED' });
-    if (!existingNames.has('Turma 3')) newSchedules.push({ id: t3Id, name: 'Turma 3', days: [2], subject: 'Informática', time: '08:00', color: '#0891B2' });
-    if (!existingNames.has('Turma 4')) newSchedules.push({ id: t4Id, name: 'Turma 4', days: [2], subject: 'Criação de Jogos', time: '10:00', color: '#D97706' });
-    if (!existingNames.has('Turma 5')) newSchedules.push({ id: t5Id, name: 'Turma 5', days: [2], subject: 'Informática', time: '14:00', color: '#059669' });
-    const existingItemIds = new Set(classes.map(c => c.id));
+    // Todas as turmas aos sábados, em horários sequenciais de 2h
+    const turmaDefs: { id: string; name: string; subject: string; time: string; color: string }[] = [
+      { id: 'seed-t1', name: 'Turma 1', subject: 'Informática',      time: '07:00', color: '#4F46E5' },
+      { id: 'seed-t2', name: 'Turma 2', subject: 'Informática',      time: '09:00', color: '#7C3AED' },
+      { id: 'seed-t3', name: 'Turma 3', subject: 'Informática',      time: '11:00', color: '#0891B2' },
+      { id: 'seed-t4', name: 'Turma 4', subject: 'Criação de Jogos', time: '13:00', color: '#D97706' },
+      { id: 'seed-t5', name: 'Turma 5', subject: 'Informática',      time: '15:00', color: '#059669' },
+    ];
+    // Upsert: cria a turma se não existir, ou corrige dias/horário se já existir
+    const updatedSchedules = [...schedules];
+    for (const def of turmaDefs) {
+      const idx = updatedSchedules.findIndex(s => s.name === def.name);
+      if (idx >= 0) {
+        updatedSchedules[idx] = { ...updatedSchedules[idx], days: [6], subject: def.subject, time: def.time, color: def.color };
+      } else {
+        updatedSchedules.push({ id: def.id, name: def.name, days: [6], subject: def.subject, time: def.time, color: def.color });
+      }
+    }
+    // Regenera as aulas seed do zero (remove as antigas para corrigir dias errados)
+    const keptClasses = classes.filter(c => !c.id.startsWith('seed-t'));
     const allItems: ClassItem[] = [
       ...generateTurmaItems('seed-t1', 'Turma 1', [6], '2026-06-13', INFORMATICA_LESSONS, holidayISOs),
       ...generateTurmaItems('seed-t2', 'Turma 2', [6], '2026-04-18', INFORMATICA_LESSONS, holidayISOs),
-      ...generateTurmaItems('seed-t3', 'Turma 3', [2], '2026-04-14', INFORMATICA_LESSONS.slice(25), holidayISOs),
-      ...generateTurmaItems('seed-t4', 'Turma 4', [2], '2026-04-14', JOGOS_LESSONS, holidayISOs),
-      ...generateTurmaItems('seed-t5', 'Turma 5', [2], '2026-04-14', INFORMATICA_LESSONS.slice(16), holidayISOs),
-    ].filter(item => !existingItemIds.has(item.id));
-    if (newSchedules.length) setSchedules([...schedules, ...newSchedules]);
-    if (allItems.length) setClasses([...classes, ...allItems]);
-    const total = allItems.length;
+      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-04-18', INFORMATICA_LESSONS.slice(25), holidayISOs),
+      ...generateTurmaItems('seed-t4', 'Turma 4', [6], '2026-04-18', JOGOS_LESSONS, holidayISOs),
+      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-04-18', INFORMATICA_LESSONS.slice(16), holidayISOs),
+    ];
+    setSchedules(updatedSchedules);
+    setClasses([...keptClasses, ...allItems]);
     const done = allItems.filter(i => i.status === 'done').length;
-    toast.success(`${newSchedules.length} turmas e ${total} aulas importadas (${done} já realizadas)!`);
+    toast.success(`5 turmas e ${allItems.length} aulas importadas (${done} já realizadas)!`);
   };
 
   const generatePlan = async (optTopic?: string, optClassId?: string) => {
