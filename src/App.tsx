@@ -5511,9 +5511,11 @@ const parseCalendarEvents = (text: string, year: number): ImportedEvent[] => {
     .filter(Boolean) as ImportedEvent[];
 };
 
-const extractAcademicCalendar = async (file: File, year: number): Promise<ImportedEvent[]> => {
-  const base64 = await fileToBase64(file);
-  const mimeType = guessMimeType(file);
+const extractAcademicCalendar = async (source: File | string, year: number): Promise<ImportedEvent[]> => {
+  // Aceita arquivo (PDF/imagem) ou texto colado pelo usuário
+  const docPart = typeof source === 'string'
+    ? { text: `TEXTO DO DOCUMENTO:\n\n${source}` }
+    : { inlineData: { data: await fileToBase64(source), mimeType: guessMimeType(source) } };
   const basePrompt = `Este documento é um calendário escolar/letivo brasileiro referente ao ano ${year}. Ele pode estar em vários formatos: texto corrido, tabela, grade mensal (calendário visual onde os dias são numerados em quadrados e os eventos são marcados por cores, círculos ou legendas), documento escaneado ou foto. Leia com atenção, incluindo legendas de cores e rodapés.
 
 Extraia TODOS os eventos com data: feriados, recessos, férias, início e fim de bimestres/trimestres/semestres, reuniões pedagógicas, conselhos de classe, entrega de notas, formação de professores (HTPC), sábados letivos, datas comemorativas e eventos escolares.
@@ -5525,7 +5527,7 @@ Se um evento durar vários dias (ex: "12 a 16/05"), registre apenas o dia de in�
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: basePrompt }
     ]}],
     config: { responseMimeType: 'application/json', responseSchema: CALENDAR_EXTRACT_SCHEMA },
@@ -5538,7 +5540,7 @@ Se um evento durar vários dias (ex: "12 a 16/05"), registre apenas o dia de in�
   const retryResponse = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é um calendário escolar brasileiro de ${year}), incluindo tabelas, grades mensais, legendas de cores e anotações. Depois, liste cada evento datado que encontrar.
 
 Responda APENAS com JSON válido no formato:
@@ -5618,13 +5620,15 @@ const parseSyllabusModules = (text: string): ImportedModule[] => {
     .filter((m: ImportedModule) => m.estimatedClasses > 0);
 };
 
-const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
-  const base64 = await fileToBase64(file);
-  const mimeType = guessMimeType(file);
+const extractSyllabus = async (source: File | string): Promise<ImportedModule[]> => {
+  // Aceita arquivo (PDF/imagem) ou texto colado pelo usuário
+  const docPart = typeof source === 'string'
+    ? { text: `TEXTO DO DOCUMENTO:\n\n${source}` }
+    : { inlineData: { data: await fileToBase64(source), mimeType: guessMimeType(source) } };
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: SYLLABUS_PROMPT }
     ]}],
     config: { responseMimeType: 'application/json', responseSchema: SYLLABUS_EXTRACT_SCHEMA },
@@ -5636,7 +5640,7 @@ const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
   const retryResponse = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é uma ementa ou plano de curso escolar brasileiro), incluindo todas as linhas de todas as tabelas. Depois, identifique os módulos e TODAS as aulas de cada módulo. Cada linha de conteúdo com carga horária é uma aula; linhas de Atividade, Revisão e Prova também são aulas.
 
 Responda APENAS com JSON válido no formato:
@@ -5743,35 +5747,50 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
   setCustomEvents: (c: any[]) => void;
   onAddClassItems: (items: ClassItem[]) => void;
 }) => {
-  const [phase, setPhase] = useState<'upload' | 'loading' | 'review' | 'error'>('upload');
+  const [phase, setPhase] = useState<'upload' | 'paste' | 'loading' | 'review' | 'error'>('upload');
   const [errorMsg, setErrorMsg] = useState('');
   const [events, setEvents] = useState<ImportedEvent[]>([]);
   const [rows, setRows] = useState<SyllabusRow[]>([]);
+  const [pasteText, setPasteText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const todayISO = toISODate(new Date());
+
+  const runExtraction = async (source: File | string) => {
+    setErrorMsg(''); setPhase('loading');
+    try {
+      if (mode === 'calendar') {
+        const ev = await extractAcademicCalendar(source, year);
+        if (!ev.length) { setErrorMsg('Não encontrei eventos com data, mesmo tentando duas vezes. Você pode colar o texto do documento ou criar os eventos manualmente.'); setPhase('error'); return; }
+        setEvents(ev.sort((a, b) => a.date.localeCompare(b.date)));
+        setPhase('review');
+      } else {
+        const mods = await extractSyllabus(source);
+        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Você pode colar o texto do documento ou criar as aulas manualmente.'); setPhase('error'); return; }
+        setRows(computeSequentialStarts(mods, todayISO, targetClass, buildHolidayISOs(customEvents)));
+        setPhase('review');
+      }
+    } catch (err) {
+      setErrorMsg(formatApiError(err, 'Não consegui processar. Tente novamente.'));
+      setPhase('error');
+    }
+  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (fileRef.current) fileRef.current.value = '';
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { setErrorMsg('Arquivo muito grande. O limite é 10 MB.'); setPhase('error'); return; }
-    setErrorMsg(''); setPhase('loading');
-    try {
-      if (mode === 'calendar') {
-        const ev = await extractAcademicCalendar(file, year);
-        if (!ev.length) { setErrorMsg('Não encontrei eventos com data neste arquivo, mesmo tentando duas vezes. Se for um documento escaneado, tente uma foto mais nítida ou um PDF com texto selecionável.'); setPhase('error'); return; }
-        setEvents(ev.sort((a, b) => a.date.localeCompare(b.date)));
-        setPhase('review');
-      } else {
-        const mods = await extractSyllabus(file);
-        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Verifique se o arquivo contém a lista de conteúdos ou tente uma versão mais legível.'); setPhase('error'); return; }
-        setRows(computeSequentialStarts(mods, todayISO, targetClass, buildHolidayISOs(customEvents)));
-        setPhase('review');
-      }
-    } catch (err) {
-      setErrorMsg(formatApiError(err, 'Não consegui processar este arquivo. Tente novamente.'));
-      setPhase('error');
+    runExtraction(file);
+  };
+
+  // Fallback sem IA: cria uma linha inicial e vai direto para a revisão editável
+  const startManual = () => {
+    if (mode === 'calendar') {
+      setEvents([{ title: 'Novo evento', date: todayISO, type: 'admin' }]);
+    } else {
+      setRows([{ title: 'Módulo 1', topics: [], estimatedClasses: 4, startDate: todayISO }]);
     }
+    setPhase('review');
   };
 
   const confirmCalendar = () => {
@@ -5845,7 +5864,50 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                 <Upload size={18} /> Escolher arquivo (PDF, imagem)
               </button>
               <p className="text-[11px] text-gray-300 mt-3">Máximo 10 MB · PDF, JPG ou PNG</p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setPhase('paste')}
+                  className="flex-1 bg-gray-100 text-gray-700 rounded-2xl py-3 font-bold text-sm active:scale-[0.98] transition-transform"
+                >
+                  Colar texto
+                </button>
+                <button
+                  onClick={startManual}
+                  className="flex-1 bg-gray-100 text-gray-700 rounded-2xl py-3 font-bold text-sm active:scale-[0.98] transition-transform"
+                >
+                  Criar manualmente
+                </button>
+              </div>
               <input ref={fileRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFile} />
+            </div>
+          )}
+
+          {/* PASTE — texto colado pelo usuário */}
+          {phase === 'paste' && (
+            <div className="py-2">
+              <p className="text-sm text-gray-600 font-medium mb-1">
+                {mode === 'calendar' ? 'Cole o texto do calendário letivo' : 'Cole o texto da ementa'}
+              </p>
+              <p className="text-xs text-gray-400 mb-3">Copie de um documento, site, e-mail ou mensagem e cole aqui. A IA organiza tudo para você revisar.</p>
+              <textarea
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                rows={10}
+                placeholder={mode === 'calendar'
+                  ? 'Ex:\n21/04 - Tiradentes (feriado)\n01/05 - Dia do Trabalhador\n12 a 16/05 - Semana de provas...'
+                  : 'Ex:\nMódulo 1: Introdução\n- O que é informática (2h)\n- Hardware e software (2h)\nMódulo 2: Word\n- Interface e menus (2h)...'}
+                className="w-full border border-gray-200 rounded-2xl p-3 text-sm resize-none focus:outline-none focus:border-indigo-400 bg-gray-50"
+              />
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => setPhase('upload')} className="flex-1 bg-gray-100 text-gray-600 rounded-2xl py-3 font-bold text-sm">Voltar</button>
+                <button
+                  onClick={() => runExtraction(pasteText.trim())}
+                  disabled={pasteText.trim().length < 20}
+                  className="flex-[2] bg-indigo-600 text-white rounded-2xl py-3 font-bold text-sm disabled:opacity-40 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                >
+                  <Sparkles size={15} /> Extrair com IA
+                </button>
+              </div>
             </div>
           )}
 
@@ -5866,7 +5928,11 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
               </div>
               <p className="text-sm font-bold text-gray-700 mb-1">Não deu certo</p>
               <p className="text-xs text-gray-400 mb-5 px-4">{errorMsg}</p>
-              <button onClick={() => setPhase('upload')} className="bg-gray-100 text-gray-700 rounded-2xl py-3 px-6 font-bold text-sm">Tentar outro arquivo</button>
+              <div className="flex flex-col gap-2 items-stretch px-4">
+                <button onClick={() => setPhase('upload')} className="bg-gray-100 text-gray-700 rounded-2xl py-3 px-6 font-bold text-sm">Tentar outro arquivo</button>
+                <button onClick={() => setPhase('paste')} className="bg-indigo-50 text-indigo-600 rounded-2xl py-3 px-6 font-bold text-sm">Colar texto do documento</button>
+                <button onClick={startManual} className="bg-indigo-50 text-indigo-600 rounded-2xl py-3 px-6 font-bold text-sm">Criar manualmente</button>
+              </div>
             </div>
           )}
 
@@ -5909,6 +5975,12 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                   </div>
                 );
               })}
+              <button
+                onClick={() => setEvents(prev => [...prev, { title: 'Novo evento', date: todayISO, type: 'admin' }])}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2.5"
+              >
+                <Plus size={14} /> Adicionar evento
+              </button>
             </div>
           )}
 
@@ -5954,6 +6026,12 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                   </div>
                 </div>
               ))}
+              <button
+                onClick={() => setRows(prev => [...prev, { title: `Módulo ${prev.length + 1}`, topics: [], estimatedClasses: 4, startDate: prev[prev.length - 1]?.startDate || todayISO }])}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2.5"
+              >
+                <Plus size={14} /> Adicionar módulo
+              </button>
             </div>
           )}
         </div>
