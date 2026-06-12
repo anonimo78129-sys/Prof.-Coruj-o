@@ -107,7 +107,7 @@ const formatApiError = (error: any, defaultMsg: string): string => {
   }
 
   if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
-    return 'Muita gente usando a IA agora. Já estou tentando de novo — se continuar, aguarde 1 minuto.';
+    return 'Muita gente usando a IA agora. Já estou tentando de novo. Se continuar, aguarde 1 minuto.';
   }
   if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
     return 'Calma, professor! Muitas perguntas de uma vez. Aguarde alguns segundos e tente de novo.';
@@ -248,7 +248,7 @@ function useFirestoreSync<T extends { id: string }>(
     } catch (err) {
       console.error(`Error in useFirestoreSync for ${collectionName}:`, err);
       setData(previousData);
-      toast.error("A internet cochilou. Suas mudanças não foram salvas — tente de novo.");
+      toast.error("A internet cochilou. Suas mudanças não foram salvas. Tente de novo.");
     }
   };
 
@@ -287,7 +287,7 @@ function useFirestoreDoc<T>(
     } catch (err) {
       console.error(`Error in useFirestoreDoc for ${docPath}:`, err);
       setData(previousData);
-      toast.error("A internet cochilou. Suas mudanças não foram salvas — tente de novo.");
+      toast.error("A internet cochilou. Suas mudanças não foram salvas. Tente de novo.");
     }
   };
 
@@ -315,7 +315,7 @@ class ErrorBoundary extends React.Component<
               <span className="text-3xl">🦉</span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
-            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem — só recarregue a página.</p>
+            <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem. Só recarregue a página.</p>
             <p className="text-xs text-red-500 mb-6 bg-red-50 p-2 rounded-xl font-mono break-all">{this.state.error?.message}</p>
             <button
               onClick={() => window.location.reload()}
@@ -558,6 +558,7 @@ interface ClassItem {
   className: string;
   timestamp: number;
   resourceIds?: string[];
+  topic?: string;  // conteúdo da aula (ex: tópicos vindos da ementa importada)
 }
 
 // --- Components ---
@@ -685,13 +686,12 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
         </AnimatePresence>
       </button>
       {rightAction !== undefined ? rightAction : (
-        <button onClick={() => setScreen?.('profile')} className="w-10 h-10 p-0 bg-indigo-600 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center">
-          <img
-            src={profile.photo || 'https://i.ibb.co/67chNLnZ/20260521-122245-0000.png'}
-            alt="Profile"
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
+        <button onClick={() => setScreen?.('profile')} className={`w-10 h-10 p-0 rounded-xl shadow-sm border-2 border-indigo-500 overflow-hidden flex items-center justify-center ${profile.photo ? 'bg-gray-200' : 'bg-indigo-600'}`}>
+          {profile.photo ? (
+            <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          ) : (
+            <User size={20} className="text-white" />
+          )}
         </button>
       )}
 
@@ -850,7 +850,10 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-gray-900 text-base truncate">{e.title}</h3>
-        <p className="text-gray-400 text-sm mt-0.5 truncate">{formatEventDate(e.date)} • {e.type === 'class' ? 'Aula' : e.type === 'prep' ? 'Tempo de Foco' : e.type === 'holiday' ? 'Feriado Nacional' : e.type === 'commemorative' ? 'Data Comemorativa' : 'Prazo Administrativo'}</p>
+        <p className="text-gray-400 text-sm mt-0.5 truncate">{formatEventDate(e.date)} • {e.type === 'class' ? `Aula${e.className ? ` · ${e.className}` : ''}` : e.type === 'prep' ? 'Tempo de Foco' : e.type === 'holiday' ? 'Feriado Nacional' : e.type === 'commemorative' ? 'Data Comemorativa' : 'Prazo Administrativo'}</p>
+        {e.type === 'class' && e.topic && (
+          <p className="text-gray-500 text-xs mt-1 line-clamp-2">{e.topic}</p>
+        )}
       </div>
       <button 
         onClick={handleComplete}
@@ -986,7 +989,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
                 <p className="text-indigo-700 text-sm leading-snug">
                   {todayCount > 0
                     ? `Você tem ${todayCount} aula${todayCount > 1 ? 's' : ''} hoje. Tudo preparado?`
-                    : `Próxima aula: ${nextClass.title}${nextClass.className ? ` — ${nextClass.className}` : ''} (${dayLabel(nextClass.timestamp)}).`
+                    : `Próxima aula: ${nextClass.title}${nextClass.className ? ` (${nextClass.className})` : ''} (${dayLabel(nextClass.timestamp)}).`
                   }
                 </p>
               </motion.div>
@@ -4366,9 +4369,9 @@ const ProfileScreen = ({
       
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
         <div className="relative inline-block mb-4">
-          <div className="w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer bg-indigo-600 flex items-center justify-center" onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
+          <div className={`w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer flex items-center justify-center ${profile.photo ? 'bg-gray-200' : 'bg-indigo-600'}`} onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
-              <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { setProfile({ ...profile, photo: '' }); }} />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white">
                 <User size={48} />
@@ -5021,7 +5024,7 @@ const ProfileScreen = ({
                 </div>
                 <h2 className="text-xl font-black text-gray-900 mb-1">Eita... tá certo disso?</h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  Isso vai apagar <span className="font-bold text-gray-700">tudo</span> — turmas, materiais, notas...
+                  Isso vai apagar <span className="font-bold text-gray-700">tudo</span>: turmas, materiais, notas...
                   até aquela atividade incrível que você fez às 23h.
                 </p>
                 <p className="text-xs text-red-400 font-bold mt-3 bg-red-50 rounded-xl py-2 px-3">
@@ -5345,7 +5348,8 @@ const IMPORT_EVENT_TYPES = [
 
 type ImportEventType = 'holiday' | 'admin' | 'prep' | 'commemorative';
 interface ImportedEvent { title: string; date: string; type: ImportEventType }
-interface ImportedModule { title: string; topics: string[]; estimatedClasses: number }
+interface ImportedLesson { title: string; content?: string }
+interface ImportedModule { title: string; topics: string[]; estimatedClasses: number; lessons?: ImportedLesson[] }
 interface SyllabusRow extends ImportedModule { startDate: string }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -5359,92 +5363,232 @@ const fileToBase64 = (file: File): Promise<string> =>
 const toISODate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// file.type pode vir vazio em alguns Androids; deduz pela extensão
+const guessMimeType = (file: File): string => {
+  if (file.type) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'webp') return 'image/webp';
+  return 'application/pdf';
+};
+
+const MONTH_NAME_TO_NUM: Record<string, number> = {
+  janeiro: 1, jan: 1, fevereiro: 2, fev: 2, marco: 3, março: 3, mar: 3, abril: 4, abr: 4,
+  maio: 5, mai: 5, junho: 6, jun: 6, julho: 7, jul: 7, agosto: 8, ago: 8,
+  setembro: 9, set: 9, outubro: 10, out: 10, novembro: 11, nov: 11, dezembro: 12, dez: 12,
+};
+
+// Normaliza datas em vários formatos para YYYY-MM-DD; null se irrecuperável
+const normalizeImportDate = (raw: any, year: number): string | null => {
+  if (!raw) return null;
+  let s = String(raw).trim();
+  // Já em ISO (com ou sem hora)
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    const mo = Number(iso[2]), da = Number(iso[3]);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) return `${iso[1]}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+    return null;
+  }
+  // DD/MM/YYYY ou DD-MM-YYYY ou DD.MM.YYYY
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) {
+    const da = Number(m[1]), mo = Number(m[2]);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) return `${m[3]}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+    return null;
+  }
+  // DD/MM ou DD-MM (sem ano)
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+  if (m) {
+    const da = Number(m[1]), mo = Number(m[2]);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) return `${year}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+    return null;
+  }
+  // "12 de maio", "12 de maio de 2026", "12 maio"
+  m = s.toLowerCase().match(/^(\d{1,2})\s*(?:de\s+)?([a-zç]+)(?:\s*(?:de\s+)?(\d{4}))?$/);
+  if (m) {
+    const da = Number(m[1]);
+    const mo = MONTH_NAME_TO_NUM[m[2]];
+    const yr = m[3] ? Number(m[3]) : year;
+    if (mo && da >= 1 && da <= 31) return `${yr}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+  }
+  return null;
+};
+
+const CALENDAR_EXTRACT_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    events: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          date: { type: Type.STRING, description: 'YYYY-MM-DD' },
+          type: { type: Type.STRING, enum: ['holiday', 'admin', 'prep', 'commemorative'] },
+        },
+        required: ['title', 'date', 'type'],
+      },
+    },
+  },
+  required: ['events'],
+};
+
+const parseCalendarEvents = (text: string, year: number): ImportedEvent[] => {
+  let raw = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  let parsed: any;
+  try { parsed = JSON.parse(raw || '{}'); } catch { return []; }
+  const list = Array.isArray(parsed) ? parsed : (parsed.events || []);
+  return list
+    .map((e: any) => {
+      if (!e || !e.title) return null;
+      const date = normalizeImportDate(e.date, year);
+      if (!date) return null;
+      return {
+        title: String(e.title).slice(0, 80),
+        date,
+        type: (['holiday', 'admin', 'prep', 'commemorative'].includes(e.type) ? e.type : 'admin') as ImportEventType,
+      };
+    })
+    .filter(Boolean) as ImportedEvent[];
+};
+
 const extractAcademicCalendar = async (file: File, year: number): Promise<ImportedEvent[]> => {
   const base64 = await fileToBase64(file);
+  const mimeType = guessMimeType(file);
+  const basePrompt = `Este documento é um calendário escolar/letivo brasileiro referente ao ano ${year}. Ele pode estar em vários formatos: texto corrido, tabela, grade mensal (calendário visual onde os dias são numerados em quadrados e os eventos são marcados por cores, círculos ou legendas), documento escaneado ou foto. Leia com atenção, incluindo legendas de cores e rodapés.
+
+Extraia TODOS os eventos com data: feriados, recessos, férias, início e fim de bimestres/trimestres/semestres, reuniões pedagógicas, conselhos de classe, entrega de notas, formação de professores (HTPC), sábados letivos, datas comemorativas e eventos escolares.
+
+Para cada evento retorne: um título curto e claro, a data no formato YYYY-MM-DD (se o ano não aparecer no documento, use ${year}), e o tipo. Regras do tipo: "holiday" para feriados, recessos e férias; "admin" para reuniões, conselhos, entrega de notas e formação; "prep" para eventos pedagógicos e planejamento; "commemorative" para datas comemorativas.
+
+Se um evento durar vários dias (ex: "12 a 16/05"), registre apenas o dia de início. Se a grade mensal usar cores ou símbolos com legenda, use a legenda para identificar o que cada dia marcado significa. Ignore texto que não seja um evento com data.`;
+
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType: file.type } },
-      { text: `Este é um calendário escolar/letivo brasileiro referente ao ano ${year}. Extraia TODOS os eventos com data: feriados, recessos, férias, início e fim de bimestres/trimestres, reuniões pedagógicas, conselhos de classe, entrega de notas, formação de professores (HTPC), datas comemorativas e eventos escolares. Para cada evento retorne: um título curto e claro, a data no formato YYYY-MM-DD (use o ano ${year}), e o tipo. Regras de classificação do tipo: "holiday" para feriados, recessos e férias; "admin" para reuniões, conselhos, entrega de notas e formação; "prep" para eventos pedagógicos e planejamento; "commemorative" para datas comemorativas. Se um evento durar vários dias, registre apenas o dia de início. Ignore qualquer texto que não seja um evento com data.` }
+      { inlineData: { data: base64, mimeType } },
+      { text: basePrompt }
     ]}],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
+    config: { responseMimeType: 'application/json', responseSchema: CALENDAR_EXTRACT_SCHEMA },
+  });
+  let events = parseCalendarEvents(response.text || '', year);
+  if (events.length) return events;
+
+  // 2ª tentativa: transcrição primeiro, sem schema rígido. Ajuda em documentos
+  // escaneados, fotos e grades visuais em que a 1ª passada não achou nada.
+  const retryResponse = await generateContentWithRetry({
+    model: AI_MODEL,
+    contents: [{ role: 'user', parts: [
+      { inlineData: { data: base64, mimeType } },
+      { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é um calendário escolar brasileiro de ${year}), incluindo tabelas, grades mensais, legendas de cores e anotações. Depois, liste cada evento datado que encontrar.
+
+Responda APENAS com JSON válido no formato:
+{"events":[{"title":"...","date":"YYYY-MM-DD","type":"holiday|admin|prep|commemorative"}]}
+
+Datas sem ano: use ${year}. Períodos (ex: 12 a 16/05): use o dia de início. Se um dia está apenas marcado com cor/símbolo, use a legenda para nomear o evento. Extraia o máximo possível, mesmo eventos pequenos.` }
+    ]}],
+  });
+  events = parseCalendarEvents(retryResponse.text || '', year);
+  return events;
+};
+
+const SYLLABUS_EXTRACT_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    modules: {
+      type: Type.ARRAY,
+      items: {
         type: Type.OBJECT,
         properties: {
-          events: {
+          title: { type: Type.STRING },
+          lessons: {
             type: Type.ARRAY,
+            description: 'Uma entrada por aula, na ordem do documento',
             items: {
               type: Type.OBJECT,
               properties: {
-                title: { type: Type.STRING },
-                date: { type: Type.STRING, description: 'YYYY-MM-DD' },
-                type: { type: Type.STRING, enum: ['holiday', 'admin', 'prep', 'commemorative'] },
+                title: { type: Type.STRING, description: 'Título ou conteúdo da aula' },
+                content: { type: Type.STRING, description: 'Detalhes, atividades ou objetivo da aula (se houver)' },
               },
-              required: ['title', 'date', 'type'],
+              required: ['title'],
             },
           },
         },
-        required: ['events'],
+        required: ['title', 'lessons'],
       },
     },
-  });
-  try {
-    const parsed = JSON.parse(response.text || '{}');
-    return (parsed.events || [])
-      .filter((e: any) => e && e.title && /^\d{4}-\d{2}-\d{2}$/.test(e.date))
-      .map((e: any) => ({
-        title: String(e.title).slice(0, 80),
-        date: e.date,
-        type: (['holiday', 'admin', 'prep', 'commemorative'].includes(e.type) ? e.type : 'admin') as ImportEventType,
-      }));
-  } catch {
-    return [];
-  }
+  },
+  required: ['modules'],
+};
+
+const SYLLABUS_PROMPT = `Este documento é uma ementa / plano de curso / plano de ensino brasileiro. Pode estar em texto corrido, tabela, documento escaneado ou foto.
+
+REGRA MAIS IMPORTANTE: cada linha de conteúdo da tabela (ou cada item numerado) normalmente corresponde a UMA aula. Por exemplo, se um módulo tem 7 linhas de conteúdo com carga horária "2 H/A" cada, ele tem 7 aulas. Se o documento numera as aulas (Aula 1, Aula 2...), cada número é uma aula. Linhas como "Atividade", "Revisão", "Prova", "Exercícios" TAMBÉM são aulas e devem ser incluídas.
+
+Extraia TODOS os módulos (ou meses/unidades) na ordem do documento, e dentro de cada módulo TODAS as aulas, da primeira à última, sem pular nenhuma. Para cada aula retorne:
+- title: o conteúdo ou título da aula (resuma em até 90 caracteres se for longo)
+- content: detalhes, atividades práticas ou objetivo da aula, se o documento tiver (senão omita)
+
+NÃO resuma nem agrupe aulas. Se o documento tem 49 linhas de conteúdo, retorne 49 aulas no total. Use a carga horária total como verificação: se o curso tem 98 horas e cada aula tem 2 horas, devem existir ~49 aulas.`;
+
+const parseSyllabusModules = (text: string): ImportedModule[] => {
+  let raw = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  let parsed: any;
+  try { parsed = JSON.parse(raw || '{}'); } catch { return []; }
+  const list = Array.isArray(parsed) ? parsed : (parsed.modules || []);
+  return list
+    .filter((m: any) => m && m.title)
+    .map((m: any) => {
+      const lessons: ImportedLesson[] = Array.isArray(m.lessons)
+        ? m.lessons
+            .filter((l: any) => l && (l.title || typeof l === 'string'))
+            .map((l: any) => typeof l === 'string'
+              ? { title: l.slice(0, 120) }
+              : { title: String(l.title).slice(0, 120), ...(l.content ? { content: String(l.content).slice(0, 300) } : {}) })
+        : [];
+      // Compat: resposta antiga com topics/estimatedClasses (2ª tentativa pode devolver esse formato)
+      const topics: string[] = lessons.length
+        ? lessons.map(l => l.title)
+        : (Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : []);
+      const estimatedClasses = lessons.length
+        ? Math.min(60, lessons.length)
+        : Math.max(1, Math.min(60, Math.round(Number(m.estimatedClasses) || 4)));
+      return { title: String(m.title).slice(0, 80), topics, estimatedClasses, ...(lessons.length ? { lessons } : {}) };
+    })
+    .filter((m: ImportedModule) => m.estimatedClasses > 0);
 };
 
 const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
   const base64 = await fileToBase64(file);
+  const mimeType = guessMimeType(file);
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType: file.type } },
-      { text: `Esta é uma ementa / plano de curso de uma disciplina escolar brasileira. Extraia a lista de módulos ou unidades temáticas na ordem em que aparecem no documento. Para cada módulo retorne: o título do módulo, a lista de tópicos/conteúdos abordados nele, e uma estimativa de quantas aulas são necessárias (estimatedClasses) com base na quantidade de conteúdo. Se o documento não indicar a carga horária, estime entre 2 e 8 aulas por módulo conforme a densidade do conteúdo. Mantenha a ordem original dos módulos.` }
+      { inlineData: { data: base64, mimeType } },
+      { text: SYLLABUS_PROMPT }
     ]}],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          modules: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                topics: { type: Type.ARRAY, items: { type: Type.STRING } },
-                estimatedClasses: { type: Type.NUMBER },
-              },
-              required: ['title', 'estimatedClasses'],
-            },
-          },
-        },
-        required: ['modules'],
-      },
-    },
+    config: { responseMimeType: 'application/json', responseSchema: SYLLABUS_EXTRACT_SCHEMA },
   });
-  try {
-    const parsed = JSON.parse(response.text || '{}');
-    return (parsed.modules || [])
-      .filter((m: any) => m && m.title)
-      .map((m: any) => ({
-        title: String(m.title).slice(0, 80),
-        topics: Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : [],
-        estimatedClasses: Math.max(1, Math.min(40, Math.round(Number(m.estimatedClasses) || 4))),
-      }));
-  } catch {
-    return [];
-  }
+  let modules = parseSyllabusModules(response.text || '');
+  if (modules.length) return modules;
+
+  // 2ª tentativa: transcrição primeiro, sem schema rígido (documentos escaneados/fotos)
+  const retryResponse = await generateContentWithRetry({
+    model: AI_MODEL,
+    contents: [{ role: 'user', parts: [
+      { inlineData: { data: base64, mimeType } },
+      { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é uma ementa ou plano de curso escolar brasileiro), incluindo todas as linhas de todas as tabelas. Depois, identifique os módulos e TODAS as aulas de cada módulo. Cada linha de conteúdo com carga horária é uma aula; linhas de Atividade, Revisão e Prova também são aulas.
+
+Responda APENAS com JSON válido no formato:
+{"modules":[{"title":"...","lessons":[{"title":"...","content":"..."}]}]}
+
+NÃO resuma nem agrupe: extraia cada aula como um item separado, da primeira à última.` }
+    ]}],
+  });
+  modules = parseSyllabusModules(retryResponse.text || '');
+  return modules;
 };
 
 // Calcula datas de início sequenciais (cada módulo começa após o anterior terminar)
@@ -5468,6 +5612,18 @@ const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selec
 };
 
 // Distribui os módulos em ClassItems no calendário, respeitando os dias da turma
+// Reparte os tópicos do módulo entre as aulas, em ordem (ex: 6 tópicos em 3
+// aulas viram 2 tópicos por aula; sobras vão para as primeiras aulas)
+const splitTopicsAcrossLessons = (topics: string[], lessons: number): string[][] => {
+  const out: string[][] = Array.from({ length: lessons }, () => []);
+  if (!topics.length || lessons < 1) return out;
+  topics.forEach((t, i) => {
+    const bucket = Math.min(lessons - 1, Math.floor((i * lessons) / topics.length));
+    out[bucket].push(t);
+  });
+  return out;
+};
+
 const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): ClassItem[] => {
   const items: ClassItem[] = [];
   const usedDays = new Set<string>();
@@ -5476,18 +5632,30 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): 
     if (!mod.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(mod.startDate)) continue;
     const [y, m, d] = mod.startDate.split('-').map(Number);
     let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
+    // Com lessons extraídas do documento: cada aula tem título e conteúdo próprios.
+    // Sem lessons (formato antigo): reparte os tópicos entre as aulas estimadas.
+    const hasLessons = !!mod.lessons?.length;
+    const lessonTopics = hasLessons ? [] : splitTopicsAcrossLessons(mod.topics || [], mod.estimatedClasses);
     let done = 0; let guard = 730;
     while (done < mod.estimatedClasses && guard > 0) {
       const key = toISODate(cur);
       if (days.includes(cur.getDay()) && !usedDays.has(key)) {
         usedDays.add(key);
+        const lesson = hasLessons ? mod.lessons![done] : undefined;
+        const title = lesson
+          ? lesson.title
+          : (mod.estimatedClasses > 1 ? `${mod.title}: Aula ${done + 1}` : mod.title);
+        const topicStr = lesson
+          ? (lesson.content || mod.title)
+          : (lessonTopics[done]?.join(' · ') || '');
         items.push({
           id: Math.random().toString(36).substr(2, 9),
-          title: mod.estimatedClasses > 1 ? `${mod.title} — Aula ${done + 1}` : mod.title,
+          title,
           date: `${cur.getDate()} ${MONTH_ABBR_IMPORT[cur.getMonth()]}`,
           status: 'pending',
           className: selectedClass.name,
           timestamp: cur.getTime(),
+          ...(topicStr ? { topic: topicStr } : {}),
         });
         done++;
       }
@@ -5523,12 +5691,12 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
     try {
       if (mode === 'calendar') {
         const ev = await extractAcademicCalendar(file, year);
-        if (!ev.length) { setErrorMsg('Não encontrei eventos com data neste arquivo. Tente um PDF mais legível ou outro formato.'); setPhase('error'); return; }
+        if (!ev.length) { setErrorMsg('Não encontrei eventos com data neste arquivo, mesmo tentando duas vezes. Se for um documento escaneado, tente uma foto mais nítida ou um PDF com texto selecionável.'); setPhase('error'); return; }
         setEvents(ev.sort((a, b) => a.date.localeCompare(b.date)));
         setPhase('review');
       } else {
         const mods = await extractSyllabus(file);
-        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa. Verifique se o arquivo contém a lista de conteúdos.'); setPhase('error'); return; }
+        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Verifique se o arquivo contém a lista de conteúdos ou tente uma versão mais legível.'); setPhase('error'); return; }
         setRows(computeSequentialStarts(mods, todayISO, targetClass));
         setPhase('review');
       }
@@ -5681,7 +5849,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
             <div className="space-y-3">
               <div className="flex items-center gap-2 bg-indigo-50 rounded-xl p-3">
                 <Sparkles size={15} className="text-indigo-500 shrink-0" />
-                <p className="text-xs text-indigo-700 font-medium">Encontrei {rows.length} módulos. Ajuste o nº de aulas e <b>quando cada módulo começou nesta turma</b>. As aulas serão distribuídas nos dias da turma ({(targetClass?.days?.length ? targetClass!.days : [1,2,3,4,5]).map(d => ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(', ')}).</p>
+                <p className="text-xs text-indigo-700 font-medium">Encontrei {rows.length} módulos com {rows.reduce((s, r) => s + r.estimatedClasses, 0)} aulas no total. Defina <b>quando cada módulo começa nesta turma</b>. As aulas serão distribuídas nos dias da turma ({(targetClass?.days?.length ? targetClass!.days : [1,2,3,4,5]).map(d => ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(', ')}), cada uma com seu conteúdo.</p>
               </div>
               <button
                 onClick={() => setRows(prev => computeSequentialStarts(prev, prev[0]?.startDate || todayISO, targetClass))}
@@ -6151,7 +6319,7 @@ const CalendarScreen = ({
                       <div key={e.id} className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getEventColorInternal(e) }} />
                         <span className={`text-sm ${e.status === 'done' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                          {e.type === 'class' ? `${e.className}${e.topic ? ` — ${e.topic}` : ''}` : e.title}
+                          {e.type === 'class' ? `${e.className}${e.topic ? `: ${e.topic}` : ''}` : e.title}
                         </span>
                       </div>
                     ))}
@@ -6725,7 +6893,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         var cellCount = card.querySelectorAll('.bingo-cell:not(.free)').length;
         var calling = document.createElement('div');
         calling.className = 'bingo-calling';
-        calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados — marque abaixo:</div><div class="bingo-calling-circles">'
+        calling.innerHTML = '<div class="bingo-calling-label">Termos sorteados. Marque abaixo:</div><div class="bingo-calling-circles">'
           + Array(cellCount).fill('<span class="bingo-circle"></span>').join('') + '</div>';
         card.appendChild(calling);
       });
@@ -6953,7 +7121,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
           + '<div class="score-row"><span class="score-label">Acertos</span><div class="score-field">___ / ___</div><span class="score-label">Nota</span><div class="score-field">___________</div></div>'
           + '</div>'
           // ── Header da folha do aluno ──
-          + '<div style="background:var(--ac,#c026d3);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:6px;letter-spacing:0.3px;">🗺️ Mapa da Metáfora — Missão do Detetive</div>'
+          + '<div style="background:var(--ac,#c026d3);color:white;padding:8px 14px;border-radius:8px;font-weight:900;font-size:13px;margin-bottom:6px;letter-spacing:0.3px;">🗺️ Mapa da Metáfora: Missão do Detetive</div>'
           + '<div style="font-size:10px;color:#6b7280;margin-bottom:12px;line-height:1.5;">Durante a história, descubra quem é quem: anote o personagem, o conceito real que ele representa e o momento da história que entregou a conexão. Cada descoberta certa vale ponto!</div>'
           // ── 2×2 grid — cards fill the remaining page space ──
           + '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;min-height:420px;">'
@@ -7092,7 +7260,7 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
         <div class="answer-line"></div>
       </div>
       <div class="hint-block">
-        <div class="hint-label">💡 DICA — USE APENAS SE PRECISAR</div>
+        <div class="hint-label">💡 DICA: USE APENAS SE PRECISAR</div>
         <p class="hint-text">${en.hint}</p>
       </div>
       <footer class="page-footer">
@@ -7514,9 +7682,9 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
       if (localGenActiveRef.current) setResult(finalResult);
     } catch (err: any) {
       console.error('[Gamification] error:', err);
-      const msg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
-      updateTask(taskId, { status: 'error', error: msg || 'Falha ao gerar.' });
-      if (localGenActiveRef.current) toast.error(msg || 'A IA travou nessa. Aguarde um instante e tente de novo.');
+      const friendlyMsg = formatApiError(err, 'A IA travou nessa. Aguarde um instante e tente de novo.');
+      updateTask(taskId, { status: 'error', error: friendlyMsg });
+      if (localGenActiveRef.current) toast.error(friendlyMsg);
     }
     if (localGenActiveRef.current) setIsGenerating(false);
     localGenActiveRef.current = false;
@@ -7558,7 +7726,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
           </div>
           <h2 className="text-3xl font-black text-white mb-2 leading-tight">Escape Room</h2>
           <p className="text-sm text-rose-100 max-w-[80%] leading-relaxed mb-4">
-            Crie enigmas encadeados temáticos para imprimir e jogar em sala — desafio a resolver em equipe.
+            Crie enigmas encadeados temáticos para imprimir e jogar em sala. Desafio a resolver em equipe.
           </p>
           <div className="inline-flex items-center gap-2 bg-white text-rose-700 font-bold px-4 py-2 rounded-full text-sm">
             <KeyRound size={16} /> Criar escape room
@@ -7606,7 +7774,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                 </div>
                 <button
                   onClick={closeModal}
-                  title={isGenerating ? 'Fechar — a geração continua em segundo plano' : 'Fechar'}
+                  title={isGenerating ? 'Fechar (a geração continua em segundo plano)' : 'Fechar'}
                   className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
                 >
                   <X size={18} />
@@ -7615,7 +7783,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
               {isGenerating && (
                 <div className="px-5 pt-3 -mb-1 flex items-center gap-2 text-[11px] text-indigo-500 font-semibold">
                   <Loader2 size={12} className="animate-spin" />
-                  <span>Pode fechar — a geração continua em segundo plano.</span>
+                  <span>Pode fechar. A geração continua em segundo plano.</span>
                 </div>
               )}
 
@@ -7638,7 +7806,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                   {activeMode === 'story' && (
                     <>
                       <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-3.5">
-                        <p className="text-xs text-fuchsia-800 leading-relaxed"><b>Como funciona:</b> seu conteúdo vira uma história no universo que a turma ama — cada personagem representa um conceito real. Vem com guia de leitura, pausas para discutir, atividade e desafio final.</p>
+                        <p className="text-xs text-fuchsia-800 leading-relaxed"><b>Como funciona:</b> seu conteúdo vira uma história no universo que a turma ama. Cada personagem representa um conceito real. Vem com guia de leitura, pausas para discutir, atividade e desafio final.</p>
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Universo pop da história *</label>
@@ -7921,14 +8089,14 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                                   <p key={j} className="quiz-opt"><b>{String.fromCharCode(65 + j)})</b> {opt}</p>
                                 ))}
                               </div>
-                              <p className="quiz-answer text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</p>
+                              <p className="quiz-answer text-xs text-emerald-700 mt-2"><b>Resposta:</b> {String.fromCharCode(65 + q.correct)}: {q.explain}</p>
                             </div>
                           ))}
                         </div>
                         <div className="answer-key-page">
                           <h2 className="answer-key-title">Gabarito</h2>
                           {result.questions.map((q: any, i: number) => (
-                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {String.fromCharCode(65 + q.correct)} — {q.explain}</div>
+                            <div key={i} className="answer-key-item"><b>{i + 1}.</b> {String.fromCharCode(65 + q.correct)}: {q.explain}</div>
                           ))}
                         </div>
                       </>
@@ -7946,14 +8114,14 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                         </div>
                         <h2>Palavras para encontrar</h2>
                         <ul className="clue-list">
-                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b> — {w.hint}</li>)}
+                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b>: {w.hint}</li>)}
                         </ul>
                       </>
                     )}
 
                     {activeMode === 'crossword' && result.words && (
                       <>
-                        <div className="instructions"><b>Instruções:</b> Leia cada definição e preencha as palavras na grade — uma letra por quadrado.</div>
+                        <div className="instructions"><b>Instruções:</b> Leia cada definição e preencha as palavras na grade, uma letra por quadrado.</div>
                         {result.crossword ? (
                           <>
                             <div className="overflow-x-auto">
@@ -8022,7 +8190,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
                     {activeMode === 'bingo' && result.cards && (
                       <>
-                        <div className="instructions"><b>Como jogar:</b> Distribua uma cartela para cada aluno. O professor sorteia os termos da lista — quem marcar uma linha, coluna ou diagonal completa grita BINGO!</div>
+                        <div className="instructions"><b>Como jogar:</b> Distribua uma cartela para cada aluno. O professor sorteia os termos da lista. Quem marcar uma linha, coluna ou diagonal completa grita BINGO!</div>
                         {result.cards.map((card: string[][], i: number) => (
                           <div key={i} className="bingo-card">
                             <div className="bingo-card-title">BINGO</div>
@@ -8088,7 +8256,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
                     {activeMode === 'flashcard' && result.cards && (
                       <>
-                        <div className="instructions"><b>Como usar:</b> Imprima, recorte pelas linhas tracejadas e dobre cada cartão ao meio — a pergunta fica na frente e a resposta no verso. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
+                        <div className="instructions"><b>Como usar:</b> Imprima, recorte pelas linhas tracejadas e dobre cada cartão ao meio. A pergunta fica na frente e a resposta no verso. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
                         <div className="memory-grid">
                           {result.cards.map((c: any, i: number) => (
                             <React.Fragment key={i}>
@@ -8182,7 +8350,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     </div>
   </div>
   <div class="content">${htmlContent}</div>
-  <div class="footer">Prof. Corujão — Material gerado por IA · Revise antes de usar</div>
+  <div class="footer">Prof. Corujão | Material gerado por IA · Revise antes de usar</div>
   <script>window.onload = () => { window.print(); }<\/script>
   </body></html>`);
   w.document.close();
@@ -8426,7 +8594,7 @@ const GAMI_EVENTS: { text: string; emoji: string; quick?: number }[] = [
   { text: 'Toda a turma chegou no horário? Pontos para todos!', emoji: '⏰', quick: 1 },
   { text: 'Hoje quem lê em voz alta ganha ponto de coragem.', emoji: '📖' },
   { text: 'Modo Espião: o professor vai observar em segredo quem mais colabora hoje.', emoji: '🕵️' },
-  { text: 'Dia da Dupla: trabalhem em duplas — as duplas que terminarem juntas ganham pontos.', emoji: '👥' },
+  { text: 'Dia da Dupla: trabalhem em duplas. As duplas que terminarem juntas ganham pontos.', emoji: '👥' },
   { text: 'Energia positiva: a equipe mais animada (sem bagunça!) ganha pontos no fim da aula.', emoji: '🎉' },
   { text: 'Quem usar a palavra mágica do dia em uma frase correta ganha ponto!', emoji: '🪄' },
   { text: 'Recorde da turma: superem o número de participações da última aula e todos ganham!', emoji: '🏆' },
@@ -8857,7 +9025,7 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
           </div>
           {!challenge && (
             <div className="space-y-2">
-              <p className="text-xs font-bold text-gray-400 uppercase text-center">Desafio do Silêncio — turma fica abaixo da linha e ganha pontos</p>
+              <p className="text-xs font-bold text-gray-400 uppercase text-center">Desafio do Silêncio: turma fica abaixo da linha e ganha pontos</p>
               <div className="grid grid-cols-3 gap-2">
                 {[3, 5, 10].map(m => (
                   <button key={m} onClick={() => setChallenge({ left: m * 60, total: m * 60, strikes: 0, status: 'on' })} className="bg-indigo-600 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform">{m} min</button>
@@ -9113,7 +9281,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}
       {phase === 'setup' && (
         <div className="space-y-4">
           <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-            <p className="text-sm text-indigo-800 leading-relaxed"><b>Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe — o placar é automático. Kahoot sem precisar de celular dos alunos!</p>
+            <p className="text-sm text-indigo-800 leading-relaxed"><b>Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe. O placar é automático. Kahoot sem precisar de celular dos alunos!</p>
           </div>
           {error && <p className="text-sm text-red-500 font-medium bg-red-50 rounded-xl p-3">{error}</p>}
           <div>
@@ -9568,7 +9736,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
       <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} />
 
       <div className="px-1 mb-6">
-        <p className="text-sm text-gray-500 leading-relaxed">Pareceres, adaptações, rubricas e comunicação com as famílias — o trabalho invisível do professor, resolvido em minutos.</p>
+        <p className="text-sm text-gray-500 leading-relaxed">Pareceres, adaptações, rubricas e comunicação com as famílias. O trabalho invisível do professor, resolvido em minutos.</p>
       </div>
 
       {/* Diário de Classe — destaque */}
@@ -9585,7 +9753,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
           </div>
           <h2 className="text-3xl font-black text-white mb-2 leading-tight">Diário de Classe</h2>
           <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
-            Chamada, anotações e notas do dia — rápido, offline e sincronizado com sua turma gamificada.
+            Chamada, anotações e notas do dia. Rápido, offline e sincronizado com sua turma gamificada.
           </p>
           <div className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-4 py-2 rounded-full text-sm">
             <NotebookPen size={16} /> Abrir diário
@@ -9792,7 +9960,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
                     <div className="markdown-body prose prose-sm max-w-none bg-gray-50 border border-gray-100 rounded-2xl p-4 max-h-[48vh] overflow-y-auto">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
                     </div>
-                    <p className="text-[11px] text-gray-400 text-center">Material gerado por IA — revise antes de usar.</p>
+                    <p className="text-[11px] text-gray-400 text-center">Material gerado por IA. Revise antes de usar.</p>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={copyResult} className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-2xl py-3 text-sm font-bold active:scale-[0.98] transition-transform">
                         <Copy size={15} /> Copiar
@@ -9905,7 +10073,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen }: {
       '',
       entry?.note ? `## Anotações do dia\n${entry.note}` : '',
     ].join('\n');
-    printPlannerContent(`Diário de Classe — ${dateBr}`, lines, 'Diário de Classe', profile.name, profile.schoolName);
+    printPlannerContent(`Diário de Classe: ${dateBr}`, lines, 'Diário de Classe', profile.name, profile.schoolName);
   };
 
   const attStyle = (a?: 'P' | 'F' | 'A') =>
@@ -9954,7 +10122,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen }: {
             <div className="text-center">
               <span className="text-5xl">🦉</span>
               <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
-              <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo — um nome por linha. Funciona nas duas telas.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo, um nome por linha. Funciona nas duas telas.</p>
             </div>
             <textarea
               value={diarioBulkNames}
@@ -10440,7 +10608,7 @@ const GamificacaoScreen = ({
                 })()}
                 {currentCls.students.some(s => !s.teamId) && (
                   <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100">
-                    <p className="text-xs font-bold text-amber-700 mb-2">Sem equipe — toque para atribuir:</p>
+                    <p className="text-xs font-bold text-amber-700 mb-2">Sem equipe. Toque para atribuir:</p>
                     <div className="flex flex-wrap gap-1">
                       {currentCls.students.filter(s => !s.teamId).map(s => (
                         <button key={s.id} onClick={() => setTeamStudentId(s.id)} className="bg-white text-gray-700 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-200 active:scale-95 transition-transform">
@@ -10688,7 +10856,7 @@ const GamificacaoScreen = ({
                       value={bulkNames}
                       onChange={e => setBulkNames(e.target.value)}
                       rows={8}
-                      placeholder={"Cole ou escreva os nomes — um por linha:\n\nAna Beatriz\nCarlos Eduardo\nMariana\nPedro Henrique\n..."}
+                      placeholder={"Cole ou escreva os nomes, um por linha:\n\nAna Beatriz\nCarlos Eduardo\nMariana\nPedro Henrique\n..."}
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 resize-none bg-white"
                     />
                     {(() => {
@@ -10729,7 +10897,7 @@ const GamificacaoScreen = ({
                   <p className="text-center text-gray-400 text-sm py-4">Adicione alunos para começar a gamificação.</p>
                 )}
                 {currentCls.students.length > 0 && (
-                  <p className="text-[11px] text-gray-400 px-1">{currentCls.students.length} aluno{currentCls.students.length !== 1 ? 's' : ''} cadastrado{currentCls.students.length !== 1 ? 's' : ''} — ficam salvos automaticamente.</p>
+                  <p className="text-[11px] text-gray-400 px-1">{currentCls.students.length} aluno{currentCls.students.length !== 1 ? 's' : ''} cadastrado{currentCls.students.length !== 1 ? 's' : ''}. Ficam salvos automaticamente.</p>
                 )}
                 {currentCls.students.map(s => (
                   <div key={s.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm border border-gray-100">
@@ -11169,7 +11337,7 @@ const TaskCard = ({ task, onTaskClick }: { task: BackgroundTask, onTaskClick?: (
           <p className="text-[10px] text-gray-500 font-bold truncate">
             {task.status === 'processing' ? (rotatingMsg || 'Iniciando...') :
              task.status === 'completed' ? 'Pronto! Toque para abrir.' :
-             'Erro ao processar'}
+             task.error || 'Erro ao processar'}
           </p>
         </div>
       </div>
@@ -11492,7 +11660,7 @@ const AdminScreen = () => {
       await deleteDoc(doc(db, 'library', item.id));
       await setDoc(doc(db, 'config', 'storage'), { totalBytes: increment(-item.fileSizeBytes) }, { merge: true });
       setStorageUsed(p => Math.max(0, p - item.fileSizeBytes));
-    } catch (e: any) { toast.error(e?.message || 'Algo deu errado. Tente de novo.'); }
+    } catch (e: any) { toast.error(formatApiError(e, 'Algo deu errado. Tente de novo.')); }
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -11694,7 +11862,7 @@ const AdminScreen = () => {
               />
             </div>
             {storageUsed / LIBRARY_LIMIT_BYTES > 0.85 && (
-              <p className="text-xs text-red-500 font-medium mt-1">⚠ Espaço quase esgotado — apague materiais antigos</p>
+              <p className="text-xs text-red-500 font-medium mt-1">⚠ Espaço quase esgotado. Apague materiais antigos.</p>
             )}
           </div>
 
@@ -12217,7 +12385,7 @@ function AppInner() {
     {
       name: 'Prof. Silva',
       subject: 'História • Ensino Fundamental II',
-      photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png'
+      photo: ''
     }
   );
   
@@ -12318,7 +12486,7 @@ function AppInner() {
       timers.push(setTimeout(async () => {
         const title = 'Aula em 30 minutos';
         const body = `${sched.subject ? `${sched.subject} — ` : ''}${sched.name} às ${sched.time}`;
-        const icon = 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png';
+        const icon = '/icon-512.png';
         // Mesma tag usada pela Cloud Function (FCM) — evita notificação duplicada:
         // o sistema substitui em vez de empilhar quando local e push coincidem.
         const tag = `aula-${sched.id}-${dateStr}`;
@@ -13661,7 +13829,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setSavedResources([]);
             setNotifications([]);
             setInboxMessages([{ id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }]);
-            setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' });
+            setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: '' });
             setEstudioContext('');
           }} onDeleteAccount={async () => {
             if (!user) return;
