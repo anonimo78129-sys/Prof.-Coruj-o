@@ -836,7 +836,7 @@ const ReminderItem = ({ cls, setSelectedDate, setScreen, setClasses, classes }: 
   );
 };
 
-const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, color: string }) => {
+const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, onComplete: () => void, color: string, onPrepare?: () => void, onReschedule?: () => void }) => {
   const [isMarked, setIsMarked] = useState(false);
   const handleComplete = () => {
     setIsMarked(true);
@@ -854,8 +854,25 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
         {e.type === 'class' && e.topic && (
           <p className="text-gray-500 text-xs mt-1 line-clamp-2">{e.topic}</p>
         )}
+        {e.type === 'class' && e.resourceIds?.length > 0 && (
+          <p className="text-indigo-500 text-xs mt-1">{e.resourceIds.length} material{e.resourceIds.length !== 1 ? 'is' : ''} vinculado{e.resourceIds.length !== 1 ? 's' : ''}</p>
+        )}
+        {e.type === 'class' && (onPrepare || onReschedule) && (
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {onPrepare && (
+              <button onClick={onPrepare} className="text-[11px] font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-200 active:scale-95 transition-transform">
+                Preparar aula
+              </button>
+            )}
+            {onReschedule && (
+              <button onClick={onReschedule} className="text-[11px] font-bold bg-amber-50 text-amber-600 px-2.5 py-1 rounded-full border border-amber-200 active:scale-95 transition-transform">
+                Adiar
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      <button 
+      <button
         onClick={handleComplete}
         className={`p-3 rounded-xl transition-all duration-300 transform active:scale-90 ${isMarked ? 'bg-emerald-500 text-white scale-110' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
       >
@@ -865,7 +882,7 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
   );
 };
 
-const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate, openFerramenta }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void }) => {
+const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
   const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
     { title: 'Estúdio', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
@@ -926,6 +943,37 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
           ))}
         </div>
       </div>
+
+      {schedules && schedules.length > 0 && (() => {
+        const now = Date.now();
+        const progressRows = schedules.map(s => {
+          const allLessons = classes.filter(c => c.className === s.name);
+          const done = allLessons.filter(c => c.status === 'done').length;
+          const total = allLessons.length;
+          const overdue = allLessons.filter(c => c.status === 'pending' && c.timestamp < now).length;
+          return { s, done, total, overdue };
+        }).filter(r => r.total > 0);
+        if (!progressRows.length) return null;
+        return (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Progresso das Turmas</h2>
+            <div className="space-y-2">
+              {progressRows.map(({ s, done, total, overdue }) => (
+                <div key={s.id} className="bg-white rounded-2xl p-4 border border-gray-50 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-bold text-gray-900 text-sm">{s.name}</p>
+                    <p className="text-xs text-gray-500">{done}/{total} aulas</p>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-indigo-500 h-2 rounded-full transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+                  </div>
+                  {overdue > 0 && <p className="text-xs text-amber-600 mt-1.5">{overdue} aula{overdue !== 1 ? 's' : ''} pendente{overdue !== 1 ? 's' : ''} no passado</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div>
         <div className="flex justify-between items-center mb-4">
@@ -5252,7 +5300,9 @@ const DayDetailScreen = ({
   notifications,
   setNotifications,
   setCustomEvents,
-  setClasses
+  setClasses,
+  onPrepareLesson,
+  onRescheduleLesson,
 }: {
   schedules: ClassSchedule[],
   selectedDate: number,
@@ -5263,7 +5313,9 @@ const DayDetailScreen = ({
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   setCustomEvents: (c: any[]) => void,
-  setClasses: (c: ClassItem[]) => void
+  setClasses: (c: ClassItem[]) => void,
+  onPrepareLesson?: (topic: string, classId: string) => void,
+  onRescheduleLesson?: (classItemId: string) => void,
 }) => {
   const monthName = new Date(currentYear, currentMonth).toLocaleString('pt-BR', { month: 'long' });
   const selectedDayEvents = getEventsForDay(allEvents, currentYear, currentMonth, selectedDate);
@@ -5307,16 +5359,21 @@ const DayDetailScreen = ({
           }} className="space-y-4">
             {selectedDayEvents.map((e) => (
               <Reorder.Item key={e.id} value={e} className="w-full" dragListener={true}>
-                <EventItem 
-                  e={e} 
-                  color={getEventColor(e)} 
+                <EventItem
+                  e={e}
+                  color={getEventColor(e)}
                   onComplete={() => {
                     if (e.type === 'class') {
                       setClasses(classes.map(c => c.id === e.id ? { ...c, status: 'done' } : c));
                     } else {
                       setCustomEvents(customEvents.map(ce => ce.id === e.id ? { ...ce, status: 'done' } : ce));
                     }
-                  }} 
+                  }}
+                  onPrepare={e.type === 'class' && onPrepareLesson ? () => {
+                    const sched = schedules.find(s => s.name === e.className);
+                    onPrepareLesson(e.topic || e.title, sched?.id || '');
+                  } : undefined}
+                  onReschedule={e.type === 'class' && onRescheduleLesson ? () => onRescheduleLesson(e.id) : undefined}
                 />
               </Reorder.Item>
             ))}
@@ -5592,18 +5649,18 @@ NÃO resuma nem agrupe: extraia cada aula como um item separado, da primeira à 
 };
 
 // Calcula datas de início sequenciais (cada módulo começa após o anterior terminar)
-const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selectedClass?: ClassSchedule): SyllabusRow[] => {
+const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selectedClass?: ClassSchedule, holidayISOs?: Set<string>): SyllabusRow[] => {
   const days = selectedClass?.days?.length ? selectedClass.days : [1, 2, 3, 4, 5];
   const [y, m, d] = startISO.split('-').map(Number);
   let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
   const result: SyllabusRow[] = [];
   for (const mod of mods) {
     let guard = 730;
-    while (!days.includes(cur.getDay()) && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
+    while ((!days.includes(cur.getDay()) || holidayISOs?.has(toISODate(cur))) && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
     result.push({ ...mod, startDate: toISODate(cur) });
     let scheduled = 0; guard = 730;
     while (scheduled < mod.estimatedClasses && guard > 0) {
-      if (days.includes(cur.getDay())) scheduled++;
+      if (days.includes(cur.getDay()) && !holidayISOs?.has(toISODate(cur))) scheduled++;
       cur.setDate(cur.getDate() + 1);
       guard--;
     }
@@ -5624,7 +5681,7 @@ const splitTopicsAcrossLessons = (topics: string[], lessons: number): string[][]
   return out;
 };
 
-const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): ClassItem[] => {
+const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule, holidayISOs?: Set<string>): ClassItem[] => {
   const items: ClassItem[] = [];
   const usedDays = new Set<string>();
   const days = selectedClass.days?.length ? selectedClass.days : [1, 2, 3, 4, 5];
@@ -5639,7 +5696,7 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): 
     let done = 0; let guard = 730;
     while (done < mod.estimatedClasses && guard > 0) {
       const key = toISODate(cur);
-      if (days.includes(cur.getDay()) && !usedDays.has(key)) {
+      if (days.includes(cur.getDay()) && !usedDays.has(key) && !holidayISOs?.has(key)) {
         usedDays.add(key);
         const lesson = hasLessons ? mod.lessons![done] : undefined;
         const title = lesson
@@ -5664,6 +5721,16 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): 
     }
   }
   return items.sort((a, b) => a.timestamp - b.timestamp);
+};
+
+const buildHolidayISOs = (customEvents: { type: string, date: string }[]): Set<string> => {
+  const isos = new Set<string>();
+  customEvents.filter(e => e.type === 'holiday').forEach(e => isos.add(e.date.split(' ')[0]));
+  const curYear = new Date().getFullYear();
+  [curYear, curYear + 1].forEach(y =>
+    getDefaultHolidays(y).filter(h => h.type === 'holiday').forEach(h => isos.add(h.date.split(' ')[0]))
+  );
+  return isos;
 };
 
 const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustomEvents, onAddClassItems }: {
@@ -5697,7 +5764,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
       } else {
         const mods = await extractSyllabus(file);
         if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Verifique se o arquivo contém a lista de conteúdos ou tente uma versão mais legível.'); setPhase('error'); return; }
-        setRows(computeSequentialStarts(mods, todayISO, targetClass));
+        setRows(computeSequentialStarts(mods, todayISO, targetClass, buildHolidayISOs(customEvents)));
         setPhase('review');
       }
     } catch (err) {
@@ -5723,7 +5790,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
 
   const confirmSyllabus = () => {
     if (!targetClass) return;
-    const items = distributeSyllabus(rows, targetClass);
+    const items = distributeSyllabus(rows, targetClass, buildHolidayISOs(customEvents));
     if (!items.length) { toast.error('Nenhuma aula foi gerada. Verifique as datas e os dias da turma.'); return; }
     onAddClassItems(items);
     toast.success(`${items.length} aulas distribuídas no calendário de ${targetClass.name}!`);
@@ -5852,7 +5919,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                 <p className="text-xs text-indigo-700 font-medium">Encontrei {rows.length} módulos com {rows.reduce((s, r) => s + r.estimatedClasses, 0)} aulas no total. Defina <b>quando cada módulo começa nesta turma</b>. As aulas serão distribuídas nos dias da turma ({(targetClass?.days?.length ? targetClass!.days : [1,2,3,4,5]).map(d => ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(', ')}), cada uma com seu conteúdo.</p>
               </div>
               <button
-                onClick={() => setRows(prev => computeSequentialStarts(prev, prev[0]?.startDate || todayISO, targetClass))}
+                onClick={() => setRows(prev => computeSequentialStarts(prev, prev[0]?.startDate || todayISO, targetClass, buildHolidayISOs(customEvents)))}
                 className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2"
               >
                 <RefreshCw size={13} /> Distribuir em sequência a partir do 1º módulo
@@ -9504,6 +9571,7 @@ const FerramentasScreen = ({
   setNotifications,
   initialTool,
   clearInitialTool,
+  classes,
 }: {
   profile: UserProfile;
   schedules: ClassSchedule[];
@@ -9513,6 +9581,7 @@ const FerramentasScreen = ({
   setNotifications?: (n: any[]) => void;
   initialTool?: string | null;
   clearInitialTool?: () => void;
+  classes?: ClassItem[];
 }) => {
   const [activeTool, setActiveTool] = useState<FerramentaId | null>(null);
   const [showDiario, setShowDiario] = useState(false);
@@ -9991,15 +10060,15 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
       {/* DIÁRIO DE CLASSE */}
       <AnimatePresence>
         {showDiario && (
-          <DiarioModal user={user} schedules={schedules} profile={profile} onClose={() => setShowDiario(false)} setScreen={setScreen} />
+          <DiarioModal user={user} schedules={schedules} profile={profile} onClose={() => setShowDiario(false)} setScreen={setScreen} classes={classes} />
         )}
       </AnimatePresence>
     </motion.div>
   );
 };
 
-const DiarioModal = ({ user, schedules, profile, onClose, setScreen }: {
-  user: any; schedules: ClassSchedule[]; profile: UserProfile; onClose: () => void; setScreen: (s: Screen) => void;
+const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: {
+  user: any; schedules: ClassSchedule[]; profile: UserProfile; onClose: () => void; setScreen: (s: Screen) => void; classes?: ClassItem[];
 }) => {
   const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
   const [entries, setEntries] = useFirestoreSync<DiarioEntry>('diario', user, []);
@@ -10246,16 +10315,40 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen }: {
             )}
 
             {/* Anotações do dia */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Anotações do dia</label>
-              <textarea
-                value={entry?.note ?? ''}
-                onChange={e => updateEntry(en => ({ ...en, note: e.target.value }))}
-                rows={3}
-                placeholder="Conteúdo dado, ocorrências, lembretes..."
-                className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 text-sm resize-none"
-              />
-            </div>
+            {(() => {
+              const sched = schedules.find(s => s.id === classId);
+              const scheduledLesson = sched && classes?.find(c =>
+                c.className === sched.name && c.status === 'pending' &&
+                toISODate(new Date(c.timestamp)) === date
+              );
+              return (
+                <div>
+                  {scheduledLesson && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 mb-2 flex items-start gap-2">
+                      <BookOpen size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-indigo-700 truncate">{scheduledLesson.title}</p>
+                        {scheduledLesson.topic && <p className="text-[11px] text-indigo-500 mt-0.5 line-clamp-2">{scheduledLesson.topic}</p>}
+                      </div>
+                      <button
+                        onClick={() => updateEntry(en => ({ ...en, note: (en.note ? en.note + '\n' : '') + scheduledLesson.title + (scheduledLesson.topic ? ': ' + scheduledLesson.topic : '') }))}
+                        className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  )}
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Anotações do dia</label>
+                  <textarea
+                    value={entry?.note ?? ''}
+                    onChange={e => updateEntry(en => ({ ...en, note: e.target.value }))}
+                    rows={3}
+                    placeholder="Conteúdo dado, ocorrências, lembretes..."
+                    className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-4 text-sm resize-none"
+                  />
+                </div>
+              );
+            })()}
             <p className="text-[11px] text-gray-400 text-center mt-2">P = presente · F = falta · A = atraso. Toque para alternar. Salva automaticamente.</p>
           </>
         )}
@@ -13147,17 +13240,24 @@ function AppInner() {
     const isDayOccupied = (dateToCheck: Date) => {
        const startOfDay = new Date(dateToCheck.getFullYear(), dateToCheck.getMonth(), dateToCheck.getDate()).getTime();
        const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
-       return existingClasses.some(c => 
-         c.className === selectedClass.name && 
-         c.timestamp >= startOfDay && 
+       return existingClasses.some(c =>
+         c.className === selectedClass.name &&
+         c.timestamp >= startOfDay &&
          c.timestamp < endOfDay
        );
     };
 
+    const isHolidayDate = (date: Date): boolean => {
+      const iso = toISODate(date);
+      const yr = date.getFullYear();
+      return customEvents.some(e => e.type === 'holiday' && e.date.startsWith(iso)) ||
+             getDefaultHolidays(yr).some(h => h.type === 'holiday' && h.date.startsWith(iso));
+    };
+
     while (addedCount < duration && maxIterations > 0) {
-      if (selectedClass.days.includes(currentDate.getDay())) {
+      if (selectedClass.days.includes(currentDate.getDay()) && !isHolidayDate(currentDate)) {
          const collision = avoidCollisions && isDayOccupied(currentDate);
-         
+
          if (!collision) {
             newItems.push({
               id: Math.random().toString(36).substr(2, 9),
@@ -13709,7 +13809,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
-          }} />}
+          }} schedules={schedules} />}
           {screen === 'planner' && <PlannerScreen 
             key="planner" 
             setScreen={setScreen} 
@@ -13749,8 +13849,25 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                   date: Date.now(),
                   read: false
                 }]);
+                // Auto-link new resource to next upcoming lesson for the selected class
+                if (plannerSelectedClassId) {
+                  const newResource = res[res.length - 1];
+                  const sched = schedules.find(s => s.id === plannerSelectedClassId);
+                  if (sched && newResource) {
+                    const now = Date.now();
+                    const nextLesson = classes
+                      .filter(c => c.className === sched.name && c.status === 'pending' && c.timestamp >= now)
+                      .sort((a, b) => a.timestamp - b.timestamp)[0];
+                    if (nextLesson) {
+                      setClasses(classes.map(c => c.id === nextLesson.id
+                        ? { ...c, resourceIds: [...(c.resourceIds || []), newResource.id] }
+                        : c
+                      ));
+                    }
+                  }
+                }
               }
-            }} 
+            }}
             notifications={allNotifications} 
             setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
@@ -13812,15 +13929,42 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             getScheduleBuffer={getScheduleBuffer}
           />}
           {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} onImport={() => setImportRequest({ mode: 'calendar' })} />}
-          {screen === 'dayDetail' && <DayDetailScreen key="dayDetail" 
-            schedules={schedules} 
-            selectedDate={selectedDate} 
-            currentMonth={currentMonth} 
-            currentYear={currentYear} 
-            allEvents={[...classes.map(c => ({...c, type: 'class' as const})), ...customEvents, ...getDefaultHolidays(currentYear).filter(h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0])))]} 
-            setScreen={setScreen} 
+          {screen === 'dayDetail' && <DayDetailScreen key="dayDetail"
+            schedules={schedules}
+            selectedDate={selectedDate}
+            currentMonth={currentMonth}
+            currentYear={currentYear}
+            allEvents={[...classes.map(c => ({...c, type: 'class' as const})), ...customEvents, ...getDefaultHolidays(currentYear).filter(h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0])))]}
+            setScreen={setScreen}
             setCustomEvents={setCustomEvents}
             setClasses={setClasses}
+            onPrepareLesson={(topic, classId) => {
+              setPlannerTopic(topic);
+              setPlannerSelectedClassId(classId);
+              setPlannerMode('plan');
+              setScreen('planner');
+            }}
+            onRescheduleLesson={(classItemId) => {
+              const item = classes.find(c => c.id === classItemId);
+              if (!item) return;
+              const sched = schedules.find(s => s.name === item.className);
+              if (!sched) return;
+              const classDays = sched.days?.length ? sched.days : [1, 2, 3, 4, 5];
+              const holidayISOs = buildHolidayISOs(customEvents);
+              let next = new Date(item.timestamp);
+              next.setDate(next.getDate() + 1);
+              let guard = 90;
+              while (guard > 0) {
+                const iso = toISODate(next);
+                const alreadyOccupied = classes.some(c => c.id !== classItemId && c.className === item.className && toISODate(new Date(c.timestamp)) === iso);
+                if (classDays.includes(next.getDay()) && !holidayISOs.has(iso) && !alreadyOccupied) break;
+                next.setDate(next.getDate() + 1);
+                guard--;
+              }
+              const newDate = `${next.getDate()} ${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][next.getMonth()]}`;
+              setClasses(classes.map(c => c.id === classItemId ? { ...c, date: newDate, timestamp: next.getTime(), status: 'pending' } : c));
+              toast.success('Aula adiada para ' + next.toLocaleDateString('pt-BR'));
+            }}
           />}
           {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={allNotifications} setNotifications={handleSetNotifications} onResetAccount={() => {
             setSchedules([]);
@@ -13855,7 +13999,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
           {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} />}
-          {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} />}
+          {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
         </AnimatePresence>
