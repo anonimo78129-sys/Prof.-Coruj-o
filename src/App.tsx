@@ -5609,9 +5609,10 @@ const parseSyllabusModules = (text: string): ImportedModule[] => {
       const topics: string[] = lessons.length
         ? lessons.map(l => l.title)
         : (Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : []);
+      // Limite de 200 = ano letivo brasileiro completo (200 dias letivos)
       const estimatedClasses = lessons.length
-        ? Math.min(60, lessons.length)
-        : Math.max(1, Math.min(60, Math.round(Number(m.estimatedClasses) || 4)));
+        ? Math.min(200, lessons.length)
+        : Math.max(1, Math.min(200, Math.round(Number(m.estimatedClasses) || 4)));
       return { title: String(m.title).slice(0, 80), topics, estimatedClasses, ...(lessons.length ? { lessons } : {}) };
     })
     .filter((m: ImportedModule) => m.estimatedClasses > 0);
@@ -5655,10 +5656,10 @@ const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selec
   let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
   const result: SyllabusRow[] = [];
   for (const mod of mods) {
-    let guard = 730;
+    let guard = 1100;
     while ((!days.includes(cur.getDay()) || holidayISOs?.has(toISODate(cur))) && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
     result.push({ ...mod, startDate: toISODate(cur) });
-    let scheduled = 0; guard = 730;
+    let scheduled = 0; guard = 1100;
     while (scheduled < mod.estimatedClasses && guard > 0) {
       if (days.includes(cur.getDay()) && !holidayISOs?.has(toISODate(cur))) scheduled++;
       cur.setDate(cur.getDate() + 1);
@@ -5693,7 +5694,7 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule, h
     // Sem lessons (formato antigo): reparte os tópicos entre as aulas estimadas.
     const hasLessons = !!mod.lessons?.length;
     const lessonTopics = hasLessons ? [] : splitTopicsAcrossLessons(mod.topics || [], mod.estimatedClasses);
-    let done = 0; let guard = 730;
+    let done = 0; let guard = 1100;
     while (done < mod.estimatedClasses && guard > 0) {
       const key = toISODate(cur);
       if (days.includes(cur.getDay()) && !usedDays.has(key) && !holidayISOs?.has(key)) {
@@ -5727,7 +5728,7 @@ const buildHolidayISOs = (customEvents: { type: string, date: string }[]): Set<s
   const isos = new Set<string>();
   customEvents.filter(e => e.type === 'holiday').forEach(e => isos.add(e.date.split(' ')[0]));
   const curYear = new Date().getFullYear();
-  [curYear, curYear + 1].forEach(y =>
+  [curYear, curYear + 1, curYear + 2].forEach(y =>
     getDefaultHolidays(y).filter(h => h.type === 'holiday').forEach(h => isos.add(h.date.split(' ')[0]))
   );
   return isos;
@@ -5942,7 +5943,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                     <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1">
                       <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.max(1, x.estimatedClasses - 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">−</button>
                       <span className="text-xs font-bold text-gray-700 w-12 text-center">{mod.estimatedClasses} aula{mod.estimatedClasses !== 1 ? 's' : ''}</span>
-                      <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.min(40, x.estimatedClasses + 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">+</button>
+                      <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.min(200, x.estimatedClasses + 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">+</button>
                     </div>
                     <input
                       type="date"
@@ -12349,6 +12350,136 @@ const AdminScreen = () => {
   );
 };
 
+// ─── Admin seed data: turmas pré-definidas ───────────────────────────────────
+const INFORMATICA_LESSONS: { title: string; topic: string }[] = [
+  // Módulo 1: IPD (1 aula)
+  { title: 'IPD: O que é Informática?', topic: 'História e evolução. Componentes de um computador: Hardware e Software.' },
+  // Módulo 2: Fundamentos da Informática e SO (7 aulas)
+  { title: 'Tipos de computadores', topic: 'Desktops, Laptops, Tablets, Smartphones e seus usos.' },
+  { title: 'Componentes básicos do computador', topic: 'CPU, Monitor, Teclado, Mouse e demais periféricos.' },
+  { title: 'Sistema Operacional: funções e importância', topic: 'Área de trabalho: Ícones, barra de tarefas, menu iniciar.' },
+  { title: 'Atividade: Sistema Operacional', topic: 'Prática de navegação e uso do sistema operacional.' },
+  { title: 'Painel de controle e Explorador de arquivos', topic: 'Configurações de data, hora e idioma. Criar, copiar, mover, renomear e excluir arquivos/pastas.' },
+  { title: 'Revisão: Fundamentos da Informática', topic: 'Revisão dos tipos de computadores, SO e explorador de arquivos.' },
+  { title: 'Prova: Fundamentos da Informática', topic: 'Avaliação do Módulo 2 — Fundamentos e Sistema Operacional.' },
+  // Módulo 3: Datilografia (5 aulas)
+  { title: 'Datilografia: conhecendo o teclado', topic: 'Posicionamento correto das mãos e dedos no teclado.' },
+  { title: 'Datilografia: linha base', topic: 'Foco nas letras da linha base (ASDF JKLÇ).' },
+  { title: 'Datilografia: exercícios de reprodução', topic: 'Exercícios de reprodução e memorização de teclas.' },
+  { title: 'Datilografia: prática intensiva', topic: 'Exercícios de datilografia para prática intensiva.' },
+  { title: 'Datilografia: revisão e posicionamento', topic: 'Consolidação do posicionamento correto das mãos e dedos.' },
+  // Módulo 4: Internet (3 aulas)
+  { title: 'Internet: o que é e como funciona?', topic: 'História e evolução. Navegadores: Chrome, Firefox, Edge.' },
+  { title: 'Internet: endereços web e domínios', topic: 'URLs, domínios e como funcionam os endereços na web.' },
+  { title: 'Internet: navegação e pesquisa online', topic: 'Exercícios práticos de navegação e pesquisa de informações.' },
+  // Módulo 5: Word (8 aulas)
+  { title: 'Word: introdução', topic: 'Interface, menu e barra de ferramentas do Word.' },
+  { title: 'Word: criação e formatação de documentos', topic: 'Criar, editar e formatar documentos. Inserção de imagens, tabelas e gráficos.' },
+  { title: 'Word: atividade prática', topic: 'Exercício prático de criação e formatação de documentos.' },
+  { title: 'Word: estilos e cabeçalho', topic: 'Estilos, formatação de parágrafos e fontes. Cabeçalho e revisão ortográfica.' },
+  { title: 'Word: atividades', topic: 'Exercícios de formatação avançada no Word.' },
+  { title: 'Word: criação e formatação de tabelas', topic: 'Criar e formatar tabelas no Word.' },
+  { title: 'Word: revisão', topic: 'Revisão dos conteúdos do módulo Word.' },
+  { title: 'Word: prova', topic: 'Avaliação do módulo Word.' },
+  // Módulo 6: Excel (8 aulas)
+  { title: 'Excel: introdução', topic: 'Planilhas, células, linhas e colunas no Excel.' },
+  { title: 'Excel: inserção e formatação de dados', topic: 'Inserção e formatação de dados em planilhas.' },
+  { title: 'Excel: fórmulas básicas', topic: 'Fórmulas de Soma, Média, Máximo e Mínimo.' },
+  { title: 'Excel: funções e gráficos', topic: 'Função SE (condição), pesquisa e criação de gráficos.' },
+  { title: 'Excel: formatação condicional', topic: 'Aplicação de formatação condicional em planilhas.' },
+  { title: 'Excel: exercícios práticos', topic: 'Planilha de orçamento pessoal e controle de estoque.' },
+  { title: 'Excel: revisão', topic: 'Revisão dos conteúdos do módulo Excel.' },
+  { title: 'Excel: prova', topic: 'Avaliação do módulo Excel.' },
+  // Módulo 7: Power BI (6 aulas)
+  { title: 'Power BI: introdução', topic: 'O que é o Power BI, importância, interface e conexão a fontes de dados.' },
+  { title: 'Power BI: modelagem de dados', topic: 'Relacionamentos entre tabelas, normalização e criação de medidas.' },
+  { title: 'Power BI: gráficos e dashboards', topic: 'Tipos de gráficos, formatação de dashboards, filtros e segmentações.' },
+  { title: 'Power BI: DAX', topic: 'O que é DAX, principais funções, medidas e colunas calculadas.' },
+  { title: 'Power BI: revisão e exercícios', topic: 'Revisão dos conceitos e exercícios práticos com desafios reais.' },
+  { title: 'Power BI: prova', topic: 'Avaliação do módulo Power BI.' },
+  // Módulo 8: PowerPoint (7 aulas)
+  { title: 'PowerPoint: introdução', topic: 'Criação de apresentações e slides no PowerPoint.' },
+  { title: 'PowerPoint: inserção e design', topic: 'Inserção de texto, imagens, vídeos e áudios. Temas, cores e fontes.' },
+  { title: 'PowerPoint: transições e animações', topic: 'Aplicação de transições e animações nos slides.' },
+  { title: 'PowerPoint: apresentação de slides', topic: 'Modos de exibição e navegação durante a apresentação.' },
+  { title: 'PowerPoint: exercícios', topic: 'Criação de apresentação sobre tema livre.' },
+  { title: 'PowerPoint: revisão', topic: 'Revisão dos conteúdos do módulo PowerPoint.' },
+  { title: 'PowerPoint: prova', topic: 'Avaliação do módulo PowerPoint.' },
+  // Módulo 9: Segurança e Nuvem (3 aulas)
+  { title: 'Segurança digital: e-mail', topic: 'Criação e gerenciamento de contas de e-mail.' },
+  { title: 'Revisão geral do curso de informática', topic: 'Revisão de todos os módulos do curso.' },
+  { title: 'Prova final do curso de informática', topic: 'Avaliação final do curso profissionalizante de informática.' },
+];
+
+const JOGOS_LESSONS: { title: string; topic: string }[] = [
+  { title: 'Aula 1: Boas-vindas ao Mundo dos Games!', topic: 'Exploração dos exemplos de jogos no GDevelop. Brainstorm de ideias de jogos.' },
+  { title: 'Aula 2: Criando o Seu Mundo', topic: 'Sprites, chão e cenário. Design de estrutura com objetos de plataforma.' },
+  { title: 'Aula 3: Dando Vida com Comportamentos', topic: 'Movimentação básica. Comportamento de plataforma: velocidade, pulo, gravidade.' },
+  { title: 'Aula 4: A Câmera e os Limites do Mundo', topic: 'Controle da visão do jogador. Expansão de fase. Parallax com camadas.' },
+  { title: 'Aula 5: A Lógica por Trás de Tudo — Eventos', topic: 'Primeira interação. Múltiplos coletáveis e feedback visual.' },
+  { title: 'Aula 6: Variáveis — Guardando Informações', topic: 'Sistema de Vidas. Contador de moedas na tela. Armazenamento de pontuação.' },
+  { title: 'Aula 7: Interface do Usuário (UI)', topic: 'Botões com feedback. Fontes customizadas. Exibição de pontuação na tela.' },
+  { title: 'Aula 8: Inimigos Simples e Condição de Perder', topic: 'Movimento de inimigo (vai e vem). Múltiplos inimigos. Condição de derrota.' },
+  { title: 'Revisão do Módulo 1 (Aulas 1 a 8)', topic: 'Tira-dúvidas e reforço de objetos, comportamentos, eventos e variáveis.' },
+  { title: 'Prova Prática 1', topic: 'Criar uma cena funcional aplicando os conceitos do Módulo 1.' },
+  { title: 'Aula 9: Projeto 1 — Planejamento', topic: 'Detalhando o Game Design Document (GDD) com história e mecânicas do jogo.' },
+  { title: 'Aula 10: Construindo a Fase', topic: 'Fase principal do jogo. Áreas secretas e elementos decorativos.' },
+  { title: 'Aula 11: Implementando a Condição de Vitória', topic: 'Múltiplos níveis. Portão para Fase 2. Tela de Vitória personalizada.' },
+  { title: 'Aula 12: Telas de Início e Fim', topic: 'Música no menu. Botões de créditos. Transições de cena com fade.' },
+  { title: 'Aula 13: Aprofundando — Sons e Músicas', topic: 'Busca de assets de sons gratuitos. Trilha sonora completa para o jogo.' },
+  { title: 'Aula 14: Aprofundando — Animações', topic: 'Animação de ataque/dano no personagem. Animação simples para inimigos.' },
+  { title: 'Aula 15: Aprofundando — Timers e Spawners', topic: 'Inimigos em locais aleatórios. Itens temporários que somem após segundos.' },
+  { title: 'Aula 16: Polimento e Desafio Criativo', topic: 'Mini Game Jam: criar protótipo em 30 minutos com tema dado.' },
+  { title: 'Revisão do Módulo 2 (Aulas 9 a 16)', topic: 'Revisão de estrutura de projetos, polimento e conceitos avançados.' },
+  { title: 'Prova Prática 2', topic: 'Aprimorar um projeto existente com som, animação e novo desafio criativo.' },
+  { title: 'Aula 17: Projeto 2 — Top-Down Shooter', topic: 'Nova mecânica de jogo. Inimigo com comportamento Pathfinding.' },
+  { title: 'Aula 18: Atirando Projéteis', topic: 'Tipos de tiro, tiro carregado. Destruição de projéteis fora da tela.' },
+  { title: 'Aula 19: Inimigos em Ondas', topic: 'Ondas progressivas de inimigos. Chefe simples com mais vida.' },
+  { title: 'Aula 20: Destruindo Inimigos e Pontuando', topic: 'Sistema de Combo. Feedback de dano. Loop principal de gameplay.' },
+  { title: 'Aula 21: Power-ups e Efeitos Visuais', topic: 'Power-up de escudo e velocidade. Efeitos de rastro com partículas.' },
+  { title: 'Aula 22: Montando o Jogo Completo', topic: 'High Score com salvamento. Polimento final e feedback entre alunos.' },
+  { title: 'Aula 23: Exportando e Compartilhando', topic: 'Exportação para Desktop. Criar página no itch.io para hospedar o jogo.' },
+  { title: 'Aula 24: Apresentação Final e Próximos Passos', topic: 'Portfólio: como usar os jogos criados. Continuidade após o curso.' },
+  { title: 'Revisão Final e Preparação', topic: 'Polimento do projeto final para a apresentação.' },
+  { title: 'Apresentação Final dos Projetos', topic: 'Cada aluno apresenta seu melhor jogo explicando conceito e mecânicas.' },
+];
+
+const generateTurmaItems = (
+  seedPrefix: string,
+  turmaName: string,
+  classDays: number[],
+  startDateStr: string,
+  lessons: { title: string; topic: string }[],
+  holidayISOs: Set<string>
+): ClassItem[] => {
+  const items: ClassItem[] = [];
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const [yr, mo, dy] = startDateStr.split('-').map(Number);
+  let cur = new Date(yr, mo - 1, dy, 12, 0, 0, 0);
+  let guard = 1500;
+  let i = 0;
+  while (i < lessons.length && guard > 0) {
+    const iso = toISODate(cur);
+    if (classDays.includes(cur.getDay()) && !holidayISOs.has(iso)) {
+      const lesson = lessons[i];
+      items.push({
+        id: `${seedPrefix}-${i}`,
+        title: lesson.title,
+        date: `${cur.getDate()} ${MONTH_ABBR_IMPORT[cur.getMonth()]}`,
+        status: cur.getTime() <= today.getTime() ? 'done' : 'pending',
+        className: turmaName,
+        timestamp: cur.getTime(),
+        topic: lesson.topic,
+      });
+      i++;
+    }
+    cur.setDate(cur.getDate() + 1);
+    guard--;
+  }
+  return items;
+};
+
 function AppInner() {
   const [user, setUser] = useState<any>(null);
   const [isAuthLoaded, setIsAuthLoaded] = useState(false);
@@ -13276,6 +13407,32 @@ function AppInner() {
     return newItems;
   };
 
+  const seedAdminData = () => {
+    const holidayISOs = buildHolidayISOs(customEvents as any);
+    const t1Id = 'seed-t1'; const t2Id = 'seed-t2'; const t3Id = 'seed-t3';
+    const t4Id = 'seed-t4'; const t5Id = 'seed-t5';
+    const existingNames = new Set(schedules.map(s => s.name));
+    const newSchedules: ClassSchedule[] = [];
+    if (!existingNames.has('Turma 1')) newSchedules.push({ id: t1Id, name: 'Turma 1', days: [6], subject: 'Informática', time: '08:00', color: '#4F46E5' });
+    if (!existingNames.has('Turma 2')) newSchedules.push({ id: t2Id, name: 'Turma 2', days: [6], subject: 'Informática', time: '10:00', color: '#7C3AED' });
+    if (!existingNames.has('Turma 3')) newSchedules.push({ id: t3Id, name: 'Turma 3', days: [2], subject: 'Informática', time: '08:00', color: '#0891B2' });
+    if (!existingNames.has('Turma 4')) newSchedules.push({ id: t4Id, name: 'Turma 4', days: [2], subject: 'Criação de Jogos', time: '10:00', color: '#D97706' });
+    if (!existingNames.has('Turma 5')) newSchedules.push({ id: t5Id, name: 'Turma 5', days: [2], subject: 'Informática', time: '14:00', color: '#059669' });
+    const existingItemIds = new Set(classes.map(c => c.id));
+    const allItems: ClassItem[] = [
+      ...generateTurmaItems('seed-t1', 'Turma 1', [6], '2026-06-13', INFORMATICA_LESSONS, holidayISOs),
+      ...generateTurmaItems('seed-t2', 'Turma 2', [6], '2026-04-18', INFORMATICA_LESSONS, holidayISOs),
+      ...generateTurmaItems('seed-t3', 'Turma 3', [2], '2026-04-14', INFORMATICA_LESSONS.slice(25), holidayISOs),
+      ...generateTurmaItems('seed-t4', 'Turma 4', [2], '2026-04-14', JOGOS_LESSONS, holidayISOs),
+      ...generateTurmaItems('seed-t5', 'Turma 5', [2], '2026-04-14', INFORMATICA_LESSONS.slice(16), holidayISOs),
+    ].filter(item => !existingItemIds.has(item.id));
+    if (newSchedules.length) setSchedules([...schedules, ...newSchedules]);
+    if (allItems.length) setClasses([...classes, ...allItems]);
+    const total = allItems.length;
+    const done = allItems.filter(i => i.status === 'done').length;
+    toast.success(`${newSchedules.length} turmas e ${total} aulas importadas (${done} já realizadas)!`);
+  };
+
   const generatePlan = async (optTopic?: string, optClassId?: string) => {
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
@@ -13803,6 +13960,17 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         )}
       </AnimatePresence>
 
+      {(profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com' || user?.email?.toLowerCase() === 'slilica69@gmail.com') && (
+        <div className="fixed bottom-24 right-4 z-[115]">
+          <button
+            onClick={seedAdminData}
+            className="bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
+            title="Importar turmas pré-definidas (admin)"
+          >
+            <Upload size={13} /> Importar turmas
+          </button>
+        </div>
+      )}
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
           {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} setSelectedDate={(d: Date) => {
