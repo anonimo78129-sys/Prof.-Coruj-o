@@ -5609,9 +5609,10 @@ const parseSyllabusModules = (text: string): ImportedModule[] => {
       const topics: string[] = lessons.length
         ? lessons.map(l => l.title)
         : (Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : []);
+      // Limite de 200 = ano letivo brasileiro completo (200 dias letivos)
       const estimatedClasses = lessons.length
-        ? Math.min(60, lessons.length)
-        : Math.max(1, Math.min(60, Math.round(Number(m.estimatedClasses) || 4)));
+        ? Math.min(200, lessons.length)
+        : Math.max(1, Math.min(200, Math.round(Number(m.estimatedClasses) || 4)));
       return { title: String(m.title).slice(0, 80), topics, estimatedClasses, ...(lessons.length ? { lessons } : {}) };
     })
     .filter((m: ImportedModule) => m.estimatedClasses > 0);
@@ -5655,10 +5656,10 @@ const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selec
   let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
   const result: SyllabusRow[] = [];
   for (const mod of mods) {
-    let guard = 730;
+    let guard = 1100;
     while ((!days.includes(cur.getDay()) || holidayISOs?.has(toISODate(cur))) && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
     result.push({ ...mod, startDate: toISODate(cur) });
-    let scheduled = 0; guard = 730;
+    let scheduled = 0; guard = 1100;
     while (scheduled < mod.estimatedClasses && guard > 0) {
       if (days.includes(cur.getDay()) && !holidayISOs?.has(toISODate(cur))) scheduled++;
       cur.setDate(cur.getDate() + 1);
@@ -5693,7 +5694,7 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule, h
     // Sem lessons (formato antigo): reparte os tópicos entre as aulas estimadas.
     const hasLessons = !!mod.lessons?.length;
     const lessonTopics = hasLessons ? [] : splitTopicsAcrossLessons(mod.topics || [], mod.estimatedClasses);
-    let done = 0; let guard = 730;
+    let done = 0; let guard = 1100;
     while (done < mod.estimatedClasses && guard > 0) {
       const key = toISODate(cur);
       if (days.includes(cur.getDay()) && !usedDays.has(key) && !holidayISOs?.has(key)) {
@@ -5727,7 +5728,7 @@ const buildHolidayISOs = (customEvents: { type: string, date: string }[]): Set<s
   const isos = new Set<string>();
   customEvents.filter(e => e.type === 'holiday').forEach(e => isos.add(e.date.split(' ')[0]));
   const curYear = new Date().getFullYear();
-  [curYear, curYear + 1].forEach(y =>
+  [curYear, curYear + 1, curYear + 2].forEach(y =>
     getDefaultHolidays(y).filter(h => h.type === 'holiday').forEach(h => isos.add(h.date.split(' ')[0]))
   );
   return isos;
@@ -5942,7 +5943,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                     <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1">
                       <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.max(1, x.estimatedClasses - 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">−</button>
                       <span className="text-xs font-bold text-gray-700 w-12 text-center">{mod.estimatedClasses} aula{mod.estimatedClasses !== 1 ? 's' : ''}</span>
-                      <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.min(40, x.estimatedClasses + 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">+</button>
+                      <button onClick={() => setRows(prev => prev.map((x, j) => j === i ? { ...x, estimatedClasses: Math.min(200, x.estimatedClasses + 1) } : x))} className="w-6 h-6 text-gray-400 font-bold">+</button>
                     </div>
                     <input
                       type="date"
