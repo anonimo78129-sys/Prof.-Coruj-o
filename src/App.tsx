@@ -558,6 +558,7 @@ interface ClassItem {
   className: string;
   timestamp: number;
   resourceIds?: string[];
+  topic?: string;  // conteúdo da aula (ex: tópicos vindos da ementa importada)
 }
 
 // --- Components ---
@@ -849,7 +850,10 @@ const EventItem = ({ e, onComplete, color }: { e: any, onComplete: () => void, c
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-gray-900 text-base truncate">{e.title}</h3>
-        <p className="text-gray-400 text-sm mt-0.5 truncate">{formatEventDate(e.date)} • {e.type === 'class' ? 'Aula' : e.type === 'prep' ? 'Tempo de Foco' : e.type === 'holiday' ? 'Feriado Nacional' : e.type === 'commemorative' ? 'Data Comemorativa' : 'Prazo Administrativo'}</p>
+        <p className="text-gray-400 text-sm mt-0.5 truncate">{formatEventDate(e.date)} • {e.type === 'class' ? `Aula${e.className ? ` · ${e.className}` : ''}` : e.type === 'prep' ? 'Tempo de Foco' : e.type === 'holiday' ? 'Feriado Nacional' : e.type === 'commemorative' ? 'Data Comemorativa' : 'Prazo Administrativo'}</p>
+        {e.type === 'class' && e.topic && (
+          <p className="text-gray-500 text-xs mt-1 line-clamp-2">{e.topic}</p>
+        )}
       </div>
       <button 
         onClick={handleComplete}
@@ -5344,7 +5348,8 @@ const IMPORT_EVENT_TYPES = [
 
 type ImportEventType = 'holiday' | 'admin' | 'prep' | 'commemorative';
 interface ImportedEvent { title: string; date: string; type: ImportEventType }
-interface ImportedModule { title: string; topics: string[]; estimatedClasses: number }
+interface ImportedLesson { title: string; content?: string }
+interface ImportedModule { title: string; topics: string[]; estimatedClasses: number; lessons?: ImportedLesson[] }
 interface SyllabusRow extends ImportedModule { startDate: string }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -5498,15 +5503,35 @@ const SYLLABUS_EXTRACT_SCHEMA = {
         type: Type.OBJECT,
         properties: {
           title: { type: Type.STRING },
-          topics: { type: Type.ARRAY, items: { type: Type.STRING } },
-          estimatedClasses: { type: Type.NUMBER },
+          lessons: {
+            type: Type.ARRAY,
+            description: 'Uma entrada por aula, na ordem do documento',
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING, description: 'Título ou conteúdo da aula' },
+                content: { type: Type.STRING, description: 'Detalhes, atividades ou objetivo da aula (se houver)' },
+              },
+              required: ['title'],
+            },
+          },
         },
-        required: ['title', 'estimatedClasses'],
+        required: ['title', 'lessons'],
       },
     },
   },
   required: ['modules'],
 };
+
+const SYLLABUS_PROMPT = `Este documento é uma ementa / plano de curso / plano de ensino brasileiro. Pode estar em texto corrido, tabela, documento escaneado ou foto.
+
+REGRA MAIS IMPORTANTE: cada linha de conteúdo da tabela (ou cada item numerado) normalmente corresponde a UMA aula. Por exemplo, se um módulo tem 7 linhas de conteúdo com carga horária "2 H/A" cada, ele tem 7 aulas. Se o documento numera as aulas (Aula 1, Aula 2...), cada número é uma aula. Linhas como "Atividade", "Revisão", "Prova", "Exercícios" TAMBÉM são aulas e devem ser incluídas.
+
+Extraia TODOS os módulos (ou meses/unidades) na ordem do documento, e dentro de cada módulo TODAS as aulas, da primeira à última, sem pular nenhuma. Para cada aula retorne:
+- title: o conteúdo ou título da aula (resuma em até 90 caracteres se for longo)
+- content: detalhes, atividades práticas ou objetivo da aula, se o documento tiver (senão omita)
+
+NÃO resuma nem agrupe aulas. Se o documento tem 49 linhas de conteúdo, retorne 49 aulas no total. Use a carga horária total como verificação: se o curso tem 98 horas e cada aula tem 2 horas, devem existir ~49 aulas.`;
 
 const parseSyllabusModules = (text: string): ImportedModule[] => {
   let raw = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -5515,11 +5540,24 @@ const parseSyllabusModules = (text: string): ImportedModule[] => {
   const list = Array.isArray(parsed) ? parsed : (parsed.modules || []);
   return list
     .filter((m: any) => m && m.title)
-    .map((m: any) => ({
-      title: String(m.title).slice(0, 80),
-      topics: Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : [],
-      estimatedClasses: Math.max(1, Math.min(40, Math.round(Number(m.estimatedClasses) || 4))),
-    }));
+    .map((m: any) => {
+      const lessons: ImportedLesson[] = Array.isArray(m.lessons)
+        ? m.lessons
+            .filter((l: any) => l && (l.title || typeof l === 'string'))
+            .map((l: any) => typeof l === 'string'
+              ? { title: l.slice(0, 120) }
+              : { title: String(l.title).slice(0, 120), ...(l.content ? { content: String(l.content).slice(0, 300) } : {}) })
+        : [];
+      // Compat: resposta antiga com topics/estimatedClasses (2ª tentativa pode devolver esse formato)
+      const topics: string[] = lessons.length
+        ? lessons.map(l => l.title)
+        : (Array.isArray(m.topics) ? m.topics.map((t: any) => String(t)) : []);
+      const estimatedClasses = lessons.length
+        ? Math.min(60, lessons.length)
+        : Math.max(1, Math.min(60, Math.round(Number(m.estimatedClasses) || 4)));
+      return { title: String(m.title).slice(0, 80), topics, estimatedClasses, ...(lessons.length ? { lessons } : {}) };
+    })
+    .filter((m: ImportedModule) => m.estimatedClasses > 0);
 };
 
 const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
@@ -5529,7 +5567,7 @@ const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
       { inlineData: { data: base64, mimeType } },
-      { text: `Este documento é uma ementa / plano de curso / plano de ensino de uma disciplina escolar brasileira. Pode estar em texto corrido, tabela, documento escaneado ou foto. Extraia a lista de módulos ou unidades temáticas na ordem em que aparecem. Para cada módulo retorne: o título do módulo, a lista de tópicos/conteúdos abordados nele, e uma estimativa de quantas aulas são necessárias (estimatedClasses) com base na quantidade de conteúdo. Se o documento não indicar a carga horária, estime entre 2 e 8 aulas por módulo conforme a densidade do conteúdo. Mantenha a ordem original dos módulos.` }
+      { text: SYLLABUS_PROMPT }
     ]}],
     config: { responseMimeType: 'application/json', responseSchema: SYLLABUS_EXTRACT_SCHEMA },
   });
@@ -5541,12 +5579,12 @@ const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
       { inlineData: { data: base64, mimeType } },
-      { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é uma ementa ou plano de curso escolar brasileiro), incluindo tabelas e listas. Depois, identifique os módulos/unidades de conteúdo na ordem do documento.
+      { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é uma ementa ou plano de curso escolar brasileiro), incluindo todas as linhas de todas as tabelas. Depois, identifique os módulos e TODAS as aulas de cada módulo. Cada linha de conteúdo com carga horária é uma aula; linhas de Atividade, Revisão e Prova também são aulas.
 
 Responda APENAS com JSON válido no formato:
-{"modules":[{"title":"...","topics":["...","..."],"estimatedClasses":4}]}
+{"modules":[{"title":"...","lessons":[{"title":"...","content":"..."}]}]}
 
-Se a carga horária não aparecer, estime entre 2 e 8 aulas por módulo. Extraia o máximo possível.` }
+NÃO resuma nem agrupe: extraia cada aula como um item separado, da primeira à última.` }
     ]}],
   });
   modules = parseSyllabusModules(retryResponse.text || '');
@@ -5574,6 +5612,18 @@ const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selec
 };
 
 // Distribui os módulos em ClassItems no calendário, respeitando os dias da turma
+// Reparte os tópicos do módulo entre as aulas, em ordem (ex: 6 tópicos em 3
+// aulas viram 2 tópicos por aula; sobras vão para as primeiras aulas)
+const splitTopicsAcrossLessons = (topics: string[], lessons: number): string[][] => {
+  const out: string[][] = Array.from({ length: lessons }, () => []);
+  if (!topics.length || lessons < 1) return out;
+  topics.forEach((t, i) => {
+    const bucket = Math.min(lessons - 1, Math.floor((i * lessons) / topics.length));
+    out[bucket].push(t);
+  });
+  return out;
+};
+
 const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): ClassItem[] => {
   const items: ClassItem[] = [];
   const usedDays = new Set<string>();
@@ -5582,18 +5632,30 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): 
     if (!mod.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(mod.startDate)) continue;
     const [y, m, d] = mod.startDate.split('-').map(Number);
     let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
+    // Com lessons extraídas do documento: cada aula tem título e conteúdo próprios.
+    // Sem lessons (formato antigo): reparte os tópicos entre as aulas estimadas.
+    const hasLessons = !!mod.lessons?.length;
+    const lessonTopics = hasLessons ? [] : splitTopicsAcrossLessons(mod.topics || [], mod.estimatedClasses);
     let done = 0; let guard = 730;
     while (done < mod.estimatedClasses && guard > 0) {
       const key = toISODate(cur);
       if (days.includes(cur.getDay()) && !usedDays.has(key)) {
         usedDays.add(key);
+        const lesson = hasLessons ? mod.lessons![done] : undefined;
+        const title = lesson
+          ? lesson.title
+          : (mod.estimatedClasses > 1 ? `${mod.title}: Aula ${done + 1}` : mod.title);
+        const topicStr = lesson
+          ? (lesson.content || mod.title)
+          : (lessonTopics[done]?.join(' · ') || '');
         items.push({
           id: Math.random().toString(36).substr(2, 9),
-          title: mod.estimatedClasses > 1 ? `${mod.title}: Aula ${done + 1}` : mod.title,
+          title,
           date: `${cur.getDate()} ${MONTH_ABBR_IMPORT[cur.getMonth()]}`,
           status: 'pending',
           className: selectedClass.name,
           timestamp: cur.getTime(),
+          ...(topicStr ? { topic: topicStr } : {}),
         });
         done++;
       }
@@ -5787,7 +5849,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
             <div className="space-y-3">
               <div className="flex items-center gap-2 bg-indigo-50 rounded-xl p-3">
                 <Sparkles size={15} className="text-indigo-500 shrink-0" />
-                <p className="text-xs text-indigo-700 font-medium">Encontrei {rows.length} módulos. Ajuste o nº de aulas e <b>quando cada módulo começou nesta turma</b>. As aulas serão distribuídas nos dias da turma ({(targetClass?.days?.length ? targetClass!.days : [1,2,3,4,5]).map(d => ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(', ')}).</p>
+                <p className="text-xs text-indigo-700 font-medium">Encontrei {rows.length} módulos com {rows.reduce((s, r) => s + r.estimatedClasses, 0)} aulas no total. Defina <b>quando cada módulo começa nesta turma</b>. As aulas serão distribuídas nos dias da turma ({(targetClass?.days?.length ? targetClass!.days : [1,2,3,4,5]).map(d => ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(', ')}), cada uma com seu conteúdo.</p>
               </div>
               <button
                 onClick={() => setRows(prev => computeSequentialStarts(prev, prev[0]?.startDate || todayISO, targetClass))}
