@@ -5592,18 +5592,18 @@ NÃO resuma nem agrupe: extraia cada aula como um item separado, da primeira à 
 };
 
 // Calcula datas de início sequenciais (cada módulo começa após o anterior terminar)
-const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selectedClass?: ClassSchedule): SyllabusRow[] => {
+const computeSequentialStarts = (mods: ImportedModule[], startISO: string, selectedClass?: ClassSchedule, holidayISOs?: Set<string>): SyllabusRow[] => {
   const days = selectedClass?.days?.length ? selectedClass.days : [1, 2, 3, 4, 5];
   const [y, m, d] = startISO.split('-').map(Number);
   let cur = new Date(y, m - 1, d, 12, 0, 0, 0);
   const result: SyllabusRow[] = [];
   for (const mod of mods) {
     let guard = 730;
-    while (!days.includes(cur.getDay()) && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
+    while ((!days.includes(cur.getDay()) || holidayISOs?.has(toISODate(cur))) && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
     result.push({ ...mod, startDate: toISODate(cur) });
     let scheduled = 0; guard = 730;
     while (scheduled < mod.estimatedClasses && guard > 0) {
-      if (days.includes(cur.getDay())) scheduled++;
+      if (days.includes(cur.getDay()) && !holidayISOs?.has(toISODate(cur))) scheduled++;
       cur.setDate(cur.getDate() + 1);
       guard--;
     }
@@ -5624,7 +5624,7 @@ const splitTopicsAcrossLessons = (topics: string[], lessons: number): string[][]
   return out;
 };
 
-const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): ClassItem[] => {
+const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule, holidayISOs?: Set<string>): ClassItem[] => {
   const items: ClassItem[] = [];
   const usedDays = new Set<string>();
   const days = selectedClass.days?.length ? selectedClass.days : [1, 2, 3, 4, 5];
@@ -5639,7 +5639,7 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): 
     let done = 0; let guard = 730;
     while (done < mod.estimatedClasses && guard > 0) {
       const key = toISODate(cur);
-      if (days.includes(cur.getDay()) && !usedDays.has(key)) {
+      if (days.includes(cur.getDay()) && !usedDays.has(key) && !holidayISOs?.has(key)) {
         usedDays.add(key);
         const lesson = hasLessons ? mod.lessons![done] : undefined;
         const title = lesson
@@ -5664,6 +5664,16 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule): 
     }
   }
   return items.sort((a, b) => a.timestamp - b.timestamp);
+};
+
+const buildHolidayISOs = (customEvents: { type: string, date: string }[]): Set<string> => {
+  const isos = new Set<string>();
+  customEvents.filter(e => e.type === 'holiday').forEach(e => isos.add(e.date.split(' ')[0]));
+  const curYear = new Date().getFullYear();
+  [curYear, curYear + 1].forEach(y =>
+    getDefaultHolidays(y).filter(h => h.type === 'holiday').forEach(h => isos.add(h.date.split(' ')[0]))
+  );
+  return isos;
 };
 
 const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustomEvents, onAddClassItems }: {
@@ -5697,7 +5707,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
       } else {
         const mods = await extractSyllabus(file);
         if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Verifique se o arquivo contém a lista de conteúdos ou tente uma versão mais legível.'); setPhase('error'); return; }
-        setRows(computeSequentialStarts(mods, todayISO, targetClass));
+        setRows(computeSequentialStarts(mods, todayISO, targetClass, buildHolidayISOs(customEvents)));
         setPhase('review');
       }
     } catch (err) {
@@ -5723,7 +5733,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
 
   const confirmSyllabus = () => {
     if (!targetClass) return;
-    const items = distributeSyllabus(rows, targetClass);
+    const items = distributeSyllabus(rows, targetClass, buildHolidayISOs(customEvents));
     if (!items.length) { toast.error('Nenhuma aula foi gerada. Verifique as datas e os dias da turma.'); return; }
     onAddClassItems(items);
     toast.success(`${items.length} aulas distribuídas no calendário de ${targetClass.name}!`);
@@ -5852,7 +5862,7 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                 <p className="text-xs text-indigo-700 font-medium">Encontrei {rows.length} módulos com {rows.reduce((s, r) => s + r.estimatedClasses, 0)} aulas no total. Defina <b>quando cada módulo começa nesta turma</b>. As aulas serão distribuídas nos dias da turma ({(targetClass?.days?.length ? targetClass!.days : [1,2,3,4,5]).map(d => ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d]).join(', ')}), cada uma com seu conteúdo.</p>
               </div>
               <button
-                onClick={() => setRows(prev => computeSequentialStarts(prev, prev[0]?.startDate || todayISO, targetClass))}
+                onClick={() => setRows(prev => computeSequentialStarts(prev, prev[0]?.startDate || todayISO, targetClass, buildHolidayISOs(customEvents)))}
                 className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2"
               >
                 <RefreshCw size={13} /> Distribuir em sequência a partir do 1º módulo
@@ -13147,17 +13157,24 @@ function AppInner() {
     const isDayOccupied = (dateToCheck: Date) => {
        const startOfDay = new Date(dateToCheck.getFullYear(), dateToCheck.getMonth(), dateToCheck.getDate()).getTime();
        const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
-       return existingClasses.some(c => 
-         c.className === selectedClass.name && 
-         c.timestamp >= startOfDay && 
+       return existingClasses.some(c =>
+         c.className === selectedClass.name &&
+         c.timestamp >= startOfDay &&
          c.timestamp < endOfDay
        );
     };
 
+    const isHolidayDate = (date: Date): boolean => {
+      const iso = toISODate(date);
+      const yr = date.getFullYear();
+      return customEvents.some(e => e.type === 'holiday' && e.date.startsWith(iso)) ||
+             getDefaultHolidays(yr).some(h => h.type === 'holiday' && h.date.startsWith(iso));
+    };
+
     while (addedCount < duration && maxIterations > 0) {
-      if (selectedClass.days.includes(currentDate.getDay())) {
+      if (selectedClass.days.includes(currentDate.getDay()) && !isHolidayDate(currentDate)) {
          const collision = avoidCollisions && isDayOccupied(currentDate);
-         
+
          if (!collision) {
             newItems.push({
               id: Math.random().toString(36).substr(2, 9),
