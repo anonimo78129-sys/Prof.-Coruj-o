@@ -13510,9 +13510,9 @@ function AppInner() {
     const allItems: ClassItem[] = [
       ...generateTurmaItems('seed-t1', 'Turma 1', [6], '2026-06-13', INFORMATICA_LESSONS, holidayISOs),
       ...generateTurmaItems('seed-t2', 'Turma 2', [6], '2026-04-18', INFORMATICA_LESSONS, holidayISOs),
-      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-04-18', INFORMATICA_LESSONS.slice(25), holidayISOs),
-      ...generateTurmaItems('seed-t4', 'Turma 4', [6], '2026-04-18', JOGOS_LESSONS, holidayISOs),
-      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-04-18', INFORMATICA_LESSONS.slice(16), holidayISOs),
+      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-03-14', INFORMATICA_LESSONS.slice(25), holidayISOs),
+      ...generateTurmaItems('seed-t4', 'Turma 4', [6], '2026-03-14', JOGOS_LESSONS, holidayISOs),
+      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-03-14', INFORMATICA_LESSONS.slice(16), holidayISOs),
     ];
     setSchedules(updatedSchedules);
     setClasses([...keptClasses, ...allItems]);
