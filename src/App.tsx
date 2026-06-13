@@ -12430,53 +12430,65 @@ const AdminScreen = () => {
 
 // ─── Admin seed data: turmas pré-definidas ───────────────────────────────────
 const INFORMATICA_LESSONS: { title: string; topic: string }[] = [
-  // Ordem oficial da planilha: IPD → Windows → Digitação → Word → Excel → PowerPoint → Power BI → Internet (38 aulas)
+  // Conteúdo da ementa oficial (EMENTA Informática). Ordem mantida conforme o app:
+  // IPD → Windows → Digitação → Word → Excel → PowerPoint → Power BI → Internet → Segurança/Nuvem (48 aulas)
   // IPD (1 aula) — índice 0
-  { title: 'IPD: Introdução ao Processamento de Dados', topic: 'O que é informática, história e evolução. Hardware e software.' },
-  // Windows (7 aulas) — índices 1-7
-  { title: 'Windows: Introdução ao Sistema Operacional', topic: 'O que é um SO, funções e importância. Visão geral da área de trabalho.' },
-  { title: 'Windows: Área de trabalho e barra de tarefas', topic: 'Ícones, barra de tarefas e menu iniciar.' },
-  { title: 'Windows: Janelas e aplicativos', topic: 'Abrir, fechar, redimensionar janelas e alternar entre programas.' },
-  { title: 'Windows: Explorador de arquivos', topic: 'Criar, copiar, mover, renomear e excluir arquivos e pastas.' },
-  { title: 'Windows: Organização de pastas', topic: 'Estrutura de pastas, bibliotecas e busca de arquivos.' },
-  { title: 'Windows: Painel de controle e configurações', topic: 'Configurações de data, hora, idioma e teclado.' },
-  { title: 'Windows: Atividade prática e revisão', topic: 'Exercícios de uso do sistema operacional.' },
-  // Digitação (4 aulas) — índices 8-11
-  { title: 'Digitação: Posição das mãos no teclado', topic: 'Posicionamento correto das mãos e dedos no teclado.' },
-  { title: 'Digitação: Linha base (ASDF JKLÇ)', topic: 'Foco nas letras da linha base e memorização das teclas.' },
-  { title: 'Digitação: Exercícios de memorização', topic: 'Exercícios de reprodução e memorização das teclas.' },
-  { title: 'Digitação: Prática intensiva', topic: 'Exercícios de datilografia para velocidade e precisão.' },
-  // Word (6 aulas) — índices 12-17 (Turma 5 começa aqui)
-  { title: 'Word: Introdução e interface', topic: 'Interface, menus e barra de ferramentas do Word.' },
-  { title: 'Word: Criação e edição de documentos', topic: 'Criar, editar e salvar documentos.' },
-  { title: 'Word: Formatação de texto', topic: 'Estilos, parágrafos, fontes e cabeçalho.' },
-  { title: 'Word: Imagens, tabelas e gráficos', topic: 'Inserção de imagens, tabelas e gráficos.' },
-  { title: 'Word: Revisão ortográfica e recursos', topic: 'Revisão ortográfica e gramatical, recursos avançados.' },
-  { title: 'Word: Atividade prática e revisão', topic: 'Exercício completo de criação e formatação de documento.' },
-  // Excel (6 aulas) — índices 18-23 (Turma 3 começa na 2ª aula, índice 19)
-  { title: 'Excel: Introdução a planilhas', topic: 'Planilhas, células, linhas e colunas.' },
-  { title: 'Excel: Inserção e formatação de dados', topic: 'Inserir e formatar dados em planilhas.' },
-  { title: 'Excel: Fórmulas básicas', topic: 'Soma, média, máximo e mínimo.' },
-  { title: 'Excel: Funções e formatação condicional', topic: 'Função SE, pesquisa e formatação condicional.' },
-  { title: 'Excel: Gráficos', topic: 'Criação e personalização de gráficos.' },
-  { title: 'Excel: Atividade prática e revisão', topic: 'Planilha de orçamento pessoal e controle de estoque.' },
-  // PowerPoint (5 aulas) — índices 24-28
-  { title: 'PowerPoint: Introdução e slides', topic: 'Criação de apresentações e slides.' },
-  { title: 'PowerPoint: Texto e mídia', topic: 'Inserção de texto, imagens, vídeos e áudios.' },
-  { title: 'PowerPoint: Design e temas', topic: 'Temas, cores e fontes para os slides.' },
-  { title: 'PowerPoint: Transições e animações', topic: 'Aplicação de transições e animações.' },
-  { title: 'PowerPoint: Apresentação e atividade', topic: 'Modos de exibição e exercício prático.' },
-  // Power BI (5 aulas) — índices 29-33
-  { title: 'Power BI: Introdução', topic: 'O que é, importância, interface e conexão a fontes de dados.' },
-  { title: 'Power BI: Modelagem de dados', topic: 'Relacionamentos entre tabelas, normalização e medidas.' },
-  { title: 'Power BI: Gráficos e dashboards', topic: 'Tipos de gráficos, filtros e segmentações.' },
-  { title: 'Power BI: DAX', topic: 'Principais funções DAX, medidas e colunas calculadas.' },
-  { title: 'Power BI: Painéis e revisão', topic: 'Painéis interativos e exercícios práticos.' },
-  // Internet (4 aulas) — índices 34-37
-  { title: 'Internet: Conceitos e navegadores', topic: 'O que é a internet, história, Chrome, Firefox, Edge.' },
-  { title: 'Internet: Endereços web e domínios', topic: 'URLs e domínios.' },
-  { title: 'Internet: Pesquisa e navegação', topic: 'Pesquisa de informações online e navegação eficiente.' },
-  { title: 'Internet: E-mail e revisão final', topic: 'Criação e gerenciamento de e-mail. Revisão geral do curso.' },
+  { title: 'IPD: Introdução ao Processamento de Dados', topic: 'O que é Informática? História e evolução. Componentes de um computador: Hardware e Software.' },
+  // Fundamentos da Informática e Sistema Operacional / Windows (7 aulas) — índices 1-7
+  { title: 'Windows: Tipos de computadores', topic: 'Tipos de computadores: Desktops, Laptops, Tablets, Smartphones.' },
+  { title: 'Windows: Componentes do computador', topic: 'Componentes básicos de um computador (CPU, Monitor, Teclado, Mouse, etc.).' },
+  { title: 'Windows: Sistema Operacional e área de trabalho', topic: 'O que é um Sistema Operacional? Funções e importância. A área de trabalho: ícones, barra de tarefas e menu iniciar.' },
+  { title: 'Windows: Atividade prática', topic: 'Atividade prática sobre o sistema operacional e a área de trabalho.' },
+  { title: 'Windows: Painel de controle e arquivos', topic: 'Painel de controle: configurações de data e hora, idioma e teclado. Explorador de arquivos: criar, copiar, mover, renomear e excluir arquivos/pastas.' },
+  { title: 'Windows: Revisão', topic: 'Revisão dos conceitos de sistema operacional, painel de controle e gerenciamento de arquivos.' },
+  { title: 'Windows: Prova', topic: 'Prova do módulo de Fundamentos da Informática e Sistema Operacional.' },
+  // Datilografia / Digitação (5 aulas) — índices 8-12
+  { title: 'Digitação: Conhecendo o teclado', topic: 'Conhecendo o teclado e o posicionamento correto das mãos e dedos.' },
+  { title: 'Digitação: Linha base (ASDF JKLÇ)', topic: 'Foco nas letras da linha base (ASDF JKLÇ).' },
+  { title: 'Digitação: Reprodução e memorização', topic: 'Exercícios de reprodução e memorização.' },
+  { title: 'Digitação: Prática intensiva', topic: 'Exercícios de datilografia para prática intensiva.' },
+  { title: 'Digitação: Posicionamento das mãos', topic: 'Posicionamento correto das mãos e dedos no teclado.' },
+  // Word (8 aulas) — índices 13-20 (Turma 5 começa aqui)
+  { title: 'Word: Introdução e interface', topic: 'Introdução ao Word: interface, menu e barra de ferramentas.' },
+  { title: 'Word: Criação e formatação de documentos', topic: 'Criação, edição e formatação de documentos. Inserção de imagens, tabelas e gráficos.' },
+  { title: 'Word: Atividade', topic: 'Atividade prática de criação e formatação de documentos.' },
+  { title: 'Word: Estilos e revisão de texto', topic: 'Estilos, formatação de parágrafos e fontes. Cabeçalho, revisão ortográfica e gramatical.' },
+  { title: 'Word: Atividades', topic: 'Atividades práticas de formatação e revisão de texto.' },
+  { title: 'Word: Tabelas', topic: 'Criação e formatação de tabelas.' },
+  { title: 'Word: Revisão', topic: 'Revisão dos conceitos do módulo Word.' },
+  { title: 'Word: Prova', topic: 'Prova do módulo Word.' },
+  // Excel (8 aulas) — índices 21-28 (Turma 3 começa na 2ª aula, índice 22)
+  { title: 'Excel: Introdução a planilhas', topic: 'Introdução ao Excel: planilhas, células, linhas e colunas.' },
+  { title: 'Excel: Inserção e formatação de dados', topic: 'Inserção e formatação de dados.' },
+  { title: 'Excel: Fórmulas básicas', topic: 'Fórmulas básicas: soma, média, máximo e mínimo.' },
+  { title: 'Excel: Funções e gráficos', topic: 'Funções: condição (SE) e pesquisa. Criação de gráficos.' },
+  { title: 'Excel: Formatação condicional', topic: 'Formatação condicional.' },
+  { title: 'Excel: Exercícios práticos', topic: 'Exercícios: planilha de orçamento pessoal e controle de estoque, praticando a digitação de números e símbolos.' },
+  { title: 'Excel: Revisão', topic: 'Revisão dos conceitos do módulo Excel.' },
+  { title: 'Excel: Prova', topic: 'Prova do módulo Excel.' },
+  // PowerPoint (7 aulas) — índices 29-35
+  { title: 'PowerPoint: Introdução e slides', topic: 'Introdução ao PowerPoint: criação de apresentações e slides.' },
+  { title: 'PowerPoint: Texto, mídia e design', topic: 'Inserção de texto, imagens, vídeos e áudios. Design de slides: temas, cores e fontes.' },
+  { title: 'PowerPoint: Transições e animações', topic: 'Transições e animações.' },
+  { title: 'PowerPoint: Apresentação de slides', topic: 'Apresentação de slides: modos de exibição e navegação.' },
+  { title: 'PowerPoint: Exercícios', topic: 'Exercícios: criação de apresentação sobre tema livre e apresentação em sala, praticando a digitação.' },
+  { title: 'PowerPoint: Revisão', topic: 'Revisão dos conceitos do módulo PowerPoint.' },
+  { title: 'PowerPoint: Prova', topic: 'Prova do módulo PowerPoint.' },
+  // Power BI (6 aulas) — índices 36-41
+  { title: 'Power BI: Introdução', topic: 'O que é o Power BI, importância e aplicações no mercado. Visão geral da interface e principais ferramentas, conectando-se a fontes de dados.' },
+  { title: 'Power BI: Modelagem de dados', topic: 'Conceito de modelagem de dados, relacionamentos entre tabelas, normalização e boas práticas. Criação de colunas e medidas.' },
+  { title: 'Power BI: Gráficos e dashboards', topic: 'Tipos de gráficos e quando usá-los. Formatação e personalização de dashboards, uso de filtros e segmentações, criando painéis interativos.' },
+  { title: 'Power BI: DAX', topic: 'O que é DAX e para que serve. Principais funções do DAX, criando medidas e colunas calculadas, aplicação de cálculos básicos.' },
+  { title: 'Power BI: Revisão', topic: 'Revisão dos conceitos abordados, exercícios práticos com desafios reais e resolução de dúvidas.' },
+  { title: 'Power BI: Prova', topic: 'Prova do módulo Power BI.' },
+  // Internet (3 aulas) — índices 42-44
+  { title: 'Internet: Introdução e navegadores', topic: 'O que é a Internet? História e evolução. Navegadores: Chrome, Firefox, Edge, etc.' },
+  { title: 'Internet: Endereços web e domínios', topic: 'Endereços web (URLs) e domínios.' },
+  { title: 'Internet: Navegação e pesquisa', topic: 'Exercícios: navegação na Internet, pesquisa de informações online e prática de digitação de URLs e termos de pesquisa.' },
+  // Segurança e Computação em Nuvem (3 aulas) — índices 45-47
+  { title: 'Segurança e Nuvem: E-mail', topic: 'Criação e gerenciamento de contas de e-mail.' },
+  { title: 'Segurança e Nuvem: Revisão geral', topic: 'Revisão geral do curso.' },
+  { title: 'Segurança e Nuvem: Prova final', topic: 'Prova final.' },
 ];
 
 const JOGOS_LESSONS: { title: string; topic: string }[] = [
@@ -13500,11 +13512,11 @@ function AppInner() {
     const allItems: ClassItem[] = [
       ...generateTurmaItems('seed-t1', 'Turma 1', [6], '2026-06-13', INFORMATICA_LESSONS, holidayISOs),
       ...generateTurmaItems('seed-t2', 'Turma 2', [6], '2026-04-18', INFORMATICA_LESSONS, holidayISOs),
-      // Turma 3: 2ª aula de Excel em diante (Excel começa no índice 18; 2ª aula = índice 19)
-      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-03-14', INFORMATICA_LESSONS.slice(19), holidayISOs),
+      // Turma 3: 2ª aula de Excel em diante (Excel começa no índice 21; 2ª aula = índice 22)
+      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-03-14', INFORMATICA_LESSONS.slice(22), holidayISOs),
       ...generateTurmaItems('seed-t4', 'Turma 4', [6], '2026-03-14', JOGOS_LESSONS, holidayISOs),
-      // Turma 5: 1ª aula de Word em diante (Word começa no índice 12)
-      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-03-14', INFORMATICA_LESSONS.slice(12), holidayISOs),
+      // Turma 5: 1ª aula de Word em diante (Word começa no índice 13)
+      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-03-14', INFORMATICA_LESSONS.slice(13), holidayISOs),
     ];
     setSchedules(updatedSchedules);
     setClasses([...keptClasses, ...allItems]);
