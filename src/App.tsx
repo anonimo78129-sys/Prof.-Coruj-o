@@ -12520,14 +12520,26 @@ const generateTurmaItems = (
   classDays: number[],
   startDateStr: string,
   lessons: { title: string; topic: string }[],
-  holidayISOs: Set<string>
+  holidayISOs: Set<string>,
+  anchorIndex: number = 0,
 ): ClassItem[] => {
   const items: ClassItem[] = [];
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   const [yr, mo, dy] = startDateStr.split('-').map(Number);
+  // startDateStr é a data da aula de índice `anchorIndex`. Recua para achar a data da aula 0,
+  // contando para trás apenas dias de aula válidos (pulando feriados), para que as aulas
+  // anteriores ao ponto de partida fiquem retroativas (já realizadas).
   let cur = new Date(yr, mo - 1, dy, 12, 0, 0, 0);
-  let guard = 1500;
+  let back = anchorIndex;
+  while (back > 0) {
+    cur.setDate(cur.getDate() - 1);
+    const iso = toISODate(cur);
+    if (classDays.includes(cur.getDay()) && !holidayISOs.has(iso)) {
+      back--;
+    }
+  }
+  let guard = 3000;
   let i = 0;
   while (i < lessons.length && guard > 0) {
     const iso = toISODate(cur);
@@ -13502,11 +13514,13 @@ function AppInner() {
     const allItems: ClassItem[] = [
       ...generateTurmaItems('seed-t1', 'Turma 1', [6], '2026-06-13', INFORMATICA_LESSONS, holidayISOs),
       ...generateTurmaItems('seed-t2', 'Turma 2', [6], '2026-04-18', INFORMATICA_LESSONS, holidayISOs),
-      // Turma 3: 2ª aula de Excel em diante (Excel começa no índice 18; 2ª aula = índice 19)
-      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-03-14', INFORMATICA_LESSONS.slice(19), holidayISOs),
+      // Turma 3: cronograma completo (38 aulas). Em 14/03 está na 2ª aula de Excel (índice 19);
+      // as aulas anteriores ficam retroativas (já realizadas).
+      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-03-14', INFORMATICA_LESSONS, holidayISOs, 19),
       ...generateTurmaItems('seed-t4', 'Turma 4', [6], '2026-03-14', JOGOS_LESSONS, holidayISOs),
-      // Turma 5: 1ª aula de Word em diante (Word começa no índice 12)
-      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-03-14', INFORMATICA_LESSONS.slice(12), holidayISOs),
+      // Turma 5: cronograma completo (38 aulas). Em 14/03 está na 1ª aula de Word (índice 12);
+      // as aulas anteriores ficam retroativas (já realizadas).
+      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-03-14', INFORMATICA_LESSONS, holidayISOs, 12),
     ];
     setSchedules(updatedSchedules);
     setClasses([...keptClasses, ...allItems]);
