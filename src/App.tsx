@@ -655,13 +655,13 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
 
   return (
   <div className="mb-3 relative z-50">
-    {bannerImage !== null && (
+    {typeof bannerImage === 'string' && (
       <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
-        <img src={bannerImage || "https://i.ibb.co/TDZNvsJv/20260420-121247-0000.png"} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
+        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
       </div>
     )}
 
-    <div className={`flex justify-between items-start ${bannerImage !== null ? 'pt-28' : bannerImage === null ? 'pt-0' : 'pt-4'}`}>
+    <div className={`flex justify-between items-start ${typeof bannerImage === 'string' ? 'pt-28' : 'pt-2'}`}>
       <div className="px-2">
         <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
         <h1 className="text-2xl font-black text-gray-900 drop-shadow-sm">{title}</h1>
@@ -9883,8 +9883,30 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} />
 
-      <div className="px-1 mb-6">
-        <p className="text-sm text-gray-500 leading-relaxed">Pareceres, adaptações, rubricas e comunicação com as famílias. O trabalho invisível do professor, resolvido em minutos.</p>
+      {/* Banner de stats */}
+      <div className="bg-gradient-to-br from-violet-600 to-indigo-600 rounded-[1.5rem] p-5 mb-6 text-white">
+        <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-3">Resumo do Kit</p>
+        <div className="flex gap-4 items-center">
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{FERRAMENTAS_META.length}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Ferramentas</span>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{profile.generationsUsed ?? 0}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Gerações usadas</span>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{profile.isPro ? '∞' : Math.max(0, 10 - (profile.generationsUsed ?? 0))}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Restantes</span>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{schedules.length}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Turmas</span>
+          </div>
+        </div>
       </div>
 
       {/* Diário de Classe — destaque */}
@@ -11642,6 +11664,32 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} />
+
+      {/* Banner de stats */}
+      <div className="bg-gradient-to-br from-cyan-600 to-blue-600 rounded-[1.5rem] p-5 mb-4 text-white">
+        <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-3">Resumo da Biblioteca</p>
+        <div className="flex gap-4 items-center">
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{items.length}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Materiais</span>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{todayStats.count}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Downloads hoje</span>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{Math.max(0, DOWNLOAD_LIMIT_PER_DAY - todayStats.count)}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Restantes</span>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-3xl font-black">{fmtBytes(todayStats.bytes)}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Volume usado</span>
+          </div>
+        </div>
+      </div>
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
