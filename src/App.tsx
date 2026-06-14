@@ -11619,7 +11619,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerPlaceholder="Ilustração 2" />
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/d0my4Y3R/Design-sem-nome-20260614-135925-0000.png" />
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
