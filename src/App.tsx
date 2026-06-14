@@ -10620,36 +10620,67 @@ const GamificacaoScreen = ({
 
   const awardingStudent = currentCls.students.find(s => s.id === awardingStudentId) ?? null;
 
+  const bannerColor = selectedSchedule?.color || '#4F46E5';
+  const totalXp = currentCls.students.reduce((sum, s) => sum + (s.totalXp ?? s.xp ?? 0), 0);
+  const topStudent = [...currentCls.students].sort((a, b) => (b.totalXp ?? b.xp ?? 0) - (a.totalXp ?? a.xp ?? 0))[0];
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-44">
-      {/* Header */}
-      <div className="pt-2 pb-4">
-        <div className="flex items-center justify-between">
+      {/* Banner de identificação da turma */}
+      <div className="rounded-[2rem] p-5 mb-4 text-white relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${bannerColor}ee, ${bannerColor}99)` }}>
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-xl font-black text-gray-900">🦉 Turma Gamificada</h1>
-            <p className="text-[11px] text-indigo-500 font-bold uppercase tracking-widest">Temporada {currentCls.season}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">Turma Gamificada</p>
+            <h1 className="text-2xl font-black leading-tight">{selectedSchedule?.name ?? '—'}</h1>
+            <p className="text-[11px] font-semibold opacity-70 mt-0.5">{selectedSchedule?.subject ?? ''} · Temporada {currentCls.season}</p>
           </div>
           <button
             onClick={() => updateCls(c => ({ ...c, soundOn: c.soundOn === false ? true : false }))}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${currentCls.soundOn !== false ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-400'}`}
+            className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center"
           >
             <Volume2 size={16} />
           </button>
         </div>
-        {schedules.length > 1 && (
-          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-            {schedules.map(s => (
-              <button
-                key={s.id}
-                onClick={() => { setSelectedClassId(s.id); setTab('alunos'); }}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${selectedClassId === s.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}
-              >
-                {s.name}
-              </button>
-            ))}
+        <div className="flex gap-4">
+          <div className="flex flex-col">
+            <span className="text-2xl font-black">{currentCls.students.length}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">Alunos</span>
           </div>
-        )}
+          <div className="w-px bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-2xl font-black">{totalXp.toLocaleString('pt-BR')}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">XP Total</span>
+          </div>
+          <div className="w-px bg-white/20" />
+          <div className="flex flex-col">
+            <span className="text-2xl font-black">{currentCls.students.length > 0 ? Math.round(totalXp / currentCls.students.length) : 0}</span>
+            <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide">XP Médio</span>
+          </div>
+          {topStudent && (
+            <>
+              <div className="w-px bg-white/20" />
+              <div className="flex flex-col min-w-0">
+                <span className="text-2xl font-black">🏆</span>
+                <span className="text-[10px] opacity-70 font-semibold uppercase tracking-wide truncate">{topStudent.name.split(' ')[0]}</span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
+      {/* Seletor de turma */}
+      {schedules.length > 1 && (
+        <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
+          {schedules.map(s => (
+            <button
+              key={s.id}
+              onClick={() => { setSelectedClassId(s.id); setTab('alunos'); }}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${selectedClassId === s.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-2 mb-4">
