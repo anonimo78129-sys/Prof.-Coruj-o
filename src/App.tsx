@@ -5511,9 +5511,11 @@ const parseCalendarEvents = (text: string, year: number): ImportedEvent[] => {
     .filter(Boolean) as ImportedEvent[];
 };
 
-const extractAcademicCalendar = async (file: File, year: number): Promise<ImportedEvent[]> => {
-  const base64 = await fileToBase64(file);
-  const mimeType = guessMimeType(file);
+const extractAcademicCalendar = async (source: File | string, year: number): Promise<ImportedEvent[]> => {
+  // Aceita arquivo (PDF/imagem) ou texto colado pelo usuário
+  const docPart = typeof source === 'string'
+    ? { text: `TEXTO DO DOCUMENTO:\n\n${source}` }
+    : { inlineData: { data: await fileToBase64(source), mimeType: guessMimeType(source) } };
   const basePrompt = `Este documento é um calendário escolar/letivo brasileiro referente ao ano ${year}. Ele pode estar em vários formatos: texto corrido, tabela, grade mensal (calendário visual onde os dias são numerados em quadrados e os eventos são marcados por cores, círculos ou legendas), documento escaneado ou foto. Leia com atenção, incluindo legendas de cores e rodapés.
 
 Extraia TODOS os eventos com data: feriados, recessos, férias, início e fim de bimestres/trimestres/semestres, reuniões pedagógicas, conselhos de classe, entrega de notas, formação de professores (HTPC), sábados letivos, datas comemorativas e eventos escolares.
@@ -5525,7 +5527,7 @@ Se um evento durar vários dias (ex: "12 a 16/05"), registre apenas o dia de in�
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: basePrompt }
     ]}],
     config: { responseMimeType: 'application/json', responseSchema: CALENDAR_EXTRACT_SCHEMA },
@@ -5538,7 +5540,7 @@ Se um evento durar vários dias (ex: "12 a 16/05"), registre apenas o dia de in�
   const retryResponse = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é um calendário escolar brasileiro de ${year}), incluindo tabelas, grades mensais, legendas de cores e anotações. Depois, liste cada evento datado que encontrar.
 
 Responda APENAS com JSON válido no formato:
@@ -5618,13 +5620,15 @@ const parseSyllabusModules = (text: string): ImportedModule[] => {
     .filter((m: ImportedModule) => m.estimatedClasses > 0);
 };
 
-const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
-  const base64 = await fileToBase64(file);
-  const mimeType = guessMimeType(file);
+const extractSyllabus = async (source: File | string): Promise<ImportedModule[]> => {
+  // Aceita arquivo (PDF/imagem) ou texto colado pelo usuário
+  const docPart = typeof source === 'string'
+    ? { text: `TEXTO DO DOCUMENTO:\n\n${source}` }
+    : { inlineData: { data: await fileToBase64(source), mimeType: guessMimeType(source) } };
   const response = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: SYLLABUS_PROMPT }
     ]}],
     config: { responseMimeType: 'application/json', responseSchema: SYLLABUS_EXTRACT_SCHEMA },
@@ -5636,7 +5640,7 @@ const extractSyllabus = async (file: File): Promise<ImportedModule[]> => {
   const retryResponse = await generateContentWithRetry({
     model: AI_MODEL,
     contents: [{ role: 'user', parts: [
-      { inlineData: { data: base64, mimeType } },
+      docPart,
       { text: `Primeiro, transcreva mentalmente TODO o conteúdo legível deste documento (é uma ementa ou plano de curso escolar brasileiro), incluindo todas as linhas de todas as tabelas. Depois, identifique os módulos e TODAS as aulas de cada módulo. Cada linha de conteúdo com carga horária é uma aula; linhas de Atividade, Revisão e Prova também são aulas.
 
 Responda APENAS com JSON válido no formato:
@@ -5743,35 +5747,50 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
   setCustomEvents: (c: any[]) => void;
   onAddClassItems: (items: ClassItem[]) => void;
 }) => {
-  const [phase, setPhase] = useState<'upload' | 'loading' | 'review' | 'error'>('upload');
+  const [phase, setPhase] = useState<'upload' | 'paste' | 'loading' | 'review' | 'error'>('upload');
   const [errorMsg, setErrorMsg] = useState('');
   const [events, setEvents] = useState<ImportedEvent[]>([]);
   const [rows, setRows] = useState<SyllabusRow[]>([]);
+  const [pasteText, setPasteText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const todayISO = toISODate(new Date());
+
+  const runExtraction = async (source: File | string) => {
+    setErrorMsg(''); setPhase('loading');
+    try {
+      if (mode === 'calendar') {
+        const ev = await extractAcademicCalendar(source, year);
+        if (!ev.length) { setErrorMsg('Não encontrei eventos com data, mesmo tentando duas vezes. Você pode colar o texto do documento ou criar os eventos manualmente.'); setPhase('error'); return; }
+        setEvents(ev.sort((a, b) => a.date.localeCompare(b.date)));
+        setPhase('review');
+      } else {
+        const mods = await extractSyllabus(source);
+        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Você pode colar o texto do documento ou criar as aulas manualmente.'); setPhase('error'); return; }
+        setRows(computeSequentialStarts(mods, todayISO, targetClass, buildHolidayISOs(customEvents)));
+        setPhase('review');
+      }
+    } catch (err) {
+      setErrorMsg(formatApiError(err, 'Não consegui processar. Tente novamente.'));
+      setPhase('error');
+    }
+  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (fileRef.current) fileRef.current.value = '';
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { setErrorMsg('Arquivo muito grande. O limite é 10 MB.'); setPhase('error'); return; }
-    setErrorMsg(''); setPhase('loading');
-    try {
-      if (mode === 'calendar') {
-        const ev = await extractAcademicCalendar(file, year);
-        if (!ev.length) { setErrorMsg('Não encontrei eventos com data neste arquivo, mesmo tentando duas vezes. Se for um documento escaneado, tente uma foto mais nítida ou um PDF com texto selecionável.'); setPhase('error'); return; }
-        setEvents(ev.sort((a, b) => a.date.localeCompare(b.date)));
-        setPhase('review');
-      } else {
-        const mods = await extractSyllabus(file);
-        if (!mods.length) { setErrorMsg('Não encontrei módulos nesta ementa, mesmo tentando duas vezes. Verifique se o arquivo contém a lista de conteúdos ou tente uma versão mais legível.'); setPhase('error'); return; }
-        setRows(computeSequentialStarts(mods, todayISO, targetClass, buildHolidayISOs(customEvents)));
-        setPhase('review');
-      }
-    } catch (err) {
-      setErrorMsg(formatApiError(err, 'Não consegui processar este arquivo. Tente novamente.'));
-      setPhase('error');
+    runExtraction(file);
+  };
+
+  // Fallback sem IA: cria uma linha inicial e vai direto para a revisão editável
+  const startManual = () => {
+    if (mode === 'calendar') {
+      setEvents([{ title: 'Novo evento', date: todayISO, type: 'admin' }]);
+    } else {
+      setRows([{ title: 'Módulo 1', topics: [], estimatedClasses: 4, startDate: todayISO }]);
     }
+    setPhase('review');
   };
 
   const confirmCalendar = () => {
@@ -5845,7 +5864,50 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                 <Upload size={18} /> Escolher arquivo (PDF, imagem)
               </button>
               <p className="text-[11px] text-gray-300 mt-3">Máximo 10 MB · PDF, JPG ou PNG</p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setPhase('paste')}
+                  className="flex-1 bg-gray-100 text-gray-700 rounded-2xl py-3 font-bold text-sm active:scale-[0.98] transition-transform"
+                >
+                  Colar texto
+                </button>
+                <button
+                  onClick={startManual}
+                  className="flex-1 bg-gray-100 text-gray-700 rounded-2xl py-3 font-bold text-sm active:scale-[0.98] transition-transform"
+                >
+                  Criar manualmente
+                </button>
+              </div>
               <input ref={fileRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFile} />
+            </div>
+          )}
+
+          {/* PASTE — texto colado pelo usuário */}
+          {phase === 'paste' && (
+            <div className="py-2">
+              <p className="text-sm text-gray-600 font-medium mb-1">
+                {mode === 'calendar' ? 'Cole o texto do calendário letivo' : 'Cole o texto da ementa'}
+              </p>
+              <p className="text-xs text-gray-400 mb-3">Copie de um documento, site, e-mail ou mensagem e cole aqui. A IA organiza tudo para você revisar.</p>
+              <textarea
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                rows={10}
+                placeholder={mode === 'calendar'
+                  ? 'Ex:\n21/04 - Tiradentes (feriado)\n01/05 - Dia do Trabalhador\n12 a 16/05 - Semana de provas...'
+                  : 'Ex:\nMódulo 1: Introdução\n- O que é informática (2h)\n- Hardware e software (2h)\nMódulo 2: Word\n- Interface e menus (2h)...'}
+                className="w-full border border-gray-200 rounded-2xl p-3 text-sm resize-none focus:outline-none focus:border-indigo-400 bg-gray-50"
+              />
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => setPhase('upload')} className="flex-1 bg-gray-100 text-gray-600 rounded-2xl py-3 font-bold text-sm">Voltar</button>
+                <button
+                  onClick={() => runExtraction(pasteText.trim())}
+                  disabled={pasteText.trim().length < 20}
+                  className="flex-[2] bg-indigo-600 text-white rounded-2xl py-3 font-bold text-sm disabled:opacity-40 flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                >
+                  <Sparkles size={15} /> Extrair com IA
+                </button>
+              </div>
             </div>
           )}
 
@@ -5866,7 +5928,11 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
               </div>
               <p className="text-sm font-bold text-gray-700 mb-1">Não deu certo</p>
               <p className="text-xs text-gray-400 mb-5 px-4">{errorMsg}</p>
-              <button onClick={() => setPhase('upload')} className="bg-gray-100 text-gray-700 rounded-2xl py-3 px-6 font-bold text-sm">Tentar outro arquivo</button>
+              <div className="flex flex-col gap-2 items-stretch px-4">
+                <button onClick={() => setPhase('upload')} className="bg-gray-100 text-gray-700 rounded-2xl py-3 px-6 font-bold text-sm">Tentar outro arquivo</button>
+                <button onClick={() => setPhase('paste')} className="bg-indigo-50 text-indigo-600 rounded-2xl py-3 px-6 font-bold text-sm">Colar texto do documento</button>
+                <button onClick={startManual} className="bg-indigo-50 text-indigo-600 rounded-2xl py-3 px-6 font-bold text-sm">Criar manualmente</button>
+              </div>
             </div>
           )}
 
@@ -5909,6 +5975,12 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                   </div>
                 );
               })}
+              <button
+                onClick={() => setEvents(prev => [...prev, { title: 'Novo evento', date: todayISO, type: 'admin' }])}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2.5"
+              >
+                <Plus size={14} /> Adicionar evento
+              </button>
             </div>
           )}
 
@@ -5954,6 +6026,12 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
                   </div>
                 </div>
               ))}
+              <button
+                onClick={() => setRows(prev => [...prev, { title: `Módulo ${prev.length + 1}`, topics: [], estimatedClasses: 4, startDate: prev[prev.length - 1]?.startDate || todayISO }])}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-xl py-2.5"
+              >
+                <Plus size={14} /> Adicionar módulo
+              </button>
             </div>
           )}
         </div>
@@ -12352,63 +12430,55 @@ const AdminScreen = () => {
 
 // ─── Admin seed data: turmas pré-definidas ───────────────────────────────────
 const INFORMATICA_LESSONS: { title: string; topic: string }[] = [
-  // Módulo 1: IPD (1 aula)
-  { title: 'IPD: O que é Informática?', topic: 'História e evolução. Componentes de um computador: Hardware e Software.' },
-  // Módulo 2: Fundamentos da Informática e SO (7 aulas)
-  { title: 'Tipos de computadores', topic: 'Desktops, Laptops, Tablets, Smartphones e seus usos.' },
-  { title: 'Componentes básicos do computador', topic: 'CPU, Monitor, Teclado, Mouse e demais periféricos.' },
-  { title: 'Sistema Operacional: funções e importância', topic: 'Área de trabalho: Ícones, barra de tarefas, menu iniciar.' },
-  { title: 'Atividade: Sistema Operacional', topic: 'Prática de navegação e uso do sistema operacional.' },
-  { title: 'Painel de controle e Explorador de arquivos', topic: 'Configurações de data, hora e idioma. Criar, copiar, mover, renomear e excluir arquivos/pastas.' },
-  { title: 'Revisão: Fundamentos da Informática', topic: 'Revisão dos tipos de computadores, SO e explorador de arquivos.' },
-  { title: 'Prova: Fundamentos da Informática', topic: 'Avaliação do Módulo 2 — Fundamentos e Sistema Operacional.' },
-  // Módulo 3: Datilografia (5 aulas)
-  { title: 'Datilografia: conhecendo o teclado', topic: 'Posicionamento correto das mãos e dedos no teclado.' },
-  { title: 'Datilografia: linha base', topic: 'Foco nas letras da linha base (ASDF JKLÇ).' },
-  { title: 'Datilografia: exercícios de reprodução', topic: 'Exercícios de reprodução e memorização de teclas.' },
-  { title: 'Datilografia: prática intensiva', topic: 'Exercícios de datilografia para prática intensiva.' },
-  { title: 'Datilografia: revisão e posicionamento', topic: 'Consolidação do posicionamento correto das mãos e dedos.' },
-  // Módulo 4: Internet (3 aulas)
-  { title: 'Internet: o que é e como funciona?', topic: 'História e evolução. Navegadores: Chrome, Firefox, Edge.' },
-  { title: 'Internet: endereços web e domínios', topic: 'URLs, domínios e como funcionam os endereços na web.' },
-  { title: 'Internet: navegação e pesquisa online', topic: 'Exercícios práticos de navegação e pesquisa de informações.' },
-  // Módulo 5: Word (8 aulas)
-  { title: 'Word: introdução', topic: 'Interface, menu e barra de ferramentas do Word.' },
-  { title: 'Word: criação e formatação de documentos', topic: 'Criar, editar e formatar documentos. Inserção de imagens, tabelas e gráficos.' },
-  { title: 'Word: atividade prática', topic: 'Exercício prático de criação e formatação de documentos.' },
-  { title: 'Word: estilos e cabeçalho', topic: 'Estilos, formatação de parágrafos e fontes. Cabeçalho e revisão ortográfica.' },
-  { title: 'Word: atividades', topic: 'Exercícios de formatação avançada no Word.' },
-  { title: 'Word: criação e formatação de tabelas', topic: 'Criar e formatar tabelas no Word.' },
-  { title: 'Word: revisão', topic: 'Revisão dos conteúdos do módulo Word.' },
-  { title: 'Word: prova', topic: 'Avaliação do módulo Word.' },
-  // Módulo 6: Excel (8 aulas)
-  { title: 'Excel: introdução', topic: 'Planilhas, células, linhas e colunas no Excel.' },
-  { title: 'Excel: inserção e formatação de dados', topic: 'Inserção e formatação de dados em planilhas.' },
-  { title: 'Excel: fórmulas básicas', topic: 'Fórmulas de Soma, Média, Máximo e Mínimo.' },
-  { title: 'Excel: funções e gráficos', topic: 'Função SE (condição), pesquisa e criação de gráficos.' },
-  { title: 'Excel: formatação condicional', topic: 'Aplicação de formatação condicional em planilhas.' },
-  { title: 'Excel: exercícios práticos', topic: 'Planilha de orçamento pessoal e controle de estoque.' },
-  { title: 'Excel: revisão', topic: 'Revisão dos conteúdos do módulo Excel.' },
-  { title: 'Excel: prova', topic: 'Avaliação do módulo Excel.' },
-  // Módulo 7: Power BI (6 aulas)
-  { title: 'Power BI: introdução', topic: 'O que é o Power BI, importância, interface e conexão a fontes de dados.' },
-  { title: 'Power BI: modelagem de dados', topic: 'Relacionamentos entre tabelas, normalização e criação de medidas.' },
-  { title: 'Power BI: gráficos e dashboards', topic: 'Tipos de gráficos, formatação de dashboards, filtros e segmentações.' },
-  { title: 'Power BI: DAX', topic: 'O que é DAX, principais funções, medidas e colunas calculadas.' },
-  { title: 'Power BI: revisão e exercícios', topic: 'Revisão dos conceitos e exercícios práticos com desafios reais.' },
-  { title: 'Power BI: prova', topic: 'Avaliação do módulo Power BI.' },
-  // Módulo 8: PowerPoint (7 aulas)
-  { title: 'PowerPoint: introdução', topic: 'Criação de apresentações e slides no PowerPoint.' },
-  { title: 'PowerPoint: inserção e design', topic: 'Inserção de texto, imagens, vídeos e áudios. Temas, cores e fontes.' },
-  { title: 'PowerPoint: transições e animações', topic: 'Aplicação de transições e animações nos slides.' },
-  { title: 'PowerPoint: apresentação de slides', topic: 'Modos de exibição e navegação durante a apresentação.' },
-  { title: 'PowerPoint: exercícios', topic: 'Criação de apresentação sobre tema livre.' },
-  { title: 'PowerPoint: revisão', topic: 'Revisão dos conteúdos do módulo PowerPoint.' },
-  { title: 'PowerPoint: prova', topic: 'Avaliação do módulo PowerPoint.' },
-  // Módulo 9: Segurança e Nuvem (3 aulas)
-  { title: 'Segurança digital: e-mail', topic: 'Criação e gerenciamento de contas de e-mail.' },
-  { title: 'Revisão geral do curso de informática', topic: 'Revisão de todos os módulos do curso.' },
-  { title: 'Prova final do curso de informática', topic: 'Avaliação final do curso profissionalizante de informática.' },
+  // Estrutura SEGUE A PLANILHA_LYELSON à risca: 38 aulas, na ordem/contagem exata da planilha.
+  // IPD(1) → Windows(7) → Digitação(4) → Word(6) → Excel(6) → PowerPoint(5) → Power BI(5) → Internet(4)
+  // O conteúdo de cada aula vem da EMENTA Informática (condensado para caber nos slots da planilha).
+  // IPD (1 aula) — índice 0
+  { title: 'IPD: Introdução ao Processamento de Dados', topic: 'O que é Informática? História e evolução. Componentes de um computador: Hardware e Software.' },
+  // Windows (7 aulas) — índices 1-7
+  { title: 'Windows: Tipos de computadores', topic: 'Tipos de computadores: Desktops, Laptops, Tablets, Smartphones.' },
+  { title: 'Windows: Componentes do computador', topic: 'Componentes básicos de um computador (CPU, Monitor, Teclado, Mouse, etc.).' },
+  { title: 'Windows: Sistema Operacional e área de trabalho', topic: 'O que é um Sistema Operacional? Funções e importância. A área de trabalho: ícones, barra de tarefas e menu iniciar.' },
+  { title: 'Windows: Atividade prática', topic: 'Atividade prática sobre o sistema operacional e a área de trabalho.' },
+  { title: 'Windows: Painel de controle e arquivos', topic: 'Painel de controle: configurações de data e hora, idioma e teclado. Explorador de arquivos: criar, copiar, mover, renomear e excluir arquivos/pastas.' },
+  { title: 'Windows: Revisão', topic: 'Revisão dos conceitos de sistema operacional, painel de controle e gerenciamento de arquivos.' },
+  { title: 'Windows: Prova', topic: 'Prova do módulo de Fundamentos da Informática e Sistema Operacional.' },
+  // Digitação (4 aulas) — índices 8-11
+  { title: 'Digitação: Conhecendo o teclado', topic: 'Conhecendo o teclado e o posicionamento correto das mãos e dedos.' },
+  { title: 'Digitação: Linha base (ASDF JKLÇ)', topic: 'Foco nas letras da linha base (ASDF JKLÇ).' },
+  { title: 'Digitação: Reprodução e memorização', topic: 'Exercícios de reprodução e memorização.' },
+  { title: 'Digitação: Prática intensiva', topic: 'Exercícios de datilografia para prática intensiva. Posicionamento correto das mãos e dedos no teclado.' },
+  // Word (6 aulas) — índices 12-17 (Turma 5 começa aqui)
+  { title: 'Word: Introdução e interface', topic: 'Introdução ao Word: interface, menu e barra de ferramentas.' },
+  { title: 'Word: Criação e formatação de documentos', topic: 'Criação, edição e formatação de documentos. Inserção de imagens, tabelas e gráficos. Atividade prática.' },
+  { title: 'Word: Estilos e revisão de texto', topic: 'Estilos, formatação de parágrafos e fontes. Cabeçalho, revisão ortográfica e gramatical.' },
+  { title: 'Word: Tabelas', topic: 'Criação e formatação de tabelas. Atividades práticas.' },
+  { title: 'Word: Revisão', topic: 'Revisão dos conceitos do módulo Word.' },
+  { title: 'Word: Prova', topic: 'Prova do módulo Word.' },
+  // Excel (6 aulas) — índices 18-23 (Turma 3 começa na 2ª aula, índice 19)
+  { title: 'Excel: Introdução a planilhas', topic: 'Introdução ao Excel: planilhas, células, linhas e colunas.' },
+  { title: 'Excel: Inserção e formatação de dados', topic: 'Inserção e formatação de dados.' },
+  { title: 'Excel: Fórmulas básicas', topic: 'Fórmulas básicas: soma, média, máximo e mínimo.' },
+  { title: 'Excel: Funções, gráficos e formatação condicional', topic: 'Funções: condição (SE) e pesquisa. Criação de gráficos. Formatação condicional.' },
+  { title: 'Excel: Exercícios práticos e revisão', topic: 'Exercícios: planilha de orçamento pessoal e controle de estoque, praticando a digitação de números e símbolos. Revisão.' },
+  { title: 'Excel: Prova', topic: 'Prova do módulo Excel.' },
+  // PowerPoint (5 aulas) — índices 24-28
+  { title: 'PowerPoint: Introdução e slides', topic: 'Introdução ao PowerPoint: criação de apresentações e slides.' },
+  { title: 'PowerPoint: Texto, mídia e design', topic: 'Inserção de texto, imagens, vídeos e áudios. Design de slides: temas, cores e fontes.' },
+  { title: 'PowerPoint: Transições e animações', topic: 'Transições e animações.' },
+  { title: 'PowerPoint: Apresentação e exercícios', topic: 'Apresentação de slides: modos de exibição e navegação. Exercício: criação de apresentação sobre tema livre e apresentação em sala.' },
+  { title: 'PowerPoint: Revisão e prova', topic: 'Revisão dos conceitos e prova do módulo PowerPoint.' },
+  // Power BI (5 aulas) — índices 29-33
+  { title: 'Power BI: Introdução', topic: 'O que é o Power BI, importância e aplicações no mercado. Visão geral da interface e principais ferramentas, conectando-se a fontes de dados.' },
+  { title: 'Power BI: Modelagem de dados', topic: 'Conceito de modelagem de dados, relacionamentos entre tabelas, normalização e boas práticas. Criação de colunas e medidas.' },
+  { title: 'Power BI: Gráficos e dashboards', topic: 'Tipos de gráficos e quando usá-los. Formatação e personalização de dashboards, uso de filtros e segmentações, criando painéis interativos.' },
+  { title: 'Power BI: DAX', topic: 'O que é DAX e para que serve. Principais funções do DAX, criando medidas e colunas calculadas, aplicação de cálculos básicos.' },
+  { title: 'Power BI: Revisão e prova', topic: 'Revisão dos conceitos abordados, exercícios práticos com desafios reais e prova do módulo Power BI.' },
+  // Internet (4 aulas) — índices 34-37
+  { title: 'Internet: Introdução e navegadores', topic: 'O que é a Internet? História e evolução. Navegadores: Chrome, Firefox, Edge, etc.' },
+  { title: 'Internet: Endereços web e domínios', topic: 'Endereços web (URLs) e domínios.' },
+  { title: 'Internet: Navegação e pesquisa', topic: 'Exercícios: navegação na Internet, pesquisa de informações online e prática de digitação de URLs e termos de pesquisa.' },
+  { title: 'Internet: E-mail e revisão final', topic: 'Criação e gerenciamento de contas de e-mail. Revisão geral e prova final do curso.' },
 ];
 
 const JOGOS_LESSONS: { title: string; topic: string }[] = [
@@ -13409,28 +13479,39 @@ function AppInner() {
 
   const seedAdminData = () => {
     const holidayISOs = buildHolidayISOs(customEvents as any);
-    const t1Id = 'seed-t1'; const t2Id = 'seed-t2'; const t3Id = 'seed-t3';
-    const t4Id = 'seed-t4'; const t5Id = 'seed-t5';
-    const existingNames = new Set(schedules.map(s => s.name));
-    const newSchedules: ClassSchedule[] = [];
-    if (!existingNames.has('Turma 1')) newSchedules.push({ id: t1Id, name: 'Turma 1', days: [6], subject: 'Informática', time: '08:00', color: '#4F46E5' });
-    if (!existingNames.has('Turma 2')) newSchedules.push({ id: t2Id, name: 'Turma 2', days: [6], subject: 'Informática', time: '10:00', color: '#7C3AED' });
-    if (!existingNames.has('Turma 3')) newSchedules.push({ id: t3Id, name: 'Turma 3', days: [2], subject: 'Informática', time: '08:00', color: '#0891B2' });
-    if (!existingNames.has('Turma 4')) newSchedules.push({ id: t4Id, name: 'Turma 4', days: [2], subject: 'Criação de Jogos', time: '10:00', color: '#D97706' });
-    if (!existingNames.has('Turma 5')) newSchedules.push({ id: t5Id, name: 'Turma 5', days: [2], subject: 'Informática', time: '14:00', color: '#059669' });
-    const existingItemIds = new Set(classes.map(c => c.id));
+    // Todas as turmas aos sábados, em horários sequenciais de 2h
+    const turmaDefs: { id: string; name: string; subject: string; time: string; color: string }[] = [
+      { id: 'seed-t1', name: 'Turma 1', subject: 'Informática',      time: '07:00', color: '#4F46E5' },
+      { id: 'seed-t2', name: 'Turma 2', subject: 'Informática',      time: '09:00', color: '#7C3AED' },
+      { id: 'seed-t3', name: 'Turma 3', subject: 'Informática',      time: '11:00', color: '#0891B2' },
+      { id: 'seed-t4', name: 'Turma 4', subject: 'Criação de Jogos', time: '13:00', color: '#D97706' },
+      { id: 'seed-t5', name: 'Turma 5', subject: 'Informática',      time: '15:00', color: '#059669' },
+    ];
+    // Upsert: cria a turma se não existir, ou corrige dias/horário se já existir
+    const updatedSchedules = [...schedules];
+    for (const def of turmaDefs) {
+      const idx = updatedSchedules.findIndex(s => s.name === def.name);
+      if (idx >= 0) {
+        updatedSchedules[idx] = { ...updatedSchedules[idx], days: [6], subject: def.subject, time: def.time, color: def.color };
+      } else {
+        updatedSchedules.push({ id: def.id, name: def.name, days: [6], subject: def.subject, time: def.time, color: def.color });
+      }
+    }
+    // Regenera as aulas seed do zero (remove as antigas para corrigir dias errados)
+    const keptClasses = classes.filter(c => !c.id.startsWith('seed-t'));
     const allItems: ClassItem[] = [
       ...generateTurmaItems('seed-t1', 'Turma 1', [6], '2026-06-13', INFORMATICA_LESSONS, holidayISOs),
       ...generateTurmaItems('seed-t2', 'Turma 2', [6], '2026-04-18', INFORMATICA_LESSONS, holidayISOs),
-      ...generateTurmaItems('seed-t3', 'Turma 3', [2], '2026-04-14', INFORMATICA_LESSONS.slice(25), holidayISOs),
-      ...generateTurmaItems('seed-t4', 'Turma 4', [2], '2026-04-14', JOGOS_LESSONS, holidayISOs),
-      ...generateTurmaItems('seed-t5', 'Turma 5', [2], '2026-04-14', INFORMATICA_LESSONS.slice(16), holidayISOs),
-    ].filter(item => !existingItemIds.has(item.id));
-    if (newSchedules.length) setSchedules([...schedules, ...newSchedules]);
-    if (allItems.length) setClasses([...classes, ...allItems]);
-    const total = allItems.length;
+      // Turma 3: 2ª aula de Excel em diante (Excel começa no índice 18; 2ª aula = índice 19)
+      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-03-14', INFORMATICA_LESSONS.slice(19), holidayISOs),
+      ...generateTurmaItems('seed-t4', 'Turma 4', [6], '2026-03-14', JOGOS_LESSONS, holidayISOs),
+      // Turma 5: 1ª aula de Word em diante (Word começa no índice 12)
+      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-03-14', INFORMATICA_LESSONS.slice(12), holidayISOs),
+    ];
+    setSchedules(updatedSchedules);
+    setClasses([...keptClasses, ...allItems]);
     const done = allItems.filter(i => i.status === 'done').length;
-    toast.success(`${newSchedules.length} turmas e ${total} aulas importadas (${done} já realizadas)!`);
+    toast.success(`5 turmas e ${allItems.length} aulas importadas (${done} já realizadas)!`);
   };
 
   const generatePlan = async (optTopic?: string, optClassId?: string) => {
