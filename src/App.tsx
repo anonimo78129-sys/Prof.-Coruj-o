@@ -632,7 +632,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
   );
 };
 
-const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, setScreen, rightAction }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; setScreen?: (s: Screen) => void; rightAction?: React.ReactNode }) => {
+const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, bannerPlaceholder, setScreen, rightAction }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; bannerPlaceholder?: string; setScreen?: (s: Screen) => void; rightAction?: React.ReactNode }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(
     'Notification' in window ? Notification.permission : 'denied'
@@ -655,13 +655,17 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
 
   return (
   <div className="mb-3 relative z-50">
-    {typeof bannerImage === 'string' && (
+    {typeof bannerImage === 'string' ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
         <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
       </div>
-    )}
+    ) : bannerPlaceholder ? (
+      <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] border-b-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
+        <span className="text-gray-300 text-sm font-bold tracking-widest uppercase">{bannerPlaceholder}</span>
+      </div>
+    ) : null}
 
-    <div className={`flex justify-between items-start ${typeof bannerImage === 'string' ? 'pt-28' : 'pt-2'}`}>
+    <div className={`flex justify-between items-start ${typeof bannerImage === 'string' || bannerPlaceholder ? 'pt-28' : 'pt-2'}`}>
       <div className="px-2">
         <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
         <h1 className="text-2xl font-black text-gray-900 drop-shadow-sm">{title}</h1>
@@ -9881,12 +9885,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} />
-
-      {/* Placeholder: substituir por ilustração real */}
-      <div className="h-36 rounded-[1.5rem] border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center mb-6">
-        <span className="text-gray-300 text-sm font-bold tracking-widest uppercase">Ilustração 1</span>
-      </div>
+      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerPlaceholder="Ilustração 1" />
 
       {/* Diário de Classe — destaque */}
       <button
@@ -10627,12 +10626,13 @@ const GamificacaoScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-44">
-      {/* Placeholder: substituir por ilustração real */}
-      <div className="h-36 rounded-[2rem] border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center mb-4">
-        <span className="text-gray-300 text-sm font-bold tracking-widest uppercase">Ilustração 3</span>
-      </div>
-      {/* Título e controles da turma */}
-      <div className="flex items-center justify-between mb-3">
+      {/* Placeholder no topo (mesmo padrão do Header bannerPlaceholder) */}
+      <div className="mb-3 relative z-50">
+        <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] border-b-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
+          <span className="text-gray-300 text-sm font-bold tracking-widest uppercase">Ilustração 3</span>
+        </div>
+        {/* Título e controles da turma */}
+        <div className="flex items-center justify-between pt-28 mb-1">
         <div>
           <h1 className="text-xl font-black text-gray-900">{selectedSchedule?.name ?? 'Turma Gamificada'}</h1>
           <p className="text-[11px] text-indigo-500 font-bold uppercase tracking-widest">{selectedSchedule?.subject ?? ''} · Temporada {currentCls.season}</p>
@@ -10644,6 +10644,7 @@ const GamificacaoScreen = ({
           <Volume2 size={16} />
         </button>
       </div>
+      </div>{/* fecha .mb-3.relative */}
       {/* Seletor de turma */}
       {schedules.length > 1 && (
         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
@@ -11618,12 +11619,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} />
-
-      {/* Placeholder: substituir por ilustração real */}
-      <div className="h-36 rounded-[1.5rem] border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center mb-4">
-        <span className="text-gray-300 text-sm font-bold tracking-widest uppercase">Ilustração 2</span>
-      </div>
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerPlaceholder="Ilustração 2" />
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
