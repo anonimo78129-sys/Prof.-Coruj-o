@@ -893,7 +893,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
     { title: 'Kit IA', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => openFerramenta?.(null) },
     { title: 'Diário', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openFerramenta?.('diario') },
-    { title: 'Biblioteca', icon: FolderOpen, action: () => setScreen('biblioteca') },
+    { title: 'Biblioteca', illustration: 'https://i.ibb.co/GQMXCYWq/Sem-nome-1300-x-1300-px-20260615-160107-0000.png', action: () => setScreen('biblioteca') },
   ];
 
   const currentHour = new Date().getHours();
