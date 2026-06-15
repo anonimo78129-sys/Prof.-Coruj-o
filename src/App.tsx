@@ -891,8 +891,8 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
     { title: 'Estúdio', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
-    { title: 'Kit IA', icon: Wand2, action: () => openFerramenta?.(null) },
-    { title: 'Diário', icon: NotebookPen, action: () => openFerramenta?.('diario') },
+    { title: 'Kit IA', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => openFerramenta?.(null) },
+    { title: 'Diário', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openFerramenta?.('diario') },
     { title: 'Biblioteca', icon: FolderOpen, action: () => setScreen('biblioteca') },
   ];
 
