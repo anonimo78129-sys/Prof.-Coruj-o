@@ -10628,8 +10628,8 @@ const GamificacaoScreen = ({
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-44">
       {/* Placeholder no topo (mesmo padrão do Header bannerPlaceholder) */}
       <div className="mb-3 relative z-50">
-        <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] border-b-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
-          <span className="text-gray-300 text-sm font-bold tracking-widest uppercase">Ilustração 3</span>
+        <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] overflow-hidden">
+          <img src="https://i.ibb.co/tTT0VWnH/Design-sem-nome-20260616-142319-0000.png" alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
         </div>
         {/* Título e controles da turma */}
         <div className="flex items-center justify-between pt-28 mb-1">
