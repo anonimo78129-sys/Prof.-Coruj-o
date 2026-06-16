@@ -1025,7 +1025,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
 
           if (upcoming.length === 0) return (
             <div className="flex flex-col items-center justify-center py-8 text-center bg-gray-50/50 rounded-3xl border border-gray-100 border-dashed">
-              <img src="https://i.ibb.co/vCWk2Fry/6-20260419-213906-0001.png" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" />
+              <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" />
               <h3 className="text-gray-600 font-bold mb-1">Sem aulas próximas</h3>
               <p className="text-gray-400 text-sm max-w-[200px]">Adicione aulas no cronograma para ver aqui.</p>
             </div>
@@ -5384,7 +5384,7 @@ const DayDetailScreen = ({
           </Reorder.Group>
         ) : (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-            <img src="https://i.ibb.co/vCWk2Fry/6-20260419-213906-0001.png" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" />
+            <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" />
             <h3 className="text-lg font-bold text-gray-900 mb-2">Dia Livre</h3>
             <p className="text-gray-500 text-sm max-w-[200px]">Nenhum evento programado para este dia.</p>
           </div>
@@ -10604,7 +10604,7 @@ const GamificacaoScreen = ({
   if (schedules.length === 0) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center min-h-[70vh] gap-6 px-6 text-center">
-        <span className="text-6xl">🦉</span>
+        <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain" referrerPolicy="no-referrer" />
         <div>
           <h2 className="text-xl font-black text-gray-900 mb-2">Nenhuma turma cadastrada</h2>
           <p className="text-gray-500 text-sm">Cadastre suas turmas na Agenda para ativar a gamificação.</p>
@@ -10704,7 +10704,7 @@ const GamificacaoScreen = ({
           <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {currentCls.students.length === 0 ? (
               <div className="text-center py-16">
-                <span className="text-5xl">🦉</span>
+                <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" />
                 <p className="text-gray-500 mt-3 text-sm font-bold">Nenhum aluno ainda</p>
                 <p className="text-gray-400 text-xs mt-1">Adicione alunos em ⚙️ Config → Alunos</p>
                 <button onClick={() => { setTab('config'); setConfigSection('students'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">
