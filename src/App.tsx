@@ -9885,7 +9885,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerPlaceholder="Ilustração 1" />
+      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/fz8jPCN3/Design-sem-nome-20260616-144136-0000.png" />
 
       {/* Diário de Classe — destaque */}
       <button
