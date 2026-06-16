@@ -312,7 +312,7 @@ class ErrorBoundary extends React.Component<
         <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🦉</span>
+              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
             <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem. Só recarregue a página.</p>
@@ -9552,7 +9552,7 @@ const GamiProjetor = ({ cls, schedule, onClose }: { cls: ClassGamification; sche
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] bg-gradient-to-br from-indigo-700 via-indigo-600 to-purple-700 flex flex-col overflow-y-auto">
       <div className="flex items-center justify-between px-6 pt-6">
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🦉</span>
+          <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
           <div>
             <h2 className="text-white font-black text-xl leading-tight">{schedule?.name || 'Turma'}</h2>
             <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Temporada {cls.season}</p>
@@ -10268,7 +10268,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
         ) : students.length === 0 ? (
           <div className="py-6 space-y-4">
             <div className="text-center">
-              <span className="text-5xl">🦉</span>
+              <img src="https://i.ibb.co/Y7df80LZ/1781545849687.png" alt="Corujão" className="w-24 h-auto object-contain mx-auto" referrerPolicy="no-referrer" />
               <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
               <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo, um nome por linha. Funciona nas duas telas.</p>
             </div>
@@ -13899,7 +13899,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               <>
                 <div className="flex flex-col items-center text-center mb-6">
                   <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
-                    <span className="text-3xl">🦉</span>
+                    <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                   </div>
                   <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
                   <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em poucos passos.</p>
