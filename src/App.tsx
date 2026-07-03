@@ -3518,7 +3518,7 @@ const PlannerScreen = ({
       </div>
 
       {showSchedulePrompt && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-gray-900/40 backdrop-blur-sm p-4 h-[100dvh]">
+        <div className="fixed inset-0 z-[70] flex flex-col justify-end bg-gray-900/40 backdrop-blur-sm p-4 h-[100dvh]">
           <motion.div 
             initial={{ y: 200, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -4650,7 +4650,7 @@ const ProfileScreen = ({
 
         {/* ── Modal Adicionar / Editar Turma ── */}
         {editingClass !== null && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setEditingClass(null); }}>
+          <div className="fixed inset-0 bg-black/60 z-[70] flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setEditingClass(null); }}>
             <motion.div
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
@@ -4943,7 +4943,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-6"
             onClick={() => setShowFeedbackModal(false)}
           >
             <motion.div 
@@ -5017,7 +5017,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-6"
             onClick={() => setShowLogoutConfirm(false)}
           >
             <motion.div 
@@ -5059,7 +5059,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-[70] flex items-center justify-center p-6"
             onClick={() => setShowResetConfirm(false)}
           >
             <motion.div
@@ -5110,7 +5110,7 @@ const ProfileScreen = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-[70] flex items-center justify-center p-6"
             onClick={() => setShowDeleteConfirm(false)}
           >
             <motion.div
@@ -6300,7 +6300,7 @@ const CalendarScreen = ({
       </Header>
       
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-6" onClick={() => setIsModalOpen(false)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-1">Novo Evento</h2>
             <p className="text-sm text-gray-400 mb-4">{selectedDate} de {monthAbbrNames[currentMonth]}</p>
@@ -13855,7 +13855,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6"
+            className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6"
             onClick={dismissAnnouncement}
           >
             <motion.div
@@ -14065,7 +14065,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
       </AnimatePresence>
 
       {(profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com' || user?.email?.toLowerCase() === 'slilica69@gmail.com') && (
-        <div className="fixed bottom-24 right-4 z-[115]">
+        <div className="fixed bottom-24 right-4 z-[55]">
           <button
             onClick={seedAdminData}
             className="bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
