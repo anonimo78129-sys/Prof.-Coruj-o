@@ -9670,7 +9670,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     </div>
   );
 
-  return (
+  if (phase === 'setup' || phase === 'loading') return (
     <GamiToolShell title="Batalha de Revisão" subtitle="Arena do conhecimento" icon={Swords} theme="crimson" onClose={onClose}>
       {phase === 'setup' && (
         <div className="space-y-4">
@@ -9730,32 +9730,46 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           <p className="text-sm font-bold text-white/60">Preparando as perguntas da batalha…</p>
         </div>
       )}
-      {inBattle && (
-        <div className="flex-1 flex flex-col max-w-lg w-full mx-auto">
-          <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 56px 56px; } }`}</style>
-          {/* ── Arena ── */}
-          <div className="relative h-[270px] sm:h-[310px] rounded-3xl overflow-hidden border border-white/10 shadow-2xl shrink-0" style={{ background: 'linear-gradient(160deg, #2d1420 0%, #1a0c14 55%, #0d060b 100%)' }}>
-            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 14px, transparent 14px 28px)', animation: 'gami-battle-stripes 1.8s linear infinite' }} />
-            {HpBox({ side: 1, corner: 'top-3 left-3' })}
-            {HpBox({ side: 0, corner: 'bottom-3 right-3' })}
-            {/* lutadores */}
+    </GamiToolShell>
+  );
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-mono">
+      <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 72px 72px; } }`}</style>
+      {/* ── Arena (tela cheia, clara) ── */}
+      <div className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #8edcd4 0%, #93dcb4 20%, #7fd08a 40%, #a2da75 62%, #bce27f 82%, #9dd46e 100%)' }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.16) 0 18px, transparent 18px 36px)', animation: 'gami-battle-stripes 2.6s linear infinite' }} />
+            <button onClick={onClose} className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-[#1e3a2a]/85 text-emerald-100 border-2 border-emerald-100/30 rounded-lg px-3 py-1.5 text-[11px] font-black tracking-widest active:scale-95 transition-transform">
+              <X size={13} /> SAIR
+            </button>
+            {HpBox({ side: 1, corner: 'top-4 left-4' })}
+            {HpBox({ side: 0, corner: 'bottom-4 right-4' })}
+            {/* lutadores em ilhas flutuantes */}
             {([1, 0] as const).map(side => (
               <div key={side} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${ANCHORS[side].x}%`, top: `${ANCHORS[side].y}%` }}>
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-[-14px] w-24 h-5 rounded-[50%] bg-black/45 blur-[3px]" />
                 <motion.div
-                  initial={{ x: side === 0 ? -120 : 120, opacity: 0 }}
+                  initial={{ x: side === 0 ? -140 : 140, opacity: 0 }}
                   animate={poseAnim(poses[side], side)}
-                  className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
-                  style={{
-                    background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}dd, ${fighters[side].color}55 62%, transparent 78%)`,
-                    boxShadow: `0 0 34px 4px ${fighters[side].color}${hp[side] <= TEAM_MAX / 2 ? '99' : '44'}`,
-                  }}
+                  className="relative flex flex-col items-center"
                 >
-                  <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]">{fighters[side].emoji}</span>
-                  {phase !== 'intro' && turn === side && winner === null && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-widest text-white bg-black/50 border border-white/20 px-2 py-0.5 rounded-full whitespace-nowrap">Sua vez</span>
-                  )}
+                  <div
+                    className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
+                    style={{
+                      background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}e8, ${fighters[side].color}55 62%, transparent 78%)`,
+                      filter: `drop-shadow(0 0 ${hp[side] <= TEAM_MAX / 2 ? 22 : 10}px ${fighters[side].color}99)`,
+                    }}
+                  >
+                    <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
+                    {phase !== 'intro' && turn === side && winner === null && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-widest text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-0.5 rounded-full whitespace-nowrap">Sua vez</span>
+                    )}
+                  </div>
+                  <div className="-mt-4">
+                    <div className="w-28 h-7 rounded-[50%] bg-gradient-to-b from-[#7ec850] to-[#57a33b] border-2 border-[#3f7c2b] shadow-md" />
+                    <div className="mx-auto -mt-2.5 w-20 h-7 rounded-b-[2.5rem] bg-gradient-to-b from-[#8a5a33] to-[#5f3d22]" />
+                  </div>
                 </motion.div>
+                <div className="mx-auto mt-2 w-24 h-4 rounded-[50%] bg-black/20 blur-[3px]" />
               </div>
             ))}
             {/* projétil */}
@@ -9797,20 +9811,57 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 </div>
               </div>
             )}
+            {/* ── Vitória ── */}
+            {phase === 'end' && winner !== null && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-5">
+                <ConfettiBurst />
+                <div className="relative bg-[#f8f0dc] border-4 border-[#5a4a3a] rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
+                  <div className="relative inline-flex mb-3">
+                    <span className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)` }}>
+                      {fighters[winner].emoji}
+                    </span>
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-white flex items-center justify-center shadow-lg">
+                      <Crown size={15} className="text-amber-900" />
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-[#3a3020]">{fighters[winner].name} venceu a batalha!</h3>
+                  <div className="space-y-1.5 mt-3">
+                    {([winner, (1 - winner) as 0 | 1]).map((i, pos) => (
+                      <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-xl border-2 ${pos === 0 ? 'bg-amber-100 border-amber-500/60' : 'bg-[#efe5cc] border-[#5a4a3a]/30'}`}>
+                        <span className="font-bold text-[#3a3020] text-xs">{pos === 0 ? '🏆' : '💔'} {fighters[i].emoji} {fighters[i].name}</span>
+                        <span className="font-black text-[#3a3020] text-xs tabular-nums">{hp[i]}/{TEAM_MAX} HP</span>
+                      </div>
+                    ))}
+                  </div>
+                  {hasRealTeams && !awarded && winnerIds.length > 0 && (
+                    <button
+                      onClick={() => { onAwardTeam(pick[winner], winnerIds, 3); setAwarded(true); }}
+                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl border-2 border-emerald-700 shadow-[0_4px_0_rgba(0,0,0,0.2)]"
+                    >⚡ Dar +3 XP à equipe vencedora</button>
+                  )}
+                  {awarded && <p className="text-emerald-700 text-sm font-bold mt-3">XP entregue! ✓</p>}
+                  <div className="flex justify-center gap-6 mt-4">
+                    <button onClick={startBattle} className="text-[#8a5a1a] font-black text-sm">⚔️ Revanche</button>
+                    <button onClick={() => setPhase('setup')} className="text-[#7a2a2a] font-black text-sm">↻ Nova batalha</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          {/* ── Caixa de diálogo ── */}
-          <div className="mt-3 bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-2xl px-4 py-3 min-h-[64px] flex items-center shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)] shrink-0">
+      {/* ── Painel inferior ── */}
+      {inBattle && (
+        <div className="bg-[#3d4a7d] border-t-4 border-[#2c3763] px-3 pt-3 pb-6 shrink-0">
+          <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-4 py-3 min-h-[62px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
             <p className="text-sm font-bold text-[#3a3020] leading-snug">
               {phase === 'intro' ? `${fighters[0].name} desafia ${fighters[1].name}! Que vença o conhecimento! ⚔️`
                 : phase === 'anim' ? msg
                 : current ? <>{current.q} <span className="block text-[10px] font-black uppercase tracking-widest text-[#8a7a5a] mt-1">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
             </p>
           </div>
-          {/* ── Alternativas 2×2 ── */}
           {current && phase !== 'intro' && (
-            <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="grid grid-cols-2 gap-2 mt-3 max-w-lg w-full mx-auto">
               {current.options.map((opt, i) => {
-                const palette = ['#dc2626', '#d97706', '#059669', '#2563eb'];
+                const palette = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
                 const locked = phase === 'anim';
                 const isCorrect = locked && i === current.correct;
                 const isWrongPick = locked && selected === i && i !== current.correct;
@@ -9820,10 +9871,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     key={i}
                     onClick={() => answer(i)}
                     disabled={locked}
-                    className={`relative rounded-2xl px-3 py-3.5 text-left transition-all active:scale-95 border-b-4 ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
-                    style={{ backgroundColor: isWrongPick ? '#7f1d1d' : palette[i], borderBottomColor: 'rgba(0,0,0,0.3)' }}
+                    className={`relative rounded-lg px-3 py-3 text-left transition-all active:translate-y-0.5 active:shadow-none border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                    style={{ backgroundColor: isWrongPick ? '#7f1d1d' : palette[i] }}
                   >
-                    <span className="text-[10px] font-black text-white/70">{['A', 'B', 'C', 'D'][i]}</span>
+                    <span className="text-[10px] font-black text-white/80">{['A', 'B', 'C', 'D'][i]}</span>
                     <p className="text-sm font-black text-white leading-tight">{opt}</p>
                     {isCorrect && <span className="absolute top-1.5 right-2 text-white font-black">✓</span>}
                     {isWrongPick && <span className="absolute top-1.5 right-2 text-white font-black">✗</span>}
@@ -9834,40 +9885,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           )}
         </div>
       )}
-      {phase === 'end' && winner !== null && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-6">
-          <ConfettiBurst />
-          <div className="relative">
-            <span className="w-24 h-24 rounded-full flex items-center justify-center text-5xl" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)`, boxShadow: `0 0 50px 8px ${fighters[winner].color}77` }}>
-              {fighters[winner].emoji}
-            </span>
-            <span className="absolute -top-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-white/70 flex items-center justify-center shadow-lg">
-              <Crown size={17} className="text-amber-900" />
-            </span>
-          </div>
-          <h3 className="text-2xl font-black text-white text-center">{fighters[winner].name} venceu a batalha!</h3>
-          <div className="w-full max-w-sm space-y-2">
-            {([winner, (1 - winner) as 0 | 1]).map((i, pos) => (
-              <div key={i} className={`flex items-center justify-between px-4 py-3 rounded-2xl border backdrop-blur ${pos === 0 ? 'bg-amber-400/15 border-amber-300/40' : 'bg-white/[0.06] border-white/10'}`}>
-                <span className="font-bold text-white/90 text-sm">{pos === 0 ? '🏆' : '💔'} {fighters[i].emoji} {fighters[i].name}</span>
-                <span className="font-black text-white tabular-nums">{hp[i]}/{TEAM_MAX} HP</span>
-              </div>
-            ))}
-          </div>
-          {hasRealTeams && !awarded && winnerIds.length > 0 && (
-            <button
-              onClick={() => { onAwardTeam(pick[winner], winnerIds, 3); setAwarded(true); }}
-              className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-emerald-950/50"
-            >⚡ Dar +3 XP à equipe vencedora</button>
-          )}
-          {awarded && <p className="text-emerald-400 text-sm font-bold">XP entregue! ✓</p>}
-          <div className="flex gap-4">
-            <button onClick={startBattle} className="text-amber-300 font-bold text-sm">⚔️ Revanche</button>
-            <button onClick={() => setPhase('setup')} className="text-rose-300 font-bold text-sm">↻ Nova batalha</button>
-          </div>
-        </div>
-      )}
-    </GamiToolShell>
+    </motion.div>
   );
 };
 
