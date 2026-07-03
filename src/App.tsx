@@ -9486,6 +9486,8 @@ const GamiParticipacao = ({ students, onToggle, onClose }: { students: GamiStude
   );
 };
 
+type GamiBattleQ = { q: string; options: string[]; correct: number };
+
 const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: {
   teams: GamiTeam[];
   students: GamiStudent[];
@@ -9494,62 +9496,186 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: 
   onClose: () => void;
   onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
 }) => {
+  const TEAM_MAX = 40, HIT = 10, WRONG_HIT = 9, FURY_BONUS = 2;
   const hasRealTeams = teams.length >= 2;
-  const battleTeams = hasRealTeams ? teams.slice(0, 4).map(t => `${t.emoji} ${t.name}`) : ['🔵 Time A', '🔴 Time B'];
-  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
+  const [pick, setPick] = useState<number[]>([0, 1]);
+  const fighters = useMemo(() => hasRealTeams
+    ? pick.map(i => ({ name: teams[i]?.name ?? '?', emoji: teams[i]?.emoji ?? '⚔️', color: teams[i]?.color ?? '#6366f1' }))
+    : [{ name: 'Time Azul', emoji: '🔵', color: '#3b82f6' }, { name: 'Time Vermelho', emoji: '🔴', color: '#ef4444' }],
+  [hasRealTeams, pick, teams]);
+
+  const [phase, setPhase] = useState<'setup' | 'loading' | 'intro' | 'question' | 'anim' | 'end'>('setup');
   const [topic, setTopic] = useState('');
   const [count, setCount] = useState(10);
   const [difficulty, setDifficulty] = useState('média');
-  const [questions, setQuestions] = useState<{ q: string; a: string }[]>([]);
-  const [idx, setIdx] = useState(0);
-  const [turn, setTurn] = useState(0);
-  const [revealed, setRevealed] = useState(false);
-  const [scores, setScores] = useState<number[]>(battleTeams.map(() => 0));
   const [error, setError] = useState('');
+  const [hp, setHp] = useState<[number, number]>([TEAM_MAX, TEAM_MAX]);
+  const [turn, setTurn] = useState<0 | 1>(0);
+  const [qNum, setQNum] = useState(0);
+  const [current, setCurrent] = useState<GamiBattleQ | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [msg, setMsg] = useState('');
+  const [winner, setWinner] = useState<0 | 1 | null>(null);
+  const [poses, setPoses] = useState<('idle' | 'attack' | 'hit' | 'faint')[]>(['idle', 'idle']);
+  const [proj, setProj] = useState<{ from: 0 | 1; key: number } | null>(null);
+  const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string } | null>(null);
+  const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string }[]>([]);
   const [awarded, setAwarded] = useState(false);
-  const colors = ['bg-indigo-600', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500'];
+
+  const questionsRef = useRef<GamiBattleQ[]>([]);
+  const bagRef = useRef<GamiBattleQ[]>([]);
+  const lastQRef = useRef('');
+  const fxKey = useRef(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const after = (ms: number, fn: () => void) => { timers.current.push(setTimeout(fn, ms)); };
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  const ANCHORS = [{ x: 24, y: 66 }, { x: 76, y: 30 }];
+
+  const shuffleQ = (raw: GamiBattleQ): GamiBattleQ => {
+    const order = raw.options.map((_, i) => i).sort(() => Math.random() - 0.5);
+    return { q: raw.q, options: order.map(i => raw.options[i]), correct: order.indexOf(raw.correct) };
+  };
+
+  const drawQuestion = () => {
+    if (bagRef.current.length === 0) {
+      bagRef.current = [...questionsRef.current].sort(() => Math.random() - 0.5);
+      if (bagRef.current.length > 1 && bagRef.current[0].q === lastQRef.current) bagRef.current.push(bagRef.current.shift()!);
+    }
+    const raw = bagRef.current.shift()!;
+    lastQRef.current = raw.q;
+    setCurrent(shuffleQ(raw));
+    setQNum(n => n + 1);
+  };
+
+  const startBattle = () => {
+    setHp([TEAM_MAX, TEAM_MAX]); setPoses(['idle', 'idle']); setWinner(null); setAwarded(false);
+    setSelected(null); setQNum(0); setTurn(0); setProj(null); setRing(null); setPops([]);
+    bagRef.current = [];
+    setPhase('intro');
+    after(2600, () => { drawQuestion(); setPhase('question'); });
+  };
 
   const generate = async () => {
-    if (!topic.trim()) { setError('Informe o tema da revisão.'); return; }
+    if (!topic.trim()) { setError('Informe o tema da batalha.'); return; }
+    if (hasRealTeams && pick.length !== 2) { setError('Escolha exatamente 2 equipes para a batalha.'); return; }
     setError(''); setPhase('loading');
     try {
-      const prompt = `Gere ${count} perguntas CURTAS de revisão oral sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade ${difficulty}.
-Cada pergunta deve ser respondível em voz alta em até 10 segundos, com resposta curta e objetiva (1 a 6 palavras).
-Varie os tipos: definição, complete a frase, verdadeiro ou falso, qual é, quem foi.
-Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}]}`;
+      const prompt = `Gere ${count} perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade ${difficulty}.
+Cada pergunta: enunciado curto (máximo 110 caracteres), 4 alternativas curtas (máximo 38 caracteres cada), apenas UMA correta.
+Varie os tipos: definição, complete a frase, verdadeiro ou falso disfarçado, qual é, quem foi.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]}
+onde "correct" é o índice (0 a 3) da alternativa correta.`;
       const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
       const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
       const parsed = JSON.parse(raw);
-      if (!parsed.questions?.length) throw new Error('sem perguntas');
-      setQuestions(parsed.questions);
-      setIdx(0); setTurn(0); setRevealed(false); setScores(battleTeams.map(() => 0));
-      setPhase('play');
+      const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
+      if (!valid.length) throw new Error('sem perguntas');
+      questionsRef.current = valid;
+      startBattle();
     } catch {
       setError('Não consegui gerar as perguntas. Tente novamente.');
       setPhase('setup');
     }
   };
 
-  const next = (hit: boolean) => {
-    if (hit) { setScores(p => p.map((s, i) => i === turn ? s + 1 : s)); playChime(true); }
-    setRevealed(false);
-    if (idx + 1 >= questions.length) { setPhase('end'); return; }
-    setIdx(idx + 1);
-    setTurn((turn + 1) % battleTeams.length);
+  const setPose = (side: 0 | 1, p: 'idle' | 'attack' | 'hit' | 'faint') =>
+    setPoses(prev => prev.map((v, i) => i === side ? p : v) as typeof poses);
+
+  const impact = (target: 0 | 1, dmg: number, color: string) => {
+    setProj(null);
+    setRing({ side: target, key: ++fxKey.current, color });
+    const id = ++fxKey.current;
+    setPops(p => [...p, { id, side: target, val: dmg, color }]);
+    after(900, () => setPops(p => p.filter(x => x.id !== id)));
+    setPose(target, 'hit');
+    setHp(h => h.map((v, i) => i === target ? Math.max(0, v - dmg) : v) as [number, number]);
   };
 
-  const maxScore = Math.max(...scores);
-  const winners = scores.map((s, i) => ({ s, i })).filter(x => x.s === maxScore);
-  const winnerNames = (ti: number) => hasRealTeams
-    ? students.filter(s => s.teamId === teams[ti]?.id).map(s => s.id)
+  const finish = (win: 0 | 1, faint: 0 | 1) => {
+    setPose(faint, 'faint');
+    setMsg(`${fighters[faint].name} não aguenta mais!`);
+    after(1100, () => { setWinner(win); setPhase('end'); playChime(true); });
+  };
+
+  const nextTurn = (prev: 0 | 1) => {
+    const nt = (1 - prev) as 0 | 1;
+    setTurn(nt);
+    setSelected(null);
+    drawQuestion();
+    setPhase('question');
+  };
+
+  const answer = (i: number) => {
+    if (phase !== 'question' || !current) return;
+    setSelected(i);
+    setPhase('anim');
+    const other = (1 - turn) as 0 | 1;
+    if (i === current.correct) {
+      playChime(true);
+      const fury = hp[turn] <= TEAM_MAX / 2;
+      const dmg = HIT + (fury ? FURY_BONUS : 0);
+      const newHp = Math.max(0, hp[other] - dmg);
+      setMsg(`Resposta certa! ${fighters[turn].name} lança um ataque${fury ? ' furioso' : ''}!`);
+      after(500, () => { setPose(turn, 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
+      after(950, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color); });
+      if (newHp <= 0) {
+        after(1500, () => finish(turn, other));
+      } else {
+        after(1500, () => setPose(other, 'idle'));
+        after(1700, () => nextTurn(turn));
+      }
+    } else {
+      playChime(false);
+      const fury = hp[other] <= TEAM_MAX / 2;
+      const dmg = WRONG_HIT + (fury ? FURY_BONUS : 0);
+      const newHp = Math.max(0, hp[turn] - dmg);
+      setMsg(`Errou! A certa era "${current.options[current.correct]}". ${fighters[other].name} contra-ataca!`);
+      after(1400, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current }); });
+      after(1850, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
+      if (newHp <= 0) {
+        after(2400, () => finish(other, turn));
+      } else {
+        after(2400, () => setPose(turn, 'idle'));
+        after(2600, () => nextTurn(turn));
+      }
+    }
+  };
+
+  const poseAnim = (p: string, side: 0 | 1): any =>
+    p === 'attack' ? { x: side === 0 ? 26 : -26, y: side === 0 ? -14 : 14, opacity: 1, rotate: 0, transition: { duration: 0.2 } }
+    : p === 'hit' ? { x: [0, -10, 10, -7, 7, 0], y: 0, opacity: 1, rotate: 0, transition: { duration: 0.5 } }
+    : p === 'faint' ? { y: 48, opacity: 0, rotate: side === 0 ? -16 : 16, transition: { duration: 0.7 } }
+    : { x: 0, y: [0, -7, 0], opacity: 1, rotate: 0, transition: { y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 0.2 } } };
+
+  const hpColor = (v: number) => v / TEAM_MAX > 0.5 ? '#4ade80' : v / TEAM_MAX > 0.25 ? '#facc15' : '#ef4444';
+  const winnerIds = winner !== null && hasRealTeams
+    ? students.filter(s => s.teamId === teams[pick[winner]]?.id).map(s => s.id)
     : [];
+  const inBattle = phase === 'intro' || phase === 'question' || phase === 'anim';
+
+  const HpBox = ({ side, corner }: { side: 0 | 1; corner: string }) => (
+    <div className={`absolute ${corner} w-[46%] bg-[#f8f0dc] rounded-xl border-2 border-[#5a4a3a] px-2.5 py-1.5 z-10 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_8px_rgba(0,0,0,0.4)]`}>
+      <div className="flex items-center justify-between gap-1">
+        <p className="font-black text-[#3a3020] text-[11px] truncate">{fighters[side].emoji} {fighters[side].name}</p>
+        {hp[side] <= TEAM_MAX / 2 && hp[side] > 0 && <span className="text-[8px] font-black text-red-600 animate-pulse shrink-0">FÚRIA</span>}
+      </div>
+      <div className="flex items-center gap-1 mt-1">
+        <span className="text-[8px] font-black text-[#c8641e] tracking-wider">HP</span>
+        <div className="flex-1 h-2 bg-[#4a3f30] rounded-full overflow-hidden border border-[#5a4a3a]">
+          <div className="h-full rounded-full" style={{ width: `${(hp[side] / TEAM_MAX) * 100}%`, backgroundColor: hpColor(hp[side]), transition: 'width 0.45s ease, background-color 0.45s ease' }} />
+        </div>
+      </div>
+      <p className="text-right text-[9px] font-black text-[#3a3020] tabular-nums mt-0.5">{hp[side]}/{TEAM_MAX}</p>
+    </div>
+  );
 
   return (
     <GamiToolShell title="Batalha de Revisão" subtitle="Arena do conhecimento" icon={Swords} theme="crimson" onClose={onClose}>
       {phase === 'setup' && (
         <div className="space-y-4">
           <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur">
-            <p className="text-sm text-white/75 leading-relaxed"><b className="text-white">Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe. O placar é automático. Kahoot sem precisar de celular dos alunos!</p>
+            <p className="text-sm text-white/75 leading-relaxed"><b className="text-white">Batalha em turnos:</b> a IA gera perguntas do seu conteúdo e cada equipe responde na sua vez. <b className="text-emerald-300">Acertou = ataque de {HIT} de dano.</b> <b className="text-red-300">Errou = contra-ataque de {WRONG_HIT}.</b> Equipe com menos da metade do HP entra em <b className="text-amber-300">Fúria (+{FURY_BONUS} de dano)</b>. Vence quem zerar o HP do rival!</p>
           </div>
           {error && <p className="text-sm text-red-300 font-medium bg-red-500/15 border border-red-400/25 rounded-xl p-3">{error}</p>}
           <div>
@@ -9558,7 +9684,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Perguntas</label>
+              <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Banco de perguntas</label>
               <div className="flex gap-1.5">
                 {[6, 10, 14].map(n => (
                   <button key={n} onClick={() => setCount(n)} className={`flex-1 py-2.5 rounded-xl font-bold text-sm border transition-colors ${count === n ? 'bg-gradient-to-br from-rose-500 to-red-600 border-rose-300/40 text-white shadow-lg shadow-rose-950/50' : 'border-white/10 text-white/50 bg-white/[0.06]'}`}>{n}</button>
@@ -9575,10 +9701,20 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}
             </div>
           </div>
           <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur">
-            <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">Equipes da batalha</p>
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">{hasRealTeams ? 'Escolha as 2 equipes da batalha' : 'Equipes da batalha'}</p>
             <div className="flex flex-wrap gap-2">
-              {battleTeams.map((t, i) => (
-                <span key={i} className={`${colors[i % colors.length]} text-white text-xs font-bold px-3 py-1.5 rounded-full`}>{t}</span>
+              {hasRealTeams ? teams.slice(0, 8).map((t, i) => {
+                const on = pick.includes(i);
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setPick(p => on ? p.filter(x => x !== i) : [...p, i].slice(-2))}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${on ? 'text-white border-white/40 shadow-lg scale-105' : 'text-white/50 border-white/10 bg-white/[0.06]'}`}
+                    style={on ? { backgroundColor: t.color } : undefined}
+                  >{t.emoji} {t.name}</button>
+                );
+              }) : fighters.map((f, i) => (
+                <span key={i} className="text-white text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: f.color }}>{f.emoji} {f.name}</span>
               ))}
             </div>
             {!hasRealTeams && <p className="text-[11px] text-white/35 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP aos vencedores.</p>}
@@ -9594,62 +9730,141 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}
           <p className="text-sm font-bold text-white/60">Preparando as perguntas da batalha…</p>
         </div>
       )}
-      {phase === 'play' && questions[idx] && (
-        <div className="flex-1 flex flex-col">
-          <div className="flex gap-2 mb-4">
-            {battleTeams.map((t, i) => (
-              <div key={i} className={`flex-1 rounded-2xl px-2 py-2.5 text-center transition-all ${i === turn ? colors[i % colors.length] + ' shadow-lg scale-[1.03]' : 'bg-white/10'}`}>
-                <p className="text-[10px] font-black text-white/90 truncate">{t}</p>
-                <p className="text-2xl font-black text-white tabular-nums">{scores[i]}</p>
+      {inBattle && (
+        <div className="flex-1 flex flex-col max-w-lg w-full mx-auto">
+          <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 56px 56px; } }`}</style>
+          {/* ── Arena ── */}
+          <div className="relative h-[270px] sm:h-[310px] rounded-3xl overflow-hidden border border-white/10 shadow-2xl shrink-0" style={{ background: 'linear-gradient(160deg, #2d1420 0%, #1a0c14 55%, #0d060b 100%)' }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 14px, transparent 14px 28px)', animation: 'gami-battle-stripes 1.8s linear infinite' }} />
+            {HpBox({ side: 1, corner: 'top-3 left-3' })}
+            {HpBox({ side: 0, corner: 'bottom-3 right-3' })}
+            {/* lutadores */}
+            {([1, 0] as const).map(side => (
+              <div key={side} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${ANCHORS[side].x}%`, top: `${ANCHORS[side].y}%` }}>
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-[-14px] w-24 h-5 rounded-[50%] bg-black/45 blur-[3px]" />
+                <motion.div
+                  initial={{ x: side === 0 ? -120 : 120, opacity: 0 }}
+                  animate={poseAnim(poses[side], side)}
+                  className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
+                  style={{
+                    background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}dd, ${fighters[side].color}55 62%, transparent 78%)`,
+                    boxShadow: `0 0 34px 4px ${fighters[side].color}${hp[side] <= TEAM_MAX / 2 ? '99' : '44'}`,
+                  }}
+                >
+                  <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]">{fighters[side].emoji}</span>
+                  {phase !== 'intro' && turn === side && winner === null && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-widest text-white bg-black/50 border border-white/20 px-2 py-0.5 rounded-full whitespace-nowrap">Sua vez</span>
+                  )}
+                </motion.div>
               </div>
             ))}
-          </div>
-          <p className="text-center text-white/60 text-xs font-bold uppercase tracking-widest mb-2">Pergunta {idx + 1} de {questions.length} · vez de {battleTeams[turn]}</p>
-          <div className="flex-1 flex flex-col items-center justify-center gap-5">
-            <motion.div key={idx} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[2rem] p-7 w-full max-w-md text-center shadow-2xl">
-              <p className="text-xl sm:text-2xl font-black text-gray-900 leading-snug">{questions[idx].q}</p>
-              {revealed && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 text-lg font-black text-emerald-600 bg-emerald-50 rounded-2xl py-3 px-4">
-                  {questions[idx].a}
-                </motion.p>
-              )}
-            </motion.div>
-            {!revealed ? (
-              <button onClick={() => setRevealed(true)} className="bg-white/15 text-white font-bold px-8 py-3.5 rounded-2xl">👁 Mostrar resposta</button>
-            ) : (
-              <div className="flex gap-3 w-full max-w-md">
-                <button onClick={() => next(true)} className="flex-1 bg-emerald-500 text-white font-black py-4 rounded-2xl">✓ Acertou (+1)</button>
-                <button onClick={() => next(false)} className="flex-1 bg-white/15 text-white font-bold py-4 rounded-2xl">Passou</button>
+            {/* projétil */}
+            {proj && (
+              <motion.div
+                key={proj.key}
+                initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.4, opacity: 0.9 }}
+                animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 1.05, opacity: 1 }}
+                transition={{ duration: 0.44, ease: 'easeIn' }}
+                className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full pointer-events-none z-20"
+                style={{ background: `radial-gradient(circle, #fff 15%, ${fighters[proj.from].color})`, boxShadow: `0 0 20px 7px ${fighters[proj.from].color}aa` }}
+              />
+            )}
+            {/* anel de impacto */}
+            {ring && (
+              <motion.div
+                key={ring.key}
+                initial={{ scale: 0.2, opacity: 0.95 }} animate={{ scale: 2.4, opacity: 0 }} transition={{ duration: 0.5 }}
+                className="absolute w-16 h-16 -ml-8 -mt-8 rounded-full border-4 pointer-events-none z-30"
+                style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, borderColor: ring.color }}
+              />
+            )}
+            {/* dano flutuante */}
+            {pops.map(p => (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 1, y: 0, scale: 0.8 }} animate={{ opacity: 0, y: -48, scale: 1.15 }} transition={{ duration: 0.9 }}
+                className="absolute font-black text-2xl pointer-events-none z-40 -translate-x-1/2"
+                style={{ left: `${ANCHORS[p.side].x}%`, top: `${ANCHORS[p.side].y - 16}%`, color: p.color, textShadow: '0 2px 0 rgba(0,0,0,0.7), 0 0 14px rgba(0,0,0,0.5)' }}
+              >−{p.val}</motion.div>
+            ))}
+            {/* intro VS */}
+            {phase === 'intro' && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/45">
+                <div className="flex items-center gap-4 px-4">
+                  <motion.p initial={{ x: -90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="text-white font-black text-lg text-right leading-tight max-w-[38%]">{fighters[0].emoji} {fighters[0].name}</motion.p>
+                  <motion.span initial={{ scale: 3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.35, type: 'spring', damping: 12 }} className="text-4xl font-black text-amber-400" style={{ textShadow: '0 0 26px rgba(251,191,36,0.8)' }}>VS</motion.span>
+                  <motion.p initial={{ x: 90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="text-white font-black text-lg leading-tight max-w-[38%]">{fighters[1].emoji} {fighters[1].name}</motion.p>
+                </div>
               </div>
             )}
           </div>
+          {/* ── Caixa de diálogo ── */}
+          <div className="mt-3 bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-2xl px-4 py-3 min-h-[64px] flex items-center shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)] shrink-0">
+            <p className="text-sm font-bold text-[#3a3020] leading-snug">
+              {phase === 'intro' ? `${fighters[0].name} desafia ${fighters[1].name}! Que vença o conhecimento! ⚔️`
+                : phase === 'anim' ? msg
+                : current ? <>{current.q} <span className="block text-[10px] font-black uppercase tracking-widest text-[#8a7a5a] mt-1">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
+            </p>
+          </div>
+          {/* ── Alternativas 2×2 ── */}
+          {current && phase !== 'intro' && (
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              {current.options.map((opt, i) => {
+                const palette = ['#dc2626', '#d97706', '#059669', '#2563eb'];
+                const locked = phase === 'anim';
+                const isCorrect = locked && i === current.correct;
+                const isWrongPick = locked && selected === i && i !== current.correct;
+                const dimmed = locked && !isCorrect && !isWrongPick;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => answer(i)}
+                    disabled={locked}
+                    className={`relative rounded-2xl px-3 py-3.5 text-left transition-all active:scale-95 border-b-4 ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                    style={{ backgroundColor: isWrongPick ? '#7f1d1d' : palette[i], borderBottomColor: 'rgba(0,0,0,0.3)' }}
+                  >
+                    <span className="text-[10px] font-black text-white/70">{['A', 'B', 'C', 'D'][i]}</span>
+                    <p className="text-sm font-black text-white leading-tight">{opt}</p>
+                    {isCorrect && <span className="absolute top-1.5 right-2 text-white font-black">✓</span>}
+                    {isWrongPick && <span className="absolute top-1.5 right-2 text-white font-black">✗</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
-      {phase === 'end' && (
+      {phase === 'end' && winner !== null && (
         <div className="flex-1 flex flex-col items-center justify-center gap-6">
           <ConfettiBurst />
-          <span className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 flex items-center justify-center shadow-[0_0_60px_-5px_rgba(251,191,36,0.6)]">
-            <Trophy size={38} className="text-amber-900" />
-          </span>
-          <h3 className="text-2xl font-black text-white text-center">
-            {winners.length === 1 ? `${battleTeams[winners[0].i]} venceu!` : 'Empate épico!'}
-          </h3>
+          <div className="relative">
+            <span className="w-24 h-24 rounded-full flex items-center justify-center text-5xl" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)`, boxShadow: `0 0 50px 8px ${fighters[winner].color}77` }}>
+              {fighters[winner].emoji}
+            </span>
+            <span className="absolute -top-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-white/70 flex items-center justify-center shadow-lg">
+              <Crown size={17} className="text-amber-900" />
+            </span>
+          </div>
+          <h3 className="text-2xl font-black text-white text-center">{fighters[winner].name} venceu a batalha!</h3>
           <div className="w-full max-w-sm space-y-2">
-            {scores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s).map(({ s, i }, pos) => (
+            {([winner, (1 - winner) as 0 | 1]).map((i, pos) => (
               <div key={i} className={`flex items-center justify-between px-4 py-3 rounded-2xl border backdrop-blur ${pos === 0 ? 'bg-amber-400/15 border-amber-300/40' : 'bg-white/[0.06] border-white/10'}`}>
-                <span className="font-bold text-white/90 text-sm">{pos === 0 ? '🥇' : pos === 1 ? '🥈' : pos === 2 ? '🥉' : '·'} {battleTeams[i]}</span>
-                <span className="font-black text-white tabular-nums">{s} pts</span>
+                <span className="font-bold text-white/90 text-sm">{pos === 0 ? '🏆' : '💔'} {fighters[i].emoji} {fighters[i].name}</span>
+                <span className="font-black text-white tabular-nums">{hp[i]}/{TEAM_MAX} HP</span>
               </div>
             ))}
           </div>
-          {hasRealTeams && winners.length >= 1 && !awarded && winnerNames(winners[0].i).length > 0 && (
+          {hasRealTeams && !awarded && winnerIds.length > 0 && (
             <button
-              onClick={() => { winners.forEach(w => onAwardTeam(w.i, winnerNames(w.i), 3)); setAwarded(true); }}
+              onClick={() => { onAwardTeam(pick[winner], winnerIds, 3); setAwarded(true); }}
               className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-emerald-950/50"
-            >⚡ Dar +3 XP {winners.length > 1 ? 'às equipes vencedoras' : 'à equipe vencedora'}</button>
+            >⚡ Dar +3 XP à equipe vencedora</button>
           )}
           {awarded && <p className="text-emerald-400 text-sm font-bold">XP entregue! ✓</p>}
-          <button onClick={() => setPhase('setup')} className="text-rose-300 font-bold text-sm">↻ Nova batalha</button>
+          <div className="flex gap-4">
+            <button onClick={startBattle} className="text-amber-300 font-bold text-sm">⚔️ Revanche</button>
+            <button onClick={() => setPhase('setup')} className="text-rose-300 font-bold text-sm">↻ Nova batalha</button>
+          </div>
         </div>
       )}
     </GamiToolShell>
