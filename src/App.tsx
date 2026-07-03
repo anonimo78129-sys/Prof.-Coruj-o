@@ -11,7 +11,7 @@ import {
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
   Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
-  Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand,
+  Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
   Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -8805,23 +8805,64 @@ const gamiDefaultClass = (classId: string): ClassGamification => ({
 });
 
 // ─── Ferramentas ao vivo (overlay em tela cheia, ideais para projetar) ────────
-const GamiToolShell = ({ title, emoji, onClose, children, dark }: { title: string; emoji: string; onClose: () => void; children: React.ReactNode; dark?: boolean }) => (
-  <motion.div
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-    className={`fixed inset-0 z-[130] flex flex-col ${dark ? 'bg-gray-900' : 'bg-[#F8F9FE]'}`}
-  >
-    <div className={`flex items-center justify-between px-5 pt-5 pb-3 ${dark ? 'text-white' : 'text-gray-900'}`}>
-      <div className="flex items-center gap-2">
-        <span className="text-2xl">{emoji}</span>
-        <h2 className="text-lg font-black">{title}</h2>
-      </div>
-      <button onClick={onClose} className={`w-9 h-9 rounded-full flex items-center justify-center ${dark ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-500'}`}>
-        <X size={18} />
-      </button>
-    </div>
-    <div className="flex-1 overflow-y-auto px-5 pb-8 flex flex-col">{children}</div>
-  </motion.div>
+const GAMI_STAGE = {
+  violet:  { bg: 'from-[#241b4d] via-[#161233] to-[#0c0a1e]', glow: 'bg-violet-500', chip: 'from-violet-500 to-indigo-600',  btn: 'from-violet-500 to-indigo-500 shadow-violet-950/60' },
+  night:   { bg: 'from-[#0f2445] via-[#0b1830] to-[#070e1d]', glow: 'bg-sky-500',    chip: 'from-sky-500 to-blue-600',      btn: 'from-sky-500 to-blue-600 shadow-sky-950/60' },
+  teal:    { bg: 'from-[#0b3a38] via-[#092528] to-[#05141a]', glow: 'bg-teal-400',   chip: 'from-teal-400 to-cyan-600',     btn: 'from-teal-500 to-cyan-600 shadow-teal-950/60' },
+  emerald: { bg: 'from-[#0b3d2a] via-[#08251d] to-[#051510]', glow: 'bg-emerald-400',chip: 'from-emerald-400 to-green-600', btn: 'from-emerald-500 to-green-600 shadow-emerald-950/60' },
+  amber:   { bg: 'from-[#4d2c0b] via-[#2e1c0a] to-[#170e05]', glow: 'bg-amber-400',  chip: 'from-amber-400 to-orange-600',  btn: 'from-amber-500 to-orange-600 shadow-amber-950/60' },
+  crimson: { bg: 'from-[#4d0f1e] via-[#2d0a14] to-[#16050a]', glow: 'bg-rose-500',   chip: 'from-rose-500 to-red-600',      btn: 'from-rose-500 to-red-600 shadow-rose-950/60' },
+  slate:   { bg: 'from-[#243044] via-[#161e2e] to-[#0a0f1a]', glow: 'bg-indigo-400', chip: 'from-slate-500 to-slate-700',   btn: 'from-indigo-500 to-indigo-600 shadow-indigo-950/60' },
+} as const;
+type GamiStageTheme = keyof typeof GAMI_STAGE;
+
+const CONFETTI_COLORS = ['#a78bfa', '#f472b6', '#fbbf24', '#34d399', '#60a5fa', '#fb7185'];
+const ConfettiBurst = () => (
+  <div className="pointer-events-none fixed inset-0 z-10 overflow-hidden">
+    {Array.from({ length: 30 }).map((_, i) => {
+      const size = 6 + Math.random() * 7;
+      return (
+        <motion.span
+          key={i}
+          initial={{ y: '-8vh', x: 0, rotate: 0, opacity: 1 }}
+          animate={{ y: '110vh', x: (Math.random() - 0.5) * 140, rotate: 360 + Math.random() * 420, opacity: [1, 1, 0.85] }}
+          transition={{ duration: 1.7 + Math.random() * 1.3, delay: Math.random() * 0.3, ease: 'easeIn' }}
+          className="absolute rounded-[2px]"
+          style={{ left: `${Math.random() * 100}%`, width: size, height: size * 0.45, backgroundColor: CONFETTI_COLORS[i % CONFETTI_COLORS.length] }}
+        />
+      );
+    })}
+  </div>
 );
+
+const GamiToolShell = ({ title, subtitle, icon: Icon, theme = 'violet', onClose, children }: { title: string; subtitle?: string; icon: any; theme?: GamiStageTheme; onClose: () => void; children: React.ReactNode }) => {
+  const t = GAMI_STAGE[theme] ?? GAMI_STAGE.violet;
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className={`fixed inset-0 z-[130] flex flex-col bg-gradient-to-b ${t.bg}`}
+    >
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className={`absolute -top-40 left-1/2 -translate-x-1/2 w-[30rem] h-[30rem] rounded-full blur-[110px] opacity-20 ${t.glow}`} />
+      </div>
+      <div className="relative flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${t.chip} flex items-center justify-center shadow-lg`}>
+            <Icon size={19} className="text-white" strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-white leading-tight">{title}</h2>
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">{subtitle ?? 'Kit ao Vivo'}</p>
+          </div>
+        </div>
+        <button onClick={onClose} className="w-9 h-9 rounded-full bg-white/10 text-white/80 flex items-center justify-center backdrop-blur">
+          <X size={18} />
+        </button>
+      </div>
+      <div className="relative flex-1 overflow-y-auto px-5 pb-8 flex flex-col">{children}</div>
+    </motion.div>
+  );
+};
 
 const GamiSorteio = ({ students, onClose, onAwardParticipation }: { students: GamiStudent[]; onClose: () => void; onAwardParticipation: (id: string) => void }) => {
   const [fair, setFair] = useState(true);
@@ -8852,45 +8893,46 @@ const GamiSorteio = ({ students, onClose, onAwardParticipation }: { students: Ga
   };
 
   return (
-    <GamiToolShell title="Sorteador" emoji="🎯" onClose={onClose}>
+    <GamiToolShell title="Sorteador" subtitle="Quem será a estrela?" icon={Ticket} theme="violet" onClose={onClose}>
+      {winner && !spinning && <ConfettiBurst />}
       <div className="flex-1 flex flex-col items-center justify-center gap-6">
         <motion.div
           key={display}
           initial={{ scale: 0.96, opacity: 0.7 }} animate={{ scale: 1, opacity: 1 }}
-          className={`w-full max-w-md rounded-[2rem] py-14 px-6 text-center shadow-xl border-2 ${winner ? 'bg-indigo-600 border-indigo-700' : 'bg-white border-indigo-100'}`}
+          className={`w-full max-w-md rounded-[2rem] py-14 px-6 text-center border transition-shadow ${winner ? 'bg-gradient-to-br from-violet-500 to-indigo-600 border-violet-300/40 shadow-[0_0_70px_-10px_rgba(139,92,246,0.65)]' : 'bg-white/[0.06] border-white/10 backdrop-blur'}`}
         >
-          <p className={`text-3xl sm:text-4xl font-black break-words ${winner ? 'text-white' : 'text-gray-900'}`}>
+          <p className={`text-3xl sm:text-4xl font-black break-words ${winner ? 'text-white' : spinning ? 'text-white/90' : 'text-white/50'}`}>
             {display || (pool.length === 0 ? 'Todos já foram sorteados! 🎉' : 'Toque em Sortear')}
           </p>
-          {winner && <p className="text-indigo-200 text-sm font-bold mt-3">✨ Sorteado!</p>}
+          {winner && <p className="text-violet-100 text-xs font-black uppercase tracking-[0.25em] mt-4">✦ Sorteado ✦</p>}
         </motion.div>
         {winner && !awarded && (
           <button
             onClick={() => { onAwardParticipation(winner.id); setAwarded(true); }}
-            className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 active:scale-95 transition-transform"
+            className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 active:scale-95 transition-transform shadow-lg shadow-emerald-950/50"
           >
-            🙋 +1 Participação para {winner.name.split(' ')[0]}
+            <Hand size={16} /> +1 Participação para {winner.name.split(' ')[0]}
           </button>
         )}
-        {awarded && <p className="text-emerald-600 text-sm font-bold">Ponto registrado! ✓</p>}
+        {awarded && <p className="text-emerald-400 text-sm font-bold">Ponto registrado! ✓</p>}
       </div>
       <div className="space-y-3">
-        <label className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm">
-          <span className="text-sm font-bold text-gray-700">Modo justo (não repete sorteados)</span>
-          <input type="checkbox" checked={fair} onChange={e => setFair(e.target.checked)} className="w-5 h-5 accent-indigo-600" />
+        <label className="flex items-center justify-between bg-white/[0.06] border border-white/10 backdrop-blur rounded-2xl px-4 py-3">
+          <span className="text-sm font-bold text-white/85">Modo justo (não repete sorteados)</span>
+          <input type="checkbox" checked={fair} onChange={e => setFair(e.target.checked)} className="w-5 h-5 accent-violet-500" />
         </label>
         {fair && drawn.length > 0 && (
-          <div className="flex items-center justify-between text-xs text-gray-400 px-1">
+          <div className="flex items-center justify-between text-xs text-white/40 px-1">
             <span>{drawn.length} de {students.length} já sorteados</span>
-            <button onClick={() => setDrawn([])} className="text-indigo-500 font-bold">Reiniciar rodada</button>
+            <button onClick={() => setDrawn([])} className="text-violet-300 font-bold">Reiniciar rodada</button>
           </div>
         )}
         <button
           onClick={spin}
           disabled={spinning || pool.length === 0}
-          className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-50 active:scale-[0.98] transition-transform"
+          className="w-full bg-gradient-to-r from-violet-500 to-indigo-500 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-50 active:scale-[0.98] transition-transform shadow-lg shadow-violet-950/60"
         >
-          {spinning ? 'Sorteando…' : '🎲 Sortear'}
+          {spinning ? 'Sorteando…' : 'Sortear'}
         </button>
       </div>
     </GamiToolShell>
@@ -8928,34 +8970,42 @@ const GamiTimer = ({ onClose }: { onClose: () => void }) => {
   const pct = totalSecs > 0 ? left / totalSecs : 0;
   const urgent = left > 0 && left <= 10;
   const warn = left > 10 && left <= 60;
-  const owl = left === 0 && totalSecs > 0 ? '⏰' : urgent ? '😱' : warn ? '🦉' : '😴';
+  const statusLabel = left === 0 && totalSecs > 0 ? 'Tempo esgotado!' : urgent ? 'Reta final!' : warn ? 'Falta pouco…' : running ? 'Foco total' : totalSecs > 0 ? 'Pausado' : 'Pronto para começar';
 
   return (
-    <GamiToolShell title="Timer" emoji="⏱️" onClose={onClose} dark>
+    <GamiToolShell title="Timer" subtitle="Tempo da atividade" icon={TimerIcon} theme="night" onClose={onClose}>
+      {urgent && running && (
+        <motion.div
+          animate={{ opacity: [0.05, 0.45, 0.05] }}
+          transition={{ duration: 1, repeat: Infinity }}
+          className="fixed inset-0 bg-red-600/30 pointer-events-none"
+        />
+      )}
       <div className="flex-1 flex flex-col items-center justify-center gap-6">
-        <span className="text-6xl">{owl}</span>
+        <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.2em] border ${urgent ? 'text-red-300 border-red-400/40 bg-red-500/10' : warn ? 'text-amber-300 border-amber-400/40 bg-amber-500/10' : 'text-sky-300 border-sky-400/30 bg-sky-500/10'}`}>
+          {statusLabel}
+        </span>
         <p className={`font-black tabular-nums tracking-tight ${urgent ? 'text-red-400' : warn ? 'text-amber-300' : 'text-white'}`} style={{ fontSize: 'min(26vw, 9rem)', lineHeight: 1 }}>
           {mm}:{ss}
         </p>
         {totalSecs > 0 && (
           <div className="w-full max-w-md h-3 bg-white/10 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-1000 ${urgent ? 'bg-red-500' : warn ? 'bg-amber-400' : 'bg-indigo-500'}`} style={{ width: `${pct * 100}%` }} />
+            <div className={`h-full rounded-full transition-all duration-1000 ${urgent ? 'bg-red-500' : warn ? 'bg-amber-400' : 'bg-gradient-to-r from-sky-400 to-blue-500'}`} style={{ width: `${pct * 100}%` }} />
           </div>
         )}
-        {left === 0 && totalSecs > 0 && <p className="text-amber-300 font-black text-xl">Tempo esgotado!</p>}
       </div>
       <div className="space-y-3">
         <div className="grid grid-cols-4 gap-2">
           {[1, 2, 5, 10].map(m => (
-            <button key={m} onClick={() => start(m)} className="bg-white/10 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform">{m} min</button>
+            <button key={m} onClick={() => start(m)} className="bg-white/[0.08] border border-white/10 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform">{m} min</button>
           ))}
         </div>
         <div className="flex gap-2">
           <input
             type="number" min={1} max={120} value={customMin} onChange={e => setCustomMin(e.target.value)}
-            placeholder="Minutos…" className="flex-1 bg-white/10 text-white placeholder-white/40 rounded-2xl px-4 py-3 font-bold focus:outline-none"
+            placeholder="Minutos…" className="flex-1 bg-white/[0.08] border border-white/10 text-white placeholder-white/40 rounded-2xl px-4 py-3 font-bold focus:outline-none focus:border-sky-400/50"
           />
-          <button onClick={() => { const m = parseInt(customMin, 10); if (m > 0) start(Math.min(m, 120)); }} className="bg-indigo-600 text-white font-bold px-5 rounded-2xl">Iniciar</button>
+          <button onClick={() => { const m = parseInt(customMin, 10); if (m > 0) start(Math.min(m, 120)); }} className="bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold px-5 rounded-2xl shadow-lg shadow-sky-950/60">Iniciar</button>
         </div>
         {totalSecs > 0 && (
           <div className="flex gap-2">
@@ -8997,62 +9047,62 @@ const GamiGrupos = ({ students, onClose }: { students: GamiStudent[]; onClose: (
   };
 
   return (
-    <GamiToolShell title="Gerador de Grupos" emoji="👥" onClose={onClose}>
+    <GamiToolShell title="Gerador de Grupos" subtitle="Equipes na hora" icon={Users} theme="teal" onClose={onClose}>
       {!groups ? (
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Alunos por grupo</label>
+            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2 block">Alunos por grupo</label>
             <div className="grid grid-cols-4 gap-2">
               {[2, 3, 4, 5].map(n => (
-                <button key={n} onClick={() => setGroupSize(n)} className={`py-3 rounded-2xl font-bold border-2 transition-colors ${groupSize === n ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500 bg-white'}`}>{n}</button>
+                <button key={n} onClick={() => setGroupSize(n)} className={`py-3 rounded-2xl font-bold border transition-colors ${groupSize === n ? 'bg-gradient-to-br from-teal-400 to-cyan-600 border-teal-300/40 text-white shadow-lg shadow-teal-950/50' : 'border-white/10 text-white/50 bg-white/[0.06]'}`}>{n}</button>
               ))}
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Separar alunos (opcional)</p>
+          <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">Separar alunos (opcional)</p>
             <div className="flex gap-2 items-center">
-              <select value={selA} onChange={e => setSelA(e.target.value)} className="flex-1 border border-gray-200 rounded-xl px-2 py-2 text-sm bg-white min-w-0">
+              <select value={selA} onChange={e => setSelA(e.target.value)} className="flex-1 border border-white/10 rounded-xl px-2 py-2 text-sm bg-white/10 text-white min-w-0 [&>option]:text-gray-900">
                 <option value="">Aluno…</option>
                 {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-              <span className="text-gray-300 font-black shrink-0">✕</span>
-              <select value={selB} onChange={e => setSelB(e.target.value)} className="flex-1 border border-gray-200 rounded-xl px-2 py-2 text-sm bg-white min-w-0">
+              <X size={14} className="text-white/30 shrink-0" />
+              <select value={selB} onChange={e => setSelB(e.target.value)} className="flex-1 border border-white/10 rounded-xl px-2 py-2 text-sm bg-white/10 text-white min-w-0 [&>option]:text-gray-900">
                 <option value="">Aluno…</option>
                 {students.filter(s => s.id !== selA).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <button
                 onClick={() => { if (selA && selB) { setSeparations(p => [...p, [selA, selB]]); setSelA(''); setSelB(''); } }}
                 disabled={!selA || !selB}
-                className="bg-indigo-600 text-white w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40 shrink-0"
+                className="bg-gradient-to-br from-teal-400 to-cyan-600 text-white w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40 shrink-0"
               ><Plus size={16} /></button>
             </div>
             {separations.length > 0 && (
               <div className="mt-3 space-y-1.5">
                 {separations.map(([a, b], i) => (
-                  <div key={i} className="flex items-center justify-between bg-red-50 rounded-xl px-3 py-1.5 text-xs">
-                    <span className="text-red-600 font-medium">{students.find(s => s.id === a)?.name} ✕ {students.find(s => s.id === b)?.name}</span>
-                    <button onClick={() => setSeparations(p => p.filter((_, j) => j !== i))} className="text-red-400"><X size={13} /></button>
+                  <div key={i} className="flex items-center justify-between bg-red-500/15 border border-red-400/20 rounded-xl px-3 py-1.5 text-xs">
+                    <span className="text-red-300 font-medium">{students.find(s => s.id === a)?.name} ✕ {students.find(s => s.id === b)?.name}</span>
+                    <button onClick={() => setSeparations(p => p.filter((_, j) => j !== i))} className="text-red-300/70"><X size={13} /></button>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <button onClick={generate} disabled={students.length === 0} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-50">
+          <button onClick={generate} disabled={students.length === 0} className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-50 shadow-lg shadow-teal-950/60">
             <Shuffle size={18} className="inline mr-2 -mt-1" />Sortear grupos
           </button>
-          {students.length === 0 && <p className="text-center text-sm text-gray-400">Cadastre os alunos da turma primeiro.</p>}
+          {students.length === 0 && <p className="text-center text-sm text-white/40">Cadastre os alunos da turma primeiro.</p>}
         </div>
       ) : (
         <div className="flex flex-col flex-1">
           <div className="grid grid-cols-2 gap-3 flex-1 content-start">
             {groups.map((g, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                <p className="text-xs font-black text-indigo-500 uppercase tracking-wider mb-2">Grupo {i + 1}</p>
-                {g.map(s => <p key={s.id} className="text-sm font-bold text-gray-800 leading-relaxed">{s.name}</p>)}
+              <motion.div key={i} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="bg-white/[0.07] rounded-2xl p-4 border border-white/10 backdrop-blur">
+                <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-600 text-white text-[10px] font-black uppercase tracking-wider mb-2.5">Grupo {i + 1}</span>
+                {g.map(s => <p key={s.id} className="text-sm font-bold text-white/90 leading-relaxed">{s.name}</p>)}
               </motion.div>
             ))}
           </div>
-          <button onClick={generate} className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl mt-4 flex items-center justify-center gap-2">
+          <button onClick={generate} className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 rounded-2xl mt-4 flex items-center justify-center gap-2 shadow-lg shadow-teal-950/60">
             <Shuffle size={16} /> Sortear de novo
           </button>
         </div>
@@ -9124,50 +9174,68 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
     return () => clearInterval(id);
   }, [challenge?.status]);
 
-  const owl = level < 0.25 ? '😴' : level < 0.5 ? '🦉' : level < 0.75 ? '😯' : '🙀';
   const zoneLabel = level < 0.25 ? 'Silêncio perfeito' : level < 0.5 ? 'Murmúrio de trabalho' : level < 0.75 ? 'Está ficando alto…' : 'MUITO BARULHO!';
-  const zoneColor = level < 0.5 ? 'text-emerald-600' : level < 0.75 ? 'text-amber-500' : 'text-red-500';
+  const zoneHex = level < 0.5 ? '#34d399' : level < 0.75 ? '#fbbf24' : '#ef4444';
 
   return (
-    <GamiToolShell title="Medidor de Barulho" emoji="🔊" onClose={onClose}>
+    <GamiToolShell title="Medidor de Barulho" subtitle="Ouvidos do Corujão" icon={Volume2} theme="emerald" onClose={onClose}>
       {err ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
-          <Volume2 size={40} className="text-gray-300" />
-          <p className="text-sm text-gray-500 max-w-xs">{err}</p>
+          <Volume2 size={40} className="text-white/25" />
+          <p className="text-sm text-white/60 max-w-xs">{err}</p>
         </div>
       ) : (
         <>
-          <div className="flex-1 flex flex-col items-center justify-center gap-5">
-            <motion.span animate={{ scale: 1 + level * 0.5 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="text-7xl">{owl}</motion.span>
-            <p className={`font-black text-xl ${zoneColor}`}>{zoneLabel}</p>
-            <div className="w-full max-w-md h-7 bg-gray-100 rounded-full overflow-hidden relative border border-gray-200">
-              <div
-                className={`h-full rounded-full transition-all duration-150 ${level < 0.5 ? 'bg-emerald-400' : level < 0.75 ? 'bg-amber-400' : 'bg-red-500'}`}
-                style={{ width: `${level * 100}%` }}
+          <div className="flex-1 flex flex-col items-center justify-center gap-7">
+            <div className="relative flex items-center justify-center h-32">
+              <motion.div
+                animate={{ scale: 1 + level * 0.9, opacity: 0.35 + level * 0.5 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                className="absolute w-32 h-32 rounded-full blur-2xl"
+                style={{ backgroundColor: zoneHex }}
               />
-              <div className="absolute top-0 bottom-0 w-0.5 bg-gray-400/70" style={{ left: '50%' }} />
+              <p className="relative font-black text-2xl sm:text-3xl text-center px-4 transition-colors duration-300" style={{ color: zoneHex }}>{zoneLabel}</p>
+            </div>
+            <div className="w-full max-w-md">
+              <div className="flex gap-1 items-end h-16">
+                {Array.from({ length: 24 }).map((_, i) => {
+                  const on = level * 24 > i;
+                  const c = i < 12 ? '#34d399' : i < 18 ? '#fbbf24' : '#ef4444';
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-full transition-all duration-100"
+                      style={{ height: `${28 + (i / 23) * 72}%`, backgroundColor: on ? c : 'rgba(255,255,255,0.08)', boxShadow: on ? `0 0 10px ${c}66` : 'none' }}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex justify-between mt-2 px-0.5">
+                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300/60">Zona tranquila</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-red-300/60">Limite do desafio ↑</span>
+              </div>
             </div>
             {challenge && (
-              <div className={`w-full max-w-md rounded-2xl p-4 text-center border-2 ${challenge.status === 'win' ? 'bg-emerald-50 border-emerald-300' : challenge.status === 'fail' ? 'bg-red-50 border-red-200' : 'bg-white border-indigo-200'}`}>
+              <div className={`w-full max-w-md rounded-2xl p-4 text-center border backdrop-blur ${challenge.status === 'win' ? 'bg-emerald-500/15 border-emerald-400/40' : challenge.status === 'fail' ? 'bg-red-500/15 border-red-400/30' : 'bg-white/[0.06] border-white/10'}`}>
                 {challenge.status === 'on' && (
                   <>
-                    <p className="text-4xl font-black text-indigo-700 tabular-nums">{String(Math.floor(challenge.left / 60)).padStart(2, '0')}:{String(challenge.left % 60).padStart(2, '0')}</p>
-                    <p className="text-xs text-gray-500 font-bold mt-1">Desafio do Silêncio em andamento · avisos: {challenge.strikes}/12</p>
+                    <p className="text-4xl font-black text-white tabular-nums">{String(Math.floor(challenge.left / 60)).padStart(2, '0')}:{String(challenge.left % 60).padStart(2, '0')}</p>
+                    <p className="text-xs text-white/50 font-bold mt-1">Desafio do Silêncio em andamento · avisos: {challenge.strikes}/12</p>
                   </>
                 )}
                 {challenge.status === 'win' && (
                   <>
-                    <p className="text-lg font-black text-emerald-700">🎉 A turma venceu o desafio!</p>
+                    <p className="text-lg font-black text-emerald-300">🎉 A turma venceu o desafio!</p>
                     <button
                       onClick={() => { onRewardClass(2); setChallenge(null); }}
-                      className="mt-3 bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-2xl"
+                      className="mt-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-5 py-2.5 rounded-2xl shadow-lg shadow-emerald-950/50"
                     >Dar +2 pontos para todos</button>
                   </>
                 )}
                 {challenge.status === 'fail' && (
                   <>
-                    <p className="text-lg font-black text-red-600">O barulho venceu desta vez… 😅</p>
-                    <button onClick={() => setChallenge(null)} className="mt-3 bg-gray-200 text-gray-700 font-bold px-5 py-2.5 rounded-2xl">Fechar desafio</button>
+                    <p className="text-lg font-black text-red-300">O barulho venceu desta vez… 😅</p>
+                    <button onClick={() => setChallenge(null)} className="mt-3 bg-white/10 text-white font-bold px-5 py-2.5 rounded-2xl">Fechar desafio</button>
                   </>
                 )}
               </div>
@@ -9175,10 +9243,10 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
           </div>
           {!challenge && (
             <div className="space-y-2">
-              <p className="text-xs font-bold text-gray-400 uppercase text-center">Desafio do Silêncio: turma fica abaixo da linha e ganha pontos</p>
+              <p className="text-xs font-bold text-white/40 uppercase tracking-wider text-center">Desafio do Silêncio: turma fica abaixo do limite e ganha pontos</p>
               <div className="grid grid-cols-3 gap-2">
                 {[3, 5, 10].map(m => (
-                  <button key={m} onClick={() => setChallenge({ left: m * 60, total: m * 60, strikes: 0, status: 'on' })} className="bg-indigo-600 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform">{m} min</button>
+                  <button key={m} onClick={() => setChallenge({ left: m * 60, total: m * 60, strikes: 0, status: 'on' })} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl active:scale-95 transition-transform shadow-lg shadow-emerald-950/50">{m} min</button>
                 ))}
               </div>
             </div>
@@ -9192,21 +9260,40 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
 const GamiSemaforo = ({ onClose }: { onClose: () => void }) => {
   const [state, setState] = useState<0 | 1 | 2>(0);
   const meta = [
-    { bg: 'bg-emerald-500', emoji: '🟢', label: 'PODE CONVERSAR', sub: 'Trabalho em grupo liberado' },
-    { bg: 'bg-amber-400',   emoji: '🟡', label: 'VOZ BAIXA',       sub: 'Só murmúrio de trabalho' },
-    { bg: 'bg-red-500',     emoji: '🔴', label: 'SILÊNCIO',        sub: 'Atenção total ao professor' },
+    { hex: '#10b981', label: 'PODE CONVERSAR', sub: 'Trabalho em grupo liberado' },
+    { hex: '#f59e0b', label: 'VOZ BAIXA',       sub: 'Só murmúrio de trabalho' },
+    { hex: '#ef4444', label: 'SILÊNCIO',        sub: 'Atenção total ao professor' },
   ][state];
+  const lamps = [
+    { hex: '#ef4444', on: state === 2 },
+    { hex: '#f59e0b', on: state === 1 },
+    { hex: '#10b981', on: state === 0 },
+  ];
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className={`fixed inset-0 z-[130] flex flex-col items-center justify-center ${meta.bg} transition-colors duration-500 cursor-pointer select-none`}
+      className="fixed inset-0 z-[130] flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#151b28] via-[#0d111c] to-[#05070d] cursor-pointer select-none"
       onClick={() => setState(s => ((s + 1) % 3) as 0 | 1 | 2)}
     >
-      <button onClick={e => { e.stopPropagation(); onClose(); }} className="absolute top-5 right-5 w-10 h-10 rounded-full bg-black/20 text-white flex items-center justify-center"><X size={20} /></button>
-      <span className="text-8xl mb-6">{meta.emoji}</span>
-      <p className="text-white font-black text-5xl sm:text-6xl text-center px-6 drop-shadow-md">{meta.label}</p>
-      <p className="text-white/85 font-bold text-lg mt-3">{meta.sub}</p>
-      <p className="text-white/60 text-xs font-bold mt-10 uppercase tracking-widest">Toque na tela para mudar</p>
+      <button onClick={e => { e.stopPropagation(); onClose(); }} className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"><X size={20} /></button>
+      <div className="bg-[#1c2433] border border-white/10 rounded-[2.5rem] px-6 py-7 shadow-2xl flex flex-col gap-5">
+        {lamps.map((l, i) => (
+          <div
+            key={i}
+            className="w-24 h-24 sm:w-28 sm:h-28 rounded-full transition-all duration-500"
+            style={{
+              backgroundColor: l.on ? l.hex : '#0a0e16',
+              boxShadow: l.on ? `0 0 70px 14px ${l.hex}77, inset 0 -8px 16px rgba(0,0,0,0.3)` : 'inset 0 6px 14px rgba(0,0,0,0.7)',
+              opacity: l.on ? 1 : 0.45,
+            }}
+          />
+        ))}
+      </div>
+      <div className="text-center px-6">
+        <p className="font-black text-4xl sm:text-5xl transition-colors duration-500" style={{ color: meta.hex, textShadow: `0 0 40px ${meta.hex}66` }}>{meta.label}</p>
+        <p className="text-white/60 font-bold text-lg mt-2">{meta.sub}</p>
+      </div>
+      <p className="text-white/30 text-xs font-bold uppercase tracking-[0.25em]">Toque na tela para mudar</p>
     </motion.div>
   );
 };
@@ -9227,23 +9314,44 @@ const GamiDado = ({ onClose }: { onClose: () => void }) => {
     };
     tick();
   };
+  const PIPS: Record<number, [number, number][]> = {
+    1: [[1, 1]],
+    2: [[0, 0], [2, 2]],
+    3: [[0, 0], [1, 1], [2, 2]],
+    4: [[0, 0], [0, 2], [2, 0], [2, 2]],
+    5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
+    6: [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
+  };
+  const showPips = faces === 6 && value !== null && PIPS[value];
   return (
-    <GamiToolShell title="Dado" emoji="🎲" onClose={onClose} dark>
+    <GamiToolShell title="Dado" subtitle="A sorte está lançada" icon={Dices} theme="slate" onClose={onClose}>
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
         <motion.div
-          key={`${value}-${rolling}`}
-          initial={{ rotate: rolling ? -8 : 0, scale: 0.94 }} animate={{ rotate: 0, scale: 1 }}
-          className="w-52 h-52 bg-white rounded-[2.5rem] shadow-2xl flex items-center justify-center"
+          animate={rolling ? { rotate: [0, 360], scale: 0.92 } : { rotate: 0, scale: 1 }}
+          transition={rolling ? { duration: 0.55, repeat: Infinity, ease: 'linear' } : { type: 'spring', stiffness: 320, damping: 16 }}
+          className="w-52 h-52 bg-gradient-to-br from-white to-gray-200 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] flex items-center justify-center"
         >
-          <span className="text-8xl font-black text-indigo-700 tabular-nums">{value ?? '?'}</span>
+          {showPips ? (
+            <div className="grid grid-cols-3 grid-rows-3 w-32 h-32">
+              {Array.from({ length: 9 }).map((_, i) => {
+                const r = Math.floor(i / 3), c = i % 3;
+                const on = (PIPS[value!] || []).some(([pr, pc]) => pr === r && pc === c);
+                return <div key={i} className="flex items-center justify-center">{on && <span className="w-6 h-6 rounded-full bg-gray-900 shadow-inner" />}</div>;
+              })}
+            </div>
+          ) : (
+            <span className="text-8xl font-black text-gray-900 tabular-nums">{value ?? '?'}</span>
+          )}
         </motion.div>
         <div className="flex gap-2">
           {[6, 10, 20].map(f => (
-            <button key={f} onClick={() => { setFaces(f); setValue(null); }} className={`px-5 py-2.5 rounded-2xl font-bold ${faces === f ? 'bg-indigo-600 text-white' : 'bg-white/10 text-white'}`}>D{f}</button>
+            <button key={f} onClick={() => { setFaces(f); setValue(null); }} className={`px-5 py-2.5 rounded-2xl font-bold border transition-colors ${faces === f ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 border-indigo-300/40 text-white shadow-lg shadow-indigo-950/50' : 'bg-white/[0.06] border-white/10 text-white/60'}`}>D{f}</button>
           ))}
         </div>
       </div>
-      <button onClick={roll} disabled={rolling} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60">🎲 Rolar dado</button>
+      <button onClick={roll} disabled={rolling} className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60 shadow-lg shadow-indigo-950/60">
+        {rolling ? 'Rolando…' : 'Rolar dado'}
+      </button>
     </GamiToolShell>
   );
 };
@@ -9252,33 +9360,42 @@ const GamiPlacar = ({ teams, onClose }: { teams: GamiTeam[]; onClose: () => void
   const initial = (teams.length >= 2 ? teams.slice(0, 4).map(t => `${t.emoji} ${t.name}`) : ['Time A', 'Time B']);
   const [names, setNames] = useState<string[]>(initial);
   const [scores, setScores] = useState<number[]>(initial.map(() => 0));
-  const colors = ['bg-indigo-600', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500'];
+  const gradients = ['from-indigo-500 to-indigo-700', 'from-rose-500 to-rose-700', 'from-emerald-500 to-emerald-700', 'from-amber-500 to-orange-600'];
+  const maxScore = Math.max(...scores);
   return (
-    <GamiToolShell title="Placar Rápido" emoji="🏆" onClose={onClose} dark>
-      <div className={`flex-1 grid gap-3 content-center ${names.length <= 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
-        {names.map((n, i) => (
-          <div key={i} className={`${colors[i % colors.length]} rounded-[2rem] p-5 flex flex-col items-center justify-center gap-3 shadow-xl`}>
-            <input
-              value={n}
-              onChange={e => setNames(p => p.map((x, j) => j === i ? e.target.value : x))}
-              className="bg-transparent text-white font-black text-center text-sm w-full focus:outline-none placeholder-white/50"
-            />
-            <p className="text-white font-black tabular-nums" style={{ fontSize: 'min(16vw, 5.5rem)', lineHeight: 1 }}>{scores[i]}</p>
-            <div className="flex gap-2">
-              <button onClick={() => setScores(p => p.map((s, j) => j === i ? Math.max(0, s - 1) : s))} className="w-11 h-11 bg-black/20 text-white rounded-full flex items-center justify-center"><Minus size={18} /></button>
-              <button onClick={() => setScores(p => p.map((s, j) => j === i ? s + 1 : s))} className="w-11 h-11 bg-white/25 text-white rounded-full flex items-center justify-center"><Plus size={18} /></button>
+    <GamiToolShell title="Placar Rápido" subtitle="Quem está na frente?" icon={Trophy} theme="slate" onClose={onClose}>
+      <div className="flex-1 grid gap-3 content-center grid-cols-2">
+        {names.map((n, i) => {
+          const leader = maxScore > 0 && scores[i] === maxScore;
+          return (
+            <div key={i} className={`relative bg-gradient-to-br ${gradients[i % gradients.length]} rounded-[2rem] p-5 flex flex-col items-center justify-center gap-3 shadow-xl transition-all ${leader ? 'ring-2 ring-white/60 scale-[1.02]' : ''}`}>
+              {leader && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-amber-400 border-2 border-white/70 flex items-center justify-center shadow-lg">
+                  <Crown size={15} className="text-amber-900" />
+                </span>
+              )}
+              <input
+                value={n}
+                onChange={e => setNames(p => p.map((x, j) => j === i ? e.target.value : x))}
+                className="bg-transparent text-white font-black text-center text-sm w-full focus:outline-none placeholder-white/50"
+              />
+              <motion.p key={scores[i]} initial={{ scale: 1.3 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 18 }} className="text-white font-black tabular-nums" style={{ fontSize: 'min(16vw, 5.5rem)', lineHeight: 1 }}>{scores[i]}</motion.p>
+              <div className="flex gap-2">
+                <button onClick={() => setScores(p => p.map((s, j) => j === i ? Math.max(0, s - 1) : s))} className="w-11 h-11 bg-black/25 text-white rounded-full flex items-center justify-center active:scale-90 transition-transform"><Minus size={18} /></button>
+                <button onClick={() => setScores(p => p.map((s, j) => j === i ? s + 1 : s))} className="w-11 h-11 bg-white/30 text-white rounded-full flex items-center justify-center active:scale-90 transition-transform"><Plus size={18} /></button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="flex gap-2 mt-4">
         {names.length < 4 && (
-          <button onClick={() => { setNames(p => [...p, `Time ${String.fromCharCode(65 + p.length)}`]); setScores(p => [...p, 0]); }} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl">+ Time</button>
+          <button onClick={() => { setNames(p => [...p, `Time ${String.fromCharCode(65 + p.length)}`]); setScores(p => [...p, 0]); }} className="flex-1 bg-white/[0.08] border border-white/10 text-white font-bold py-3 rounded-2xl">+ Time</button>
         )}
         {names.length > 2 && (
-          <button onClick={() => { setNames(p => p.slice(0, -1)); setScores(p => p.slice(0, -1)); }} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl">− Time</button>
+          <button onClick={() => { setNames(p => p.slice(0, -1)); setScores(p => p.slice(0, -1)); }} className="flex-1 bg-white/[0.08] border border-white/10 text-white font-bold py-3 rounded-2xl">− Time</button>
         )}
-        <button onClick={() => setScores(p => p.map(() => 0))} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-2xl">Zerar</button>
+        <button onClick={() => setScores(p => p.map(() => 0))} className="flex-1 bg-white/[0.08] border border-white/10 text-white font-bold py-3 rounded-2xl">Zerar</button>
       </div>
     </GamiToolShell>
   );
@@ -9307,28 +9424,29 @@ const GamiEvento = ({ customEvents, onClose, onQuickAward }: { customEvents: str
     tick();
   };
   return (
-    <GamiToolShell title="Evento do Dia" emoji="🎲" onClose={onClose}>
+    <GamiToolShell title="Evento do Dia" subtitle="Surpresa da aula" icon={Zap} theme="amber" onClose={onClose}>
+      {result && <ConfettiBurst />}
       <div className="flex-1 flex flex-col items-center justify-center gap-6">
         <motion.div
           key={display?.text || 'empty'}
           initial={{ scale: 0.95, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }}
-          className={`w-full max-w-md rounded-[2rem] p-8 text-center shadow-xl border-2 min-h-[180px] flex flex-col items-center justify-center gap-3 ${result ? 'bg-gradient-to-br from-indigo-600 to-purple-600 border-indigo-700' : 'bg-white border-indigo-100'}`}
+          className={`w-full max-w-md rounded-[2rem] p-8 text-center border min-h-[180px] flex flex-col items-center justify-center gap-3 ${result ? 'bg-gradient-to-br from-amber-500 to-orange-600 border-amber-300/40 shadow-[0_0_70px_-10px_rgba(245,158,11,0.6)]' : 'bg-white/[0.06] border-white/10 backdrop-blur'}`}
         >
-          <span className="text-5xl">{display?.emoji || '🦉'}</span>
-          <p className={`text-lg font-black leading-snug ${result ? 'text-white' : 'text-gray-700'}`}>
+          <span className="text-5xl">{display?.emoji || '✨'}</span>
+          <p className={`text-lg font-black leading-snug ${result ? 'text-white' : spinning ? 'text-white/90' : 'text-white/50'}`}>
             {display?.text || 'Sorteie o evento que abre a aula de hoje!'}
           </p>
         </motion.div>
         {result?.quick !== undefined && !applied && (
           <button
             onClick={() => { onQuickAward(result.quick!, result.text); setApplied(true); }}
-            className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl active:scale-95 transition-transform"
+            className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-6 py-3 rounded-2xl active:scale-95 transition-transform shadow-lg shadow-emerald-950/50"
           >✨ Aplicar +{result.quick} para a turma toda</button>
         )}
-        {applied && <p className="text-emerald-600 text-sm font-bold">Pontos aplicados! ✓</p>}
+        {applied && <p className="text-emerald-400 text-sm font-bold">Pontos aplicados! ✓</p>}
       </div>
-      <button onClick={spin} disabled={spinning} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60">
-        {spinning ? 'Sorteando…' : '🎲 Sortear evento'}
+      <button onClick={spin} disabled={spinning} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60 shadow-lg shadow-amber-950/60">
+        {spinning ? 'Sorteando…' : 'Sortear evento'}
       </button>
     </GamiToolShell>
   );
@@ -9338,11 +9456,11 @@ const GamiParticipacao = ({ students, onToggle, onClose }: { students: GamiStude
   const today = gamiTodayKey();
   const done = students.filter(s => s.participatedDay === today);
   return (
-    <GamiToolShell title="Participação de Hoje" emoji="✋" onClose={onClose}>
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 flex items-center justify-between">
-        <p className="text-sm font-bold text-gray-700">{done.length} de {students.length} participaram</p>
-        <div className="w-28 h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${students.length ? (done.length / students.length) * 100 : 0}%` }} />
+    <GamiToolShell title="Participação de Hoje" subtitle="Toda voz conta" icon={Hand} theme="night" onClose={onClose}>
+      <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur mb-4 flex items-center justify-between">
+        <p className="text-sm font-bold text-white/85">{done.length} de {students.length} participaram</p>
+        <div className="w-28 h-2 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all" style={{ width: `${students.length ? (done.length / students.length) * 100 : 0}%` }} />
         </div>
       </div>
       <div className="space-y-2">
@@ -9352,18 +9470,18 @@ const GamiParticipacao = ({ students, onToggle, onClose }: { students: GamiStude
             <button
               key={s.id}
               onClick={() => onToggle(s.id)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-colors ${did ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-100'}`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-colors ${did ? 'bg-emerald-500/15 border-emerald-400/40' : 'bg-white/[0.06] border-white/10'}`}
             >
-              <span className={`text-sm font-bold ${did ? 'text-emerald-700' : 'text-gray-700'}`}>{s.name}</span>
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center ${did ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-300'}`}>
+              <span className={`text-sm font-bold ${did ? 'text-emerald-300' : 'text-white/80'}`}>{s.name}</span>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${did ? 'bg-emerald-500 text-white shadow-[0_0_14px_rgba(16,185,129,0.5)]' : 'bg-white/10 text-white/25'}`}>
                 <CheckCircle2 size={15} />
               </span>
             </button>
           );
         })}
-        {students.length === 0 && <p className="text-center text-sm text-gray-400 py-8">Cadastre os alunos da turma primeiro.</p>}
+        {students.length === 0 && <p className="text-center text-sm text-white/40 py-8">Cadastre os alunos da turma primeiro.</p>}
       </div>
-      <p className="text-[11px] text-gray-400 text-center mt-4">Dica: marque quem participa e dê voz a quem ainda está em branco. A lista zera todo dia.</p>
+      <p className="text-[11px] text-white/35 text-center mt-4">Dica: marque quem participa e dê voz a quem ainda está em branco. A lista zera todo dia.</p>
     </GamiToolShell>
   );
 };
@@ -9427,53 +9545,53 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}
     : [];
 
   return (
-    <GamiToolShell title="Batalha de Revisão" emoji="⚔️" onClose={onClose} dark={phase === 'play'}>
+    <GamiToolShell title="Batalha de Revisão" subtitle="Arena do conhecimento" icon={Swords} theme="crimson" onClose={onClose}>
       {phase === 'setup' && (
         <div className="space-y-4">
-          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-            <p className="text-sm text-indigo-800 leading-relaxed"><b>Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe. O placar é automático. Kahoot sem precisar de celular dos alunos!</p>
+          <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur">
+            <p className="text-sm text-white/75 leading-relaxed"><b className="text-white">Como funciona:</b> a IA gera perguntas rápidas; você lê em voz alta e cada equipe responde na sua vez. Marque acerto ou passe. O placar é automático. Kahoot sem precisar de celular dos alunos!</p>
           </div>
-          {error && <p className="text-sm text-red-500 font-medium bg-red-50 rounded-xl p-3">{error}</p>}
+          {error && <p className="text-sm text-red-300 font-medium bg-red-500/15 border border-red-400/25 rounded-xl p-3">{error}</p>}
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Tema da revisão</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Frações, Era Vargas, Sistema Solar…" className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
+            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Tema da revisão</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Frações, Era Vargas, Sistema Solar…" className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400/50 bg-white/[0.08] text-white placeholder-white/30" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Perguntas</label>
+              <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Perguntas</label>
               <div className="flex gap-1.5">
                 {[6, 10, 14].map(n => (
-                  <button key={n} onClick={() => setCount(n)} className={`flex-1 py-2.5 rounded-xl font-bold text-sm border-2 ${count === n ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-500 bg-white'}`}>{n}</button>
+                  <button key={n} onClick={() => setCount(n)} className={`flex-1 py-2.5 rounded-xl font-bold text-sm border transition-colors ${count === n ? 'bg-gradient-to-br from-rose-500 to-red-600 border-rose-300/40 text-white shadow-lg shadow-rose-950/50' : 'border-white/10 text-white/50 bg-white/[0.06]'}`}>{n}</button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Dificuldade</label>
-              <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+              <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Dificuldade</label>
+              <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/10 rounded-xl px-3 py-2.5 text-sm bg-white/[0.08] text-white [&>option]:text-gray-900">
                 <option value="fácil">Fácil</option>
                 <option value="média">Média</option>
                 <option value="difícil">Difícil</option>
               </select>
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Equipes da batalha</p>
+          <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">Equipes da batalha</p>
             <div className="flex flex-wrap gap-2">
               {battleTeams.map((t, i) => (
                 <span key={i} className={`${colors[i % colors.length]} text-white text-xs font-bold px-3 py-1.5 rounded-full`}>{t}</span>
               ))}
             </div>
-            {!hasRealTeams && <p className="text-[11px] text-gray-400 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP aos vencedores.</p>}
+            {!hasRealTeams && <p className="text-[11px] text-white/35 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP aos vencedores.</p>}
           </div>
-          <button onClick={generate} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2">
+          <button onClick={generate} className="w-full bg-gradient-to-r from-rose-500 to-red-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-lg shadow-rose-950/60">
             <Swords size={20} /> Começar batalha
           </button>
         </div>
       )}
       {phase === 'loading' && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <Loader2 size={40} className="animate-spin text-indigo-600" />
-          <p className="text-sm font-bold text-gray-500">Preparando as perguntas da batalha…</p>
+          <Loader2 size={40} className="animate-spin text-rose-400" />
+          <p className="text-sm font-bold text-white/60">Preparando as perguntas da batalha…</p>
         </div>
       )}
       {phase === 'play' && questions[idx] && (
@@ -9509,26 +9627,29 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","a":"resposta curta"}
       )}
       {phase === 'end' && (
         <div className="flex-1 flex flex-col items-center justify-center gap-6">
-          <span className="text-6xl">🏆</span>
-          <h3 className="text-2xl font-black text-gray-900 text-center">
+          <ConfettiBurst />
+          <span className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 flex items-center justify-center shadow-[0_0_60px_-5px_rgba(251,191,36,0.6)]">
+            <Trophy size={38} className="text-amber-900" />
+          </span>
+          <h3 className="text-2xl font-black text-white text-center">
             {winners.length === 1 ? `${battleTeams[winners[0].i]} venceu!` : 'Empate épico!'}
           </h3>
           <div className="w-full max-w-sm space-y-2">
             {scores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s).map(({ s, i }, pos) => (
-              <div key={i} className={`flex items-center justify-between px-4 py-3 rounded-2xl ${pos === 0 ? 'bg-amber-50 border-2 border-amber-300' : 'bg-white border border-gray-100'}`}>
-                <span className="font-bold text-gray-800 text-sm">{pos === 0 ? '🥇' : pos === 1 ? '🥈' : pos === 2 ? '🥉' : '·'} {battleTeams[i]}</span>
-                <span className="font-black text-gray-900 tabular-nums">{s} pts</span>
+              <div key={i} className={`flex items-center justify-between px-4 py-3 rounded-2xl border backdrop-blur ${pos === 0 ? 'bg-amber-400/15 border-amber-300/40' : 'bg-white/[0.06] border-white/10'}`}>
+                <span className="font-bold text-white/90 text-sm">{pos === 0 ? '🥇' : pos === 1 ? '🥈' : pos === 2 ? '🥉' : '·'} {battleTeams[i]}</span>
+                <span className="font-black text-white tabular-nums">{s} pts</span>
               </div>
             ))}
           </div>
           {hasRealTeams && winners.length >= 1 && !awarded && winnerNames(winners[0].i).length > 0 && (
             <button
               onClick={() => { winners.forEach(w => onAwardTeam(w.i, winnerNames(w.i), 3)); setAwarded(true); }}
-              className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl"
+              className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-emerald-950/50"
             >⚡ Dar +3 XP {winners.length > 1 ? 'às equipes vencedoras' : 'à equipe vencedora'}</button>
           )}
-          {awarded && <p className="text-emerald-600 text-sm font-bold">XP entregue! ✓</p>}
-          <button onClick={() => setPhase('setup')} className="text-indigo-600 font-bold text-sm">↻ Nova batalha</button>
+          {awarded && <p className="text-emerald-400 text-sm font-bold">XP entregue! ✓</p>}
+          <button onClick={() => setPhase('setup')} className="text-rose-300 font-bold text-sm">↻ Nova batalha</button>
         </div>
       )}
     </GamiToolShell>
@@ -9549,7 +9670,7 @@ const GamiProjetor = ({ cls, schedule, onClose }: { cls: ClassGamification; sche
   const missionProgress = cls.mission ? (cls.mission.weekKey === wk ? cls.mission.progress : 0) : 0;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] bg-gradient-to-br from-indigo-700 via-indigo-600 to-purple-700 flex flex-col overflow-y-auto">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] bg-gradient-to-b from-[#312e81] via-[#1e1b4b] to-[#12102b] flex flex-col overflow-y-auto">
       <div className="flex items-center justify-between px-6 pt-6">
         <div className="flex items-center gap-3">
           <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
@@ -10588,17 +10709,17 @@ const GamificacaoScreen = ({
   };
 
   const LIVE_TOOLS = [
-    { id: 'sorteio', emoji: '🎲', label: 'Sorteador' },
-    { id: 'timer', emoji: '⏱️', label: 'Timer' },
-    { id: 'grupos', emoji: '👥', label: 'Grupos' },
-    { id: 'barulho', emoji: '🔊', label: 'Barulho' },
-    { id: 'semaforo', emoji: '🚦', label: 'Semáforo' },
-    { id: 'dado', emoji: '🎯', label: 'Dado' },
-    { id: 'placar', emoji: '📊', label: 'Placar' },
-    { id: 'evento', emoji: '⚡', label: 'Evento' },
-    { id: 'participacao', emoji: '✋', label: 'Chamada' },
-    { id: 'batalha', emoji: '⚔️', label: 'Batalha' },
-    { id: 'projetor', emoji: '📽️', label: 'Projetar' },
+    { id: 'sorteio', icon: Ticket, grad: 'from-violet-500 to-indigo-600', label: 'Sorteador' },
+    { id: 'timer', icon: TimerIcon, grad: 'from-sky-500 to-blue-600', label: 'Timer' },
+    { id: 'grupos', icon: Users, grad: 'from-teal-400 to-cyan-600', label: 'Grupos' },
+    { id: 'barulho', icon: Volume2, grad: 'from-emerald-500 to-green-600', label: 'Barulho' },
+    { id: 'semaforo', icon: Siren, grad: 'from-emerald-400 via-amber-400 to-red-500', label: 'Semáforo' },
+    { id: 'dado', icon: Dices, grad: 'from-slate-500 to-slate-700', label: 'Dado' },
+    { id: 'placar', icon: Trophy, grad: 'from-amber-500 to-orange-600', label: 'Placar' },
+    { id: 'evento', icon: Zap, grad: 'from-fuchsia-500 to-pink-600', label: 'Evento' },
+    { id: 'participacao', icon: Hand, grad: 'from-blue-400 to-indigo-500', label: 'Chamada' },
+    { id: 'batalha', icon: Swords, grad: 'from-rose-500 to-red-600', label: 'Batalha' },
+    { id: 'projetor', icon: MonitorPlay, grad: 'from-indigo-500 to-purple-600', label: 'Projetar' },
   ];
 
   if (schedules.length === 0) {
@@ -11393,16 +11514,18 @@ const GamificacaoScreen = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-              className="bg-white rounded-2xl p-3 mb-2 shadow-xl border border-gray-100 grid grid-cols-4 gap-2"
+              className="bg-white rounded-3xl p-3 mb-2 shadow-xl border border-gray-100 grid grid-cols-4 gap-1.5"
             >
               {LIVE_TOOLS.map(tool => (
                 <button
                   key={tool.id}
                   onClick={() => { setLiveTool(tool.id); setKitExpanded(false); }}
-                  className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-indigo-50 active:scale-90 transition-transform"
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-2xl active:scale-90 transition-transform"
                 >
-                  <span className="text-xl leading-none">{tool.emoji}</span>
-                  <span className="text-[9px] font-bold text-indigo-600 leading-tight text-center">{tool.label}</span>
+                  <span className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${tool.grad} flex items-center justify-center shadow-md`}>
+                    <tool.icon size={19} className="text-white" strokeWidth={2.4} />
+                  </span>
+                  <span className="text-[9px] font-bold text-gray-600 leading-tight text-center">{tool.label}</span>
                 </button>
               ))}
             </motion.div>
@@ -11410,7 +11533,7 @@ const GamificacaoScreen = ({
         </AnimatePresence>
         <button
           onClick={() => setKitExpanded(e => !e)}
-          className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-transform"
+          className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-transform"
         >
           <Zap size={16} />
           <span className="text-sm">Kit ao Vivo</span>
