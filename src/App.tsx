@@ -9737,8 +9737,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-mono">
       <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 72px 72px; } }`}</style>
       {/* ── Arena (tela cheia, clara) ── */}
-      <div className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #8edcd4 0%, #93dcb4 20%, #7fd08a 40%, #a2da75 62%, #bce27f 82%, #9dd46e 100%)' }}>
-            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.16) 0 18px, transparent 18px 36px)', animation: 'gami-battle-stripes 2.6s linear infinite' }} />
+      <div className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
+            <div className="absolute inset-0 pointer-events-none opacity-70" style={{ backgroundImage: 'repeating-linear-gradient(180deg, rgba(255,255,255,0.10) 0 26px, rgba(0,0,0,0.04) 26px 52px)' }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.14) 0 20px, transparent 20px 40px)', animation: 'gami-battle-stripes 2.6s linear infinite' }} />
             <button onClick={onClose} className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-[#1e3a2a]/85 text-emerald-100 border-2 border-emerald-100/30 rounded-lg px-3 py-1.5 text-[11px] font-black tracking-widest active:scale-95 transition-transform">
               <X size={13} /> SAIR
             </button>
