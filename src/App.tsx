@@ -9852,11 +9852,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       {/* ── Painel inferior ── */}
       {inBattle && (
         <div className="bg-[#3d4a7d] border-t-4 border-[#2c3763] px-3 pt-3 pb-6 shrink-0">
-          <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-4 py-3 min-h-[62px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
-            <p className="text-sm font-bold text-[#3a3020] leading-snug">
+          <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3.5 min-h-[71px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
+            <p className="text-base font-bold text-[#3a3020] leading-snug">
               {phase === 'intro' ? `${fighters[0].name} desafia ${fighters[1].name}! Que vença o conhecimento! ⚔️`
                 : phase === 'anim' ? msg
-                : current ? <>{current.q} <span className="block text-[10px] font-black uppercase tracking-widest text-[#8a7a5a] mt-1">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
+                : current ? <>{current.q} <span className="block text-[11px] font-black uppercase tracking-widest text-[#8a7a5a] mt-1">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
             </p>
           </div>
           {current && phase !== 'intro' && (
@@ -9872,11 +9872,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     key={i}
                     onClick={() => answer(i)}
                     disabled={locked}
-                    className={`relative rounded-lg px-3 py-3 text-left transition-all active:translate-y-0.5 active:shadow-none border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                    className={`relative rounded-lg px-4 py-3.5 text-left transition-all active:translate-y-0.5 active:shadow-none border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
                     style={{ backgroundColor: isWrongPick ? '#7f1d1d' : palette[i] }}
                   >
-                    <span className="text-[10px] font-black text-white/80">{['A', 'B', 'C', 'D'][i]}</span>
-                    <p className="text-sm font-black text-white leading-tight">{opt}</p>
+                    <span className="text-[11px] font-black text-white/80">{['A', 'B', 'C', 'D'][i]}</span>
+                    <p className="text-base font-black text-white leading-tight">{opt}</p>
                     {isCorrect && <span className="absolute top-1.5 right-2 text-white font-black">✓</span>}
                     {isWrongPick && <span className="absolute top-1.5 right-2 text-white font-black">✗</span>}
                   </button>
