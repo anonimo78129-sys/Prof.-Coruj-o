@@ -9860,7 +9860,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
             </p>
           </div>
           {current && phase !== 'intro' && (
-            <div className="grid grid-cols-2 gap-2 mt-3 max-w-lg w-full mx-auto">
+            <div className="grid grid-cols-2 gap-2 max-w-lg w-full mx-auto" style={{ marginTop: 60, marginBottom: 60 }}>
               {current.options.map((opt, i) => {
                 const palette = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
                 const locked = phase === 'anim';
