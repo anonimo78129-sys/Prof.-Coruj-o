@@ -12084,6 +12084,8 @@ const AdminScreen = () => {
   const [usersError, setUsersError] = useState('');
   const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca' | 'metrics' | 'holidays'>('users');
   const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState<'all' | 'pro' | 'free' | 'limit' | 'admin'>('all');
+  const [confirmDeleteFbId, setConfirmDeleteFbId] = useState<string | null>(null);
   const [usersPage, setUsersPage] = useState(0);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [globalStats, setGlobalStats] = useState<any>(null);
@@ -12250,6 +12252,14 @@ const AdminScreen = () => {
     } catch (e) { console.error(e); }
   };
 
+  const deleteFeedback = async (id: string) => {
+    if (confirmDeleteFbId !== id) { setConfirmDeleteFbId(id); return; }
+    setConfirmDeleteFbId(null);
+    try {
+      await deleteDoc(doc(db, 'feedback', id));
+    } catch (e: any) { toast.error(formatApiError(e, 'Não consegui apagar o feedback.')); }
+  };
+
   const saveAnnouncement = async () => {
     setAnnouncementSaving(true);
     try {
@@ -12299,53 +12309,68 @@ const AdminScreen = () => {
 
   const totalUsers = sysUsers.length;
   const proUsers = sysUsers.filter(u => u.isPro).length;
+  const adminUsers = sysUsers.filter(u => u.role === 'admin').length;
   const expiredUsers = sysUsers.filter(u => !u.isPro && u.role !== 'admin' && (u.generationsUsed ?? 0) >= FREE_LIMIT).length;
 
   const filteredUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
-    if (!q) return sysUsers;
-    return sysUsers.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
-  }, [sysUsers, userSearch]);
+    let list = sysUsers;
+    if (userFilter === 'pro') list = list.filter(u => u.isPro);
+    else if (userFilter === 'admin') list = list.filter(u => u.role === 'admin');
+    else if (userFilter === 'limit') list = list.filter(u => !u.isPro && u.role !== 'admin' && (u.generationsUsed ?? 0) >= FREE_LIMIT);
+    else if (userFilter === 'free') list = list.filter(u => !u.isPro && u.role !== 'admin');
+    if (!q) return list;
+    return list.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
+  }, [sysUsers, userSearch, userFilter]);
   const usersPageCount = Math.ceil(filteredUsers.length / USERS_PAGE_SIZE);
   const pagedUsers = filteredUsers.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-md">
-          <Shield size={24} />
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 rounded-[2rem] p-5 mb-5 shadow-lg">
+        <div className="absolute -top-12 -right-12 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-10 w-40 h-40 bg-violet-400/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="flex items-center gap-3 relative">
+          <div className="w-12 h-12 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center text-white border border-white/20">
+            <Shield size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-white">Painel Admin</h1>
+            <p className="text-indigo-200 text-[10px] font-black uppercase tracking-[0.2em]">Gerenciamento do sistema</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Painel Admin</h1>
-          <p className="text-gray-500 text-sm">Gerenciamento do sistema</p>
+        <div className="grid grid-cols-4 gap-2 mt-4 relative">
+          {[
+            { v: totalUsers, l: 'Usuários' },
+            { v: proUsers, l: 'PRO' },
+            { v: adminUsers, l: 'Admins' },
+            { v: expiredUsers, l: 'No limite' },
+          ].map((s, i) => (
+            <div key={i} className="bg-white/10 border border-white/15 backdrop-blur rounded-xl py-2 text-center">
+              <p className="text-lg font-black text-white leading-tight tabular-nums">{s.v}</p>
+              <p className="text-[9px] text-indigo-200 font-bold uppercase tracking-wider">{s.l}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
-          <p className="text-2xl font-black text-indigo-600">{totalUsers}</p>
-          <p className="text-xs text-gray-500 font-medium">Usuários</p>
-        </div>
-        <div className="bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
-          <p className="text-2xl font-black text-emerald-600">{proUsers}</p>
-          <p className="text-xs text-gray-500 font-medium">PRO</p>
-        </div>
-        <div className="bg-white rounded-2xl p-3 text-center border border-gray-100 shadow-sm">
-          <p className="text-2xl font-black text-red-500">{expiredUsers}</p>
-          <p className="text-xs text-gray-500 font-medium">Expirados</p>
-        </div>
-      </div>
-
-      <div className="flex bg-gray-200/50 p-1 rounded-xl mb-6 shadow-sm gap-1 overflow-x-auto no-scrollbar">
-        {(['users','feedbacks','biblioteca','metrics','holidays'] as const).map(tab => {
-          const labels: Record<string, string> = { users: 'Usuários', feedbacks: 'Feedbacks', biblioteca: 'Biblioteca', metrics: 'Métricas', holidays: 'Feriados' };
-          return (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-none px-3 py-2 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>
-              {labels[tab]}
-            </button>
-          );
-        })}
+      <div className="flex bg-white p-1 rounded-2xl mb-5 shadow-sm border border-gray-100 gap-1 overflow-x-auto no-scrollbar">
+        {([
+          { id: 'users', label: 'Usuários', icon: Users },
+          { id: 'feedbacks', label: 'Feedbacks', icon: MessageSquare },
+          { id: 'biblioteca', label: 'Biblioteca', icon: Library },
+          { id: 'metrics', label: 'Métricas', icon: Database },
+          { id: 'holidays', label: 'Feriados', icon: CalendarIcon },
+        ] as const).map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)}
+            className={`flex-none px-3 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-1.5 ${activeTab === t.id ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <t.icon size={13} />
+            {t.label}
+            {t.id === 'feedbacks' && feedbacks.length > 0 && (
+              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${activeTab === t.id ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{feedbacks.length}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {activeTab === 'feedbacks' && (
@@ -12368,16 +12393,30 @@ const AdminScreen = () => {
             <div className="space-y-4 overflow-y-auto no-scrollbar flex-1">
               {feedbacks.map((fb) => (
                 <div key={fb.id} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="font-bold text-gray-900 text-sm">{fb.name || 'Usuário Anônimo'}</p>
-                      <p className="text-xs text-gray-500">{fb.email || 'Sem e-mail'}</p>
+                  <div className="flex justify-between items-start mb-2 gap-2">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center text-sm font-black shrink-0">
+                        {(fb.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="font-bold text-gray-900 text-sm truncate">{fb.name || 'Usuário Anônimo'}</p>
+                        <p className="text-xs text-gray-500 truncate">{fb.email || 'Sem e-mail'}</p>
+                      </div>
                     </div>
-                    <span className="text-xs text-gray-400 bg-white px-2 py-1 rounded-lg border border-gray-100">
+                    <span className="text-[10px] text-gray-400 bg-white px-2 py-1 rounded-lg border border-gray-100 shrink-0">
                       {new Date(fb.date).toLocaleDateString('pt-BR')} {new Date(fb.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-gray-700 text-sm mt-2">{fb.text}</p>
+                  <p className="text-gray-700 text-sm mt-2 leading-relaxed">{fb.text}</p>
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={() => deleteFeedback(fb.id)}
+                      onBlur={() => setConfirmDeleteFbId(null)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${confirmDeleteFbId === fb.id ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`}
+                    >
+                      <Trash2 size={12} /> {confirmDeleteFbId === fb.id ? 'Confirmar?' : 'Apagar'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -12484,7 +12523,7 @@ const AdminScreen = () => {
             </div>
           )}
 
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input
               value={userSearch}
@@ -12494,13 +12533,28 @@ const AdminScreen = () => {
             />
           </div>
 
+          <div className="flex gap-1.5 mb-4 overflow-x-auto no-scrollbar">
+            {([['all', 'Todos'], ['pro', 'PRO'], ['free', 'Free'], ['limit', 'No limite'], ['admin', 'Admins']] as const).map(([id, label]) => (
+              <button key={id} onClick={() => { setUserFilter(id); setUsersPage(0); }}
+                className={`flex-none px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors ${userFilter === id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
+            {pagedUsers.length === 0 && (
+              <p className="text-center text-sm text-gray-400 py-10">Nenhum usuário encontrado com esse filtro.</p>
+            )}
             {pagedUsers.map(u => {
               const trialStatus = getUsageStatus(u);
               const isAdmin = u.role === 'admin';
               return (
-                <div key={u.id} className="p-3 border border-gray-100 rounded-xl bg-gray-50">
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                <div key={u.id} className="p-3 border border-gray-100 rounded-2xl bg-gray-50">
+                  <div className="flex items-start gap-2.5 mb-2">
+                    <div className={`w-9 h-9 rounded-full text-white flex items-center justify-center text-sm font-black shrink-0 bg-gradient-to-br ${isAdmin ? 'from-indigo-500 to-violet-700' : u.isPro ? 'from-emerald-400 to-green-600' : 'from-gray-400 to-gray-500'}`}>
+                      {(u.name || u.email || '?').charAt(0).toUpperCase()}
+                    </div>
                     <div className="overflow-hidden flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-bold text-sm text-gray-900 truncate">{u.name || 'Sem nome'}</p>
@@ -12631,7 +12685,7 @@ const AdminScreen = () => {
                       <p className="text-2xl font-black text-indigo-700">${currentCost.toFixed(5)}</p>
                       <p className="text-xs text-indigo-400">{current.gens.toLocaleString()} gerações · {(current.inp + current.out).toLocaleString()} tokens</p>
                     </div>
-                    <span className="text-3xl">🦉</span>
+                    <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-12 h-12 object-contain" referrerPolicy="no-referrer" />
                   </div>
                 )}
                 <div className="flex items-end gap-2 h-24">
@@ -12755,17 +12809,24 @@ const AdminScreen = () => {
           <p className="text-xs text-gray-400 mb-4">Aparecem no calendário de todos os professores automaticamente.</p>
 
           <div className="space-y-2 mb-4">
-            {holidays.sort((a,b) => a.date.localeCompare(b.date)).map(h => (
-              <div key={h.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{h.name}</p>
-                  <p className="text-xs text-gray-500">{new Date(h.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+            {holidays.sort((a,b) => a.date.localeCompare(b.date)).map(h => {
+              const d = new Date(h.date + 'T00:00:00');
+              return (
+                <div key={h.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                  <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-100 flex flex-col items-center justify-center shrink-0">
+                    <span className="text-sm font-black text-indigo-700 leading-none">{d.getDate()}</span>
+                    <span className="text-[9px] font-bold text-indigo-400 uppercase">{d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{h.name}</p>
+                    <p className="text-xs text-gray-400">{d.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric' })}</p>
+                  </div>
+                  <button onClick={() => deleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-                <button onClick={() => deleteHoliday(h.id)} className="text-red-400 hover:text-red-600 p-1">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
             {holidays.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhum feriado cadastrado.</p>}
           </div>
 
@@ -12777,16 +12838,18 @@ const AdminScreen = () => {
               onChange={e => setNewHoliday(h => ({...h, name: e.target.value}))}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
             />
-            <input
-              type="date"
-              value={newHoliday.date}
-              onChange={e => setNewHoliday(h => ({...h, date: e.target.value}))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-            />
-            <button onClick={saveHoliday} disabled={holidaySaving || !newHoliday.name.trim() || !newHoliday.date}
-              className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl disabled:opacity-50">
-              {holidaySaving ? 'Salvando...' : '+ Adicionar feriado'}
-            </button>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={newHoliday.date}
+                onChange={e => setNewHoliday(h => ({...h, date: e.target.value}))}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white"
+              />
+              <button onClick={saveHoliday} disabled={holidaySaving || !newHoliday.name.trim() || !newHoliday.date}
+                className="bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl disabled:opacity-50 flex items-center gap-1.5 text-sm">
+                {holidaySaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Adicionar
+              </button>
+            </div>
           </div>
         </div>
       )}
