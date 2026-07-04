@@ -12326,7 +12326,7 @@ const AdminScreen = () => {
   const pagedUsers = filteredUsers.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40 h-full flex flex-col">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 rounded-[2rem] p-5 mb-5 shadow-lg">
         <div className="absolute -top-12 -right-12 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-16 -left-10 w-40 h-40 bg-violet-400/20 rounded-full blur-2xl pointer-events-none" />
@@ -12374,23 +12374,23 @@ const AdminScreen = () => {
       </div>
 
       {activeTab === 'feedbacks' && (
-        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col">
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <MessageSquare size={20} className="text-indigo-600" />
             Feedbacks dos Usuários
           </h2>
 
           {isLoading ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="py-20 flex items-center justify-center">
               <Loader2 className="animate-spin text-indigo-600" size={32} />
             </div>
           ) : feedbacks.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+            <div className="py-20 flex flex-col items-center justify-center text-gray-400">
               <MessageSquare size={48} className="mb-4 opacity-20" />
               <p>Nenhum feedback recebido ainda.</p>
             </div>
           ) : (
-            <div className="space-y-4 overflow-y-auto no-scrollbar flex-1">
+            <div className="space-y-4">
               {feedbacks.map((fb) => (
                 <div key={fb.id} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
                   <div className="flex justify-between items-start mb-2 gap-2">
@@ -12511,7 +12511,7 @@ const AdminScreen = () => {
       )}
 
       {activeTab === 'users' && (
-        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8 flex-1 flex flex-col">
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <Shield size={20} className="text-indigo-600" />
             Gerenciamento de Usuários
@@ -12542,7 +12542,7 @@ const AdminScreen = () => {
             ))}
           </div>
 
-          <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
+          <div className="space-y-3">
             {pagedUsers.length === 0 && (
               <p className="text-center text-sm text-gray-400 py-10">Nenhum usuário encontrado com esse filtro.</p>
             )}
