@@ -905,7 +905,7 @@ const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, 
   );
 };
 
-const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, inboxMessages, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
+const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, profileLoaded, inboxMessages, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, profileLoaded?: boolean, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
   const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
     { title: 'Estúdio', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
@@ -927,11 +927,14 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
     return parts[0];
   };
   
+  // Enquanto o Firestore não respondeu (profileLoaded false), não renderizamos
+  // um nome — evita o flash do placeholder antes do nome real chegar.
   const firstName = getDisplayName(profile?.name || '');
+  const headerTitle = profileLoaded === false && !profile?.name ? 'Olá!' : `${firstName}!`;
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title={`${firstName}!`} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
+      <Header setScreen={setScreen} title={headerTitle} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
       
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2rem] p-6 text-white shadow-lg mb-8 relative overflow-hidden">
         <div className="relative z-10">
@@ -13298,7 +13301,7 @@ function AppInner() {
     user ? `users/${user.uid}` : 'users/temp',
     user,
     {
-      name: 'Prof. Silva',
+      name: '',
       subject: 'História • Ensino Fundamental II',
       photo: ''
     }
@@ -13624,7 +13627,7 @@ function AppInner() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
-            name: 'Prof. Silva',
+            name: '',
             email: email.toLowerCase().trim(),
             role: 'user',
             isPro: false,
@@ -14704,7 +14707,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
       )}
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
-          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} setSelectedDate={(d: Date) => {
+          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} profileLoaded={profileLoaded} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} setSelectedDate={(d: Date) => {
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
