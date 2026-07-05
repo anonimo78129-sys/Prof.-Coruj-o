@@ -4430,13 +4430,15 @@ const ProfileScreen = ({
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
       
-      <div className="bg-white rounded-[2rem] p-6 shadow-sm border-2 border-gray-50 mb-8 flex flex-col items-center text-center">
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 rounded-[2rem] p-6 shadow-lg mb-8 flex flex-col items-center text-center">
+        <div className="absolute -top-14 -right-14 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-12 w-40 h-40 bg-violet-400/20 rounded-full blur-2xl pointer-events-none" />
         <div className="relative inline-block mb-4">
-          <div className={`w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-indigo-600 relative group cursor-pointer flex items-center justify-center ${profile.photo ? 'bg-gray-200' : 'bg-indigo-600'}`} onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
+          <div className={`w-24 h-24 rounded-full overflow-hidden shadow-xl border-[3px] border-white/80 relative group cursor-pointer flex items-center justify-center ${profile.photo ? 'bg-gray-200' : 'bg-white/15'}`} onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
               <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { setProfile({ ...profile, photo: '' }); }} />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white">
+              <div className="w-full h-full flex items-center justify-center bg-white/10 text-white">
                 <User size={48} />
               </div>
             )}
@@ -4456,7 +4458,7 @@ const ProfileScreen = ({
           <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
         </div>
         {isEditingProfile ? (
-          <div className="w-full space-y-3 mt-4">
+          <div className="relative w-full space-y-3 mt-4 bg-white rounded-2xl p-4 text-left">
             <div className="text-left">
               <label className="text-xs font-bold text-gray-400 uppercase ml-1">Seu Nome</label>
               <input
@@ -4492,20 +4494,20 @@ const ProfileScreen = ({
           </div>
         ) : (
           <>
-            <h2 className="text-xl font-bold text-gray-900 mt-2">{profile.name || 'Professor'}</h2>
-            {profile.subject && <p className="text-sm text-gray-400 mt-0.5">{profile.subject}</p>}
+            <h2 className="relative text-xl font-black text-white mt-2">{profile.name || 'Professor'}</h2>
+            {profile.subject && <p className="relative text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 mt-1">{profile.subject}</p>}
             {profile.schoolName && (
-              <p className="text-sm text-indigo-600 font-medium mt-1 bg-indigo-50 px-3 py-1 rounded-full">
+              <p className="relative text-sm text-white font-medium mt-2 bg-white/15 border border-white/20 backdrop-blur px-3 py-1 rounded-full">
                 {profile.schoolName}
               </p>
             )}
-            {user?.email && <p className="text-xs text-gray-400 mt-2">{user.email}</p>}
+            {user?.email && <p className="relative text-xs text-indigo-200/80 mt-2">{user.email}</p>}
           </>
         )}
 
         <button
           onClick={() => isEditingProfile ? saveProfile() : setIsEditingProfile(true)}
-          className="mt-6 bg-[#F8F9FE] text-indigo-600 px-6 py-2.5 rounded-full text-base font-bold w-full"
+          className={`relative mt-6 px-6 py-2.5 rounded-full text-base font-bold w-full active:scale-[0.98] transition-all ${isEditingProfile ? 'bg-white text-indigo-700 shadow-lg' : 'bg-white/15 border border-white/25 text-white backdrop-blur'}`}
         >
           {isEditingProfile ? 'Salvar' : 'Editar Perfil'}
         </button>
@@ -4514,7 +4516,7 @@ const ProfileScreen = ({
       {/* Pro Status Card */}
       {profile.isPro || profile.role === 'admin' ? (
         <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-5 shadow-lg mb-4 flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0 text-3xl">⭐</div>
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0"><Crown size={28} className="text-white" /></div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="bg-white text-orange-600 text-xs font-black px-2 py-0.5 rounded-full tracking-wider uppercase">PRO</span>
@@ -4527,7 +4529,7 @@ const ProfileScreen = ({
       ) : (
         <div className="bg-white rounded-[2rem] p-5 shadow-sm border-2 border-gray-100 mb-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-xl">🔒</div>
+            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center"><Lock size={18} className="text-indigo-600" /></div>
             <div>
               <p className="font-bold text-gray-900 text-sm">Modo Gratuito</p>
               <p className="text-xs text-gray-400">{profile.generationsUsed ?? 0} de 10 gerações usadas</p>
@@ -4535,7 +4537,7 @@ const ProfileScreen = ({
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
             <div
-              className="bg-indigo-500 h-2 rounded-full transition-all"
+              className="bg-gradient-to-r from-indigo-500 to-violet-500 h-2 rounded-full transition-all"
               style={{ width: `${Math.min(100, ((profile.generationsUsed ?? 0) / 10) * 100)}%` }}
             />
           </div>
@@ -4543,7 +4545,7 @@ const ProfileScreen = ({
             href="https://wa.me/5598981796309?text=Olá! Quero ativar o plano Pro do Prof. Corujão."
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full bg-green-500 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm"
+            className="w-full bg-green-500 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg shadow-green-500/25 active:scale-[0.98] transition-transform"
           >
             <MessageCircle size={18} /> Ativar Pro via WhatsApp
           </a>
@@ -4899,7 +4901,7 @@ const ProfileScreen = ({
           onClick={() => setShowDangerZone(!showDangerZone)}
           className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-red-50 border border-red-100 active:scale-[0.98] transition-transform"
         >
-          <span className="text-xs font-black text-red-400 uppercase tracking-widest">⚠️ Zona de Perigo</span>
+          <span className="text-xs font-black text-red-400 uppercase tracking-widest flex items-center gap-1.5"><AlertCircle size={13} /> Zona de Perigo</span>
           <ChevronRight size={16} className={`text-red-300 transition-transform ${showDangerZone ? 'rotate-90' : ''}`} />
         </button>
 
