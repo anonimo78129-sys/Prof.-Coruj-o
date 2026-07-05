@@ -13,7 +13,7 @@ import {
   Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
   Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
-  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen
+  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -1186,7 +1186,15 @@ const AdvancedSettings = ({
         <>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de questões</label>
-            <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={Number.isFinite(questionCount) ? questionCount : ''}
+              onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+              onBlur={() => setQuestionCount(Number.isFinite(questionCount) ? Math.min(30, Math.max(1, questionCount)) : 10)}
+              className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de questão</label>
@@ -1930,10 +1938,9 @@ const buildDocx = async (
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
   const gabMd  = sepIdx >= 0 ? rawMd.slice(sepIdx + SEP.length) : '';
 
-  const accentHex = { plan: '059669', exam: 'DC2626', activities: '2563EB' };
-  const darkHex   = { plan: '064E3B', exam: '7F1D1D', activities: '1E3A8A' };
-  const ac = accentHex[docType];
-  const dk = darkHex[docType];
+  // Cor única da marca (indigo) para todos os tipos de documento
+  const ac = '4338CA';
+  const dk = '312E81';
 
   const parseInline = (text: string) => {
     const runs: InstanceType<typeof TextRun>[] = [];
@@ -2043,6 +2050,12 @@ const buildDocx = async (
     // Header info
     docChildren.push(infoLine(`ESCOLA: ${opts.school || '____________'}   |   PROFESSOR(A): ${opts.teacher || '____________'}   |   DISCIPLINA: ${opts.subject || '____________'}`));
     docChildren.push(infoLine(`TURMA: ${opts.className || '____________'}   |   DATA: ___/___/______   |   ${isExam ? 'NOTA: _______' : 'ENTREGA: ____________'}`));
+    if (isExam && (opts.examValue || opts.examDuration)) {
+      const durStr = opts.examDuration
+        ? (opts.examDuration < 60 ? `${opts.examDuration} min` : `${Math.floor(opts.examDuration / 60)}h${opts.examDuration % 60 ? `${opts.examDuration % 60}min` : ''}`)
+        : '____________';
+      docChildren.push(infoLine(`VALOR: ${opts.examValue ?? '____'} pontos   |   DURAÇÃO: ${durStr}`));
+    }
     docChildren.push(hr());
 
     // Student name underline
@@ -2444,8 +2457,6 @@ const PlannerScreen = ({
   setPlannerPlan: setPlan,
   plannerPresentationData: presentationData,
   setPlannerPresentationData: setPresentationData,
-  plannerResources: resources,
-  setPlannerResources: setResources,
   plannerActivity: activity,
   setPlannerActivity: setActivity,
   plannerExam: exam,
@@ -2507,8 +2518,6 @@ const PlannerScreen = ({
   setPlannerPlan: (p: string | ((prev: string) => string)) => void,
   plannerPresentationData: PresentationData | null,
   setPlannerPresentationData: (d: PresentationData | null) => void,
-  plannerResources: {type: 'activities' | 'slides' | 'exam', content: string}[],
-  setPlannerResources: (r: {type: 'activities' | 'slides' | 'exam', content: string}[] | ((prev: {type: 'activities' | 'slides' | 'exam', content: string}[]) => {type: 'activities' | 'slides' | 'exam', content: string}[])) => void,
   plannerActivity: string,
   setPlannerActivity: (a: string | ((prev: string) => string)) => void,
   plannerExam: string,
@@ -2584,6 +2593,18 @@ const PlannerScreen = ({
 
   const [error, setError] = useState('');
   const [regenLoading, setRegenLoading] = useState(false);
+
+  // Gabarito no preview: oculto por padrão em provas, visível nos demais modos
+  const [showGabarito, setShowGabarito] = useState(mode !== 'exam');
+  useEffect(() => { setShowGabarito(mode !== 'exam'); }, [mode]);
+
+  const resultText = typeof currentResult === 'string' ? currentResult : '';
+  // Separador cru ---GABARITO--- vira um heading legível no preview
+  // (consome o heading "## Gabarito…" logo em seguida, se houver, para não duplicar)
+  const displayResult = resultText.replace(/^[ \t]*---GABARITO---[ \t]*$(?:\n+^#{1,3} .*gabarito.*$)?/gim, '## 🔑 Gabarito do Professor');
+  const gabHeadingMatch = displayResult.match(/^#{1,3} .*gabarito.*$/im);
+  const hasGabarito = (gabHeadingMatch?.index ?? -1) > 0;
+  const visibleResult = hasGabarito && !showGabarito ? displayResult.slice(0, gabHeadingMatch!.index as number) : displayResult;
 
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
   const [regenState, setRegenState] = useState<{ idx: number; prompt: string } | null>(null);
@@ -3355,13 +3376,13 @@ const PlannerScreen = ({
               <div className="flex flex-col gap-2 mb-6">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => generateResource('activities')}
+                    onClick={() => { generateResource('activities'); setPlannerMode('activities'); }}
                     className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
                   >
                     <FileText size={16} /> Atividades
                   </button>
                   <button
-                    onClick={() => generateResource('slides')}
+                    onClick={() => { generateResource('slides'); setPlannerMode('slides'); }}
                     className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
                   >
                     <Presentation size={16} /> Slides
@@ -3408,9 +3429,26 @@ const PlannerScreen = ({
                 transition={{ duration: 0.35 }}
                 className="flex flex-col gap-2 mb-4"
               >
-                <div className="max-h-64 overflow-y-auto no-scrollbar border border-gray-100 rounded-2xl p-4 bg-gray-50">
-                  <div className="markdown-body text-xs">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+                    {mode === 'exam' ? 'Prova' : mode === 'activities' ? 'Atividades' : 'Plano de Aula'}
+                  </span>
+                  {selectedClass?.name && <span className="text-[11px] font-medium text-gray-500">Turma: {selectedClass.name}</span>}
+                  {(selectedClass?.subject || profile.subject) && <span className="text-[11px] font-medium text-gray-500">{selectedClass?.subject || profile.subject}</span>}
+                  <span className="text-[11px] text-gray-400">{new Date().toLocaleDateString('pt-BR')}</span>
+                </div>
+                {hasGabarito && (
+                  <button
+                    onClick={() => setShowGabarito(!showGabarito)}
+                    className="self-start flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full active:scale-95 transition-transform"
+                  >
+                    {showGabarito ? <EyeOff size={12} /> : <Eye size={12} />}
+                    {showGabarito ? 'Ocultar gabarito' : 'Mostrar gabarito'}
+                  </button>
+                )}
+                <div className="max-h-[60vh] overflow-y-auto no-scrollbar border border-gray-100 rounded-2xl p-4 bg-gray-50">
+                  <div className="markdown-body text-sm">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{visibleResult}</ReactMarkdown>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -3467,59 +3505,6 @@ const PlannerScreen = ({
               </motion.div>
             )}
 
-            {mode !== 'slides' && resources.length > 0 && (
-              <div className="space-y-4 border-t border-gray-100 pt-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Materiais Complementares</h3>
-                {resources.map((res, i) => (
-                  <div key={i} className="flex flex-col gap-2">
-                    <div className="max-h-64 overflow-y-auto no-scrollbar border border-gray-100 rounded-2xl p-4 bg-white shadow-sm">
-                      <div className="flex items-center gap-2 mb-4 font-bold text-indigo-600">
-                        {res.type === 'activities' ? <FileText size={16} /> : <Presentation size={16} />}
-                        {res.type === 'activities' ? 'Atividades' : 'Roteiro de Slides'}
-                      </div>
-                      <div className="markdown-body text-xs">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{res.content}</ReactMarkdown>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                          onClick={async () => {
-                            if (preparingDoc !== null) return;
-                            setPreparingDoc(i);
-                            try {
-                              const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
-                              const blob = await buildDocx(res.content, dt, {
-                                school: selectedClass?.school || profileSchoolName || '',
-                                teacher: profileName || '',
-                                subject: selectedClass?.subject || profile.subject || '',
-                                topic,
-                                className: selectedClass?.name || '',
-                                duration,
-                                lessonTime,
-                                turn,
-                                examValue,
-                                examDuration,
-                              });
-                              const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
-                              const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                              downloadBlob(blob, filename);
-                            } catch (e) {
-                              console.error('Erro ao exportar Word:', e);
-                              toast.error('O documento Word fugiu! Tenta gerar de novo.');
-                            } finally {
-                              setPreparingDoc(null);
-                            }
-                          }}
-                          disabled={preparingDoc !== null}
-                          className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-                        >
-                          {preparingDoc === i ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
-                        </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -8435,10 +8420,18 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
       return '<table><thead><tr>' + head.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' +
         body.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>\n';
     })
+    // Separador literal ---GABARITO--- → quebra de página + título (consome o heading
+    // "## Gabarito…" logo em seguida, se houver, para não duplicar a quebra)
+    .replace(/^[ \t]*---GABARITO---[ \t]*$(?:\n+^#{1,3} .*gabarito.*$)?/gim, '<div style="page-break-before: always"></div><h2>GABARITO DO PROFESSOR</h2>')
+    // ### antes de ## (senão "### Título" vira "<h2># Título</h2>")
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     // Gabarito começa sempre em página nova (evita resposta na mesma folha do aluno)
     .replace(/^## (.+)$/gm, (_m, t: string) => `${/gabarito/i.test(t) ? '<div style="page-break-before: always"></div>' : ''}<h2>${t}</h2>`)
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^# (.+)$/gm, (_m, t: string) => `${/gabarito/i.test(t) ? '<div style="page-break-before: always"></div>' : ''}<h1>${t}</h1>`)
+    // Alternativas de múltipla escolha "( ) A) …" → linha de opção estilizada
+    .replace(/^\( \) (.+)$\n?/gm, '<div class="opt"><span class="opt-bubble"></span><span>$1</span></div>')
+    // Linhas de resposta (10+ underscores) → linha limpa com borda inferior
+    .replace(/^_{10,}[ \t]*$\n?/gm, '<div class="answer-line"></div>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^---$/gm, '<hr>')
@@ -8468,6 +8461,9 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     th { background: #4338ca; color: white; font-weight: 800; padding: ${printOpts?.landscape ? '8px 10px' : '6px 8px'}; text-align: left; border: 1px solid #4338ca; }
     td { padding: ${printOpts?.landscape ? '8px 10px' : '6px 8px'}; border: 1px solid #e2e8f0; vertical-align: top; }
     tr:nth-child(even) td { background: #f8fafc; }
+    .opt { display: flex; align-items: center; gap: 8px; margin: 3px 0 3px 14px; font-size: 11.5px; }
+    .opt-bubble { width: 11px; height: 11px; border: 1.5px solid #64748b; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+    .answer-line { border-bottom: 1px solid #94a3b8; height: 22px; width: 100%; max-width: 640px; margin: 0 0 4px; }
     .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
   </style></head><body>
   <div class="header">
@@ -13524,7 +13520,6 @@ function AppInner() {
   const [plannerPresentationData, setPlannerPresentationData] = useState<PresentationData | null>(null);
   const [plannerActivity, setPlannerActivity] = useState('');
   const [plannerExam, setPlannerExam] = useState('');
-  const [plannerResources, setPlannerResources] = useState<{type: 'activities' | 'slides' | 'exam', content: string}[]>([]);
   
   // Generation Settings (moved to global for Chat Control)
   const [plannerDuration, setPlannerDuration] = useState(1);
@@ -14267,9 +14262,9 @@ ${avaliacaoBlock}
         const hasInvalidCode = allCodesInPlan.some(c => !validCodes.has(c));
         const hasMissingCode = bnccSkills.some(s => !allCodesInPlan.includes(s.code.toUpperCase()));
         if (hasInvalidCode || hasMissingCode || allCodesInPlan.length === 0) {
-          const correctSection = `## Habilidade (BNCC)\n${bnccBlock}`;
+          const correctSection = `## HABILIDADE (BNCC)\n${bnccBlock}`;
           planResult = planDraft.replace(
-            /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/,
+            /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/i,
             correctSection + '\n'
           );
         }
@@ -14289,7 +14284,7 @@ ${avaliacaoBlock}
     if (!targetTopic.trim()) return;
     if (isLimitReached) return;
 
-    const taskId = addTask({ type, title: `${type === 'slides' ? 'Slides' : 'Atividades'}: ${targetTopic}` });
+    const taskId = addTask({ type, title: `${type === 'slides' ? 'Slides' : type === 'exam' ? 'Prova' : 'Atividades'}: ${targetTopic}` });
     try {
       const selectedClass = schedules.find(c => c.id === targetClassId);
       const className = selectedClass ? selectedClass.name : 'Geral';
@@ -14737,8 +14732,6 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerPlan={setPlannerPlan}
             plannerPresentationData={plannerPresentationData}
             setPlannerPresentationData={setPlannerPresentationData}
-            plannerResources={plannerResources}
-            setPlannerResources={setPlannerResources}
             plannerActivity={plannerActivity}
             setPlannerActivity={setPlannerActivity}
             plannerExam={plannerExam}
