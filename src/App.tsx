@@ -12,7 +12,7 @@ import {
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
   Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
   Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
-  Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays,
+  Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
   Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -4140,6 +4140,9 @@ const ChatScreen = ({
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
               >
+                {msg.role !== 'user' && (
+                  <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-7 h-7 object-contain shrink-0 mb-5" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                )}
                 <div
                   onTouchStart={() => startLongPress(cleanText)}
                   onTouchEnd={cancelLongPress}
@@ -4148,7 +4151,7 @@ const ChatScreen = ({
                     isError
                       ? 'bg-red-50 text-red-700 rounded-bl-none border border-red-100'
                       : msg.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-br-none'
+                      ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-br-none shadow-md shadow-indigo-600/20'
                       : 'bg-white text-gray-800 rounded-bl-none shadow-sm border border-gray-50'
                   }`}
                 >
@@ -4183,8 +4186,9 @@ const ChatScreen = ({
               animate={{ opacity: 1, y: 0, x: 0 }}
               exit={{ opacity: 0, y: 6 }}
               transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-              className="flex justify-start"
+              className="flex justify-start items-end gap-2"
             >
+              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-7 h-7 object-contain shrink-0 mb-1" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-50 flex flex-col gap-1.5 max-w-[240px]">
                 <div className="flex gap-2 items-center">
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
@@ -4549,9 +4553,9 @@ const ProfileScreen = ({
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Turmas', value: schedules.length, emoji: '👥' },
-          { label: 'Materiais', value: savedResources.length, emoji: '📄', action: () => setScreen('acervo') },
-          { label: 'Gerações', value: profile.generationsUsed ?? 0, emoji: '✨' },
+          { label: 'Turmas', value: schedules.length, icon: Users, chip: 'bg-indigo-50 text-indigo-600', action: undefined as (() => void) | undefined },
+          { label: 'Materiais', value: savedResources.length, icon: FolderOpen, chip: 'bg-amber-50 text-amber-600', action: () => setScreen('acervo') },
+          { label: 'Gerações', value: profile.generationsUsed ?? 0, icon: Sparkles, chip: 'bg-violet-50 text-violet-600', action: undefined },
         ].map(stat => (
           <button
             key={stat.label}
@@ -4559,7 +4563,7 @@ const ProfileScreen = ({
             disabled={!stat.action}
             className={`bg-white rounded-2xl p-4 shadow-sm border border-gray-50 text-center ${stat.action ? 'active:scale-95 transition-transform' : 'cursor-default'}`}
           >
-            <div className="text-2xl mb-1">{stat.emoji}</div>
+            <div className={`w-9 h-9 mx-auto rounded-xl flex items-center justify-center mb-1.5 ${stat.chip}`}><stat.icon size={17} /></div>
             <div className="text-xl font-black text-gray-900">{stat.value}</div>
             <div className="text-xs text-gray-400 font-medium">{stat.label}{stat.action ? ' →' : ''}</div>
           </button>
@@ -11353,7 +11357,7 @@ const GamificacaoScreen = ({
             </div>
             {currentCls.rewards.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
-                <span className="text-3xl">🛒</span>
+                <Gift size={36} className="mx-auto text-gray-300" />
                 <p className="mt-2 font-bold">Sem recompensas configuradas</p>
                 <button onClick={() => { setTab('config'); setConfigSection('rewards'); }} className="mt-3 bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-xl">Configurar loja</button>
               </div>
@@ -11364,10 +11368,10 @@ const GamificacaoScreen = ({
                 return (
                   <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{r.emoji}</span>
+                      <span className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-xl shrink-0">{r.emoji}</span>
                       <div>
                         <p className="font-bold text-gray-800 text-sm">{r.label}</p>
-                        <p className="text-xs text-amber-500 font-black">🪙 {r.cost} corujinhas</p>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 font-black bg-amber-100 rounded-full px-2 py-0.5 mt-1">🪙 {r.cost} corujinhas</span>
                       </div>
                     </div>
                     {shopStudentId ? (
@@ -13619,25 +13623,31 @@ function AppInner() {
                   </div>
                 )}
 
-                <input
-                  type="email"
-                  placeholder="Seu e-mail"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  required
-                />
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="email"
+                    placeholder="Seu e-mail"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
 
                 {!isResetMode && (
                   <div className="flex flex-col gap-2">
-                    <input
-                      type="password"
-                      placeholder="Sua senha"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      required
-                    />
+                    <div className="relative">
+                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <input
+                        type="password"
+                        placeholder="Sua senha"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        required
+                      />
+                    </div>
                     {isLoginMode && (
                       <button
                         type="button"
@@ -13653,7 +13663,7 @@ function AppInner() {
                 <button
                   type="submit"
                   disabled={isAuthProcessing}
-                  className={`w-full text-white font-bold py-3 px-6 rounded-xl shadow-md transition-colors ${isAuthProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                  className={`w-full text-white font-bold py-3 px-6 rounded-xl transition-all ${isAuthProcessing ? 'bg-gray-400 cursor-not-allowed shadow-md' : 'bg-gradient-to-r from-indigo-600 to-violet-600 shadow-lg shadow-indigo-600/30 active:scale-[0.98]'}`}
                 >
                   {isAuthProcessing ? 'Processando...' : (isResetMode ? 'Enviar link' : (isLoginMode ? 'Entrar' : 'Cadastrar'))}
                 </button>
@@ -14355,6 +14365,11 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
       {showOnboarding && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-end justify-center p-0">
           <div className="bg-white w-full max-w-md rounded-t-[2.5rem] p-6 pb-10 shadow-2xl">
+            <div className="flex justify-center gap-1.5 mb-5">
+              {[0, 2, 3].map(stepId => (
+                <div key={stepId} className={`h-1.5 rounded-full transition-all duration-300 ${onboardingStep === stepId ? 'w-6 bg-indigo-600' : 'w-1.5 bg-gray-200'}`} />
+              ))}
+            </div>
             {onboardingStep === 0 && (
               <>
                 <div className="flex flex-col items-center text-center mb-6">
