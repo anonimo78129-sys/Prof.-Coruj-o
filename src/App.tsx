@@ -41,6 +41,16 @@ const escapeHtml = (s: unknown): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// Embaralhamento Fisher–Yates — sort(() => Math.random() - 0.5) é enviesado.
+const shuffleArray = <T,>(arr: readonly T[]): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 // ── Contas administradoras (bootstrap) ──────────────────────────────────────
 // A autorização real é aplicada nas regras do Firestore/Storage; estas listas
 // controlam apenas a exibição de recursos de admin no cliente.
@@ -1911,7 +1921,7 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
         </button>
         <button
           onClick={() => {
-            const newResourceId = Math.random().toString(36).substr(2, 9);
+            const newResourceId = Math.random().toString(36).slice(2, 11);
             setSavedResources((prev: SavedResource[]) => [...prev, { id: newResourceId, type: 'slides' as const, title: presentationData.presentationTitle, date: Date.now(), presentationData }]);
           }}
           className="flex-1 bg-indigo-50 text-indigo-600 rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-sm">
@@ -2650,7 +2660,7 @@ const PlannerScreen = ({
   const addNewClass = () => {
     if (!newClassName.trim()) return;
     const newClass: ClassSchedule = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).slice(2, 11),
       name: newClassName,
       days: [1, 2, 3, 4, 5], // Default to weekdays
       time: '08:00'
@@ -3766,7 +3776,7 @@ const ChatScreen = ({
     const newMessages = [...messages, { 
       role: 'user' as const, 
       text: textToSend, 
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).slice(2, 11),
       date: Date.now(),
       attachment: currentFile ? {
         mimeType: currentFile.file.type,
@@ -3978,7 +3988,7 @@ const ChatScreen = ({
           
           if (call.name === 'schedule_class') {
             addClassItems([{
-              id: Math.random().toString(36).substr(2, 9),
+              id: Math.random().toString(36).slice(2, 11),
               title: args.title,
               date: args.date,
               status: 'pending',
@@ -4036,13 +4046,13 @@ const ChatScreen = ({
             responseText += `Perfil atualizado com sucesso. `;
           }
         }
-        setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: responseText || "Tudo certo! Realizei as ações solicitadas.", date: Date.now() }]);
+        setMessages([...newMessages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: responseText || "Tudo certo! Realizei as ações solicitadas.", date: Date.now() }]);
       } else {
-        setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: response.text || "Em que posso ajudar?", date: Date.now() }]);
+        setMessages([...newMessages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: response.text || "Em que posso ajudar?", date: Date.now() }]);
       }
     } catch (error) {
       console.error(error);
-      setMessages([...newMessages, { id: Math.random().toString(36).substr(2, 9), role: 'model', text: '❌ ' + formatApiError(error, 'Tive um branco aqui, professor. Envia de novo que eu respondo.'), date: Date.now() }]);
+      setMessages([...newMessages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: '❌ ' + formatApiError(error, 'Tive um branco aqui, professor. Envia de novo que eu respondo.'), date: Date.now() }]);
     }
     setLoading(false);
   };
@@ -4383,7 +4393,7 @@ const ProfileScreen = ({
       classProfile: classForm.profile || undefined,
     };
     if (editingClass === 'new') {
-      onAddClass({ id: Math.random().toString(36).substr(2, 9), ...classData });
+      onAddClass({ id: Math.random().toString(36).slice(2, 11), ...classData });
     } else if (editingClass && typeof editingClass !== 'string') {
       setSchedules(schedules.map(s => s.id === (editingClass as ClassSchedule).id ? { ...s, ...classData } : s));
     }
@@ -5738,7 +5748,7 @@ const distributeSyllabus = (rows: SyllabusRow[], selectedClass: ClassSchedule, h
           ? (lesson.content || mod.title)
           : (lessonTopics[done]?.join(' · ') || '');
         items.push({
-          id: Math.random().toString(36).substr(2, 9),
+          id: Math.random().toString(36).slice(2, 11),
           title,
           date: `${cur.getDate()} ${MONTH_ABBR_IMPORT[cur.getMonth()]}`,
           status: 'pending',
@@ -6560,7 +6570,7 @@ const buildBingoCards = (items: string[], count: number, dim: 3 | 5 = 5, freeTex
   const freeR = Math.floor(dim / 2), freeC = Math.floor(dim / 2);
   const cards: string[][][] = [];
   for (let n = 0; n < count; n++) {
-    const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, needed);
+    const shuffled = shuffleArray(items).slice(0, needed);
     const card: string[][] = [];
     let idx = 0;
     for (let r = 0; r < dim; r++) {
@@ -8808,11 +8818,16 @@ const gamiYesterdayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// AudioContext único e reutilizado: criar um por toque estoura o limite do
+// navegador (~6 no Chrome) em premiações rápidas e silencia o som.
+let chimeCtx: AudioContext | null = null;
 const playChime = (positive = true) => {
   try {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
     if (!Ctx) return;
-    const ctx = new Ctx();
+    if (!chimeCtx || chimeCtx.state === 'closed') chimeCtx = new Ctx();
+    const ctx = chimeCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.connect(g); g.connect(ctx.destination);
@@ -8823,7 +8838,7 @@ const playChime = (positive = true) => {
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
     o.start();
     o.stop(ctx.currentTime + 0.4);
-    setTimeout(() => { try { ctx.close(); } catch {} }, 600);
+    setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, 600);
   } catch { /* sem áudio disponível */ }
 };
 
@@ -8912,12 +8927,15 @@ const GamiSorteio = ({ students, onClose, onAwardParticipation }: { students: Ga
   const [awarded, setAwarded] = useState(false);
 
   const pool = students.filter(s => !fair || !drawn.includes(s.id));
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
 
   const spin = () => {
     if (pool.length === 0 || spinning) return;
     setSpinning(true); setWinner(null); setAwarded(false);
     const total = 20 + Math.floor(Math.random() * 8);
     const tick = (n: number) => {
+      if (!alive.current) return;
       setDisplay(pool[Math.floor(Math.random() * pool.length)].name);
       if (n >= total) {
         const w = pool[Math.floor(Math.random() * pool.length)];
@@ -9068,19 +9086,23 @@ const GamiGrupos = ({ students, onClose }: { students: GamiStudent[]; onClose: (
   const [selB, setSelB] = useState('');
   const [groups, setGroups] = useState<GamiStudent[][] | null>(null);
 
-  const violates = (gs: GamiStudent[][]) =>
-    separations.some(([a, b]) => gs.some(g => g.some(s => s.id === a) && g.some(s => s.id === b)));
+  const countViolations = (gs: GamiStudent[][]) =>
+    separations.filter(([a, b]) => gs.some(g => g.some(s => s.id === a) && g.some(s => s.id === b))).length;
 
   const generate = () => {
     if (students.length === 0) return;
+    // Guarda a tentativa com MENOS violações — antes a primeira tentativa ruim
+    // ficava travada como resultado mesmo com 249 chances de melhorar.
     let best: GamiStudent[][] | null = null;
+    let bestViolations = Infinity;
     for (let attempt = 0; attempt < 250; attempt++) {
-      const shuffled = [...students].sort(() => Math.random() - 0.5);
+      const shuffled = shuffleArray(students);
       const count = Math.max(1, Math.ceil(shuffled.length / groupSize));
       const gs: GamiStudent[][] = Array.from({ length: count }, () => []);
       shuffled.forEach((s, i) => gs[i % count].push(s));
-      if (!violates(gs)) { best = gs; break; }
-      if (!best) best = gs;
+      const v = countViolations(gs);
+      if (v === 0) { best = gs; break; }
+      if (v < bestViolations) { bestViolations = v; best = gs; }
     }
     setGroups(best);
   };
@@ -9205,7 +9227,7 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
         if (!c || c.status !== 'on') return c;
         const noisy = levelRef.current > 0.5;
         const strikes = noisy ? c.strikes + 1 : c.strikes;
-        if (strikes > 12) { playChime(false); return { ...c, strikes, status: 'fail' }; }
+        if (strikes >= 12) { playChime(false); return { ...c, strikes, status: 'fail' }; }
         if (c.left <= 1) { playChime(true); setTimeout(() => playChime(true), 300); return { ...c, left: 0, status: 'win' }; }
         return { ...c, left: c.left - 1, strikes };
       });
@@ -9341,11 +9363,14 @@ const GamiDado = ({ onClose }: { onClose: () => void }) => {
   const [faces, setFaces] = useState(6);
   const [value, setValue] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const roll = () => {
     if (rolling) return;
     setRolling(true);
     let n = 0;
     const tick = () => {
+      if (!alive.current) return;
       setValue(1 + Math.floor(Math.random() * faces));
       n++;
       if (n >= 14) { setRolling(false); return; }
@@ -9446,11 +9471,14 @@ const GamiEvento = ({ customEvents, onClose, onQuickAward }: { customEvents: str
   const [spinning, setSpinning] = useState(false);
   const [display, setDisplay] = useState<{ text: string; emoji: string } | null>(null);
   const [applied, setApplied] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const spin = () => {
     if (spinning) return;
     setSpinning(true); setResult(null); setApplied(false);
     let n = 0;
     const tick = () => {
+      if (!alive.current) return;
       setDisplay(bank[Math.floor(Math.random() * bank.length)]);
       n++;
       if (n >= 16) {
@@ -9572,13 +9600,13 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: 
   const ANCHORS = [{ x: 24, y: 66 }, { x: 76, y: 30 }];
 
   const shuffleQ = (raw: GamiBattleQ): GamiBattleQ => {
-    const order = raw.options.map((_, i) => i).sort(() => Math.random() - 0.5);
+    const order = shuffleArray(raw.options.map((_, i) => i));
     return { q: raw.q, options: order.map(i => raw.options[i]), correct: order.indexOf(raw.correct) };
   };
 
   const drawQuestion = () => {
     if (bagRef.current.length === 0) {
-      bagRef.current = [...questionsRef.current].sort(() => Math.random() - 0.5);
+      bagRef.current = shuffleArray(questionsRef.current);
       if (bagRef.current.length > 1 && bagRef.current[0].q === lastQRef.current) bagRef.current.push(bagRef.current.shift()!);
     }
     const raw = bagRef.current.shift()!;
@@ -9588,6 +9616,9 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: 
   };
 
   const startBattle = () => {
+    // Cancela a coreografia pendente da luta anterior (Revanche no meio de uma animação).
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
     setHp([TEAM_MAX, TEAM_MAX]); setPoses(['idle', 'idle']); setWinner(null); setAwarded(false);
     setSelected(null); setQNum(0); setTurn(0); setProj(null); setRing(null); setPops([]);
     bagRef.current = [];
@@ -10099,11 +10130,17 @@ const FerramentasScreen = ({
     clearInitialTool?.();
   }, [initialTool, clearInitialTool]);
 
+  // Sequência de geração: fechar/trocar a ferramenta invalida respostas em voo,
+  // senão o resultado da ferramenta anterior "vaza" para a próxima aberta.
+  const genSeqRef = useRef(0);
+
   const closeTool = () => {
+    genSeqRef.current++;
     setActiveTool(null); setResult(''); setIsGenerating(false); setPdfFile(null);
   };
 
   const runGeneration = async (prompt: string, extraParts?: any[]) => {
+    const seq = ++genSeqRef.current;
     setIsGenerating(true);
     setResult('');
     try {
@@ -10112,13 +10149,15 @@ const FerramentasScreen = ({
         model: AI_MODEL,
         contents: [{ role: 'user', parts }],
       });
+      if (genSeqRef.current !== seq) return;
       const text = response.text || '';
       if (!text.trim()) throw new Error('Resposta vazia');
       setResult(text.trim());
     } catch (e: any) {
+      if (genSeqRef.current !== seq) return;
       toast.error(formatApiError(e, 'A geração não saiu dessa vez. Tente de novo.'));
     } finally {
-      setIsGenerating(false);
+      if (genSeqRef.current === seq) setIsGenerating(false);
     }
   };
 
@@ -10674,7 +10713,13 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 resize-none bg-white"
             />
             {(() => {
-              const names = diarioBulkNames.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+              const seen = new Set((cls?.students ?? []).map(s => s.name.toLowerCase()));
+              const names = diarioBulkNames.split('\n').map(n => n.trim()).filter(n => {
+                const k = n.toLowerCase();
+                if (!n || seen.has(k)) return false;
+                seen.add(k);
+                return true;
+              });
               return (
                 <button
                   onClick={() => {
@@ -10755,7 +10800,13 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
                   <button onClick={() => setDiarioBulkNames('')} className="flex-1 bg-gray-100 text-gray-600 font-bold py-2 rounded-xl text-sm">Cancelar</button>
                   <button
                     onClick={() => {
-                      const names = diarioBulkNames.split('\n').map(n => n.trim()).filter(n => n.length > 0 && !cls?.students.some(s => s.name.toLowerCase() === n.toLowerCase()));
+                      const seen = new Set((cls?.students ?? []).map(s => s.name.toLowerCase()));
+                      const names = diarioBulkNames.split('\n').map(n => n.trim()).filter(n => {
+                        const k = n.toLowerCase();
+                        if (!n || seen.has(k)) return false;
+                        seen.add(k);
+                        return true;
+                      });
                       if (names.length === 0 || !classId) { setDiarioBulkNames(''); return; }
                       const newStudents: GamiStudent[] = names.map(name => ({ id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }));
                       setGamiClasses(list => {
@@ -10927,8 +10978,10 @@ const GamificacaoScreen = ({
         return { ...s, xp: newXp, totalXp: newTotal, weekXp: newWeekXp, coins: newCoins, streak, lastPointDay: points > 0 ? today : s.lastPointDay };
       });
       const checked = checkBadges(students, { ...cls, weekKey: wk, students });
-      let mission = cls.mission;
-      if (mission && mission.weekKey === wk && points > 0) {
+      // Missão de semana anterior expira na virada — sem isso ela ficava "morta"
+      // no estado: parava de contar e nunca era limpa.
+      let mission = cls.mission && cls.mission.weekKey === wk ? cls.mission : null;
+      if (mission && points > 0) {
         mission = { ...mission, progress: mission.progress + points * studentIds.length };
       }
       const logEntry: GamiLogEntry = { id: gamiRid(), studentIds, label: behavior.label, emoji: behavior.emoji, points, coins, kind: 'award', date: Date.now() };
@@ -10972,7 +11025,8 @@ const GamificacaoScreen = ({
       ...cls,
       season: cls.season + 1,
       hallOfFame: [...(cls.hallOfFame ?? []), entry],
-      students: cls.students.map(s => ({ ...s, xp: 0, totalXp: 0, weekXp: 0, coins: 0, streak: 0, lastPointDay: undefined, participatedDay: undefined })),
+      // totalXp é vitalício (nível/skins/badges) e sobrevive à virada de temporada.
+      students: cls.students.map(s => ({ ...s, xp: 0, weekXp: 0, coins: 0, streak: 0, lastPointDay: undefined, participatedDay: undefined })),
       log: [],
       mission: null,
       weekKey: gamiWeekKey(),
@@ -12211,7 +12265,7 @@ const AdminScreen = () => {
     if (storageUsed + uploadFile.size > LIBRARY_LIMIT_BYTES) {
       setUploadErr(`Limite de 4.9 GB atingido. Apague materiais para liberar espaço.`); return;
     }
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = Math.random().toString(36).slice(2, 11);
     const sRef = storageRef(storage, `library/${id}/${uploadFile.name}`);
     const task = uploadBytesResumable(sRef, uploadFile);
     setUploadProgress(0);
@@ -12271,8 +12325,8 @@ const AdminScreen = () => {
   const togglePro = async (userId: string, currentStatus: boolean) => {
     try {
       await setDoc(doc(db, 'users', userId), { isPro: !currentStatus }, { merge: true });
-    } catch (e) {
-      console.error("Error toggling pro:", e);
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Não consegui alterar o PRO deste usuário.'));
     }
   };
 
@@ -12280,15 +12334,16 @@ const AdminScreen = () => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     try {
       await setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true });
-    } catch (e) {
-      console.error("Error toggling admin:", e);
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Não consegui alterar o papel deste usuário.'));
     }
   };
 
   const resetGenerations = async (userId: string) => {
     try {
       await setDoc(doc(db, 'users', userId), { generationsUsed: 0 }, { merge: true });
-    } catch (e) { console.error(e); }
+      toast.success('Gerações zeradas!');
+    } catch (e: any) { toast.error(formatApiError(e, 'Não consegui zerar as gerações.')); }
   };
 
   const deleteFeedback = async (id: string) => {
@@ -12303,7 +12358,8 @@ const AdminScreen = () => {
     setAnnouncementSaving(true);
     try {
       await setDoc(doc(db, 'config', 'announcement'), { message: announcement, active: announcementActive, updatedAt: Date.now() });
-    } catch (e) { console.error(e); } finally { setAnnouncementSaving(false); }
+      toast.success('Aviso salvo!');
+    } catch (e: any) { toast.error(formatApiError(e, 'Não consegui salvar o aviso.')); } finally { setAnnouncementSaving(false); }
   };
 
   const saveHoliday = async () => {
@@ -12314,7 +12370,7 @@ const AdminScreen = () => {
       await setDoc(doc(db, 'config', 'feriados'), { list: newList });
       setHolidays(newList);
       setNewHoliday({ name: '', date: '' });
-    } catch (e) { console.error(e); } finally { setHolidaySaving(false); }
+    } catch (e: any) { toast.error(formatApiError(e, 'Não consegui salvar o feriado.')); } finally { setHolidaySaving(false); }
   };
 
   const deleteHoliday = async (id: string) => {
@@ -12322,7 +12378,7 @@ const AdminScreen = () => {
     try {
       await setDoc(doc(db, 'config', 'feriados'), { list: newList });
       setHolidays(newList);
-    } catch (e) { console.error(e); }
+    } catch (e: any) { toast.error(formatApiError(e, 'Não consegui apagar o feriado.')); }
   };
 
   const exportCsv = () => {
@@ -13092,7 +13148,7 @@ function AppInner() {
   const [studioReopenTaskId, setStudioReopenTaskId] = useState<string | null>(null);
   
   const addTask = (task: Omit<BackgroundTask, 'id' | 'status' | 'startTime'>): string => {
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = Math.random().toString(36).slice(2, 11);
     setActiveTasks(prev => ({
       ...prev,
       [id]: {
@@ -13277,6 +13333,23 @@ function AppInner() {
   // ── Registro do token FCM (push com app fechado) ──────────────────────────
   // Salva o token do dispositivo no Firestore para a Cloud Function enviar os
   // lembretes de aula mesmo quando o app não está aberto.
+  // Recarrega quando um service worker NOVO assume o controle (versão nova
+  // publicada). Guardado contra a primeira instalação para não recarregar à toa.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    let hadController = !!navigator.serviceWorker.controller;
+    let refreshed = false;
+    const onChange = () => {
+      if (!hadController) { hadController = true; return; }
+      if (refreshed) return;
+      refreshed = true;
+      toast.success('Nova versão do Corujão! Atualizando…');
+      setTimeout(() => window.location.reload(), 900);
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', onChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+  }, []);
+
   useEffect(() => {
     if (!user || !('Notification' in window) || Notification.permission !== 'granted') return;
     if (!('serviceWorker' in navigator)) return;
@@ -13321,7 +13394,7 @@ function AppInner() {
   }, [onboardingLsKey, profileLoaded, profile.onboarded]);
 
   const buildOnboardingClass = (): ClassSchedule => ({
-    id: Math.random().toString(36).substr(2, 9),
+    id: Math.random().toString(36).slice(2, 11),
     name: onboardingClass.name,
     days: [1, 2, 3, 4, 5],
     time: '08:00',
@@ -13384,7 +13457,7 @@ function AppInner() {
       if (task.status === 'completed' && task.result && !processedTasksRef.current.has(task.id)) {
         processedTasksRef.current.add(task.id);
         const topicLabel = task.title.replace(/^(Slides|Atividades|Plano|Prova): /, '');
-        const newResourceId = Math.random().toString(36).substr(2, 9);
+        const newResourceId = Math.random().toString(36).slice(2, 11);
         let saved = false;
         if (task.type === 'slides' && typeof task.result === 'object') {
           setSavedResources(prev => [...prev, {
@@ -13787,7 +13860,7 @@ function AppInner() {
   const addClassItems = (newItems: ClassItem[]) => {
     setClasses(prev => [...prev, ...newItems].sort((a, b) => a.timestamp - b.timestamp));
     setNotifications(prev => [...prev, {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).slice(2, 11),
       title: 'Plano Gerado',
       message: `O plano de aula para ${newItems[0]?.className || 'sua turma'} está pronto para revisão.`,
       date: Date.now(),
@@ -13800,14 +13873,14 @@ function AppInner() {
     setInboxMessages(prev => [
       ...prev,
       {
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).slice(2, 11),
         role: 'model',
         text: `Vi que você adicionou a turma **${newClass.name}**${newClass.level ? ` (${newClass.level})` : ''}! Quer que eu monte uma sugestão de planejamento anual para eles baseada na BNCC da sua disciplina?`,
         date: Date.now()
       }
     ]);
     setNotifications(prev => [...prev, {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).slice(2, 11),
       title: 'Nova Turma Adicionada',
       message: `A turma ${newClass.name} foi adicionada ao seu calendário.`,
       date: Date.now(),
@@ -13941,7 +14014,7 @@ function AppInner() {
 
          if (!collision) {
             newItems.push({
-              id: Math.random().toString(36).substr(2, 9),
+              id: Math.random().toString(36).slice(2, 11),
               title: `${topic} - Parte ${addedCount + 1}`,
               date: `${currentDate.getDate()} ${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][currentDate.getMonth()]}`,
               status: 'pending',
@@ -14574,7 +14647,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               setSavedResources(res);
               if (res.length > savedResources.length) {
                 setNotifications([...notifications, {
-                  id: Math.random().toString(36).substr(2, 9),
+                  id: Math.random().toString(36).slice(2, 11),
                   title: 'Material Salvo',
                   message: 'Novo material gerado com sucesso.',
                   date: Date.now(),
