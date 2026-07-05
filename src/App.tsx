@@ -371,6 +371,44 @@ const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', 
   return <IconComponent size={size} color={color} className={className} style={style} />;
 };
 
+// Seletor padrão do app: trilho branco com pílulas, a ativa preenchida de índigo
+// (mesmo estilo das abas do Painel Admin). Use em abas e filtros de tela.
+const PillTabs = ({ tabs, active, onChange, layoutKey, stretch, className = '' }: {
+  tabs: { id: string; label: string; icon?: any; badge?: number }[];
+  active: string;
+  onChange: (id: string) => void;
+  layoutKey: string;
+  stretch?: boolean;
+  className?: string;
+}) => (
+  <div className={`flex bg-white p-1 rounded-2xl shadow-sm border border-gray-100 gap-1 overflow-x-auto no-scrollbar ${className}`}>
+    {tabs.map(t => {
+      const is = active === t.id;
+      return (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          className={`relative ${stretch ? 'flex-1' : 'flex-none'} px-3 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 ${is ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+        >
+          {is && (
+            <motion.div
+              layoutId={`pill-tabs-${layoutKey}`}
+              className="absolute inset-0 bg-indigo-600 rounded-xl shadow-md"
+              style={{ zIndex: -1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+            />
+          )}
+          {t.icon && <t.icon size={13} />}
+          {t.label}
+          {typeof t.badge === 'number' && t.badge > 0 && (
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${is ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{t.badge}</span>
+          )}
+        </button>
+      );
+    })}
+  </div>
+);
+
 const PIXABAY_CACHE_KEY = '__pxcache__';
 const pixabayCache = {
   get(k: string): string | undefined {
@@ -3119,31 +3157,19 @@ const PlannerScreen = ({
       <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-gray-50 mb-6 shrink-0">
         {step === 'input' && (
           <>
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6">
-              {([
-                { key: 'plan', label: 'Plano' },
-                { key: 'activities', label: 'Atividades' },
-                { key: 'slides', label: 'Slides' },
-                { key: 'exam', label: 'Prova' },
-              ] as { key: PlannerMode; label: string }[]).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setPlannerMode(key)}
-                  className="relative flex-1 py-2 rounded-xl text-xs font-bold transition-colors z-10"
-                  style={{ color: mode === key ? '#4338ca' : '#6b7280' }}
-                >
-                  {mode === key && (
-                    <motion.div
-                      layoutId="planner-tab-pill"
-                      className="absolute inset-0 bg-white rounded-xl shadow-sm"
-                      style={{ zIndex: -1 }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                    />
-                  )}
-                  {label}
-                </button>
-              ))}
-            </div>
+            <PillTabs
+              layoutKey="planner"
+              stretch
+              className="mb-6"
+              tabs={[
+                { id: 'plan', label: 'Plano', icon: BookOpen },
+                { id: 'activities', label: 'Atividades', icon: FileText },
+                { id: 'slides', label: 'Slides', icon: Presentation },
+                { id: 'exam', label: 'Prova', icon: FileQuestion },
+              ]}
+              active={mode}
+              onChange={id => setPlannerMode(id as PlannerMode)}
+            />
             <label className="block text-base font-bold text-gray-700 mb-2">Conteúdo ou Arquivo</label>
             <textarea 
               value={topic}
@@ -8532,15 +8558,20 @@ const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, n
             )}
           </div>
 
-          {/* Type filter chips */}
-          <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
-            {[['all','Todos'], ['slides','Slides'], ['activities','Atividades'], ['exam','Provas'], ['plan','Planos']].map(([v, l]) => (
-              <button key={v} onClick={() => setTypeFilter(v)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex-shrink-0 transition-colors ${typeFilter === v ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
-                {l}
-              </button>
-            ))}
-          </div>
+          {/* Type filter */}
+          <PillTabs
+            layoutKey="acervo"
+            className="mb-4"
+            tabs={[
+              { id: 'all', label: 'Todos', icon: Filter },
+              { id: 'slides', label: 'Slides', icon: Presentation },
+              { id: 'activities', label: 'Atividades', icon: FileText },
+              { id: 'exam', label: 'Provas', icon: FileQuestion },
+              { id: 'plan', label: 'Planos', icon: BookOpen },
+            ]}
+            active={typeFilter}
+            onChange={setTypeFilter}
+          />
 
           {/* Count */}
           <p className="text-xs text-gray-400 font-medium mb-3 px-1">
@@ -11091,24 +11122,20 @@ const GamificacaoScreen = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto no-scrollbar mb-4 -mx-1 px-1">
-        {([
-          { id: 'alunos', label: '👥 Alunos' },
-          { id: 'equipes', label: '🏆 Equipes' },
-          { id: 'missao', label: '🎯 Missão' },
-          { id: 'loja', label: '🛒 Loja' },
-          { id: 'log', label: '📜 Log' },
-          { id: 'config', label: '⚙️ Config' },
-        ] as const).map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${tab === t.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <PillTabs
+        layoutKey="gami"
+        className="mb-4"
+        tabs={[
+          { id: 'alunos', label: 'Alunos', icon: Users },
+          { id: 'equipes', label: 'Equipes', icon: Trophy },
+          { id: 'missao', label: 'Missão', icon: Star },
+          { id: 'loja', label: 'Loja', icon: Gift },
+          { id: 'log', label: 'Log', icon: ScrollText },
+          { id: 'config', label: 'Config', icon: Settings },
+        ]}
+        active={tab}
+        onChange={id => setTab(id as any)}
+      />
 
       {/* Tab content */}
       <AnimatePresence mode="wait">
@@ -12061,14 +12088,19 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
-        {[['all','Todos'],['slides','Slides'],['activities','Atividades'],['exam','Provas'],['plan','Planos']].map(([v,l]) => (
-          <button key={v} onClick={() => setFilter(v)}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex-shrink-0 transition-colors ${filter===v ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
-            {l}
-          </button>
-        ))}
-      </div>
+      <PillTabs
+        layoutKey="biblioteca"
+        className="mb-4"
+        tabs={[
+          { id: 'all', label: 'Todos', icon: Filter },
+          { id: 'slides', label: 'Slides', icon: Presentation },
+          { id: 'activities', label: 'Atividades', icon: FileText },
+          { id: 'exam', label: 'Provas', icon: FileQuestion },
+          { id: 'plan', label: 'Planos', icon: BookOpen },
+        ]}
+        active={filter}
+        onChange={setFilter}
+      />
 
       {errMsg && <div className="bg-red-50 border border-red-100 text-red-600 text-sm font-medium rounded-xl p-3 mb-4">{errMsg}</div>}
 
@@ -12426,24 +12458,19 @@ const AdminScreen = () => {
         </div>
       </div>
 
-      <div className="flex bg-white p-1 rounded-2xl mb-5 shadow-sm border border-gray-100 gap-1 overflow-x-auto no-scrollbar">
-        {([
+      <PillTabs
+        layoutKey="admin"
+        className="mb-5"
+        tabs={[
           { id: 'users', label: 'Usuários', icon: Users },
-          { id: 'feedbacks', label: 'Feedbacks', icon: MessageSquare },
+          { id: 'feedbacks', label: 'Feedbacks', icon: MessageSquare, badge: feedbackCount },
           { id: 'biblioteca', label: 'Biblioteca', icon: Library },
           { id: 'metrics', label: 'Métricas', icon: Database },
           { id: 'holidays', label: 'Feriados', icon: CalendarIcon },
-        ] as const).map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={`flex-none px-3 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-1.5 ${activeTab === t.id ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-            <t.icon size={13} />
-            {t.label}
-            {t.id === 'feedbacks' && feedbackCount > 0 && (
-              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${activeTab === t.id ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{feedbackCount}</span>
-            )}
-          </button>
-        ))}
-      </div>
+        ]}
+        active={activeTab}
+        onChange={id => setActiveTab(id as any)}
+      />
 
       {activeTab === 'feedbacks' && (
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-50 mb-8">
