@@ -11826,7 +11826,7 @@ const GamificacaoScreen = ({
       </AnimatePresence>
 
       {/* ── Kit ao Vivo dock ──────────────────────────────────────────────────── */}
-      <div className="fixed bottom-24 left-0 right-0 z-[60] px-4 max-w-md mx-auto">
+      <div className="fixed bottom-[146px] left-0 right-0 z-[60] px-4 max-w-md mx-auto">
         <AnimatePresence>
           {kitExpanded && (
             <motion.div
