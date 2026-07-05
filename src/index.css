@@ -58,3 +58,61 @@
 
 .story-section-art { margin: 12px 0 4px; line-height: 0; }
 .story-section-art svg { width: 100%; height: auto; max-height: 160px; display: block; image-rendering: pixelated; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+/* ══════════════════════════════════════════════════════════════
+   ESTÚDIO — preview em tela dos jogos (#game-print-area)
+   Espelha o visual da janela de impressão para a prévia não
+   renderizar como texto empilhado sem estilo.
+   ══════════════════════════════════════════════════════════════ */
+#game-print-area { --ac: #4338ca; --ac-light: #eef2ff; }
+
+#game-print-area h2 { display: inline-block; background: var(--ac); color: white; font-size: 13px; font-weight: 900; padding: 5px 12px; border-radius: 8px; margin: 18px 0 8px; }
+
+#game-print-area .instructions { display: flex; gap: 10px; align-items: center; background: white; border: 2px dashed var(--ac); padding: 10px 14px; margin: 0 0 16px; border-radius: 12px; font-size: 12px; color: #1f2937; line-height: 1.5; }
+
+/* Caça-palavras */
+#game-print-area .ws-wrapper { display: flex; justify-content: flex-start; margin: 14px 0 10px; overflow-x: auto; }
+#game-print-area .ws-grid { display: grid; gap: 0; border: 3px solid var(--ac); background: var(--ac); padding: 2px; border-radius: 8px; margin: 0 auto; }
+#game-print-area .ws-cell { background: white; width: 24px; height: 24px; text-align: center; line-height: 24px; font-weight: 800; font-size: 12px; font-family: 'Courier New', monospace; color: #111827; }
+
+/* Lista de pistas / termos */
+#game-print-area .clue-list { list-style: none; padding-left: 0; columns: 2; column-gap: 20px; counter-reset: clue; font-size: 12px; color: #1f2937; }
+#game-print-area .clue-list li { margin-bottom: 5px; break-inside: avoid; padding-left: 22px; position: relative; counter-increment: clue; }
+#game-print-area .clue-list li::before { content: counter(clue) '.'; position: absolute; left: 0; font-weight: 800; color: var(--ac); }
+
+/* Quiz */
+#game-print-area .quiz-q { position: relative; border: 2px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+#game-print-area .quiz-opt { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 8px; background: #f9fafb; border: 1.5px solid #e5e7eb; font-size: 12px; margin: 4px 0; }
+
+/* Bingo */
+#game-print-area .bingo-card { border: 3px solid var(--ac); margin: 0 0 20px; border-radius: 14px; overflow: hidden; background: white; box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+#game-print-area .bingo-card-title { text-align: center; background: #1e293b; color: white; font-weight: 900; font-size: 18px; letter-spacing: 6px; padding: 8px 10px; }
+#game-print-area .bingo-sub { text-align: center; font-size: 10px; color: #6b7280; padding: 4px 0; background: #f8f7ff; border-bottom: 1px solid #e5e7eb; letter-spacing: 1px; font-weight: 700; }
+#game-print-area .bingo-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; }
+#game-print-area .bingo-cell { border: 1px solid #e5e7eb; padding: 8px 4px; min-height: 48px; text-align: center; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; background: white; }
+#game-print-area .bingo-cell.free { background: #fbbf24; font-weight: 900; color: #78350f; font-size: 13px; border-color: #f59e0b; }
+#game-print-area .bingo-draw-section { margin-top: 8px; }
+
+/* Memória / Flashcards */
+#game-print-area .memory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; padding: 6px; background: #f9fafb; border-radius: 12px; border: 2px dashed #d1d5db; }
+#game-print-area .memory-pair { border: 1.5px dashed #9ca3af; padding: 12px 8px; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 11px; background: white; border-radius: 8px; color: #1f2937; }
+#game-print-area .memory-pair.concept { background: var(--ac); color: white; font-weight: 900; border-color: var(--ac); border-style: solid; font-size: 12px; }
+
+/* Palavras cruzadas */
+#game-print-area .cw-grid-table { border-collapse: collapse; margin: 14px auto; }
+#game-print-area .cw-grid-black { background: transparent; }
+#game-print-area .cw-grid-white { border: 2px solid #374151; position: relative; vertical-align: top; background: white; }
+#game-print-area .cw-grid-num { position: absolute; top: 1px; left: 2px; font-size: 8px; font-weight: 900; color: var(--ac); line-height: 1; }
+#game-print-area .cw-clues-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; margin-top: 14px; padding: 12px 14px; background: var(--ac-light); border: 2px solid var(--ac); border-radius: 10px; }
+#game-print-area .cw-clue-dir { font-size: 10px; font-weight: 900; color: var(--ac); letter-spacing: 1.5px; text-transform: uppercase; margin: 0 0 6px; display: block; border-bottom: 1.5px solid var(--ac); padding-bottom: 4px; }
+#game-print-area .cw-clue-item { font-size: 12px; margin-bottom: 4px; line-height: 1.35; color: #1f2937; }
+#game-print-area .cw-item { margin-bottom: 14px; }
+#game-print-area .cw-clue { font-weight: 700; margin-bottom: 5px; color: #1f2937; }
+#game-print-area .cw-boxes { display: flex; gap: 3px; flex-wrap: wrap; }
+#game-print-area .cw-box { border: 2px solid #374151; width: 24px; height: 24px; border-radius: 4px; background: white; }
+
+/* Gabarito do professor — cartão âmbar destacado na tela */
+#game-print-area .answer-key-page { margin-top: 20px; padding: 14px; background: #fffbeb; border: 2px dashed #f59e0b; border-radius: 14px; }
+#game-print-area .answer-key-page::before { content: 'GABARITO DO PROFESSOR'; display: block; font-size: 10px; font-weight: 900; letter-spacing: 2px; color: #b45309; margin-bottom: 6px; }
+#game-print-area .answer-key-title { display: inline-block; background: #d97706; color: white; margin: 0 0 10px; }
+#game-print-area .answer-key-item { font-size: 12px; margin-bottom: 6px; padding: 7px 12px; background: white; border-radius: 8px; border-left: 4px solid #f59e0b; color: #1f2937; }

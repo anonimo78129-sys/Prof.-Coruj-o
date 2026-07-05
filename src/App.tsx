@@ -6552,7 +6552,8 @@ const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
   const grid: Cell[][] = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
   type Placement = {word: string, clue: string, row: number, col: number, dir: 'H' | 'V'};
   const placements: Placement[] = [];
-  const words = rawWords.slice(0, 15).map(w => ({...w, word: w.word.toUpperCase().replace(/[^A-Z]/g, '')})).filter(w => w.word.length >= 3);
+  // Normaliza acentos (Á→A, É→E, Ç→C, …) ANTES de filtrar para não mutilar palavras acentuadas
+  const words = rawWords.slice(0, 15).map(w => ({...w, word: w.word.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z]/g, '')})).filter(w => w.word.length >= 3);
   if (words.length === 0) return null;
 
   const canPlace = (word: string, row: number, col: number, dir: 'H' | 'V'): boolean => {
@@ -6685,36 +6686,45 @@ Return ONLY valid JSON with these exact keys:
   }
 };
 
-const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string, bingoDim?: number }) => {
+const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, bingoDim?: number }) => {
   const node = document.getElementById('game-print-area');
   if (!node) return;
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
-  const todayStr = new Date().toLocaleDateString('pt-BR');
+  // Sequência Didática é documento do PROFESSOR: sem campos de aluno, sem placar, sem "boa sorte"
+  const isTeacherDoc = opts.activityLabel === 'Sequência Didática';
+  const fieldsHtml = isTeacherDoc
+    ? `
+        <div class="fields-grid">
+          <div class="field" style="grid-column:1/3"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${escapeHtml(opts.teacherName || '')}</div></div>
+          <div class="field" style="grid-column:3/-1"><span class="field-label">TURMA</span><div class="field-line">${escapeHtml(opts.className || '')}</div></div>
+        </div>`
+    : `
+        <div class="fields-grid">
+          <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
+          <div class="field"><span class="field-label">DATA</span><div class="field-line short"></div></div>
+          <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${escapeHtml(opts.className || '')}</div></div>
+          <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
+          <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${escapeHtml(opts.teacherName || '')}</div></div>
+        </div>`;
   const headerHtml = `
     <div class="page-header">
       <div class="header-inner">
         <div class="header-top-row">
           <div class="header-text">
             <div class="school-row">
-              <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
-              <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
+              <div class="school-name">${escapeHtml(opts.schoolName || 'ESCOLA')}</div>
+              <div class="school-meta">${escapeHtml(opts.subject || '')}${opts.level ? ' • ' + escapeHtml(opts.level) : ''}</div>
             </div>
-            <div class="activity-tag">${opts.activityLabel}</div>
-            <h1 class="doc-title">${opts.title}</h1>
+            <div class="activity-tag">${escapeHtml(opts.activityLabel)}</div>
+            <h1 class="doc-title">${escapeHtml(opts.title)}</h1>
           </div>
         </div>
-        <div class="fields-grid">
-          <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
-          <div class="field"><span class="field-label">DATA</span><div class="field-line short"></div></div>
-          <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
-          <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
-          <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
-        </div>
+        ${fieldsHtml}
       </div>
     </div>
   `;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(opts.title)}</title><style>
     @page { size: A4; margin: 1.4cm 1.4cm 2cm; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
@@ -6760,7 +6770,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .word-chip-box { width:14px; height:14px; border:1.5px solid var(--ac,#4338ca); border-radius:3px; flex-shrink:0; background:white; }
 
     /* ── BINGO ────────────────────────────────────────────── */
-    .bingo-card { border:3px solid var(--ac,#4338ca); margin:0 0 22px; page-break-inside:avoid; break-inside:avoid; border-radius:14px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+    .bingo-card { border:3px solid var(--ac,#4338ca); margin:8px 8px 26px; page-break-inside:avoid; break-inside:avoid; border-radius:14px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.12); outline:1.5px dashed #9ca3af; outline-offset:6px; }
+    .bingo-draw-section { page-break-before:always; break-before:page; }
     .bingo-card-title { display:flex; justify-content:center; gap:0; background:#1e293b; padding:8px 10px; }
     .bingo-letter { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; font-size:28px; font-weight:900; color:white; border-radius:8px; margin:0 2px; }
     .bingo-sub { text-align:center; font-size:9px; color:#6b7280; padding:4px 0; background:#f8f7ff; border-bottom:1px solid #ddd6fe; letter-spacing:1px; font-weight:700; }
@@ -6788,28 +6799,12 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
 
     /* ── MEMORY ───────────────────────────────────────────── */
     .cut-hint { font-size:10px; color:#6b7280; font-style:italic; margin:0 0 10px; display:flex; align-items:center; gap:5px; padding:6px 10px; background:#fef3c7; border-radius:6px; border:1.5px dashed #f59e0b; }
-    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; page-break-inside:avoid; break-inside:avoid; padding:10px; background:#f9fafb; border-radius:12px; border:2px dashed #d1d5db; }
-    .memory-pair { border:2px dashed #9ca3af; padding:14px 8px; min-height:88px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:8px; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+    /* quebra de página por CARTA (não pela grade inteira): 20 pares fluem por várias páginas */
+    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; padding:6px; background:#f9fafb; border-radius:12px; border:2px dashed #d1d5db; }
+    .memory-pair { border:1.5px dashed #9ca3af; padding:14px 8px; min-height:88px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:8px; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
     .memory-pair::after { content:'✂'; position:absolute; top:-10px; right:6px; font-size:12px; color:#6b7280; background:#f9fafb; padding:0 3px; border-radius:4px; }
     .memory-pair.concept { background:var(--ac,#4338ca); color:white; font-weight:900; border-color:var(--ac,#4338ca); font-size:11px; border-style:solid; }
     .memory-pair.concept::after { background:var(--ac,#4338ca); color:rgba(255,255,255,0.7); }
-
-    /* ── TRAIL ────────────────────────────────────────────── */
-    .trail-wrapper { margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
-    .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; padding:16px; background:var(--ac-light,#eef2ff); border-radius:14px; border:3px solid var(--ac,#4338ca); position:relative; background-image:radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size:8px 8px; }
-    .trail-cell { border:3px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); box-shadow:0 2px 4px rgba(0,0,0,0.08); position:relative; }
-    .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
-    .trail-cell.type-pergunta { background:#fbbf24 !important; color:#78350f !important; border-color:#d97706 !important; }
-    .trail-cell.type-bonus { background:#16a34a !important; color:white !important; border-color:#14532d !important; }
-    .trail-cell.type-penalidade { background:#dc2626 !important; color:white !important; border-color:#991b1b !important; }
-    .trail-cell.type-desafio { background:#3b82f6 !important; color:white !important; border-color:#1d4ed8 !important; }
-    .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:18px; box-shadow:0 0 0 3px #fee2e2, 0 2px 6px rgba(0,0,0,0.15); }
-    .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:18px; box-shadow:0 0 0 3px #dcfce7, 0 2px 6px rgba(0,0,0,0.15); }
-    /* legend (injected) */
-    .trail-legend { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:8px 12px; background:white; border-radius:8px; border:1.5px solid #e5e7eb; }
-    .trail-legend-title { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
-    .trail-legend-items { display:flex; gap:12px; flex-wrap:wrap; font-size:9.5px; font-weight:600; color:#374151; flex:1; }
-    .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
     /* ── CROSSWORD ────────────────────────────────────────── */
     /* Cell size is driven by inline style (computed from grid width in React).
@@ -6888,14 +6883,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     <script>
     (function(){
       var label = "${opts.activityLabel}";
+      // Cores alinhadas às cores de tela do modeMeta (EstudioScreen)
       var themes = {
         'Metafora Narrativa':    { ac:'#c026d3', light:'#fdf4ff', emoji:'📖' },
-        'Quiz Avaliativo':       { ac:'#ea580c', light:'#fff7ed', emoji:'⚡' },
-        'Caca-Palavras':         { ac:'#2563eb', light:'#eff6ff', emoji:'🔍' },
-        'Palavras Cruzadas':     { ac:'#0d9488', light:'#f0fdfa', emoji:'✏️' },
-        'Bingo Educativo':       { ac:'#7c3aed', light:'#f5f3ff', emoji:'🎱' },
-        'Trilha do Conhecimento':{ ac:'#16a34a', light:'#f0fdf4', emoji:'🎲' },
-        'Jogo da Memoria':       { ac:'#db2777', light:'#fdf2f8', emoji:'🃏' }
+        'Quiz Avaliativo':       { ac:'#d97706', light:'#fffbeb', emoji:'⚡' },
+        'Caca-Palavras':         { ac:'#059669', light:'#ecfdf5', emoji:'🔍' },
+        'Palavras Cruzadas':     { ac:'#2563eb', light:'#eff6ff', emoji:'✏️' },
+        'Bingo Educativo':       { ac:'#db2777', light:'#fdf2f8', emoji:'🎱' },
+        'Jogo da Memoria':       { ac:'#0d9488', light:'#f0fdfa', emoji:'🃏' },
+        'Sequencia Didatica':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📋' },
+        'Flashcards':            { ac:'#ea580c', light:'#fff7ed', emoji:'🗂️' }
       };
       // labels chegam acentuados; keys do objeto são sem acento — normaliza para casar
       var norm = function(s){ return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); };
@@ -6948,12 +6945,6 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
           + '<rect x="4" y="6" width="5" height="8" fill="#ffffff"/>'
           + '<rect x="5" y="8" width="3" height="1" fill="#ec4899"/><rect x="7" y="9" width="1" height="1" fill="#ec4899"/><rect x="6" y="10" width="1" height="1" fill="#ec4899"/><rect x="6" y="12" width="1" height="1" fill="#ec4899"/>'
           + '</svg>',
-        'Trilha do Conhecimento': '<svg viewBox="0 0 16 16"' + SR + '>'
-          + '<rect x="3" y="2" width="10" height="1" fill="#14532d"/><rect x="2" y="3" width="1" height="10" fill="#14532d"/><rect x="13" y="3" width="1" height="10" fill="#14532d"/><rect x="3" y="13" width="10" height="1" fill="#14532d"/>'
-          + '<rect x="3" y="3" width="10" height="10" fill="#ffffff"/>'
-          + '<rect x="3" y="3" width="10" height="1" fill="#bbf7d0"/><rect x="3" y="4" width="1" height="9" fill="#bbf7d0"/>'
-          + '<rect x="4" y="4" width="2" height="2" fill="#14532d"/><rect x="10" y="4" width="2" height="2" fill="#14532d"/><rect x="7" y="7" width="2" height="2" fill="#14532d"/><rect x="4" y="10" width="2" height="2" fill="#14532d"/><rect x="10" y="10" width="2" height="2" fill="#14532d"/>'
-          + '</svg>',
         'Palavras Cruzadas': '<svg viewBox="0 0 16 16"' + SR + '>'
           + '<rect x="1" y="1" width="10" height="1" fill="#134e4a"/><rect x="1" y="2" width="1" height="9" fill="#134e4a"/><rect x="10" y="2" width="1" height="9" fill="#134e4a"/><rect x="1" y="10" width="10" height="1" fill="#134e4a"/>'
           + '<rect x="1" y="4" width="10" height="1" fill="#134e4a"/><rect x="1" y="7" width="10" height="1" fill="#134e4a"/>'
@@ -7002,19 +6993,17 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         clueList.replaceWith(chips);
       }
 
-      // ── BINGO: colored B-I-N-G-O tiles + calling circles ─
-      var bingoTitle = document.querySelector('.bingo-card-title');
-      if (bingoTitle) {
-        var cols = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+      // ── BINGO: colored B-I-N-G-O tiles + calling circles (em TODAS as cartelas) ─
+      var bingoCols = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+      document.querySelectorAll('.bingo-card-title').forEach(function(bingoTitle){
         bingoTitle.innerHTML = 'BINGO'.split('').map(function(l,i){
-          return '<span class="bingo-letter" style="background:' + cols[i] + '">' + l + '</span>';
+          return '<span class="bingo-letter" style="background:' + bingoCols[i] + '">' + l + '</span>';
         }).join('');
-      }
-      var bingoFree = document.querySelector('.bingo-cell.free');
-      if (bingoFree) {
+      });
+      document.querySelectorAll('.bingo-cell.free').forEach(function(bingoFree){
         var freeText = bingoFree.textContent.replace('★ ', '').trim();
         bingoFree.innerHTML = '&#11088;<br>' + (freeText || 'FREE') + '<br>&#11088;';
-      }
+      });
       document.querySelectorAll('.bingo-card').forEach(function(card) {
         var cellCount = card.querySelectorAll('.bingo-cell:not(.free)').length;
         var calling = document.createElement('div');
@@ -7049,41 +7038,14 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         });
       }
 
-      // ── TRAIL: emoji cells + dice + legend ──────────────
-      var cells = document.querySelectorAll('.trail-cell');
-      if (cells.length) {
-        cells[0].textContent = '🚀';
-        cells[cells.length-1].textContent = '🏆';
-        cells.forEach(function(c) {
-          var type = c.dataset ? c.dataset.type : c.getAttribute('data-type');
-          if (c.classList.contains('start')) { c.textContent = '🚀'; }
-          else if (c.classList.contains('end')) { c.textContent = '🏆'; }
-          else if (type === 'pergunta') { c.classList.add('type-pergunta'); c.textContent = '❓'; }
-          else if (type === 'bonus') { c.classList.add('type-bonus'); c.textContent = '⭐'; }
-          else if (type === 'penalidade') { c.classList.add('type-penalidade'); c.textContent = '💀'; }
-          else if (type === 'desafio') { c.classList.add('type-desafio'); c.textContent = '⚡'; }
-          else if (c.classList.contains('special')) { c.textContent = '⭐'; }
-        });
-        var board = document.querySelector('.trail-board');
-        if (board) {
-          var wrapper = document.createElement('div');
-          wrapper.className = 'trail-wrapper';
-          board.parentNode.insertBefore(wrapper, board);
-          wrapper.appendChild(board);
-          var diceSvg = '<svg class="trail-dice" width="38" height="38" viewBox="0 0 40 40"><rect x="2" y="2" width="36" height="36" rx="9" fill="white" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="28" cy="12" r="3.2" fill="currentColor"/><circle cx="20" cy="20" r="3.2" fill="currentColor"/><circle cx="12" cy="28" r="3.2" fill="currentColor"/><circle cx="28" cy="28" r="3.2" fill="currentColor"/></svg>';
-          var legend = document.createElement('div');
-          legend.className = 'trail-legend';
-          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>❓ Pergunta</span><span>⭐ Bônus</span><span>💀 Penalidade</span><span>⚡ Desafio</span></div></div>' + diceSvg;
-          wrapper.appendChild(legend);
-        }
-      }
-
-      // ── MEMORY: cut hint + scissors on grid ─────────────
+      // ── MEMORY / FLASHCARDS: cut hint próprio de cada jogo ─
       var memGrid = document.querySelector('.memory-grid');
       if (memGrid) {
         var hint = document.createElement('p');
         hint.className = 'cut-hint';
-        hint.innerHTML = '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
+        hint.innerHTML = memGrid.classList.contains('flashcard-grid')
+          ? '✂&nbsp; Recorte os cartões pelas linhas tracejadas &mdash; <strong>frente</strong> e <strong>verso</strong> são cartas separadas: use a frente para perguntar e o verso para conferir a resposta.'
+          : '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
         memGrid.before(hint);
       }
 
@@ -7183,7 +7145,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
 
       // Only inject standalone tracker for non-storytelling activities.
       // For 'Metafora Narrativa' the tracker is bundled with the Mapa da Metafora page.
-      if (norm(label) !== 'Metafora Narrativa') {
+      // 'Sequencia Didatica' é documento do professor: sem placar nem "boa sorte".
+      if (norm(label) !== 'Metafora Narrativa' && norm(label) !== 'Sequencia Didatica') {
         if (akPage) {
           akPage.before(boaSorte);
           akPage.before(tracker);
@@ -7209,6 +7172,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         wrap.appendChild(titleBox);
         akTitle.replaceWith(wrap);
       }
+
+      // ── STORY: Gabarito do Professor em página própria ───
+      document.querySelectorAll('.markdown-body h2').forEach(function(h){
+        if (/gabarito/i.test(h.textContent)) {
+          var br = document.createElement('div');
+          br.style.pageBreakBefore = 'always';
+          br.style.breakBefore = 'page';
+          h.parentNode.insertBefore(br, h);
+        }
+      });
 
       // ── STORY: last page = score tracker + Mapa da Metafora ─
       // Folha do aluno: decodificar a metáfora durante a leitura
@@ -7661,10 +7634,13 @@ Retorne em Markdown brasileiro com EXATAMENTE estas seções (títulos h2 idênt
 **1. [Compreensão]** — sobre o que aconteceu na história
 **2. [Conexão]** — sobre o que determinado personagem/elemento representa
 **3. [Aplicação]** — aplica o conceito real a uma situação nova, fora da história
-Depois das questões, um bloco "**Gabarito comentado:**" com a letra correta e 1 frase de justificativa para cada.)
+NÃO inclua o gabarito nesta seção — ele vai na seção final exclusiva do professor.)
 
 ## 💡 Síntese da Metáfora
 (1 parágrafo que desmonta a metáfora explicitamente: "Na história, X representava Y porque...; na vida real, isso significa que...". É o fechamento que garante que toda a turma captou a simbologia.)
+
+## 🔑 Gabarito do Professor
+(Seção final, claramente separada da folha do aluno: para CADA questão do Desafio do Conhecimento, a letra correta e 1 frase de justificativa.)
 
 REGRAS: fidelidade conceitual absoluta — a metáfora NUNCA pode ensinar o conceito errado; linguagem adequada ao nível da turma, envolvente sem infantilizar; NÃO copie diálogos nem trechos de obras — inspire-se no universo e crie cenas originais. Português brasileiro natural.`;
       } else if (activeMode === 'quiz') {
@@ -7801,7 +7777,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
             throw new Error('[IA_FORMATO] caça-palavras sem lista de words válida');
           }
           const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word), wsGridSize);
-          finalResult = { ...parsed, grid: built.grid };
+          finalResult = { ...parsed, grid: built.grid, placements: built.placements };
         } else if (activeMode === 'bingo') {
           if (!Array.isArray(parsed?.items) || parsed.items.length === 0) {
             throw new Error('[IA_FORMATO] bingo sem lista de items válida');
@@ -8166,8 +8142,6 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                   teacherName: profile.name,
                   schoolName: profile.schoolName || selectedClass?.school,
                   activityLabel: activityLabels[activeMode!],
-                  genre: activeMode === 'story' ? popTheme : undefined,
-                  topic: activeMode === 'story' ? topic : undefined,
                   bingoDim: result.bingoSize || 5,
                 };
                 return (
@@ -8242,7 +8216,13 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       </>
                     )}
 
-                    {activeMode === 'wordsearch' && result.grid && (
+                    {activeMode === 'wordsearch' && result.grid && (() => {
+                      const wsNorm = (s: string) => (s || '').toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÔÃÕÇÜ]/gi, '');
+                      const placements: { word: string, row: number, col: number, dir: string }[] = result.placements || [];
+                      const placedSet = new Set(placements.map(p => p.word));
+                      // Só lista pistas de palavras que realmente entraram na grade
+                      const placedWords = placements.length ? result.words.filter((w: any) => placedSet.has(wsNorm(w.word))) : result.words;
+                      return (
                       <>
                         <div className="instructions"><b>Instruções:</b> Encontre todas as palavras da lista escondidas na grade. Elas podem aparecer na horizontal, vertical ou diagonal.</div>
                         <div className="ws-wrapper">
@@ -8254,10 +8234,19 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                         </div>
                         <h2>Palavras para encontrar</h2>
                         <ul className="clue-list">
-                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b>: {w.hint}</li>)}
+                          {placedWords.map((w: any, i: number) => <li key={i}><b>{w.word}</b>: {w.hint}</li>)}
                         </ul>
+                        {placements.length > 0 && (
+                          <div className="answer-key-page">
+                            <h2 className="answer-key-title">Gabarito</h2>
+                            {placements.map((p, i) => (
+                              <div key={i} className="answer-key-item"><b>{p.word}</b> — linha {p.row + 1}, coluna {p.col + 1}, direção {p.dir}</div>
+                            ))}
+                          </div>
+                        )}
                       </>
-                    )}
+                      );
+                    })()}
 
                     {activeMode === 'crossword' && result.words && (
                       <>
@@ -8335,17 +8324,19 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                           <div key={i} className="bingo-card">
                             <div className="bingo-card-title">BINGO</div>
                             <div className="bingo-sub">Cartela {i + 1}</div>
-                            <div className="bingo-grid">
+                            <div className="bingo-grid" style={{ gridTemplateColumns: `repeat(${result.bingoSize || 5}, minmax(0, 1fr))` }}>
                               {card.flatMap((row, r) => row.map((cell, c) => (
                                 <div key={`${r}-${c}`} className={`bingo-cell ${cell.startsWith('★') ? 'free' : ''}`}>{cell.replace('★ ', '')}</div>
                               )))}
                             </div>
                           </div>
                         ))}
-                        <h2>Termos para sortear</h2>
-                        <ul className="clue-list">
-                          {result.items.slice(0, 40).map((it: string, i: number) => <li key={i}>{it}</li>)}
-                        </ul>
+                        <div className="bingo-draw-section">
+                          <h2>Termos para sortear</h2>
+                          <ul className="clue-list">
+                            {result.items.slice(0, 40).map((it: string, i: number) => <li key={i}>{it}</li>)}
+                          </ul>
+                        </div>
                       </>
                     )}
 
@@ -8396,8 +8387,8 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
                     {activeMode === 'flashcard' && result.cards && (
                       <>
-                        <div className="instructions"><b>Como usar:</b> Imprima, recorte pelas linhas tracejadas e dobre cada cartão ao meio. A pergunta fica na frente e a resposta no verso. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
-                        <div className="memory-grid">
+                        <div className="instructions"><b>Como usar:</b> Imprima e recorte os cartões pelas linhas tracejadas. Frente e verso são cartas separadas: use a frente para perguntar e o verso para conferir a resposta. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
+                        <div className="memory-grid flashcard-grid">
                           {result.cards.map((c: any, i: number) => (
                             <React.Fragment key={i}>
                               <div className="memory-pair concept">
