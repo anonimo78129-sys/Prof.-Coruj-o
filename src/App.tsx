@@ -6691,19 +6691,6 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
   const todayStr = new Date().toLocaleDateString('pt-BR');
-  const owlSvg = `<svg width="84" height="84" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:0.88;flex-shrink:0">
-    <ellipse cx="30" cy="43" rx="19" ry="16" fill="rgba(255,255,255,0.18)"/>
-    <circle cx="30" cy="20" r="17" fill="rgba(255,255,255,0.18)"/>
-    <polygon points="17,4 22,17 13,17" fill="rgba(255,255,255,0.28)"/>
-    <polygon points="43,4 47,17 38,17" fill="rgba(255,255,255,0.28)"/>
-    <circle cx="22" cy="20" r="8" fill="white"/><circle cx="38" cy="20" r="8" fill="white"/>
-    <circle cx="23" cy="21" r="5" fill="#1e293b"/><circle cx="39" cy="21" r="5" fill="#1e293b"/>
-    <circle cx="25" cy="19" r="2" fill="white"/><circle cx="41" cy="19" r="2" fill="white"/>
-    <polygon points="30,27 25,33 35,33" fill="#fbbf24"/>
-    <ellipse cx="10" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(-15,10,43)"/>
-    <ellipse cx="50" cy="43" rx="10" ry="14" fill="rgba(255,255,255,0.13)" transform="rotate(15,50,43)"/>
-    <text x="30" y="57" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.65)" font-family="Arial" font-weight="bold" letter-spacing="1">CORUJAO</text>
-  </svg>`;
   const headerHtml = `
     <div class="page-header">
       <div class="header-inner">
@@ -6716,7 +6703,6 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
             <div class="activity-tag">${opts.activityLabel}</div>
             <h1 class="doc-title">${opts.title}</h1>
           </div>
-          <div class="header-owl">${owlSvg}</div>
         </div>
         <div class="fields-grid">
           <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
@@ -6734,21 +6720,19 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
 
     /* ── HEADER ───────────────────────────────────────────── */
-    .page-header { background: var(--ac,#4338ca); border-radius: 16px; padding: 14px 16px 16px; color: white; position: relative; overflow: hidden; margin-bottom: 18px; }
-    .page-header::before { content:''; position:absolute; inset:0; background-image:radial-gradient(circle, rgba(255,255,255,0.14) 1.5px, transparent 1.5px); background-size:16px 16px; border-radius:16px; pointer-events:none; }
-    .header-inner { position:relative; z-index:1; }
+    .page-header { background: white; border: 1.5px solid #e5e7eb; border-top: 6px solid var(--ac,#4338ca); border-radius: 12px; padding: 16px 18px 14px; color: #111827; margin-bottom: 18px; }
+    .header-inner { position:relative; }
     .header-top-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
     .header-text { flex:1; min-width:0; }
-    .header-owl { flex-shrink:0; margin-top:-4px; }
-    .school-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:8.5px; letter-spacing:1.5px; color:rgba(255,255,255,0.75); text-transform:uppercase; font-weight:700; }
-    .school-name { font-weight:900; color:white; }
-    .activity-tag { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.22); color:white; padding:4px 12px; border-radius:20px; font-size:10px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; border:1.5px solid rgba(255,255,255,0.45); }
-    .doc-title { font-size:24px; font-weight:900; color:white; margin:0 0 14px; line-height:1.2; text-shadow:0 1px 6px rgba(0,0,0,0.22); letter-spacing:-0.3px; }
+    .school-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #f3f4f6; font-size:8.5px; letter-spacing:1.5px; color:#9ca3af; text-transform:uppercase; font-weight:700; }
+    .school-name { font-weight:900; color:#111827; font-size:10px; }
+    .activity-tag { display:inline-flex; align-items:center; gap:5px; background:var(--ac,#4338ca); color:white; padding:3.5px 12px; border-radius:20px; font-size:9px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:7px; }
+    .doc-title { font-size:23px; font-weight:900; color:#111827; margin:0 0 14px; line-height:1.2; letter-spacing:-0.3px; }
     .fields-grid { display:grid; grid-template-columns:2fr 1fr 1fr 0.5fr; gap:7px 12px; margin-top:4px; }
     .field { display:flex; flex-direction:column; gap:2px; }
     .field.full { grid-column:1/-1; }
-    .field-label { font-size:7px; font-weight:900; color:rgba(255,255,255,0.65); letter-spacing:1.5px; text-transform:uppercase; }
-    .field-line { border-bottom:1.5px solid rgba(255,255,255,0.55); min-height:17px; padding:2px 4px; font-size:10.5px; color:white; font-weight:700; }
+    .field-label { font-size:7px; font-weight:900; color:#9ca3af; letter-spacing:1.5px; text-transform:uppercase; }
+    .field-line { border-bottom:1.5px solid #d1d5db; min-height:17px; padding:2px 4px; font-size:10.5px; color:#111827; font-weight:700; }
 
     /* ── HOW TO PLAY card ─────────────────────────────────── */
     .instructions { display:flex; gap:12px; align-items:center; background:white; border:2.5px dashed var(--ac,#4338ca); padding:10px 14px; margin:10px 0 18px; border-radius:10px; font-size:11px; color:#1f2937; }
