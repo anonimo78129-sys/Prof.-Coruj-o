@@ -1,12 +1,16 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { clientsClaim } from 'workbox-core';
 import { initializeApp } from 'firebase/app';
 import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
 import firebaseConfig from '../firebase-applet-config.json';
 
 declare const self: ServiceWorkerGlobalScope;
 
-// v1.1.0 — limpa caches antigos e registra novos assets
+// v1.2.0 — ativa a versão nova imediatamente: sem skipWaiting o SW atualizado
+// ficava "waiting" até TODAS as abas fecharem, prendendo usuários na versão antiga.
+self.skipWaiting();
+clientsClaim();
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
