@@ -13,7 +13,7 @@ import {
   Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
   Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
-  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen
+  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -1186,7 +1186,15 @@ const AdvancedSettings = ({
         <>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de questões</label>
-            <input type="number" min="1" max="20" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm" />
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={Number.isFinite(questionCount) ? questionCount : ''}
+              onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+              onBlur={() => setQuestionCount(Number.isFinite(questionCount) ? Math.min(30, Math.max(1, questionCount)) : 10)}
+              className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de questão</label>
@@ -1930,10 +1938,9 @@ const buildDocx = async (
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
   const gabMd  = sepIdx >= 0 ? rawMd.slice(sepIdx + SEP.length) : '';
 
-  const accentHex = { plan: '059669', exam: 'DC2626', activities: '2563EB' };
-  const darkHex   = { plan: '064E3B', exam: '7F1D1D', activities: '1E3A8A' };
-  const ac = accentHex[docType];
-  const dk = darkHex[docType];
+  // Cor única da marca (indigo) para todos os tipos de documento
+  const ac = '4338CA';
+  const dk = '312E81';
 
   const parseInline = (text: string) => {
     const runs: InstanceType<typeof TextRun>[] = [];
@@ -2043,6 +2050,12 @@ const buildDocx = async (
     // Header info
     docChildren.push(infoLine(`ESCOLA: ${opts.school || '____________'}   |   PROFESSOR(A): ${opts.teacher || '____________'}   |   DISCIPLINA: ${opts.subject || '____________'}`));
     docChildren.push(infoLine(`TURMA: ${opts.className || '____________'}   |   DATA: ___/___/______   |   ${isExam ? 'NOTA: _______' : 'ENTREGA: ____________'}`));
+    if (isExam && (opts.examValue || opts.examDuration)) {
+      const durStr = opts.examDuration
+        ? (opts.examDuration < 60 ? `${opts.examDuration} min` : `${Math.floor(opts.examDuration / 60)}h${opts.examDuration % 60 ? `${opts.examDuration % 60}min` : ''}`)
+        : '____________';
+      docChildren.push(infoLine(`VALOR: ${opts.examValue ?? '____'} pontos   |   DURAÇÃO: ${durStr}`));
+    }
     docChildren.push(hr());
 
     // Student name underline
@@ -2444,8 +2457,6 @@ const PlannerScreen = ({
   setPlannerPlan: setPlan,
   plannerPresentationData: presentationData,
   setPlannerPresentationData: setPresentationData,
-  plannerResources: resources,
-  setPlannerResources: setResources,
   plannerActivity: activity,
   setPlannerActivity: setActivity,
   plannerExam: exam,
@@ -2507,8 +2518,6 @@ const PlannerScreen = ({
   setPlannerPlan: (p: string | ((prev: string) => string)) => void,
   plannerPresentationData: PresentationData | null,
   setPlannerPresentationData: (d: PresentationData | null) => void,
-  plannerResources: {type: 'activities' | 'slides' | 'exam', content: string}[],
-  setPlannerResources: (r: {type: 'activities' | 'slides' | 'exam', content: string}[] | ((prev: {type: 'activities' | 'slides' | 'exam', content: string}[]) => {type: 'activities' | 'slides' | 'exam', content: string}[])) => void,
   plannerActivity: string,
   setPlannerActivity: (a: string | ((prev: string) => string)) => void,
   plannerExam: string,
@@ -2584,6 +2593,18 @@ const PlannerScreen = ({
 
   const [error, setError] = useState('');
   const [regenLoading, setRegenLoading] = useState(false);
+
+  // Gabarito no preview: oculto por padrão em provas, visível nos demais modos
+  const [showGabarito, setShowGabarito] = useState(mode !== 'exam');
+  useEffect(() => { setShowGabarito(mode !== 'exam'); }, [mode]);
+
+  const resultText = typeof currentResult === 'string' ? currentResult : '';
+  // Separador cru ---GABARITO--- vira um heading legível no preview
+  // (consome o heading "## Gabarito…" logo em seguida, se houver, para não duplicar)
+  const displayResult = resultText.replace(/^[ \t]*---GABARITO---[ \t]*$(?:\n+^#{1,3} .*gabarito.*$)?/gim, '## 🔑 Gabarito do Professor');
+  const gabHeadingMatch = displayResult.match(/^#{1,3} .*gabarito.*$/im);
+  const hasGabarito = (gabHeadingMatch?.index ?? -1) > 0;
+  const visibleResult = hasGabarito && !showGabarito ? displayResult.slice(0, gabHeadingMatch!.index as number) : displayResult;
 
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
   const [regenState, setRegenState] = useState<{ idx: number; prompt: string } | null>(null);
@@ -3355,13 +3376,13 @@ const PlannerScreen = ({
               <div className="flex flex-col gap-2 mb-6">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => generateResource('activities')}
+                    onClick={() => { generateResource('activities'); setPlannerMode('activities'); }}
                     className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
                   >
                     <FileText size={16} /> Atividades
                   </button>
                   <button
-                    onClick={() => generateResource('slides')}
+                    onClick={() => { generateResource('slides'); setPlannerMode('slides'); }}
                     className="flex-1 bg-indigo-50 text-indigo-600 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
                   >
                     <Presentation size={16} /> Slides
@@ -3408,9 +3429,26 @@ const PlannerScreen = ({
                 transition={{ duration: 0.35 }}
                 className="flex flex-col gap-2 mb-4"
               >
-                <div className="max-h-64 overflow-y-auto no-scrollbar border border-gray-100 rounded-2xl p-4 bg-gray-50">
-                  <div className="markdown-body text-xs">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentResult as string}</ReactMarkdown>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+                    {mode === 'exam' ? 'Prova' : mode === 'activities' ? 'Atividades' : 'Plano de Aula'}
+                  </span>
+                  {selectedClass?.name && <span className="text-[11px] font-medium text-gray-500">Turma: {selectedClass.name}</span>}
+                  {(selectedClass?.subject || profile.subject) && <span className="text-[11px] font-medium text-gray-500">{selectedClass?.subject || profile.subject}</span>}
+                  <span className="text-[11px] text-gray-400">{new Date().toLocaleDateString('pt-BR')}</span>
+                </div>
+                {hasGabarito && (
+                  <button
+                    onClick={() => setShowGabarito(!showGabarito)}
+                    className="self-start flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full active:scale-95 transition-transform"
+                  >
+                    {showGabarito ? <EyeOff size={12} /> : <Eye size={12} />}
+                    {showGabarito ? 'Ocultar gabarito' : 'Mostrar gabarito'}
+                  </button>
+                )}
+                <div className="max-h-[60vh] overflow-y-auto no-scrollbar border border-gray-100 rounded-2xl p-4 bg-gray-50">
+                  <div className="markdown-body text-sm">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{visibleResult}</ReactMarkdown>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -3467,59 +3505,6 @@ const PlannerScreen = ({
               </motion.div>
             )}
 
-            {mode !== 'slides' && resources.length > 0 && (
-              <div className="space-y-4 border-t border-gray-100 pt-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Materiais Complementares</h3>
-                {resources.map((res, i) => (
-                  <div key={i} className="flex flex-col gap-2">
-                    <div className="max-h-64 overflow-y-auto no-scrollbar border border-gray-100 rounded-2xl p-4 bg-white shadow-sm">
-                      <div className="flex items-center gap-2 mb-4 font-bold text-indigo-600">
-                        {res.type === 'activities' ? <FileText size={16} /> : <Presentation size={16} />}
-                        {res.type === 'activities' ? 'Atividades' : 'Roteiro de Slides'}
-                      </div>
-                      <div className="markdown-body text-xs">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{res.content}</ReactMarkdown>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                          onClick={async () => {
-                            if (preparingDoc !== null) return;
-                            setPreparingDoc(i);
-                            try {
-                              const dt = res.type === 'activities' ? 'activities' : res.type === 'exam' ? 'exam' : 'plan';
-                              const blob = await buildDocx(res.content, dt, {
-                                school: selectedClass?.school || profileSchoolName || '',
-                                teacher: profileName || '',
-                                subject: selectedClass?.subject || profile.subject || '',
-                                topic,
-                                className: selectedClass?.name || '',
-                                duration,
-                                lessonTime,
-                                turn,
-                                examValue,
-                                examDuration,
-                              });
-                              const label = dt === 'plan' ? 'plano' : dt === 'exam' ? 'avaliacao' : 'atividades';
-                              const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                              downloadBlob(blob, filename);
-                            } catch (e) {
-                              console.error('Erro ao exportar Word:', e);
-                              toast.error('O documento Word fugiu! Tenta gerar de novo.');
-                            } finally {
-                              setPreparingDoc(null);
-                            }
-                          }}
-                          disabled={preparingDoc !== null}
-                          className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-                        >
-                          {preparingDoc === i ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar Word
-                        </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -6552,7 +6537,8 @@ const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
   const grid: Cell[][] = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
   type Placement = {word: string, clue: string, row: number, col: number, dir: 'H' | 'V'};
   const placements: Placement[] = [];
-  const words = rawWords.slice(0, 15).map(w => ({...w, word: w.word.toUpperCase().replace(/[^A-Z]/g, '')})).filter(w => w.word.length >= 3);
+  // Normaliza acentos (Á→A, É→E, Ç→C, …) ANTES de filtrar para não mutilar palavras acentuadas
+  const words = rawWords.slice(0, 15).map(w => ({...w, word: w.word.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z]/g, '')})).filter(w => w.word.length >= 3);
   if (words.length === 0) return null;
 
   const canPlace = (word: string, row: number, col: number, dir: 'H' | 'V'): boolean => {
@@ -6685,36 +6671,45 @@ Return ONLY valid JSON with these exact keys:
   }
 };
 
-const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, genre?: string, topic?: string, bingoDim?: number }) => {
+const printGameResult = (opts: { title: string, subject?: string, level?: string, className?: string, teacherName?: string, schoolName?: string, activityLabel: string, bingoDim?: number }) => {
   const node = document.getElementById('game-print-area');
   if (!node) return;
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
-  const todayStr = new Date().toLocaleDateString('pt-BR');
+  // Sequência Didática é documento do PROFESSOR: sem campos de aluno, sem placar, sem "boa sorte"
+  const isTeacherDoc = opts.activityLabel === 'Sequência Didática';
+  const fieldsHtml = isTeacherDoc
+    ? `
+        <div class="fields-grid">
+          <div class="field" style="grid-column:1/3"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${escapeHtml(opts.teacherName || '')}</div></div>
+          <div class="field" style="grid-column:3/-1"><span class="field-label">TURMA</span><div class="field-line">${escapeHtml(opts.className || '')}</div></div>
+        </div>`
+    : `
+        <div class="fields-grid">
+          <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
+          <div class="field"><span class="field-label">DATA</span><div class="field-line short"></div></div>
+          <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${escapeHtml(opts.className || '')}</div></div>
+          <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
+          <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${escapeHtml(opts.teacherName || '')}</div></div>
+        </div>`;
   const headerHtml = `
     <div class="page-header">
       <div class="header-inner">
         <div class="header-top-row">
           <div class="header-text">
             <div class="school-row">
-              <div class="school-name">${opts.schoolName || 'ESCOLA'}</div>
-              <div class="school-meta">${opts.subject || ''}${opts.level ? ' • ' + opts.level : ''}</div>
+              <div class="school-name">${escapeHtml(opts.schoolName || 'ESCOLA')}</div>
+              <div class="school-meta">${escapeHtml(opts.subject || '')}${opts.level ? ' • ' + escapeHtml(opts.level) : ''}</div>
             </div>
-            <div class="activity-tag">${opts.activityLabel}</div>
-            <h1 class="doc-title">${opts.title}</h1>
+            <div class="activity-tag">${escapeHtml(opts.activityLabel)}</div>
+            <h1 class="doc-title">${escapeHtml(opts.title)}</h1>
           </div>
         </div>
-        <div class="fields-grid">
-          <div class="field"><span class="field-label">NOME</span><div class="field-line"></div></div>
-          <div class="field"><span class="field-label">DATA</span><div class="field-line short"></div></div>
-          <div class="field"><span class="field-label">TURMA</span><div class="field-line short">${opts.className || ''}</div></div>
-          <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
-          <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${opts.teacherName || ''}</div></div>
-        </div>
+        ${fieldsHtml}
       </div>
     </div>
   `;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.title}</title><style>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(opts.title)}</title><style>
     @page { size: A4; margin: 1.4cm 1.4cm 2cm; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; margin: 0; font-size: 12px; background: white; }
@@ -6760,7 +6755,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .word-chip-box { width:14px; height:14px; border:1.5px solid var(--ac,#4338ca); border-radius:3px; flex-shrink:0; background:white; }
 
     /* ── BINGO ────────────────────────────────────────────── */
-    .bingo-card { border:3px solid var(--ac,#4338ca); margin:0 0 22px; page-break-inside:avoid; break-inside:avoid; border-radius:14px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+    .bingo-card { border:3px solid var(--ac,#4338ca); margin:8px 8px 26px; page-break-inside:avoid; break-inside:avoid; border-radius:14px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.12); outline:1.5px dashed #9ca3af; outline-offset:6px; }
+    .bingo-draw-section { page-break-before:always; break-before:page; }
     .bingo-card-title { display:flex; justify-content:center; gap:0; background:#1e293b; padding:8px 10px; }
     .bingo-letter { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; font-size:28px; font-weight:900; color:white; border-radius:8px; margin:0 2px; }
     .bingo-sub { text-align:center; font-size:9px; color:#6b7280; padding:4px 0; background:#f8f7ff; border-bottom:1px solid #ddd6fe; letter-spacing:1px; font-weight:700; }
@@ -6788,28 +6784,12 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
 
     /* ── MEMORY ───────────────────────────────────────────── */
     .cut-hint { font-size:10px; color:#6b7280; font-style:italic; margin:0 0 10px; display:flex; align-items:center; gap:5px; padding:6px 10px; background:#fef3c7; border-radius:6px; border:1.5px dashed #f59e0b; }
-    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; page-break-inside:avoid; break-inside:avoid; padding:10px; background:#f9fafb; border-radius:12px; border:2px dashed #d1d5db; }
-    .memory-pair { border:2px dashed #9ca3af; padding:14px 8px; min-height:88px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:8px; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+    /* quebra de página por CARTA (não pela grade inteira): 20 pares fluem por várias páginas */
+    .memory-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; padding:6px; background:#f9fafb; border-radius:12px; border:2px dashed #d1d5db; }
+    .memory-pair { border:1.5px dashed #9ca3af; padding:14px 8px; min-height:88px; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; page-break-inside:avoid; break-inside:avoid; background:white; border-radius:8px; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
     .memory-pair::after { content:'✂'; position:absolute; top:-10px; right:6px; font-size:12px; color:#6b7280; background:#f9fafb; padding:0 3px; border-radius:4px; }
     .memory-pair.concept { background:var(--ac,#4338ca); color:white; font-weight:900; border-color:var(--ac,#4338ca); font-size:11px; border-style:solid; }
     .memory-pair.concept::after { background:var(--ac,#4338ca); color:rgba(255,255,255,0.7); }
-
-    /* ── TRAIL ────────────────────────────────────────────── */
-    .trail-wrapper { margin:14px 0; page-break-inside:avoid; break-inside:avoid; }
-    .trail-board { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; padding:16px; background:var(--ac-light,#eef2ff); border-radius:14px; border:3px solid var(--ac,#4338ca); position:relative; background-image:radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size:8px 8px; }
-    .trail-cell { border:3px solid var(--ac,#4338ca); border-radius:50%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; background:white; color:var(--ac,#4338ca); box-shadow:0 2px 4px rgba(0,0,0,0.08); position:relative; }
-    .trail-cell.special { background:#fbbf24; color:#78350f; border-color:#d97706; }
-    .trail-cell.type-pergunta { background:#fbbf24 !important; color:#78350f !important; border-color:#d97706 !important; }
-    .trail-cell.type-bonus { background:#16a34a !important; color:white !important; border-color:#14532d !important; }
-    .trail-cell.type-penalidade { background:#dc2626 !important; color:white !important; border-color:#991b1b !important; }
-    .trail-cell.type-desafio { background:#3b82f6 !important; color:white !important; border-color:#1d4ed8 !important; }
-    .trail-cell.end { background:#dc2626; color:white; border-color:#991b1b; font-size:18px; box-shadow:0 0 0 3px #fee2e2, 0 2px 6px rgba(0,0,0,0.15); }
-    .trail-cell.start { background:#16a34a; color:white; border-color:#14532d; font-size:18px; box-shadow:0 0 0 3px #dcfce7, 0 2px 6px rgba(0,0,0,0.15); }
-    /* legend (injected) */
-    .trail-legend { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:8px 12px; background:white; border-radius:8px; border:1.5px solid #e5e7eb; }
-    .trail-legend-title { font-size:8px; font-weight:900; color:var(--ac,#4338ca); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
-    .trail-legend-items { display:flex; gap:12px; flex-wrap:wrap; font-size:9.5px; font-weight:600; color:#374151; flex:1; }
-    .trail-dice { flex-shrink:0; color:var(--ac,#4338ca); }
 
     /* ── CROSSWORD ────────────────────────────────────────── */
     /* Cell size is driven by inline style (computed from grid width in React).
@@ -6888,14 +6868,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     <script>
     (function(){
       var label = "${opts.activityLabel}";
+      // Cores alinhadas às cores de tela do modeMeta (EstudioScreen)
       var themes = {
         'Metafora Narrativa':    { ac:'#c026d3', light:'#fdf4ff', emoji:'📖' },
-        'Quiz Avaliativo':       { ac:'#ea580c', light:'#fff7ed', emoji:'⚡' },
-        'Caca-Palavras':         { ac:'#2563eb', light:'#eff6ff', emoji:'🔍' },
-        'Palavras Cruzadas':     { ac:'#0d9488', light:'#f0fdfa', emoji:'✏️' },
-        'Bingo Educativo':       { ac:'#7c3aed', light:'#f5f3ff', emoji:'🎱' },
-        'Trilha do Conhecimento':{ ac:'#16a34a', light:'#f0fdf4', emoji:'🎲' },
-        'Jogo da Memoria':       { ac:'#db2777', light:'#fdf2f8', emoji:'🃏' }
+        'Quiz Avaliativo':       { ac:'#d97706', light:'#fffbeb', emoji:'⚡' },
+        'Caca-Palavras':         { ac:'#059669', light:'#ecfdf5', emoji:'🔍' },
+        'Palavras Cruzadas':     { ac:'#2563eb', light:'#eff6ff', emoji:'✏️' },
+        'Bingo Educativo':       { ac:'#db2777', light:'#fdf2f8', emoji:'🎱' },
+        'Jogo da Memoria':       { ac:'#0d9488', light:'#f0fdfa', emoji:'🃏' },
+        'Sequencia Didatica':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📋' },
+        'Flashcards':            { ac:'#ea580c', light:'#fff7ed', emoji:'🗂️' }
       };
       // labels chegam acentuados; keys do objeto são sem acento — normaliza para casar
       var norm = function(s){ return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); };
@@ -6948,12 +6930,6 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
           + '<rect x="4" y="6" width="5" height="8" fill="#ffffff"/>'
           + '<rect x="5" y="8" width="3" height="1" fill="#ec4899"/><rect x="7" y="9" width="1" height="1" fill="#ec4899"/><rect x="6" y="10" width="1" height="1" fill="#ec4899"/><rect x="6" y="12" width="1" height="1" fill="#ec4899"/>'
           + '</svg>',
-        'Trilha do Conhecimento': '<svg viewBox="0 0 16 16"' + SR + '>'
-          + '<rect x="3" y="2" width="10" height="1" fill="#14532d"/><rect x="2" y="3" width="1" height="10" fill="#14532d"/><rect x="13" y="3" width="1" height="10" fill="#14532d"/><rect x="3" y="13" width="10" height="1" fill="#14532d"/>'
-          + '<rect x="3" y="3" width="10" height="10" fill="#ffffff"/>'
-          + '<rect x="3" y="3" width="10" height="1" fill="#bbf7d0"/><rect x="3" y="4" width="1" height="9" fill="#bbf7d0"/>'
-          + '<rect x="4" y="4" width="2" height="2" fill="#14532d"/><rect x="10" y="4" width="2" height="2" fill="#14532d"/><rect x="7" y="7" width="2" height="2" fill="#14532d"/><rect x="4" y="10" width="2" height="2" fill="#14532d"/><rect x="10" y="10" width="2" height="2" fill="#14532d"/>'
-          + '</svg>',
         'Palavras Cruzadas': '<svg viewBox="0 0 16 16"' + SR + '>'
           + '<rect x="1" y="1" width="10" height="1" fill="#134e4a"/><rect x="1" y="2" width="1" height="9" fill="#134e4a"/><rect x="10" y="2" width="1" height="9" fill="#134e4a"/><rect x="1" y="10" width="10" height="1" fill="#134e4a"/>'
           + '<rect x="1" y="4" width="10" height="1" fill="#134e4a"/><rect x="1" y="7" width="10" height="1" fill="#134e4a"/>'
@@ -7002,19 +6978,17 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         clueList.replaceWith(chips);
       }
 
-      // ── BINGO: colored B-I-N-G-O tiles + calling circles ─
-      var bingoTitle = document.querySelector('.bingo-card-title');
-      if (bingoTitle) {
-        var cols = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+      // ── BINGO: colored B-I-N-G-O tiles + calling circles (em TODAS as cartelas) ─
+      var bingoCols = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+      document.querySelectorAll('.bingo-card-title').forEach(function(bingoTitle){
         bingoTitle.innerHTML = 'BINGO'.split('').map(function(l,i){
-          return '<span class="bingo-letter" style="background:' + cols[i] + '">' + l + '</span>';
+          return '<span class="bingo-letter" style="background:' + bingoCols[i] + '">' + l + '</span>';
         }).join('');
-      }
-      var bingoFree = document.querySelector('.bingo-cell.free');
-      if (bingoFree) {
+      });
+      document.querySelectorAll('.bingo-cell.free').forEach(function(bingoFree){
         var freeText = bingoFree.textContent.replace('★ ', '').trim();
         bingoFree.innerHTML = '&#11088;<br>' + (freeText || 'FREE') + '<br>&#11088;';
-      }
+      });
       document.querySelectorAll('.bingo-card').forEach(function(card) {
         var cellCount = card.querySelectorAll('.bingo-cell:not(.free)').length;
         var calling = document.createElement('div');
@@ -7049,41 +7023,14 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         });
       }
 
-      // ── TRAIL: emoji cells + dice + legend ──────────────
-      var cells = document.querySelectorAll('.trail-cell');
-      if (cells.length) {
-        cells[0].textContent = '🚀';
-        cells[cells.length-1].textContent = '🏆';
-        cells.forEach(function(c) {
-          var type = c.dataset ? c.dataset.type : c.getAttribute('data-type');
-          if (c.classList.contains('start')) { c.textContent = '🚀'; }
-          else if (c.classList.contains('end')) { c.textContent = '🏆'; }
-          else if (type === 'pergunta') { c.classList.add('type-pergunta'); c.textContent = '❓'; }
-          else if (type === 'bonus') { c.classList.add('type-bonus'); c.textContent = '⭐'; }
-          else if (type === 'penalidade') { c.classList.add('type-penalidade'); c.textContent = '💀'; }
-          else if (type === 'desafio') { c.classList.add('type-desafio'); c.textContent = '⚡'; }
-          else if (c.classList.contains('special')) { c.textContent = '⭐'; }
-        });
-        var board = document.querySelector('.trail-board');
-        if (board) {
-          var wrapper = document.createElement('div');
-          wrapper.className = 'trail-wrapper';
-          board.parentNode.insertBefore(wrapper, board);
-          wrapper.appendChild(board);
-          var diceSvg = '<svg class="trail-dice" width="38" height="38" viewBox="0 0 40 40"><rect x="2" y="2" width="36" height="36" rx="9" fill="white" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="28" cy="12" r="3.2" fill="currentColor"/><circle cx="20" cy="20" r="3.2" fill="currentColor"/><circle cx="12" cy="28" r="3.2" fill="currentColor"/><circle cx="28" cy="28" r="3.2" fill="currentColor"/></svg>';
-          var legend = document.createElement('div');
-          legend.className = 'trail-legend';
-          legend.innerHTML = '<div><div class="trail-legend-title">Legenda</div><div class="trail-legend-items"><span>🚀 Início</span><span>🏆 Chegada</span><span>❓ Pergunta</span><span>⭐ Bônus</span><span>💀 Penalidade</span><span>⚡ Desafio</span></div></div>' + diceSvg;
-          wrapper.appendChild(legend);
-        }
-      }
-
-      // ── MEMORY: cut hint + scissors on grid ─────────────
+      // ── MEMORY / FLASHCARDS: cut hint próprio de cada jogo ─
       var memGrid = document.querySelector('.memory-grid');
       if (memGrid) {
         var hint = document.createElement('p');
         hint.className = 'cut-hint';
-        hint.innerHTML = '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
+        hint.innerHTML = memGrid.classList.contains('flashcard-grid')
+          ? '✂&nbsp; Recorte os cartões pelas linhas tracejadas &mdash; <strong>frente</strong> e <strong>verso</strong> são cartas separadas: use a frente para perguntar e o verso para conferir a resposta.'
+          : '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
         memGrid.before(hint);
       }
 
@@ -7183,7 +7130,8 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
 
       // Only inject standalone tracker for non-storytelling activities.
       // For 'Metafora Narrativa' the tracker is bundled with the Mapa da Metafora page.
-      if (norm(label) !== 'Metafora Narrativa') {
+      // 'Sequencia Didatica' é documento do professor: sem placar nem "boa sorte".
+      if (norm(label) !== 'Metafora Narrativa' && norm(label) !== 'Sequencia Didatica') {
         if (akPage) {
           akPage.before(boaSorte);
           akPage.before(tracker);
@@ -7209,6 +7157,16 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         wrap.appendChild(titleBox);
         akTitle.replaceWith(wrap);
       }
+
+      // ── STORY: Gabarito do Professor em página própria ───
+      document.querySelectorAll('.markdown-body h2').forEach(function(h){
+        if (/gabarito/i.test(h.textContent)) {
+          var br = document.createElement('div');
+          br.style.pageBreakBefore = 'always';
+          br.style.breakBefore = 'page';
+          h.parentNode.insertBefore(br, h);
+        }
+      });
 
       // ── STORY: last page = score tracker + Mapa da Metafora ─
       // Folha do aluno: decodificar a metáfora durante a leitura
@@ -7661,10 +7619,13 @@ Retorne em Markdown brasileiro com EXATAMENTE estas seções (títulos h2 idênt
 **1. [Compreensão]** — sobre o que aconteceu na história
 **2. [Conexão]** — sobre o que determinado personagem/elemento representa
 **3. [Aplicação]** — aplica o conceito real a uma situação nova, fora da história
-Depois das questões, um bloco "**Gabarito comentado:**" com a letra correta e 1 frase de justificativa para cada.)
+NÃO inclua o gabarito nesta seção — ele vai na seção final exclusiva do professor.)
 
 ## 💡 Síntese da Metáfora
 (1 parágrafo que desmonta a metáfora explicitamente: "Na história, X representava Y porque...; na vida real, isso significa que...". É o fechamento que garante que toda a turma captou a simbologia.)
+
+## 🔑 Gabarito do Professor
+(Seção final, claramente separada da folha do aluno: para CADA questão do Desafio do Conhecimento, a letra correta e 1 frase de justificativa.)
 
 REGRAS: fidelidade conceitual absoluta — a metáfora NUNCA pode ensinar o conceito errado; linguagem adequada ao nível da turma, envolvente sem infantilizar; NÃO copie diálogos nem trechos de obras — inspire-se no universo e crie cenas originais. Português brasileiro natural.`;
       } else if (activeMode === 'quiz') {
@@ -7801,7 +7762,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
             throw new Error('[IA_FORMATO] caça-palavras sem lista de words válida');
           }
           const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word), wsGridSize);
-          finalResult = { ...parsed, grid: built.grid };
+          finalResult = { ...parsed, grid: built.grid, placements: built.placements };
         } else if (activeMode === 'bingo') {
           if (!Array.isArray(parsed?.items) || parsed.items.length === 0) {
             throw new Error('[IA_FORMATO] bingo sem lista de items válida');
@@ -8166,8 +8127,6 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                   teacherName: profile.name,
                   schoolName: profile.schoolName || selectedClass?.school,
                   activityLabel: activityLabels[activeMode!],
-                  genre: activeMode === 'story' ? popTheme : undefined,
-                  topic: activeMode === 'story' ? topic : undefined,
                   bingoDim: result.bingoSize || 5,
                 };
                 return (
@@ -8242,7 +8201,13 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       </>
                     )}
 
-                    {activeMode === 'wordsearch' && result.grid && (
+                    {activeMode === 'wordsearch' && result.grid && (() => {
+                      const wsNorm = (s: string) => (s || '').toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÔÃÕÇÜ]/gi, '');
+                      const placements: { word: string, row: number, col: number, dir: string }[] = result.placements || [];
+                      const placedSet = new Set(placements.map(p => p.word));
+                      // Só lista pistas de palavras que realmente entraram na grade
+                      const placedWords = placements.length ? result.words.filter((w: any) => placedSet.has(wsNorm(w.word))) : result.words;
+                      return (
                       <>
                         <div className="instructions"><b>Instruções:</b> Encontre todas as palavras da lista escondidas na grade. Elas podem aparecer na horizontal, vertical ou diagonal.</div>
                         <div className="ws-wrapper">
@@ -8254,10 +8219,19 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                         </div>
                         <h2>Palavras para encontrar</h2>
                         <ul className="clue-list">
-                          {result.words.map((w: any, i: number) => <li key={i}><b>{w.word}</b>: {w.hint}</li>)}
+                          {placedWords.map((w: any, i: number) => <li key={i}><b>{w.word}</b>: {w.hint}</li>)}
                         </ul>
+                        {placements.length > 0 && (
+                          <div className="answer-key-page">
+                            <h2 className="answer-key-title">Gabarito</h2>
+                            {placements.map((p, i) => (
+                              <div key={i} className="answer-key-item"><b>{p.word}</b> — linha {p.row + 1}, coluna {p.col + 1}, direção {p.dir}</div>
+                            ))}
+                          </div>
+                        )}
                       </>
-                    )}
+                      );
+                    })()}
 
                     {activeMode === 'crossword' && result.words && (
                       <>
@@ -8335,17 +8309,19 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                           <div key={i} className="bingo-card">
                             <div className="bingo-card-title">BINGO</div>
                             <div className="bingo-sub">Cartela {i + 1}</div>
-                            <div className="bingo-grid">
+                            <div className="bingo-grid" style={{ gridTemplateColumns: `repeat(${result.bingoSize || 5}, minmax(0, 1fr))` }}>
                               {card.flatMap((row, r) => row.map((cell, c) => (
                                 <div key={`${r}-${c}`} className={`bingo-cell ${cell.startsWith('★') ? 'free' : ''}`}>{cell.replace('★ ', '')}</div>
                               )))}
                             </div>
                           </div>
                         ))}
-                        <h2>Termos para sortear</h2>
-                        <ul className="clue-list">
-                          {result.items.slice(0, 40).map((it: string, i: number) => <li key={i}>{it}</li>)}
-                        </ul>
+                        <div className="bingo-draw-section">
+                          <h2>Termos para sortear</h2>
+                          <ul className="clue-list">
+                            {result.items.slice(0, 40).map((it: string, i: number) => <li key={i}>{it}</li>)}
+                          </ul>
+                        </div>
                       </>
                     )}
 
@@ -8396,8 +8372,8 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
                     {activeMode === 'flashcard' && result.cards && (
                       <>
-                        <div className="instructions"><b>Como usar:</b> Imprima, recorte pelas linhas tracejadas e dobre cada cartão ao meio. A pergunta fica na frente e a resposta no verso. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
-                        <div className="memory-grid">
+                        <div className="instructions"><b>Como usar:</b> Imprima e recorte os cartões pelas linhas tracejadas. Frente e verso são cartas separadas: use a frente para perguntar e o verso para conferir a resposta. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
+                        <div className="memory-grid flashcard-grid">
                           {result.cards.map((c: any, i: number) => (
                             <React.Fragment key={i}>
                               <div className="memory-pair concept">
@@ -8426,7 +8402,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
   );
 };
 
-const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string) => {
+const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string, printOpts?: { landscape?: boolean }) => {
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
   const typeLabel = ({ plan: 'Plano de Aula', activities: 'Atividades', exam: 'Avaliação' } as Record<string, string>)[type] || escapeHtml(type);
@@ -8444,9 +8420,18 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
       return '<table><thead><tr>' + head.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' +
         body.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>\n';
     })
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    // Separador literal ---GABARITO--- → quebra de página + título (consome o heading
+    // "## Gabarito…" logo em seguida, se houver, para não duplicar a quebra)
+    .replace(/^[ \t]*---GABARITO---[ \t]*$(?:\n+^#{1,3} .*gabarito.*$)?/gim, '<div style="page-break-before: always"></div><h2>GABARITO DO PROFESSOR</h2>')
+    // ### antes de ## (senão "### Título" vira "<h2># Título</h2>")
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    // Gabarito começa sempre em página nova (evita resposta na mesma folha do aluno)
+    .replace(/^## (.+)$/gm, (_m, t: string) => `${/gabarito/i.test(t) ? '<div style="page-break-before: always"></div>' : ''}<h2>${t}</h2>`)
+    .replace(/^# (.+)$/gm, (_m, t: string) => `${/gabarito/i.test(t) ? '<div style="page-break-before: always"></div>' : ''}<h1>${t}</h1>`)
+    // Alternativas de múltipla escolha "( ) A) …" → linha de opção estilizada
+    .replace(/^\( \) (.+)$\n?/gm, '<div class="opt"><span class="opt-bubble"></span><span>$1</span></div>')
+    // Linhas de resposta (10+ underscores) → linha limpa com borda inferior
+    .replace(/^_{10,}[ \t]*$\n?/gm, '<div class="answer-line"></div>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^---$/gm, '<hr>')
@@ -8454,7 +8439,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
     .replace(/\n/g, '<br>');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
-    @page { size: A4; margin: 2cm; }
+    @page { size: A4${printOpts?.landscape ? ' landscape' : ''}; margin: ${printOpts?.landscape ? '1.4cm' : '2cm'}; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.6; margin: 0; font-size: 12px; }
     .header { background: #4338ca; color: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
@@ -8472,10 +8457,13 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     ul { padding-left: 20px; margin: 4px 0; }
     hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
     strong { font-weight: 800; color: #0f172a; }
-    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10.5px; }
-    th { background: #4338ca; color: white; font-weight: 800; padding: 6px 8px; text-align: left; border: 1px solid #4338ca; }
-    td { padding: 6px 8px; border: 1px solid #e2e8f0; vertical-align: top; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: ${printOpts?.landscape ? '11.5px' : '10.5px'}; }
+    th { background: #4338ca; color: white; font-weight: 800; padding: ${printOpts?.landscape ? '8px 10px' : '6px 8px'}; text-align: left; border: 1px solid #4338ca; }
+    td { padding: ${printOpts?.landscape ? '8px 10px' : '6px 8px'}; border: 1px solid #e2e8f0; vertical-align: top; }
     tr:nth-child(even) td { background: #f8fafc; }
+    .opt { display: flex; align-items: center; gap: 8px; margin: 3px 0 3px 14px; font-size: 11.5px; }
+    .opt-bubble { width: 11px; height: 11px; border: 1.5px solid #64748b; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+    .answer-line { border-bottom: 1px solid #94a3b8; height: 22px; width: 100%; max-width: 640px; margin: 0 0 4px; }
     .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
   </style></head><body>
   <div class="header">
@@ -10037,6 +10025,157 @@ const FERRAMENTAS_META: { id: FerramentaId; title: string; icon: any; color: str
   { id: 'pdf',       title: 'Material do meu PDF',    icon: FileUp,         color: 'text-violet-600',  bg: 'bg-violet-50 border-violet-200',   desc: 'Gere materiais a partir do seu livro ou apostila' },
 ];
 
+// ── Impressão: Parecer Descritivo (papel timbrado sóbrio, com assinaturas) ──
+const printParecer = (opts: { text: string; studentName: string; period: string; teacherName?: string; schoolName?: string; className?: string }) => {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
+  const today = new Date().toLocaleDateString('pt-BR');
+  const body = escapeHtml(opts.text)
+    .replace(/^#{1,3}\s+(.+)$/gm, '<strong>$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .split(/\n{2,}/)
+    .map(p => `<p>${p.trim().replace(/\n/g, '<br>')}</p>`)
+    .join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Parecer Descritivo — ${escapeHtml(opts.studentName)}</title><style>
+    @page { size: A4; margin: 2.2cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Georgia, 'Times New Roman', serif; color: #111827; margin: 0; font-size: 12.5px; line-height: 1.75; }
+    .letterhead { text-align: center; border-bottom: 1.5px solid #111827; padding-bottom: 10px; margin-bottom: 22px; }
+    .school { font-size: 15px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+    .doc-title { text-align: center; font-size: 14px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin: 0 0 20px; }
+    .meta { width: 100%; border-collapse: collapse; margin-bottom: 22px; font-size: 12px; }
+    .meta td { padding: 4px 0; vertical-align: bottom; }
+    .meta .lbl { font-weight: 700; white-space: nowrap; padding-right: 6px; width: 1%; }
+    .meta .val { border-bottom: 1px solid #9ca3af; padding-left: 4px; }
+    .body p { margin: 0 0 12px; text-align: justify; text-indent: 2em; }
+    .sigs { display: flex; gap: 28px; margin-top: 70px; page-break-inside: avoid; }
+    .sig { flex: 1; text-align: center; font-size: 11px; }
+    .sig .line { border-top: 1px solid #111827; padding-top: 5px; }
+  </style></head><body>
+    <div class="letterhead"><div class="school">${escapeHtml(opts.schoolName || 'Escola')}</div></div>
+    <h1 class="doc-title">Parecer Descritivo</h1>
+    <table class="meta">
+      <tr><td class="lbl">Aluno(a):</td><td class="val">${escapeHtml(opts.studentName)}</td><td class="lbl" style="padding-left:18px">Período:</td><td class="val" style="width:140px">${escapeHtml(opts.period)}</td></tr>
+      <tr><td class="lbl">Professor(a):</td><td class="val">${escapeHtml(opts.teacherName || '')}</td><td class="lbl" style="padding-left:18px">Data:</td><td class="val" style="width:140px">${today}</td></tr>
+      ${opts.className ? `<tr><td class="lbl">Turma:</td><td class="val" colspan="3">${escapeHtml(opts.className)}</td></tr>` : ''}
+    </table>
+    <div class="body">${body}</div>
+    <div class="sigs">
+      <div class="sig"><div class="line">Professor(a)</div></div>
+      <div class="sig"><div class="line">Coordenação</div></div>
+      <div class="sig"><div class="line">Responsável</div></div>
+    </div>
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`);
+  w.document.close();
+};
+
+// ── Impressão: Bilhete para famílias (2 vias por folha A4, com linha de corte) ──
+const printBilhete = (opts: { text: string; teacherName?: string; schoolName?: string; className?: string }) => {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
+  const today = new Date().toLocaleDateString('pt-BR');
+  const msg = escapeHtml(opts.text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  const copy = `
+    <div class="copy">
+      <div class="copy-head">
+        <span>${escapeHtml(opts.schoolName || 'Escola')}</span>
+        <span>Prof(a). ${escapeHtml(opts.teacherName || '')}${opts.className ? ' · ' + escapeHtml(opts.className) : ''} · ${today}</span>
+      </div>
+      <div class="msg">${msg}</div>
+      <div class="sig">Assinatura do responsável: <span class="sig-line"></span></div>
+    </div>`;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Comunicado — ${escapeHtml(opts.schoolName || 'Escola')}</title><style>
+    @page { size: A4; margin: 1.2cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Georgia, 'Times New Roman', serif; color: #111827; margin: 0; font-size: 12.5px; line-height: 1.6; }
+    .copy { height: 12.6cm; display: flex; flex-direction: column; padding: 0.5cm 0.3cm; }
+    .copy-head { display: flex; justify-content: space-between; gap: 12px; font-family: Arial, sans-serif; font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: #374151; border-bottom: 1px solid #111827; padding-bottom: 6px; margin-bottom: 12px; }
+    .msg { flex: 1; overflow: hidden; }
+    .sig { margin-top: 14px; font-size: 11.5px; display: flex; align-items: flex-end; gap: 6px; }
+    .sig-line { flex: 1; border-bottom: 1px solid #111827; min-width: 160px; height: 14px; }
+    .cut { display: flex; align-items: center; gap: 8px; color: #6b7280; font-family: Arial, sans-serif; font-size: 11px; margin: 0.25cm 0; }
+    .cut::before, .cut::after { content: ''; flex: 1; border-top: 1.5px dashed #9ca3af; }
+  </style></head><body>
+    ${copy}
+    <div class="cut">✂ recorte aqui</div>
+    ${copy}
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`);
+  w.document.close();
+};
+
+// ── Impressão: Chamada do Diário de Classe (folha de frequência sóbria) ──
+const printChamada = (opts: {
+  className: string; dateBr: string; teacherName?: string; schoolName?: string; note?: string; withGrades: boolean;
+  rows: { n: number; name: string; att?: 'P' | 'F' | 'A'; grade?: string }[];
+  totals: { p: number; f: number; a: number };
+}) => {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
+  const sq = (marked: boolean) => `<span class="sq">${marked ? '✕' : ''}</span>`;
+  const rowsHtml = opts.rows.map(r => `<tr>
+    <td class="c">${r.n}</td>
+    <td>${escapeHtml(r.name)}</td>
+    <td class="c">${sq(r.att === 'P')}</td>
+    <td class="c">${sq(r.att === 'F')}</td>
+    <td class="c">${sq(r.att === 'A')}</td>
+    ${opts.withGrades ? `<td class="c">${escapeHtml(r.grade || '')}</td>` : ''}
+  </tr>`).join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Diário de Classe — ${escapeHtml(opts.className)} — ${escapeHtml(opts.dateBr)}</title><style>
+    @page { size: A4; margin: 1.6cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 11px; margin: 0; }
+    .head { border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
+    .school { text-align: center; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; }
+    .doc { text-align: center; font-size: 10px; letter-spacing: 2px; margin-top: 2px; }
+    .meta { display: flex; gap: 24px; margin-bottom: 10px; }
+    table.list { width: 100%; border-collapse: collapse; }
+    .list th, .list td { border: 1px solid #111; padding: 3.5px 6px; text-align: left; }
+    .list th { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .list tr { page-break-inside: avoid; }
+    .c { text-align: center; }
+    th.st { width: 34px; text-align: center; }
+    .sq { display: inline-block; width: 13px; height: 13px; border: 1.2px solid #111; line-height: 13px; font-size: 10px; text-align: center; vertical-align: middle; }
+    .totals { margin-top: 6px; font-size: 10.5px; }
+    .conteudo { margin-top: 18px; page-break-inside: avoid; }
+    .conteudo .lbl { font-weight: 700; margin-bottom: 4px; }
+    .note { margin-bottom: 4px; }
+    .wline { border-bottom: 1px solid #6b7280; height: 22px; }
+    .psig { margin-top: 46px; display: flex; justify-content: center; page-break-inside: avoid; }
+    .pline { border-top: 1px solid #111; padding-top: 4px; width: 60%; text-align: center; font-size: 10.5px; }
+  </style></head><body>
+    <div class="head">
+      <div class="school">${escapeHtml(opts.schoolName || 'Escola')}</div>
+      <div class="doc">DIÁRIO DE CLASSE — REGISTRO DE FREQUÊNCIA</div>
+    </div>
+    <div class="meta">
+      <span><strong>Turma:</strong> ${escapeHtml(opts.className)}</span>
+      <span><strong>Data:</strong> ${escapeHtml(opts.dateBr)}</span>
+      <span><strong>Professor(a):</strong> ${escapeHtml(opts.teacherName || '')}</span>
+    </div>
+    <table class="list">
+      <thead><tr><th style="width:28px" class="c">Nº</th><th>Nome do aluno</th><th class="st">P</th><th class="st">F</th><th class="st">A</th>${opts.withGrades ? '<th style="width:60px" class="c">Nota</th>' : ''}</tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="totals">Presentes: ${opts.totals.p} · Faltas: ${opts.totals.f} · Atrasos: ${opts.totals.a} · Total de alunos: ${opts.rows.length}</div>
+    <div class="conteudo">
+      <div class="lbl">Conteúdo ministrado:</div>
+      ${opts.note ? `<div class="note">${escapeHtml(opts.note).replace(/\n/g, '<br>')}</div>` : ''}
+      <div class="wline"></div>
+      <div class="wline"></div>
+      ${opts.note ? '' : '<div class="wline"></div>'}
+    </div>
+    <div class="psig"><div class="pline">Assinatura do(a) professor(a)</div></div>
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`);
+  w.document.close();
+};
+
 const FerramentaChips = ({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) => (
   <div className="flex flex-wrap gap-1.5">
     {options.map(o => (
@@ -10091,6 +10230,7 @@ const FerramentasScreen = ({
   const [targetLevel, setTargetLevel] = useState('3º a 5º ano');
   const [msgType, setMsgType] = useState('Bilhete na agenda');
   const [msgContext, setMsgContext] = useState('');
+  const [familiaTone, setFamiliaTone] = useState('acolhedor');
   const [videoUrl, setVideoUrl] = useState('');
   const [videoGoal, setVideoGoal] = useState('Roteiro de aula');
   const [pdfGoal, setPdfGoal] = useState('Atividade com questões');
@@ -10224,11 +10364,11 @@ REGRAS: não infantilize além do necessário, não adicione informações novas
       await runGeneration(`Você é um professor brasileiro experiente em comunicação com famílias.
 Escreva: ${msgType}
 Contexto/assunto: ${msgContext.trim()}
-${selectedClass ? `Turma: ${selectedClass.name}` : ''} | Tom: ${tone}
+${selectedClass ? `Turma: ${selectedClass.name}` : ''} | Tom: ${familiaTone}
 
 REGRAS:
 - ${msgType.includes('WhatsApp') ? 'Mensagem curta de WhatsApp (máx. 6 linhas), pode usar 1-2 emojis discretos' : 'Texto pronto para copiar, com saudação e despedida'}
-- Linguagem ${tone === 'formal' ? 'formal e institucional' : 'acolhedora, próxima e respeitosa'}
+- Linguagem ${familiaTone === 'formal' ? 'formal e institucional' : 'acolhedora, próxima e respeitosa'}
 - Se o assunto for delicado (comportamento, dificuldade), use abordagem construtiva: comece com algo positivo, descreva o fato sem julgamento, proponha parceria
 - NUNCA exponha ou compare a criança
 - Inclua espaço [NOME] onde o nome do aluno deve entrar, se aplicável
@@ -10277,8 +10417,17 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
   const toolTitle = activeTool ? FERRAMENTAS_META.find(t => t.id === activeTool)!.title : '';
 
   const printResult = () => {
-    if (!result) return;
-    printPlannerContent(toolTitle, result, toolTitle, profile.name, profile.schoolName);
+    if (!result || !activeTool) return;
+    if (activeTool === 'parecer') {
+      printParecer({ text: result, studentName: studentName.trim(), period, teacherName: profile.name, schoolName: profile.schoolName, className: selectedClass?.name });
+      return;
+    }
+    if (activeTool === 'familia') {
+      printBilhete({ text: result, teacherName: profile.name, schoolName: profile.schoolName, className: selectedClass?.name });
+      return;
+    }
+    const tagLabels: Record<FerramentaId, string> = { parecer: 'Parecer', inclusao: 'Inclusão', rubrica: 'Avaliação', nivelador: 'Leitura', familia: 'Famílias', video: 'Vídeo', pdf: 'Material' };
+    printPlannerContent(toolTitle, result, tagLabels[activeTool], profile.name, profile.schoolName, activeTool === 'rubrica' ? { landscape: true } : undefined);
   };
 
   const classSelectorEl = schedules.length > 0 ? (
@@ -10457,7 +10606,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Tom</label>
-                          <Chips options={['acolhedor', 'formal']} value={tone} onChange={setTone} />
+                          <Chips options={['acolhedor', 'formal']} value={familiaTone} onChange={setFamiliaTone} />
                         </div>
                       </>
                     )}
@@ -10524,7 +10673,30 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
                 {result && !isGenerating && (
                   <>
-                    <div className="markdown-body prose prose-sm max-w-none bg-gray-50 border border-gray-100 rounded-2xl p-4 max-h-[48vh] overflow-y-auto">
+                    {(() => {
+                      const meta = FERRAMENTAS_META.find(t => t.id === activeTool)!;
+                      const Icon = meta.icon;
+                      const ctxParts: string[] = [];
+                      if (activeTool === 'parecer') {
+                        if (studentName.trim()) ctxParts.push(studentName.trim());
+                        ctxParts.push(period);
+                      } else if (activeTool === 'inclusao') ctxParts.push(need);
+                      else if (activeTool === 'nivelador') ctxParts.push(targetLevel);
+                      else if (activeTool === 'familia') ctxParts.push(msgType);
+                      else if (activeTool === 'video') ctxParts.push(videoGoal);
+                      else if (activeTool === 'pdf') ctxParts.push(pdfGoal);
+                      if (selectedClass) ctxParts.push(selectedClass.name);
+                      return (
+                        <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${meta.bg}`}>
+                          <Icon size={20} className={`${meta.color} shrink-0`} />
+                          <div className="min-w-0">
+                            <p className={`text-sm font-bold leading-tight ${meta.color}`}>{meta.title}</p>
+                            {ctxParts.length > 0 && <p className="text-[11px] text-gray-500 truncate">{ctxParts.join(' · ')}</p>}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    <div className={`markdown-body prose prose-sm max-w-none bg-gray-50 border border-gray-100 rounded-2xl p-4 max-h-[48vh] overflow-y-auto ${activeTool === 'rubrica' ? 'overflow-x-auto [&_table]:min-w-[540px]' : ''}`}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
                     </div>
                     <p className="text-[11px] text-gray-400 text-center">Material gerado por IA. Revise antes de usar.</p>
@@ -10625,22 +10797,17 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
   const printDay = () => {
     const schedule = schedules.find(s => s.id === classId);
     const dateBr = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR');
-    const lines = [
-      `## Chamada — ${schedule?.name ?? 'Turma'} — ${dateBr}`,
-      '',
-      '| Nº | Aluno | Presença | Nota |',
-      '|---|---|---|---|',
-      ...students.map((s, i) => {
-        const a = entry?.att[s.id];
-        const label = a === 'P' ? 'Presente' : a === 'F' ? 'Falta' : a === 'A' ? 'Atraso' : '—';
-        return `| ${i + 1} | ${s.name} | ${label} | ${entry?.grades?.[s.id] ?? ''} |`;
-      }),
-      '',
-      `**Presentes:** ${presentCount} · **Faltas:** ${absentCount} · **Atrasos:** ${lateCount}`,
-      '',
-      entry?.note ? `## Anotações do dia\n${entry.note}` : '',
-    ].join('\n');
-    printPlannerContent(`Diário de Classe: ${dateBr}`, lines, 'Diário de Classe', profile.name, profile.schoolName);
+    const withGrades = showGrades || students.some(s => (entry?.grades?.[s.id] ?? '').trim() !== '');
+    printChamada({
+      className: schedule?.name ?? 'Turma',
+      dateBr,
+      teacherName: profile.name,
+      schoolName: profile.schoolName,
+      note: entry?.note,
+      withGrades,
+      rows: students.map((s, i) => ({ n: i + 1, name: s.name, att: entry?.att[s.id], grade: entry?.grades?.[s.id] })),
+      totals: { p: presentCount, f: absentCount, a: lateCount },
+    });
   };
 
   const attStyle = (a?: 'P' | 'F' | 'A') =>
@@ -13353,7 +13520,6 @@ function AppInner() {
   const [plannerPresentationData, setPlannerPresentationData] = useState<PresentationData | null>(null);
   const [plannerActivity, setPlannerActivity] = useState('');
   const [plannerExam, setPlannerExam] = useState('');
-  const [plannerResources, setPlannerResources] = useState<{type: 'activities' | 'slides' | 'exam', content: string}[]>([]);
   
   // Generation Settings (moved to global for Chat Control)
   const [plannerDuration, setPlannerDuration] = useState(1);
@@ -14096,9 +14262,9 @@ ${avaliacaoBlock}
         const hasInvalidCode = allCodesInPlan.some(c => !validCodes.has(c));
         const hasMissingCode = bnccSkills.some(s => !allCodesInPlan.includes(s.code.toUpperCase()));
         if (hasInvalidCode || hasMissingCode || allCodesInPlan.length === 0) {
-          const correctSection = `## Habilidade (BNCC)\n${bnccBlock}`;
+          const correctSection = `## HABILIDADE (BNCC)\n${bnccBlock}`;
           planResult = planDraft.replace(
-            /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/,
+            /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/i,
             correctSection + '\n'
           );
         }
@@ -14118,7 +14284,7 @@ ${avaliacaoBlock}
     if (!targetTopic.trim()) return;
     if (isLimitReached) return;
 
-    const taskId = addTask({ type, title: `${type === 'slides' ? 'Slides' : 'Atividades'}: ${targetTopic}` });
+    const taskId = addTask({ type, title: `${type === 'slides' ? 'Slides' : type === 'exam' ? 'Prova' : 'Atividades'}: ${targetTopic}` });
     try {
       const selectedClass = schedules.find(c => c.id === targetClassId);
       const className = selectedClass ? selectedClass.name : 'Geral';
@@ -14566,8 +14732,6 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerPlan={setPlannerPlan}
             plannerPresentationData={plannerPresentationData}
             setPlannerPresentationData={setPlannerPresentationData}
-            plannerResources={plannerResources}
-            setPlannerResources={setPlannerResources}
             plannerActivity={plannerActivity}
             setPlannerActivity={setPlannerActivity}
             plannerExam={plannerExam}
