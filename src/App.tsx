@@ -19,7 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { auth, db, storage, logOut, getFcmToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 
@@ -8079,7 +8079,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de perguntas</label>
-                        <input type="number" min={5} max={30} value={count} onChange={e => setCount(Math.max(5, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                        <input type="number" min={5} max={30} value={count} onChange={e => setCount(parseInt(e.target.value) || 0)} onBlur={() => setCount(c => Math.max(5, Math.min(30, c || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dificuldade</label>
@@ -8106,7 +8106,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quantidade de palavras</label>
-                        <input type="number" min={5} max={wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                        <input type="number" min={5} max={wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20} value={count} onChange={e => setCount(parseInt(e.target.value) || 0)} onBlur={() => setCount(c => Math.max(5, Math.min(wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20, c || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
                       </div>
                     </>
                   )}
@@ -8115,7 +8115,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                         {activeMode === 'memory' ? 'Quantidade de pares' : activeMode === 'flashcard' ? 'Quantidade de cartões' : 'Quantidade de palavras'}
                       </label>
-                      <input type="number" min={5} max={20} value={count} onChange={e => setCount(Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                      <input type="number" min={5} max={20} value={count} onChange={e => setCount(parseInt(e.target.value) || 0)} onBlur={() => setCount(c => Math.max(5, Math.min(20, c || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
                     </div>
                   )}
 
@@ -8144,7 +8144,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       </div>
                       <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Número de cartelas</label>
-                        <input type="number" min={1} max={30} value={bingoCardCount} onChange={e => setBingoCardCount(Math.max(1, Math.min(30, parseInt(e.target.value) || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
+                        <input type="number" min={1} max={30} value={bingoCardCount} onChange={e => setBingoCardCount(parseInt(e.target.value) || 0)} onBlur={() => setBingoCardCount(c => Math.max(1, Math.min(30, c || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
                       </div>
                       {bingoSize === 5 && (
                         <div>
@@ -8650,6 +8650,7 @@ const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, n
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${meta.color}`}>{meta.label}</span>
                       <span className="text-[10px] text-gray-400">{new Date(resource.date).toLocaleDateString('pt-BR')}</span>
+                      {!hasTextContent && <span className="text-[10px] text-gray-400 italic">sem prévia — gere de novo no Estúdio para editar</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -8959,7 +8960,7 @@ const GamiSorteio = ({ students, onClose, onAwardParticipation }: { students: Ga
           className={`w-full max-w-md rounded-[2rem] py-14 px-6 text-center border transition-shadow ${winner ? 'bg-gradient-to-br from-violet-500 to-indigo-600 border-violet-300/40 shadow-[0_0_70px_-10px_rgba(139,92,246,0.65)]' : 'bg-white/[0.06] border-white/10 backdrop-blur'}`}
         >
           <p className={`text-3xl sm:text-4xl font-black break-words ${winner ? 'text-white' : spinning ? 'text-white/90' : 'text-white/50'}`}>
-            {display || (pool.length === 0 ? 'Todos já foram sorteados! 🎉' : 'Toque em Sortear')}
+            {display || (students.length === 0 ? 'Cadastre os alunos da turma primeiro' : pool.length === 0 ? 'Todos já foram sorteados! 🎉' : 'Toque em Sortear')}
           </p>
           {winner && <p className="text-violet-100 text-xs font-black uppercase tracking-[0.25em] mt-4">✦ Sorteado ✦</p>}
         </motion.div>
@@ -9062,7 +9063,7 @@ const GamiTimer = ({ onClose }: { onClose: () => void }) => {
             type="number" min={1} max={120} value={customMin} onChange={e => setCustomMin(e.target.value)}
             placeholder="Minutos…" className="flex-1 bg-white/[0.08] border border-white/10 text-white placeholder-white/40 rounded-2xl px-4 py-3 font-bold focus:outline-none focus:border-sky-400/50"
           />
-          <button onClick={() => { const m = parseInt(customMin, 10); if (m > 0) start(Math.min(m, 120)); }} className="bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold px-5 rounded-2xl shadow-lg shadow-sky-950/60">Iniciar</button>
+          <button onClick={() => { const m = parseInt(customMin, 10); if (m > 0) start(Math.min(m, 120)); }} disabled={!(parseInt(customMin, 10) > 0)} className="bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold px-5 rounded-2xl shadow-lg shadow-sky-950/60 disabled:opacity-40">Iniciar</button>
         </div>
         {totalSecs > 0 && (
           <div className="flex gap-2">
@@ -9177,6 +9178,7 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
   const [err, setErr] = useState('');
   const [challenge, setChallenge] = useState<{ left: number; total: number; strikes: number; status: 'on' | 'win' | 'fail' } | null>(null);
   const levelRef = useRef(0);
+  const lastUiUpdateRef = useRef(0);
   const rafRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
@@ -9204,7 +9206,13 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
           const rms = Math.sqrt(sum / data.length);
           const next = Math.min(1, levelRef.current * 0.82 + rms * 3.2 * 0.18);
           levelRef.current = next;
-          setLevel(next);
+          // Estado a ~12 Hz: setLevel a 60 fps re-renderizava o componente
+          // inteiro a cada frame; a lógica do desafio continua lendo levelRef.
+          const now = performance.now();
+          if (now - lastUiUpdateRef.current > 80) {
+            lastUiUpdateRef.current = now;
+            setLevel(next);
+          }
           rafRef.current = requestAnimationFrame(loop);
         };
         loop();
@@ -9333,8 +9341,12 @@ const GamiSemaforo = ({ onClose }: { onClose: () => void }) => {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[130] flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#151b28] via-[#0d111c] to-[#05070d] cursor-pointer select-none"
+      className="fixed inset-0 z-[130] flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#151b28] via-[#0d111c] to-[#05070d] cursor-pointer select-none focus:outline-none"
       onClick={() => setState(s => ((s + 1) % 3) as 0 | 1 | 2)}
+      role="button"
+      tabIndex={0}
+      aria-label={`Semáforo da turma: ${meta.label}. Toque ou pressione Enter para mudar.`}
+      onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setState(s => ((s + 1) % 3) as 0 | 1 | 2); } }}
     >
       <button onClick={e => { e.stopPropagation(); onClose(); }} className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"><X size={20} /></button>
       <div className="bg-[#1c2433] border border-white/10 rounded-[2.5rem] px-6 py-7 shadow-2xl flex flex-col gap-5">
@@ -9441,6 +9453,7 @@ const GamiPlacar = ({ teams, onClose }: { teams: GamiTeam[]; onClose: () => void
               <input
                 value={n}
                 onChange={e => setNames(p => p.map((x, j) => j === i ? e.target.value : x))}
+                aria-label={`Nome do time ${i + 1}`}
                 className="bg-transparent text-white font-black text-center text-sm w-full focus:outline-none placeholder-white/50"
               />
               <motion.p key={scores[i]} initial={{ scale: 1.3 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 18 }} className="text-white font-black tabular-nums" style={{ fontSize: 'min(16vw, 5.5rem)', lineHeight: 1 }}>{scores[i]}</motion.p>
@@ -9909,6 +9922,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       onClick={() => { onAwardTeam(pick[winner], winnerIds, 3); setAwarded(true); }}
                       className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl border-2 border-emerald-700 shadow-[0_4px_0_rgba(0,0,0,0.2)]"
                     >⚡ Dar +3 XP à equipe vencedora</button>
+                  )}
+                  {hasRealTeams && !awarded && winnerIds.length === 0 && (
+                    <p className="text-[11px] text-[#8a7a5a] font-bold mt-3">Vincule alunos a esta equipe na aba Equipes para premiar com XP.</p>
                   )}
                   {awarded && <p className="text-emerald-700 text-sm font-bold mt-3">XP entregue! ✓</p>}
                   <div className="flex justify-center gap-6 mt-4">
@@ -10521,7 +10537,16 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
                     <button
                       onClick={generate}
-                      className="w-full bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                      disabled={
+                        (activeTool === 'parecer' && !studentName.trim()) ||
+                        (activeTool === 'inclusao' && !originalActivity.trim()) ||
+                        (activeTool === 'rubrica' && !taskDesc.trim()) ||
+                        (activeTool === 'nivelador' && !originalText.trim()) ||
+                        (activeTool === 'familia' && !msgContext.trim()) ||
+                        (activeTool === 'video' && !/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(videoUrl.trim())) ||
+                        (activeTool === 'pdf' && !pdfFile)
+                      }
+                      className="w-full bg-indigo-600 text-white rounded-2xl py-3.5 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
                     >
                       <Sparkles size={16} /> Gerar com o Corujão
                     </button>
@@ -10776,6 +10801,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
                     )}
                     <button
                       onClick={() => cycleAtt(s.id)}
+                      aria-label={`${s.name}: ${a === 'P' ? 'presente' : a === 'F' ? 'falta' : a === 'A' ? 'atraso' : 'sem marcação'}. Toque para alternar presente, falta, atraso.`}
                       className={`w-9 h-9 rounded-xl font-black text-sm shrink-0 transition-colors ${attStyle(a)}`}
                     >
                       {a ?? '·'}
@@ -12179,6 +12205,7 @@ const AdminScreen = () => {
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState<'all' | 'pro' | 'free' | 'limit' | 'admin'>('all');
   const [confirmDeleteFbId, setConfirmDeleteFbId] = useState<string | null>(null);
+  const [confirmUserAction, setConfirmUserAction] = useState<string | null>(null); // "pro:<id>" | "admin:<id>"
   const [usersPage, setUsersPage] = useState(0);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [globalStats, setGlobalStats] = useState<any>(null);
@@ -12297,16 +12324,30 @@ const AdminScreen = () => {
   };
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Contagem barata para o badge da aba (agregação no servidor); a coleção
+  // completa de feedbacks só é assinada quando a aba abre.
+  const [feedbackCount, setFeedbackCount] = useState(0);
   useEffect(() => {
+    getCountFromServer(collection(db, 'feedback'))
+      .then(snap => setFeedbackCount(snap.data().count))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'feedbacks') return;
     const unsubFeedbacks = onSnapshot(collection(db, 'feedback'), (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFeedbacks(items.sort((a: any, b: any) => b.date - a.date));
+      setFeedbackCount(items.length);
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching feedback:", error);
       setIsLoading(false);
     });
+    return unsubFeedbacks;
+  }, [activeTab]);
 
+  useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSysUsers(items.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || '')));
@@ -12315,11 +12356,7 @@ const AdminScreen = () => {
       console.error("Error fetching users:", error);
       setUsersError('Sem permissão para listar usuários. Verifique as regras do Firestore.');
     });
-
-    return () => {
-      unsubFeedbacks();
-      unsubUsers();
-    };
+    return unsubUsers;
   }, []);
 
   const togglePro = async (userId: string, currentStatus: boolean) => {
@@ -12461,8 +12498,8 @@ const AdminScreen = () => {
             className={`flex-none px-3 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-1.5 ${activeTab === t.id ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
             <t.icon size={13} />
             {t.label}
-            {t.id === 'feedbacks' && feedbacks.length > 0 && (
-              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${activeTab === t.id ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{feedbacks.length}</span>
+            {t.id === 'feedbacks' && feedbackCount > 0 && (
+              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${activeTab === t.id ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{feedbackCount}</span>
             )}
           </button>
         ))}
@@ -12664,16 +12701,26 @@ const AdminScreen = () => {
                   </div>
                   <div className="flex gap-2 mb-2">
                     <button
-                      onClick={() => togglePro(u.id, u.isPro)}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${u.isPro ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400 hover:text-emerald-600'}`}
+                      onClick={() => {
+                        if (confirmUserAction !== `pro:${u.id}`) { setConfirmUserAction(`pro:${u.id}`); return; }
+                        setConfirmUserAction(null);
+                        togglePro(u.id, u.isPro);
+                      }}
+                      onBlur={() => setConfirmUserAction(c => c === `pro:${u.id}` ? null : c)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${confirmUserAction === `pro:${u.id}` ? 'bg-amber-500 text-white border-amber-600' : u.isPro ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400 hover:text-emerald-600'}`}
                     >
-                      {u.isPro ? 'PRO ATIVO' : 'ATIVAR PRO'}
+                      {confirmUserAction === `pro:${u.id}` ? (u.isPro ? 'Remover PRO?' : 'Confirmar PRO?') : u.isPro ? 'PRO ATIVO' : 'ATIVAR PRO'}
                     </button>
                     <button
-                      onClick={() => toggleAdmin(u.id, u.role)}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${isAdmin ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'}`}
+                      onClick={() => {
+                        if (confirmUserAction !== `admin:${u.id}`) { setConfirmUserAction(`admin:${u.id}`); return; }
+                        setConfirmUserAction(null);
+                        toggleAdmin(u.id, u.role);
+                      }}
+                      onBlur={() => setConfirmUserAction(c => c === `admin:${u.id}` ? null : c)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-colors ${confirmUserAction === `admin:${u.id}` ? 'bg-amber-500 text-white border-amber-600' : isAdmin ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'}`}
                     >
-                      {isAdmin ? 'ADMIN ATIVO' : 'DAR ADMIN'}
+                      {confirmUserAction === `admin:${u.id}` ? (isAdmin ? 'Remover admin?' : 'Confirmar admin?') : isAdmin ? 'ADMIN ATIVO' : 'DAR ADMIN'}
                     </button>
                   </div>
                   <div className="flex gap-2">
