@@ -12,6 +12,7 @@ import {
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
   Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
   Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
+  Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays,
   Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -22,6 +23,12 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
+import {
+  escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
+  formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
+  AI_PRICING, estimateCostUSD,
+} from './utils';
+import { INFORMATICA_LESSONS, JOGOS_LESSONS } from './seed-lessons';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -30,36 +37,6 @@ if (!apiKey) {
 const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
 
 const AI_MODEL = 'gemini-2.5-flash';
-
-// Escapa texto para interpolação segura em HTML gerado (impressões).
-// Conteúdo vindo da IA ou digitado pelo usuário NUNCA deve entrar cru em document.write.
-const escapeHtml = (s: unknown): string =>
-  String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-
-// Embaralhamento Fisher–Yates — sort(() => Math.random() - 0.5) é enviesado.
-const shuffleArray = <T,>(arr: readonly T[]): T[] => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-// ── Contas administradoras (bootstrap) ──────────────────────────────────────
-// A autorização real é aplicada nas regras do Firestore/Storage; estas listas
-// controlam apenas a exibição de recursos de admin no cliente.
-const ADMIN_BOOTSTRAP_EMAILS = ['lyelsonmf520@gmail.com'];
-const SEED_IMPORT_EMAILS = [...ADMIN_BOOTSTRAP_EMAILS, 'slilica69@gmail.com'];
-const isAdminAccount = (profile: { role?: string } | null | undefined, user: { email?: string | null } | null | undefined): boolean =>
-  profile?.role === 'admin' || ADMIN_BOOTSTRAP_EMAILS.includes((user?.email || '').toLowerCase());
-const canSeedTurmas = (profile: { role?: string } | null | undefined, user: { email?: string | null } | null | undefined): boolean =>
-  profile?.role === 'admin' || SEED_IMPORT_EMAILS.includes((user?.email || '').toLowerCase());
 
 const LOADING_MESSAGES = {
   planner: [
@@ -124,29 +101,6 @@ function renderChatText(text: string, isUser: boolean): React.ReactNode {
   });
 }
 
-const formatApiError = (error: any, defaultMsg: string): string => {
-  let msg = '';
-  if (typeof error === 'string') {
-    msg = error;
-  } else if (error instanceof Error) {
-    msg = error.message;
-  } else if (error?.message) {
-    msg = error.message;
-  } else {
-    try { msg = JSON.stringify(error); } catch (e) {}
-  }
-
-  if (msg.startsWith('[IA_FORMATO]')) {
-    return 'A IA respondeu num formato inesperado. Toque em gerar de novo que normalmente resolve.';
-  }
-  if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
-    return 'Muita gente usando a IA agora. Já estou tentando de novo. Se continuar, aguarde 1 minuto.';
-  }
-  if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
-    return 'Calma, professor! Muitas perguntas de uma vez. Aguarde alguns segundos e tente de novo.';
-  }
-  return defaultMsg;
-};
 
 const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs = 2000): Promise<T> => {
   let attempt = 0;
@@ -345,7 +299,7 @@ class ErrorBoundary extends React.Component<
         <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
             <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem. Só recarregue a página.</p>
@@ -575,12 +529,6 @@ const LIBRARY_LIMIT_BYTES = Math.floor(4.9 * 1024 * 1024 * 1024); // 4.9 GB hard
 const DOWNLOAD_LIMIT_PER_DAY = 30;                                 // max downloads/user/day
 const DOWNLOAD_MB_PER_DAY    = 500;                                // max MB/user/day
 
-const fmtBytes = (b: number) => {
-  if (b < 1024)               return `${b} B`;
-  if (b < 1024 * 1024)        return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-};
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ClassItem {
@@ -690,7 +638,7 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
   <div className="mb-3 relative z-50">
     {typeof bannerImage === 'string' ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
-        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" />
+        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
       </div>
     ) : bannerPlaceholder ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] border-b-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
@@ -959,7 +907,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
           </button>
         </div>
         <div className="absolute right-0 bottom-0 w-36 h-36 md:w-40 md:h-40 z-0">
-          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
       </div>
 
@@ -970,7 +918,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
             <button key={action.title} onClick={action.action} className="flex flex-col items-center gap-3 relative group">
               <div className={`w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-sm bg-white border-[1.5px] border-indigo-600 flex flex-col items-center justify-center relative`}>
                 {action.illustration ? (
-                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 ) : action.icon ? (
                   <action.icon size={26} className="text-indigo-600" strokeWidth={2.2} />
                 ) : null}
@@ -1058,7 +1006,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, i
 
           if (upcoming.length === 0) return (
             <div className="flex flex-col items-center justify-center py-8 text-center bg-gray-50/50 rounded-3xl border border-gray-100 border-dashed">
-              <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" />
+              <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <h3 className="text-gray-600 font-bold mb-1">Sem aulas próximas</h3>
               <p className="text-gray-400 text-sm max-w-[200px]">Adicione aulas no cronograma para ver aqui.</p>
             </div>
@@ -1583,7 +1531,7 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
       </div>
       {/* Right panel image — full bleed, no padding/border */}
       <div style={{ flex: 1, height: SLIDE_H, overflow: 'hidden' }}>
-        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
       </div>
     </div>
   );
@@ -1599,7 +1547,7 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
     );
     const imgPanel = (
       <div style={{ width: 384, height: SLIDE_H, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         {/* brand tint for unity */}
         <div style={{ position: 'absolute', inset: 0, backgroundColor: theme.primaryColor, opacity: 0.22 }} />
         <div style={{ position: 'absolute', top: 0, bottom: 0, [isLeft ? 'left' : 'right']: 0, width: 6, backgroundColor: theme.accentColor }} />
@@ -1620,7 +1568,7 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
           primaryColor={theme.primaryColor} accentColor={theme.accentColor} style={{ minHeight: 60 }} />
       </div>
       <div style={{ flex: 1, margin: `4px ${PAD}px 30px`, borderRadius: 14, overflow: 'hidden', boxShadow: cardShadow }}>
-        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+        <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
       </div>
     </div>
   );
@@ -1718,7 +1666,7 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
     const imgSrcFull = slide.data.imageUrl || getImageUrl(slide.data.imagePrompt, 1200, 800);
     return (
       <div style={{ width: SLIDE_W, height: SLIDE_H, position: 'relative', overflow: 'hidden', backgroundColor: '#111' }}>
-        <img src={imgSrcFull} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" />
+        <img src={imgSrcFull} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         {/* Dark gradient overlay */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.1) 100%)' }} />
         {/* Accent left bar */}
@@ -5417,7 +5365,7 @@ const DayDetailScreen = ({
           </Reorder.Group>
         ) : (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-            <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" />
+            <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
             <h3 className="text-lg font-bold text-gray-900 mb-2">Dia Livre</h3>
             <p className="text-gray-500 text-sm max-w-[200px]">Nenhum evento programado para este dia.</p>
           </div>
@@ -5446,27 +5394,6 @@ interface ImportedLesson { title: string; content?: string }
 interface ImportedModule { title: string; topics: string[]; estimatedClasses: number; lessons?: ImportedLesson[] }
 interface SyllabusRow extends ImportedModule { startDate: string }
 
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-const toISODate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-// file.type pode vir vazio em alguns Androids; deduz pela extensão
-const guessMimeType = (file: File): string => {
-  if (file.type) return file.type;
-  const ext = file.name.split('.').pop()?.toLowerCase();
-  if (ext === 'pdf') return 'application/pdf';
-  if (ext === 'png') return 'image/png';
-  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
-  if (ext === 'webp') return 'image/webp';
-  return 'application/pdf';
-};
 
 const MONTH_NAME_TO_NUM: Record<string, number> = {
   janeiro: 1, jan: 1, fevereiro: 2, fev: 2, marco: 3, março: 3, mar: 3, abril: 4, abr: 4,
@@ -8230,7 +8157,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                 return (
                 <div className="p-5">
                   <div className="flex gap-2 mb-4">
-                    <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm">↻ Refazer</button>
+                    <button onClick={() => setResult(null)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-2.5 rounded-xl text-sm"><RotateCcw size={14} className="inline -mt-0.5 mr-1" />Refazer</button>
                     <button onClick={() => {
                       if (activeMode === 'escape' && result.enigmas) {
                         printEscapeRoom(result as EscapeRoomData, { className: selectedClass?.name, teacherName: profile.name, schoolName: profile.schoolName || selectedClass?.school, subject: defaultSubject, level: defaultLevel });
@@ -8422,7 +8349,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                                 <p className="text-xs font-black text-rose-600 mb-1">ENIGMA {i + 1}</p>
                                 <p className="text-sm font-bold text-gray-800 leading-snug">{en.challenge}</p>
                                 {en.narrative && <p className="text-xs text-gray-600 mt-1 leading-snug italic line-clamp-2">{en.narrative}</p>}
-                                <p className="text-xs font-semibold text-emerald-700 mt-1.5">🔑 {en.answer}</p>
+                                <p className="text-xs font-semibold text-emerald-700 mt-1.5"><KeyRound size={12} className="inline -mt-0.5 mr-1" />{en.answer}</p>
                               </div>
                             </div>
                           ))}
@@ -8868,6 +8795,7 @@ const GAMI_STAGE = {
   amber:   { bg: 'from-[#4d2c0b] via-[#2e1c0a] to-[#170e05]', glow: 'bg-amber-400',  chip: 'from-amber-400 to-orange-600',  btn: 'from-amber-500 to-orange-600 shadow-amber-950/60' },
   crimson: { bg: 'from-[#4d0f1e] via-[#2d0a14] to-[#16050a]', glow: 'bg-rose-500',   chip: 'from-rose-500 to-red-600',      btn: 'from-rose-500 to-red-600 shadow-rose-950/60' },
   slate:   { bg: 'from-[#243044] via-[#161e2e] to-[#0a0f1a]', glow: 'bg-indigo-400', chip: 'from-slate-500 to-slate-700',   btn: 'from-indigo-500 to-indigo-600 shadow-indigo-950/60' },
+  fuchsia: { bg: 'from-[#4a0d33] via-[#2b0820] to-[#150410]', glow: 'bg-fuchsia-500', chip: 'from-fuchsia-500 to-pink-600',   btn: 'from-fuchsia-500 to-pink-600 shadow-fuchsia-950/60' },
 } as const;
 type GamiStageTheme = keyof typeof GAMI_STAGE;
 
@@ -9349,6 +9277,16 @@ const GamiSemaforo = ({ onClose }: { onClose: () => void }) => {
       onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setState(s => ((s + 1) % 3) as 0 | 1 | 2); } }}
     >
       <button onClick={e => { e.stopPropagation(); onClose(); }} className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"><X size={20} /></button>
+      {/* Cabeçalho no padrão do GamiToolShell (a tela toda é clicável, então o shell não envolve) */}
+      <div className="absolute top-5 left-5 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 via-amber-400 to-red-500 flex items-center justify-center shadow-lg">
+          <Siren size={19} className="text-white" strokeWidth={2.5} />
+        </div>
+        <div>
+          <h2 className="text-lg font-black text-white leading-tight">Semáforo</h2>
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Kit ao Vivo</p>
+        </div>
+      </div>
       <div className="bg-[#1c2433] border border-white/10 rounded-[2.5rem] px-6 py-7 shadow-2xl flex flex-col gap-5">
         {lamps.map((l, i) => (
           <div
@@ -9439,7 +9377,7 @@ const GamiPlacar = ({ teams, onClose }: { teams: GamiTeam[]; onClose: () => void
   const gradients = ['from-indigo-500 to-indigo-700', 'from-rose-500 to-rose-700', 'from-emerald-500 to-emerald-700', 'from-amber-500 to-orange-600'];
   const maxScore = Math.max(...scores);
   return (
-    <GamiToolShell title="Placar Rápido" subtitle="Quem está na frente?" icon={Trophy} theme="slate" onClose={onClose}>
+    <GamiToolShell title="Placar Rápido" subtitle="Quem está na frente?" icon={Trophy} theme="amber" onClose={onClose}>
       <div className="flex-1 grid gap-3 content-center grid-cols-2">
         {names.map((n, i) => {
           const leader = maxScore > 0 && scores[i] === maxScore;
@@ -9504,13 +9442,13 @@ const GamiEvento = ({ customEvents, onClose, onQuickAward }: { customEvents: str
     tick();
   };
   return (
-    <GamiToolShell title="Evento do Dia" subtitle="Surpresa da aula" icon={Zap} theme="amber" onClose={onClose}>
+    <GamiToolShell title="Evento do Dia" subtitle="Surpresa da aula" icon={Zap} theme="fuchsia" onClose={onClose}>
       {result && <ConfettiBurst />}
       <div className="flex-1 flex flex-col items-center justify-center gap-6">
         <motion.div
           key={display?.text || 'empty'}
           initial={{ scale: 0.95, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }}
-          className={`w-full max-w-md rounded-[2rem] p-8 text-center border min-h-[180px] flex flex-col items-center justify-center gap-3 ${result ? 'bg-gradient-to-br from-amber-500 to-orange-600 border-amber-300/40 shadow-[0_0_70px_-10px_rgba(245,158,11,0.6)]' : 'bg-white/[0.06] border-white/10 backdrop-blur'}`}
+          className={`w-full max-w-md rounded-[2rem] p-8 text-center border min-h-[180px] flex flex-col items-center justify-center gap-3 ${result ? 'bg-gradient-to-br from-fuchsia-500 to-pink-600 border-fuchsia-300/40 shadow-[0_0_70px_-10px_rgba(217,70,239,0.6)]' : 'bg-white/[0.06] border-white/10 backdrop-blur'}`}
         >
           <span className="text-5xl">{display?.emoji || '✨'}</span>
           <p className={`text-lg font-black leading-snug ${result ? 'text-white' : spinning ? 'text-white/90' : 'text-white/50'}`}>
@@ -9525,7 +9463,7 @@ const GamiEvento = ({ customEvents, onClose, onQuickAward }: { customEvents: str
         )}
         {applied && <p className="text-emerald-400 text-sm font-bold">Pontos aplicados! ✓</p>}
       </div>
-      <button onClick={spin} disabled={spinning} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60 shadow-lg shadow-amber-950/60">
+      <button onClick={spin} disabled={spinning} className="w-full bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60 shadow-lg shadow-fuchsia-950/60">
         {spinning ? 'Sorteando…' : 'Sortear evento'}
       </button>
     </GamiToolShell>
@@ -9713,7 +9651,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       const fury = hp[other] <= TEAM_MAX / 2;
       const dmg = WRONG_HIT + (fury ? FURY_BONUS : 0);
       const newHp = Math.max(0, hp[turn] - dmg);
-      setMsg(`Errou! A certa era "${current.options[current.correct]}". ${fighters[other].name} contra-ataca!`);
+      setMsg(`Errou! A certa era "${current.options[current.correct]}". ${fighters[other].name} contra-ataca${fury ? ' com fúria' : ''}!`);
       after(1400, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current }); });
       after(1850, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
       if (newHp <= 0) {
@@ -9740,8 +9678,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const HpBox = ({ side, corner }: { side: 0 | 1; corner: string }) => (
     <div className={`absolute ${corner} w-[46%] bg-[#f8f0dc] rounded-xl border-2 border-[#5a4a3a] px-2.5 py-1.5 z-10 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_8px_rgba(0,0,0,0.4)]`}>
       <div className="flex items-center justify-between gap-1">
-        <p className="font-black text-[#3a3020] text-[11px] truncate">{fighters[side].emoji} {fighters[side].name}</p>
-        {hp[side] <= TEAM_MAX / 2 && hp[side] > 0 && <span className="text-[8px] font-black text-red-600 animate-pulse shrink-0">FÚRIA</span>}
+        <p className="font-black text-[#3a3020] text-sm truncate">{fighters[side].emoji} {fighters[side].name}</p>
+        {hp[side] <= TEAM_MAX / 2 && hp[side] > 0 && <span className="text-[8px] font-black text-red-600 animate-pulse shrink-0">FÚRIA +2</span>}
       </div>
       <div className="flex items-center gap-1 mt-1">
         <span className="text-[8px] font-black text-[#c8641e] tracking-wider">HP</span>
@@ -9749,7 +9687,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           <div className="h-full rounded-full" style={{ width: `${(hp[side] / TEAM_MAX) * 100}%`, backgroundColor: hpColor(hp[side]), transition: 'width 0.45s ease, background-color 0.45s ease' }} />
         </div>
       </div>
-      <p className="text-right text-[9px] font-black text-[#3a3020] tabular-nums mt-0.5">{hp[side]}/{TEAM_MAX}</p>
+      <p className="text-right text-[11px] font-black text-[#3a3020] tabular-nums mt-0.5">{hp[side]}/{TEAM_MAX}</p>
     </div>
   );
 
@@ -9816,8 +9754,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     </GamiToolShell>
   );
 
+  // Tema retrô (GBA) da batalha: arena verde-campo, painel azul profundo e
+  // caixas creme — paleta própria, deliberadamente distinta do modo palco.
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-mono">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col" style={{ fontFamily: "'VT323', 'Courier New', monospace" }}>
       <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 72px 72px; } }`}</style>
       {/* ── Arena (tela cheia, clara) ── */}
       <div className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
@@ -9928,8 +9868,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   )}
                   {awarded && <p className="text-emerald-700 text-sm font-bold mt-3">XP entregue! ✓</p>}
                   <div className="flex justify-center gap-6 mt-4">
-                    <button onClick={startBattle} className="text-[#8a5a1a] font-black text-sm">⚔️ Revanche</button>
-                    <button onClick={() => setPhase('setup')} className="text-[#7a2a2a] font-black text-sm">↻ Nova batalha</button>
+                    <button onClick={startBattle} className="text-[#8a5a1a] font-black text-sm"><Swords size={14} className="inline -mt-0.5 mr-1" />Revanche</button>
+                    <button onClick={() => setPhase('setup')} className="text-[#7a2a2a] font-black text-sm"><RotateCcw size={14} className="inline -mt-0.5 mr-1" />Nova batalha</button>
                   </div>
                 </div>
               </div>
@@ -9939,14 +9879,14 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       {inBattle && (
         <div className="bg-[#3d4a7d] border-t-4 border-[#2c3763] px-3 pt-3 pb-6 shrink-0">
           <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3.5 min-h-[71px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
-            <p className="text-base font-bold text-[#3a3020] leading-snug">
+            <p className="text-lg font-bold text-[#3a3020] leading-snug">
               {phase === 'intro' ? `${fighters[0].name} desafia ${fighters[1].name}! Que vença o conhecimento! ⚔️`
                 : phase === 'anim' ? msg
-                : current ? <>{current.q} <span className="block text-[11px] font-black uppercase tracking-widest text-[#8a7a5a] mt-1">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
+                : current ? <>{current.q} <span className="block text-[13px] font-black uppercase tracking-widest text-[#8a7a5a] mt-1">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
             </p>
           </div>
           {current && phase !== 'intro' && (
-            <div className="grid grid-cols-2 gap-2 max-w-lg w-full mx-auto" style={{ marginTop: 60, marginBottom: 60 }}>
+            <div className="grid grid-cols-2 gap-2 max-w-lg w-full mx-auto mt-[60px] mb-[60px]">
               {current.options.map((opt, i) => {
                 const palette = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
                 const locked = phase === 'anim';
@@ -9962,7 +9902,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     style={{ backgroundColor: isWrongPick ? '#7f1d1d' : palette[i] }}
                   >
                     <span className="text-[11px] font-black text-white/80">{['A', 'B', 'C', 'D'][i]}</span>
-                    <p className="text-base font-black text-white leading-tight">{opt}</p>
+                    <p className="text-lg font-black text-white leading-tight">{opt}</p>
                     {isCorrect && <span className="absolute top-1.5 right-2 text-white font-black">✓</span>}
                     {isWrongPick && <span className="absolute top-1.5 right-2 text-white font-black">✗</span>}
                   </button>
@@ -9993,7 +9933,7 @@ const GamiProjetor = ({ cls, schedule, onClose }: { cls: ClassGamification; sche
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] bg-gradient-to-b from-[#312e81] via-[#1e1b4b] to-[#12102b] flex flex-col overflow-y-auto">
       <div className="flex items-center justify-between px-6 pt-6">
         <div className="flex items-center gap-3">
-          <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+          <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
           <div>
             <h2 className="text-white font-black text-xl leading-tight">{schedule?.name || 'Turma'}</h2>
             <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Temporada {cls.season}</p>
@@ -10719,14 +10659,14 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
 
         {schedules.length === 0 ? (
           <div className="text-center py-16">
-            <span className="text-5xl">📅</span>
+            <CalendarDays size={48} className="mx-auto text-gray-300" />
             <p className="text-gray-500 mt-3 text-sm font-bold">Cadastre suas turmas na Agenda primeiro.</p>
             <button onClick={() => { onClose(); setScreen('calendar'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">Ir para a Agenda</button>
           </div>
         ) : students.length === 0 ? (
           <div className="py-6 space-y-4">
             <div className="text-center">
-              <img src="https://i.ibb.co/Y7df80LZ/1781545849687.png" alt="Corujão" className="w-24 h-auto object-contain mx-auto" referrerPolicy="no-referrer" />
+              <img src="https://i.ibb.co/Y7df80LZ/1781545849687.png" alt="Corujão" className="w-24 h-auto object-contain mx-auto" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
               <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo, um nome por linha. Funciona nas duas telas.</p>
             </div>
@@ -11065,12 +11005,12 @@ const GamificacaoScreen = ({
     { id: 'sorteio', icon: Ticket, grad: 'from-violet-500 to-indigo-600', label: 'Sorteador' },
     { id: 'timer', icon: TimerIcon, grad: 'from-sky-500 to-blue-600', label: 'Timer' },
     { id: 'grupos', icon: Users, grad: 'from-teal-400 to-cyan-600', label: 'Grupos' },
-    { id: 'barulho', icon: Volume2, grad: 'from-emerald-500 to-green-600', label: 'Barulho' },
+    { id: 'barulho', icon: Volume2, grad: 'from-emerald-400 to-green-600', label: 'Barulho' },
     { id: 'semaforo', icon: Siren, grad: 'from-emerald-400 via-amber-400 to-red-500', label: 'Semáforo' },
     { id: 'dado', icon: Dices, grad: 'from-slate-500 to-slate-700', label: 'Dado' },
     { id: 'placar', icon: Trophy, grad: 'from-amber-500 to-orange-600', label: 'Placar' },
     { id: 'evento', icon: Zap, grad: 'from-fuchsia-500 to-pink-600', label: 'Evento' },
-    { id: 'participacao', icon: Hand, grad: 'from-blue-400 to-indigo-500', label: 'Chamada' },
+    { id: 'participacao', icon: Hand, grad: 'from-sky-500 to-blue-600', label: 'Chamada' },
     { id: 'batalha', icon: Swords, grad: 'from-rose-500 to-red-600', label: 'Batalha' },
     { id: 'projetor', icon: MonitorPlay, grad: 'from-indigo-500 to-purple-600', label: 'Projetar' },
   ];
@@ -11078,7 +11018,7 @@ const GamificacaoScreen = ({
   if (schedules.length === 0) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center min-h-[70vh] gap-6 px-6 text-center">
-        <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain" referrerPolicy="no-referrer" />
+        <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         <div>
           <h2 className="text-xl font-black text-gray-900 mb-2">Nenhuma turma cadastrada</h2>
           <p className="text-gray-500 text-sm">Cadastre suas turmas na Agenda para ativar a gamificação.</p>
@@ -11103,7 +11043,7 @@ const GamificacaoScreen = ({
       {/* Placeholder no topo (mesmo padrão do Header bannerPlaceholder) */}
       <div className="mb-3 relative z-50">
         <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] overflow-hidden">
-          <img src="https://i.ibb.co/tTT0VWnH/Design-sem-nome-20260616-142319-0000.png" alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          <img src="https://i.ibb.co/tTT0VWnH/Design-sem-nome-20260616-142319-0000.png" alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
         {/* Título e controles da turma */}
         <div className="flex items-center justify-between pt-28 mb-1">
@@ -11178,7 +11118,7 @@ const GamificacaoScreen = ({
           <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {currentCls.students.length === 0 ? (
               <div className="text-center py-16">
-                <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" />
+                <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 <p className="text-gray-500 mt-3 text-sm font-bold">Nenhum aluno ainda</p>
                 <p className="text-gray-400 text-xs mt-1">Adicione alunos em ⚙️ Config → Alunos</p>
                 <button onClick={() => { setTab('config'); setConfigSection('students'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">
@@ -12506,7 +12446,7 @@ const AdminScreen = () => {
       </div>
 
       {activeTab === 'feedbacks' && (
-        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-50 mb-8">
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <MessageSquare size={20} className="text-indigo-600" />
             Feedbacks dos Usuários
@@ -12643,7 +12583,7 @@ const AdminScreen = () => {
       )}
 
       {activeTab === 'users' && (
-        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-50 mb-8">
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <Shield size={20} className="text-indigo-600" />
             Gerenciamento de Usuários
@@ -12737,7 +12677,7 @@ const AdminScreen = () => {
                       <p><span className="font-bold text-indigo-700">Tokens entrada:</span> {(u.inputTokens || 0).toLocaleString()}</p>
                       <p><span className="font-bold text-indigo-700">Tokens saída:</span> {(u.outputTokens || 0).toLocaleString()}</p>
                       {(() => {
-                        const cost = ((u.inputTokens || 0) * 0.075 / 1_000_000 + (u.outputTokens || 0) * 0.30 / 1_000_000) * 5.2;
+                        const cost = estimateCostUSD(u.inputTokens || 0, u.outputTokens || 0) * AI_PRICING.usdToBrl;
                         return <p><span className="font-bold text-indigo-700">Custo estimado:</span> R$ {cost.toFixed(5)}</p>;
                       })()}
                       <p><span className="font-bold text-indigo-700">Telefone:</span> {u.phone || 'Não verificado'}</p>
@@ -12777,13 +12717,13 @@ const AdminScreen = () => {
         <div className="space-y-4 mb-8">
           {/* API Cost Dashboard */}
           {globalStats && (() => {
-            const inputCost = (globalStats.totalInputTokens || 0) * 0.075 / 1_000_000;
-            const outputCost = (globalStats.totalOutputTokens || 0) * 0.30 / 1_000_000;
+            const inputCost = (globalStats.totalInputTokens || 0) * AI_PRICING.inputUsdPer1M / 1_000_000;
+            const outputCost = (globalStats.totalOutputTokens || 0) * AI_PRICING.outputUsdPer1M / 1_000_000;
             const totalCostUSD = inputCost + outputCost;
-            const totalCostBRL = totalCostUSD * 5.2;
+            const totalCostBRL = totalCostUSD * AI_PRICING.usdToBrl;
             return (
               <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>💰</span> Custo Real da API</h3>
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Coins size={18} className="text-amber-500" /> Custo Real da API</h3>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="bg-indigo-50 rounded-2xl p-3 text-center">
                     <p className="text-xl font-black text-indigo-600">R$ {totalCostBRL.toFixed(4)}</p>
@@ -12814,11 +12754,11 @@ const AdminScreen = () => {
             const now = new Date();
             const currentKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}`;
             const current = monthlyStats.find(m => m.key === currentKey);
-            const currentCost = current ? (current.inp * 0.075 + current.out * 0.30) / 1_000_000 : 0;
-            const maxCostMonth = Math.max(...monthlyStats.map(m => (m.inp * 0.075 + m.out * 0.30) / 1_000_000), 0.000001);
+            const currentCost = current ? estimateCostUSD(current.inp, current.out) : 0;
+            const maxCostMonth = Math.max(...monthlyStats.map(m => estimateCostUSD(m.inp, m.out)), 0.000001);
             return (
               <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
-                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><span>📅</span> Consumo Mensal</h3>
+                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><CalendarDays size={18} className="text-indigo-500" /> Consumo Mensal</h3>
                 <p className="text-xs text-gray-400 mb-3">Últimos 6 meses · custo estimado em USD</p>
                 {current && (
                   <div className="bg-indigo-50 rounded-2xl p-3 mb-4 flex items-center justify-between">
@@ -12827,12 +12767,12 @@ const AdminScreen = () => {
                       <p className="text-2xl font-black text-indigo-700">${currentCost.toFixed(5)}</p>
                       <p className="text-xs text-indigo-400">{current.gens.toLocaleString()} gerações · {(current.inp + current.out).toLocaleString()} tokens</p>
                     </div>
-                    <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-12 h-12 object-contain" referrerPolicy="no-referrer" />
+                    <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-12 h-12 object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                 )}
                 <div className="flex items-end gap-2 h-24">
                   {monthlyStats.map((m, i) => {
-                    const cost = (m.inp * 0.075 + m.out * 0.30) / 1_000_000;
+                    const cost = estimateCostUSD(m.inp, m.out);
                     const pct = (cost / maxCostMonth) * 100;
                     const isCurrent = m.key === currentKey;
                     return (
@@ -12859,7 +12799,7 @@ const AdminScreen = () => {
               .map(u => {
                 const inp = u.inputTokens || 0;
                 const out = u.outputTokens || 0;
-                const cost = (inp * 0.075 + out * 0.30) / 1_000_000;
+                const cost = estimateCostUSD(inp, out);
                 return { name: u.displayName || u.email || u.id, cost, inp, out };
               })
               .filter(u => u.cost > 0)
@@ -12869,7 +12809,7 @@ const AdminScreen = () => {
             const maxCost = usersWithCost[0].cost;
             return (
               <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
-                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><span>📊</span> Top Consumidores (API)</h3>
+                <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><BarChart3 size={18} className="text-violet-500" /> Top Consumidores (API)</h3>
                 <p className="text-xs text-gray-400 mb-4">Custo estimado por usuário em USD</p>
                 <div className="space-y-3">
                   {usersWithCost.map((u, i) => {
@@ -12904,7 +12844,7 @@ const AdminScreen = () => {
             const inpPct = total > 0 ? (inp / total) * 100 : 50;
             return (
               <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>⚖️</span> Input vs Output</h3>
+                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Scale size={18} className="text-emerald-500" /> Input vs Output</h3>
                 <div className="flex rounded-full overflow-hidden h-4 mb-2">
                   <div className="bg-indigo-500 transition-all duration-700" style={{ width: `${inpPct}%` }} />
                   <div className="bg-emerald-400 flex-1" />
@@ -12919,7 +12859,7 @@ const AdminScreen = () => {
 
           {/* Announcement */}
           <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-50">
-            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><span>📢</span> Aviso Global</h3>
+            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Megaphone size={18} className="text-rose-500" /> Aviso Global</h3>
             <textarea
               value={announcement}
               onChange={e => setAnnouncement(e.target.value)}
@@ -12946,8 +12886,8 @@ const AdminScreen = () => {
       )}
 
       {activeTab === 'holidays' && (
-        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-50 mb-8">
-          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><span>🎉</span> Feriados Globais</h3>
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-50 mb-8">
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><PartyPopper size={18} className="text-amber-500" /> Feriados Globais</h3>
           <p className="text-xs text-gray-400 mb-4">Aparecem no calendário de todos os professores automaticamente.</p>
 
           <div className="space-y-2 mb-4">
@@ -12998,92 +12938,6 @@ const AdminScreen = () => {
     </motion.div>
   );
 };
-
-// ─── Admin seed data: turmas pré-definidas ───────────────────────────────────
-const INFORMATICA_LESSONS: { title: string; topic: string }[] = [
-  // Estrutura SEGUE A PLANILHA_LYELSON à risca: 38 aulas, na ordem/contagem exata da planilha.
-  // IPD(1) → Windows(7) → Digitação(4) → Word(6) → Excel(6) → PowerPoint(5) → Power BI(5) → Internet(4)
-  // O conteúdo de cada aula vem da EMENTA Informática (condensado para caber nos slots da planilha).
-  // IPD (1 aula) — índice 0
-  { title: 'IPD: Introdução ao Processamento de Dados', topic: 'O que é Informática? História e evolução. Componentes de um computador: Hardware e Software.' },
-  // Windows (7 aulas) — índices 1-7
-  { title: 'Windows: Tipos de computadores', topic: 'Tipos de computadores: Desktops, Laptops, Tablets, Smartphones.' },
-  { title: 'Windows: Componentes do computador', topic: 'Componentes básicos de um computador (CPU, Monitor, Teclado, Mouse, etc.).' },
-  { title: 'Windows: Sistema Operacional e área de trabalho', topic: 'O que é um Sistema Operacional? Funções e importância. A área de trabalho: ícones, barra de tarefas e menu iniciar.' },
-  { title: 'Windows: Atividade prática', topic: 'Atividade prática sobre o sistema operacional e a área de trabalho.' },
-  { title: 'Windows: Painel de controle e arquivos', topic: 'Painel de controle: configurações de data e hora, idioma e teclado. Explorador de arquivos: criar, copiar, mover, renomear e excluir arquivos/pastas.' },
-  { title: 'Windows: Revisão', topic: 'Revisão dos conceitos de sistema operacional, painel de controle e gerenciamento de arquivos.' },
-  { title: 'Windows: Prova', topic: 'Prova do módulo de Fundamentos da Informática e Sistema Operacional.' },
-  // Digitação (4 aulas) — índices 8-11
-  { title: 'Digitação: Conhecendo o teclado', topic: 'Conhecendo o teclado e o posicionamento correto das mãos e dedos.' },
-  { title: 'Digitação: Linha base (ASDF JKLÇ)', topic: 'Foco nas letras da linha base (ASDF JKLÇ).' },
-  { title: 'Digitação: Reprodução e memorização', topic: 'Exercícios de reprodução e memorização.' },
-  { title: 'Digitação: Prática intensiva', topic: 'Exercícios de datilografia para prática intensiva. Posicionamento correto das mãos e dedos no teclado.' },
-  // Word (6 aulas) — índices 12-17 (Turma 5 começa aqui)
-  { title: 'Word: Introdução e interface', topic: 'Introdução ao Word: interface, menu e barra de ferramentas.' },
-  { title: 'Word: Criação e formatação de documentos', topic: 'Criação, edição e formatação de documentos. Inserção de imagens, tabelas e gráficos. Atividade prática.' },
-  { title: 'Word: Estilos e revisão de texto', topic: 'Estilos, formatação de parágrafos e fontes. Cabeçalho, revisão ortográfica e gramatical.' },
-  { title: 'Word: Tabelas', topic: 'Criação e formatação de tabelas. Atividades práticas.' },
-  { title: 'Word: Revisão', topic: 'Revisão dos conceitos do módulo Word.' },
-  { title: 'Word: Prova', topic: 'Prova do módulo Word.' },
-  // Excel (6 aulas) — índices 18-23 (Turma 3 começa na 2ª aula, índice 19)
-  { title: 'Excel: Introdução a planilhas', topic: 'Introdução ao Excel: planilhas, células, linhas e colunas.' },
-  { title: 'Excel: Inserção e formatação de dados', topic: 'Inserção e formatação de dados.' },
-  { title: 'Excel: Fórmulas básicas', topic: 'Fórmulas básicas: soma, média, máximo e mínimo.' },
-  { title: 'Excel: Funções, gráficos e formatação condicional', topic: 'Funções: condição (SE) e pesquisa. Criação de gráficos. Formatação condicional.' },
-  { title: 'Excel: Exercícios práticos e revisão', topic: 'Exercícios: planilha de orçamento pessoal e controle de estoque, praticando a digitação de números e símbolos. Revisão.' },
-  { title: 'Excel: Prova', topic: 'Prova do módulo Excel.' },
-  // PowerPoint (5 aulas) — índices 24-28
-  { title: 'PowerPoint: Introdução e slides', topic: 'Introdução ao PowerPoint: criação de apresentações e slides.' },
-  { title: 'PowerPoint: Texto, mídia e design', topic: 'Inserção de texto, imagens, vídeos e áudios. Design de slides: temas, cores e fontes.' },
-  { title: 'PowerPoint: Transições e animações', topic: 'Transições e animações.' },
-  { title: 'PowerPoint: Apresentação e exercícios', topic: 'Apresentação de slides: modos de exibição e navegação. Exercício: criação de apresentação sobre tema livre e apresentação em sala.' },
-  { title: 'PowerPoint: Revisão e prova', topic: 'Revisão dos conceitos e prova do módulo PowerPoint.' },
-  // Power BI (5 aulas) — índices 29-33
-  { title: 'Power BI: Introdução', topic: 'O que é o Power BI, importância e aplicações no mercado. Visão geral da interface e principais ferramentas, conectando-se a fontes de dados.' },
-  { title: 'Power BI: Modelagem de dados', topic: 'Conceito de modelagem de dados, relacionamentos entre tabelas, normalização e boas práticas. Criação de colunas e medidas.' },
-  { title: 'Power BI: Gráficos e dashboards', topic: 'Tipos de gráficos e quando usá-los. Formatação e personalização de dashboards, uso de filtros e segmentações, criando painéis interativos.' },
-  { title: 'Power BI: DAX', topic: 'O que é DAX e para que serve. Principais funções do DAX, criando medidas e colunas calculadas, aplicação de cálculos básicos.' },
-  { title: 'Power BI: Revisão e prova', topic: 'Revisão dos conceitos abordados, exercícios práticos com desafios reais e prova do módulo Power BI.' },
-  // Internet (4 aulas) — índices 34-37
-  { title: 'Internet: Introdução e navegadores', topic: 'O que é a Internet? História e evolução. Navegadores: Chrome, Firefox, Edge, etc.' },
-  { title: 'Internet: Endereços web e domínios', topic: 'Endereços web (URLs) e domínios.' },
-  { title: 'Internet: Navegação e pesquisa', topic: 'Exercícios: navegação na Internet, pesquisa de informações online e prática de digitação de URLs e termos de pesquisa.' },
-  { title: 'Internet: E-mail e revisão final', topic: 'Criação e gerenciamento de contas de e-mail. Revisão geral e prova final do curso.' },
-];
-
-const JOGOS_LESSONS: { title: string; topic: string }[] = [
-  { title: 'Aula 1: Boas-vindas ao Mundo dos Games!', topic: 'Exploração dos exemplos de jogos no GDevelop. Brainstorm de ideias de jogos.' },
-  { title: 'Aula 2: Criando o Seu Mundo', topic: 'Sprites, chão e cenário. Design de estrutura com objetos de plataforma.' },
-  { title: 'Aula 3: Dando Vida com Comportamentos', topic: 'Movimentação básica. Comportamento de plataforma: velocidade, pulo, gravidade.' },
-  { title: 'Aula 4: A Câmera e os Limites do Mundo', topic: 'Controle da visão do jogador. Expansão de fase. Parallax com camadas.' },
-  { title: 'Aula 5: A Lógica por Trás de Tudo — Eventos', topic: 'Primeira interação. Múltiplos coletáveis e feedback visual.' },
-  { title: 'Aula 6: Variáveis — Guardando Informações', topic: 'Sistema de Vidas. Contador de moedas na tela. Armazenamento de pontuação.' },
-  { title: 'Aula 7: Interface do Usuário (UI)', topic: 'Botões com feedback. Fontes customizadas. Exibição de pontuação na tela.' },
-  { title: 'Aula 8: Inimigos Simples e Condição de Perder', topic: 'Movimento de inimigo (vai e vem). Múltiplos inimigos. Condição de derrota.' },
-  { title: 'Revisão do Módulo 1 (Aulas 1 a 8)', topic: 'Tira-dúvidas e reforço de objetos, comportamentos, eventos e variáveis.' },
-  { title: 'Prova Prática 1', topic: 'Criar uma cena funcional aplicando os conceitos do Módulo 1.' },
-  { title: 'Aula 9: Projeto 1 — Planejamento', topic: 'Detalhando o Game Design Document (GDD) com história e mecânicas do jogo.' },
-  { title: 'Aula 10: Construindo a Fase', topic: 'Fase principal do jogo. Áreas secretas e elementos decorativos.' },
-  { title: 'Aula 11: Implementando a Condição de Vitória', topic: 'Múltiplos níveis. Portão para Fase 2. Tela de Vitória personalizada.' },
-  { title: 'Aula 12: Telas de Início e Fim', topic: 'Música no menu. Botões de créditos. Transições de cena com fade.' },
-  { title: 'Aula 13: Aprofundando — Sons e Músicas', topic: 'Busca de assets de sons gratuitos. Trilha sonora completa para o jogo.' },
-  { title: 'Aula 14: Aprofundando — Animações', topic: 'Animação de ataque/dano no personagem. Animação simples para inimigos.' },
-  { title: 'Aula 15: Aprofundando — Timers e Spawners', topic: 'Inimigos em locais aleatórios. Itens temporários que somem após segundos.' },
-  { title: 'Aula 16: Polimento e Desafio Criativo', topic: 'Mini Game Jam: criar protótipo em 30 minutos com tema dado.' },
-  { title: 'Revisão do Módulo 2 (Aulas 9 a 16)', topic: 'Revisão de estrutura de projetos, polimento e conceitos avançados.' },
-  { title: 'Prova Prática 2', topic: 'Aprimorar um projeto existente com som, animação e novo desafio criativo.' },
-  { title: 'Aula 17: Projeto 2 — Top-Down Shooter', topic: 'Nova mecânica de jogo. Inimigo com comportamento Pathfinding.' },
-  { title: 'Aula 18: Atirando Projéteis', topic: 'Tipos de tiro, tiro carregado. Destruição de projéteis fora da tela.' },
-  { title: 'Aula 19: Inimigos em Ondas', topic: 'Ondas progressivas de inimigos. Chefe simples com mais vida.' },
-  { title: 'Aula 20: Destruindo Inimigos e Pontuando', topic: 'Sistema de Combo. Feedback de dano. Loop principal de gameplay.' },
-  { title: 'Aula 21: Power-ups e Efeitos Visuais', topic: 'Power-up de escudo e velocidade. Efeitos de rastro com partículas.' },
-  { title: 'Aula 22: Montando o Jogo Completo', topic: 'High Score com salvamento. Polimento final e feedback entre alunos.' },
-  { title: 'Aula 23: Exportando e Compartilhando', topic: 'Exportação para Desktop. Criar página no itch.io para hospedar o jogo.' },
-  { title: 'Aula 24: Apresentação Final e Próximos Passos', topic: 'Portfólio: como usar os jogos criados. Continuidade após o curso.' },
-  { title: 'Revisão Final e Preparação', topic: 'Polimento do projeto final para a apresentação.' },
-  { title: 'Apresentação Final dos Projetos', topic: 'Cada aluno apresenta seu melhor jogo explicando conceito e mecânicas.' },
-];
 
 const generateTurmaItems = (
   seedPrefix: string,
@@ -14447,7 +14301,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             >
               <div className="bg-gradient-to-br from-indigo-600 to-purple-600 px-6 py-5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-2xl">📢</div>
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><Megaphone size={20} className="text-white" /></div>
                   <h3 className="text-white font-bold text-lg">Aviso</h3>
                 </div>
                 <button onClick={dismissAnnouncement} className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
@@ -14478,7 +14332,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               <>
                 <div className="flex flex-col items-center text-center mb-6">
                   <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
-                    <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                   <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
                   <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em poucos passos.</p>
