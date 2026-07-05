@@ -30,6 +30,24 @@ export default defineConfig(({ mode }) => {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.PIXABAY_API_KEY': JSON.stringify(env.PIXABAY_API_KEY),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Separa vendors estáveis do código do app: mudanças no App.tsx não
+          // invalidam mais o cache de firebase/react/ícones no navegador, e o
+          // download inicial acontece em paralelo.
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return;
+            if (id.includes('firebase') || id.includes('@grpc') || id.includes('protobuf')) return 'vendor-firebase';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('@google/genai')) return 'vendor-genai';
+            if (/node_modules\/(motion|framer-motion|motion-dom|motion-utils)\//.test(id)) return 'vendor-motion';
+            if (/node_modules\/(react-markdown|remark|rehype|micromark|mdast|unist|hast|unified|vfile|bail|trough|zwitch|comma-separated|space-separated|property-information|devlop|estree|character-entities|decode-named|trim-lines|html-url-attributes)/.test(id)) return 'vendor-markdown';
+            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react';
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
