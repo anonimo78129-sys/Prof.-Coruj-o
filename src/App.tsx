@@ -8417,7 +8417,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
   );
 };
 
-const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string) => {
+const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string, printOpts?: { landscape?: boolean }) => {
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
   const typeLabel = ({ plan: 'Plano de Aula', activities: 'Atividades', exam: 'Avaliação' } as Record<string, string>)[type] || escapeHtml(type);
@@ -8435,9 +8435,10 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
       return '<table><thead><tr>' + head.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' +
         body.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>\n';
     })
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    // Gabarito começa sempre em página nova (evita resposta na mesma folha do aluno)
+    .replace(/^## (.+)$/gm, (_m, t: string) => `${/gabarito/i.test(t) ? '<div style="page-break-before: always"></div>' : ''}<h2>${t}</h2>`)
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^# (.+)$/gm, (_m, t: string) => `${/gabarito/i.test(t) ? '<div style="page-break-before: always"></div>' : ''}<h1>${t}</h1>`)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^---$/gm, '<hr>')
@@ -8445,7 +8446,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
     .replace(/\n/g, '<br>');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
-    @page { size: A4; margin: 2cm; }
+    @page { size: A4${printOpts?.landscape ? ' landscape' : ''}; margin: ${printOpts?.landscape ? '1.4cm' : '2cm'}; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.6; margin: 0; font-size: 12px; }
     .header { background: #4338ca; color: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
@@ -8463,9 +8464,9 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     ul { padding-left: 20px; margin: 4px 0; }
     hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
     strong { font-weight: 800; color: #0f172a; }
-    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10.5px; }
-    th { background: #4338ca; color: white; font-weight: 800; padding: 6px 8px; text-align: left; border: 1px solid #4338ca; }
-    td { padding: 6px 8px; border: 1px solid #e2e8f0; vertical-align: top; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: ${printOpts?.landscape ? '11.5px' : '10.5px'}; }
+    th { background: #4338ca; color: white; font-weight: 800; padding: ${printOpts?.landscape ? '8px 10px' : '6px 8px'}; text-align: left; border: 1px solid #4338ca; }
+    td { padding: ${printOpts?.landscape ? '8px 10px' : '6px 8px'}; border: 1px solid #e2e8f0; vertical-align: top; }
     tr:nth-child(even) td { background: #f8fafc; }
     .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
   </style></head><body>
@@ -10028,6 +10029,157 @@ const FERRAMENTAS_META: { id: FerramentaId; title: string; icon: any; color: str
   { id: 'pdf',       title: 'Material do meu PDF',    icon: FileUp,         color: 'text-violet-600',  bg: 'bg-violet-50 border-violet-200',   desc: 'Gere materiais a partir do seu livro ou apostila' },
 ];
 
+// ── Impressão: Parecer Descritivo (papel timbrado sóbrio, com assinaturas) ──
+const printParecer = (opts: { text: string; studentName: string; period: string; teacherName?: string; schoolName?: string; className?: string }) => {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
+  const today = new Date().toLocaleDateString('pt-BR');
+  const body = escapeHtml(opts.text)
+    .replace(/^#{1,3}\s+(.+)$/gm, '<strong>$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .split(/\n{2,}/)
+    .map(p => `<p>${p.trim().replace(/\n/g, '<br>')}</p>`)
+    .join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Parecer Descritivo — ${escapeHtml(opts.studentName)}</title><style>
+    @page { size: A4; margin: 2.2cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Georgia, 'Times New Roman', serif; color: #111827; margin: 0; font-size: 12.5px; line-height: 1.75; }
+    .letterhead { text-align: center; border-bottom: 1.5px solid #111827; padding-bottom: 10px; margin-bottom: 22px; }
+    .school { font-size: 15px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+    .doc-title { text-align: center; font-size: 14px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin: 0 0 20px; }
+    .meta { width: 100%; border-collapse: collapse; margin-bottom: 22px; font-size: 12px; }
+    .meta td { padding: 4px 0; vertical-align: bottom; }
+    .meta .lbl { font-weight: 700; white-space: nowrap; padding-right: 6px; width: 1%; }
+    .meta .val { border-bottom: 1px solid #9ca3af; padding-left: 4px; }
+    .body p { margin: 0 0 12px; text-align: justify; text-indent: 2em; }
+    .sigs { display: flex; gap: 28px; margin-top: 70px; page-break-inside: avoid; }
+    .sig { flex: 1; text-align: center; font-size: 11px; }
+    .sig .line { border-top: 1px solid #111827; padding-top: 5px; }
+  </style></head><body>
+    <div class="letterhead"><div class="school">${escapeHtml(opts.schoolName || 'Escola')}</div></div>
+    <h1 class="doc-title">Parecer Descritivo</h1>
+    <table class="meta">
+      <tr><td class="lbl">Aluno(a):</td><td class="val">${escapeHtml(opts.studentName)}</td><td class="lbl" style="padding-left:18px">Período:</td><td class="val" style="width:140px">${escapeHtml(opts.period)}</td></tr>
+      <tr><td class="lbl">Professor(a):</td><td class="val">${escapeHtml(opts.teacherName || '')}</td><td class="lbl" style="padding-left:18px">Data:</td><td class="val" style="width:140px">${today}</td></tr>
+      ${opts.className ? `<tr><td class="lbl">Turma:</td><td class="val" colspan="3">${escapeHtml(opts.className)}</td></tr>` : ''}
+    </table>
+    <div class="body">${body}</div>
+    <div class="sigs">
+      <div class="sig"><div class="line">Professor(a)</div></div>
+      <div class="sig"><div class="line">Coordenação</div></div>
+      <div class="sig"><div class="line">Responsável</div></div>
+    </div>
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`);
+  w.document.close();
+};
+
+// ── Impressão: Bilhete para famílias (2 vias por folha A4, com linha de corte) ──
+const printBilhete = (opts: { text: string; teacherName?: string; schoolName?: string; className?: string }) => {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
+  const today = new Date().toLocaleDateString('pt-BR');
+  const msg = escapeHtml(opts.text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  const copy = `
+    <div class="copy">
+      <div class="copy-head">
+        <span>${escapeHtml(opts.schoolName || 'Escola')}</span>
+        <span>Prof(a). ${escapeHtml(opts.teacherName || '')}${opts.className ? ' · ' + escapeHtml(opts.className) : ''} · ${today}</span>
+      </div>
+      <div class="msg">${msg}</div>
+      <div class="sig">Assinatura do responsável: <span class="sig-line"></span></div>
+    </div>`;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Comunicado — ${escapeHtml(opts.schoolName || 'Escola')}</title><style>
+    @page { size: A4; margin: 1.2cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Georgia, 'Times New Roman', serif; color: #111827; margin: 0; font-size: 12.5px; line-height: 1.6; }
+    .copy { height: 12.6cm; display: flex; flex-direction: column; padding: 0.5cm 0.3cm; }
+    .copy-head { display: flex; justify-content: space-between; gap: 12px; font-family: Arial, sans-serif; font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: #374151; border-bottom: 1px solid #111827; padding-bottom: 6px; margin-bottom: 12px; }
+    .msg { flex: 1; overflow: hidden; }
+    .sig { margin-top: 14px; font-size: 11.5px; display: flex; align-items: flex-end; gap: 6px; }
+    .sig-line { flex: 1; border-bottom: 1px solid #111827; min-width: 160px; height: 14px; }
+    .cut { display: flex; align-items: center; gap: 8px; color: #6b7280; font-family: Arial, sans-serif; font-size: 11px; margin: 0.25cm 0; }
+    .cut::before, .cut::after { content: ''; flex: 1; border-top: 1.5px dashed #9ca3af; }
+  </style></head><body>
+    ${copy}
+    <div class="cut">✂ recorte aqui</div>
+    ${copy}
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`);
+  w.document.close();
+};
+
+// ── Impressão: Chamada do Diário de Classe (folha de frequência sóbria) ──
+const printChamada = (opts: {
+  className: string; dateBr: string; teacherName?: string; schoolName?: string; note?: string; withGrades: boolean;
+  rows: { n: number; name: string; att?: 'P' | 'F' | 'A'; grade?: string }[];
+  totals: { p: number; f: number; a: number };
+}) => {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
+  const sq = (marked: boolean) => `<span class="sq">${marked ? '✕' : ''}</span>`;
+  const rowsHtml = opts.rows.map(r => `<tr>
+    <td class="c">${r.n}</td>
+    <td>${escapeHtml(r.name)}</td>
+    <td class="c">${sq(r.att === 'P')}</td>
+    <td class="c">${sq(r.att === 'F')}</td>
+    <td class="c">${sq(r.att === 'A')}</td>
+    ${opts.withGrades ? `<td class="c">${escapeHtml(r.grade || '')}</td>` : ''}
+  </tr>`).join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Diário de Classe — ${escapeHtml(opts.className)} — ${escapeHtml(opts.dateBr)}</title><style>
+    @page { size: A4; margin: 1.6cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 11px; margin: 0; }
+    .head { border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
+    .school { text-align: center; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; }
+    .doc { text-align: center; font-size: 10px; letter-spacing: 2px; margin-top: 2px; }
+    .meta { display: flex; gap: 24px; margin-bottom: 10px; }
+    table.list { width: 100%; border-collapse: collapse; }
+    .list th, .list td { border: 1px solid #111; padding: 3.5px 6px; text-align: left; }
+    .list th { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .list tr { page-break-inside: avoid; }
+    .c { text-align: center; }
+    th.st { width: 34px; text-align: center; }
+    .sq { display: inline-block; width: 13px; height: 13px; border: 1.2px solid #111; line-height: 13px; font-size: 10px; text-align: center; vertical-align: middle; }
+    .totals { margin-top: 6px; font-size: 10.5px; }
+    .conteudo { margin-top: 18px; page-break-inside: avoid; }
+    .conteudo .lbl { font-weight: 700; margin-bottom: 4px; }
+    .note { margin-bottom: 4px; }
+    .wline { border-bottom: 1px solid #6b7280; height: 22px; }
+    .psig { margin-top: 46px; display: flex; justify-content: center; page-break-inside: avoid; }
+    .pline { border-top: 1px solid #111; padding-top: 4px; width: 60%; text-align: center; font-size: 10.5px; }
+  </style></head><body>
+    <div class="head">
+      <div class="school">${escapeHtml(opts.schoolName || 'Escola')}</div>
+      <div class="doc">DIÁRIO DE CLASSE — REGISTRO DE FREQUÊNCIA</div>
+    </div>
+    <div class="meta">
+      <span><strong>Turma:</strong> ${escapeHtml(opts.className)}</span>
+      <span><strong>Data:</strong> ${escapeHtml(opts.dateBr)}</span>
+      <span><strong>Professor(a):</strong> ${escapeHtml(opts.teacherName || '')}</span>
+    </div>
+    <table class="list">
+      <thead><tr><th style="width:28px" class="c">Nº</th><th>Nome do aluno</th><th class="st">P</th><th class="st">F</th><th class="st">A</th>${opts.withGrades ? '<th style="width:60px" class="c">Nota</th>' : ''}</tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="totals">Presentes: ${opts.totals.p} · Faltas: ${opts.totals.f} · Atrasos: ${opts.totals.a} · Total de alunos: ${opts.rows.length}</div>
+    <div class="conteudo">
+      <div class="lbl">Conteúdo ministrado:</div>
+      ${opts.note ? `<div class="note">${escapeHtml(opts.note).replace(/\n/g, '<br>')}</div>` : ''}
+      <div class="wline"></div>
+      <div class="wline"></div>
+      ${opts.note ? '' : '<div class="wline"></div>'}
+    </div>
+    <div class="psig"><div class="pline">Assinatura do(a) professor(a)</div></div>
+    <script>window.onload = () => { window.print(); }<\/script>
+  </body></html>`);
+  w.document.close();
+};
+
 const FerramentaChips = ({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) => (
   <div className="flex flex-wrap gap-1.5">
     {options.map(o => (
@@ -10082,6 +10234,7 @@ const FerramentasScreen = ({
   const [targetLevel, setTargetLevel] = useState('3º a 5º ano');
   const [msgType, setMsgType] = useState('Bilhete na agenda');
   const [msgContext, setMsgContext] = useState('');
+  const [familiaTone, setFamiliaTone] = useState('acolhedor');
   const [videoUrl, setVideoUrl] = useState('');
   const [videoGoal, setVideoGoal] = useState('Roteiro de aula');
   const [pdfGoal, setPdfGoal] = useState('Atividade com questões');
@@ -10215,11 +10368,11 @@ REGRAS: não infantilize além do necessário, não adicione informações novas
       await runGeneration(`Você é um professor brasileiro experiente em comunicação com famílias.
 Escreva: ${msgType}
 Contexto/assunto: ${msgContext.trim()}
-${selectedClass ? `Turma: ${selectedClass.name}` : ''} | Tom: ${tone}
+${selectedClass ? `Turma: ${selectedClass.name}` : ''} | Tom: ${familiaTone}
 
 REGRAS:
 - ${msgType.includes('WhatsApp') ? 'Mensagem curta de WhatsApp (máx. 6 linhas), pode usar 1-2 emojis discretos' : 'Texto pronto para copiar, com saudação e despedida'}
-- Linguagem ${tone === 'formal' ? 'formal e institucional' : 'acolhedora, próxima e respeitosa'}
+- Linguagem ${familiaTone === 'formal' ? 'formal e institucional' : 'acolhedora, próxima e respeitosa'}
 - Se o assunto for delicado (comportamento, dificuldade), use abordagem construtiva: comece com algo positivo, descreva o fato sem julgamento, proponha parceria
 - NUNCA exponha ou compare a criança
 - Inclua espaço [NOME] onde o nome do aluno deve entrar, se aplicável
@@ -10268,8 +10421,17 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
   const toolTitle = activeTool ? FERRAMENTAS_META.find(t => t.id === activeTool)!.title : '';
 
   const printResult = () => {
-    if (!result) return;
-    printPlannerContent(toolTitle, result, toolTitle, profile.name, profile.schoolName);
+    if (!result || !activeTool) return;
+    if (activeTool === 'parecer') {
+      printParecer({ text: result, studentName: studentName.trim(), period, teacherName: profile.name, schoolName: profile.schoolName, className: selectedClass?.name });
+      return;
+    }
+    if (activeTool === 'familia') {
+      printBilhete({ text: result, teacherName: profile.name, schoolName: profile.schoolName, className: selectedClass?.name });
+      return;
+    }
+    const tagLabels: Record<FerramentaId, string> = { parecer: 'Parecer', inclusao: 'Inclusão', rubrica: 'Avaliação', nivelador: 'Leitura', familia: 'Famílias', video: 'Vídeo', pdf: 'Material' };
+    printPlannerContent(toolTitle, result, tagLabels[activeTool], profile.name, profile.schoolName, activeTool === 'rubrica' ? { landscape: true } : undefined);
   };
 
   const classSelectorEl = schedules.length > 0 ? (
@@ -10448,7 +10610,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Tom</label>
-                          <Chips options={['acolhedor', 'formal']} value={tone} onChange={setTone} />
+                          <Chips options={['acolhedor', 'formal']} value={familiaTone} onChange={setFamiliaTone} />
                         </div>
                       </>
                     )}
@@ -10515,7 +10677,30 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
                 {result && !isGenerating && (
                   <>
-                    <div className="markdown-body prose prose-sm max-w-none bg-gray-50 border border-gray-100 rounded-2xl p-4 max-h-[48vh] overflow-y-auto">
+                    {(() => {
+                      const meta = FERRAMENTAS_META.find(t => t.id === activeTool)!;
+                      const Icon = meta.icon;
+                      const ctxParts: string[] = [];
+                      if (activeTool === 'parecer') {
+                        if (studentName.trim()) ctxParts.push(studentName.trim());
+                        ctxParts.push(period);
+                      } else if (activeTool === 'inclusao') ctxParts.push(need);
+                      else if (activeTool === 'nivelador') ctxParts.push(targetLevel);
+                      else if (activeTool === 'familia') ctxParts.push(msgType);
+                      else if (activeTool === 'video') ctxParts.push(videoGoal);
+                      else if (activeTool === 'pdf') ctxParts.push(pdfGoal);
+                      if (selectedClass) ctxParts.push(selectedClass.name);
+                      return (
+                        <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${meta.bg}`}>
+                          <Icon size={20} className={`${meta.color} shrink-0`} />
+                          <div className="min-w-0">
+                            <p className={`text-sm font-bold leading-tight ${meta.color}`}>{meta.title}</p>
+                            {ctxParts.length > 0 && <p className="text-[11px] text-gray-500 truncate">{ctxParts.join(' · ')}</p>}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    <div className={`markdown-body prose prose-sm max-w-none bg-gray-50 border border-gray-100 rounded-2xl p-4 max-h-[48vh] overflow-y-auto ${activeTool === 'rubrica' ? 'overflow-x-auto [&_table]:min-w-[540px]' : ''}`}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
                     </div>
                     <p className="text-[11px] text-gray-400 text-center">Material gerado por IA. Revise antes de usar.</p>
@@ -10616,22 +10801,17 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
   const printDay = () => {
     const schedule = schedules.find(s => s.id === classId);
     const dateBr = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR');
-    const lines = [
-      `## Chamada — ${schedule?.name ?? 'Turma'} — ${dateBr}`,
-      '',
-      '| Nº | Aluno | Presença | Nota |',
-      '|---|---|---|---|',
-      ...students.map((s, i) => {
-        const a = entry?.att[s.id];
-        const label = a === 'P' ? 'Presente' : a === 'F' ? 'Falta' : a === 'A' ? 'Atraso' : '—';
-        return `| ${i + 1} | ${s.name} | ${label} | ${entry?.grades?.[s.id] ?? ''} |`;
-      }),
-      '',
-      `**Presentes:** ${presentCount} · **Faltas:** ${absentCount} · **Atrasos:** ${lateCount}`,
-      '',
-      entry?.note ? `## Anotações do dia\n${entry.note}` : '',
-    ].join('\n');
-    printPlannerContent(`Diário de Classe: ${dateBr}`, lines, 'Diário de Classe', profile.name, profile.schoolName);
+    const withGrades = showGrades || students.some(s => (entry?.grades?.[s.id] ?? '').trim() !== '');
+    printChamada({
+      className: schedule?.name ?? 'Turma',
+      dateBr,
+      teacherName: profile.name,
+      schoolName: profile.schoolName,
+      note: entry?.note,
+      withGrades,
+      rows: students.map((s, i) => ({ n: i + 1, name: s.name, att: entry?.att[s.id], grade: entry?.grades?.[s.id] })),
+      totals: { p: presentCount, f: absentCount, a: lateCount },
+    });
   };
 
   const attStyle = (a?: 'P' | 'F' | 'A') =>
