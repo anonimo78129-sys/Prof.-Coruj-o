@@ -31,6 +31,26 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
 
 const AI_MODEL = 'gemini-2.5-flash';
 
+// Escapa texto para interpolação segura em HTML gerado (impressões).
+// Conteúdo vindo da IA ou digitado pelo usuário NUNCA deve entrar cru em document.write.
+const escapeHtml = (s: unknown): string =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+// ── Contas administradoras (bootstrap) ──────────────────────────────────────
+// A autorização real é aplicada nas regras do Firestore/Storage; estas listas
+// controlam apenas a exibição de recursos de admin no cliente.
+const ADMIN_BOOTSTRAP_EMAILS = ['lyelsonmf520@gmail.com'];
+const SEED_IMPORT_EMAILS = [...ADMIN_BOOTSTRAP_EMAILS, 'slilica69@gmail.com'];
+const isAdminAccount = (profile: { role?: string } | null | undefined, user: { email?: string | null } | null | undefined): boolean =>
+  profile?.role === 'admin' || ADMIN_BOOTSTRAP_EMAILS.includes((user?.email || '').toLowerCase());
+const canSeedTurmas = (profile: { role?: string } | null | undefined, user: { email?: string | null } | null | undefined): boolean =>
+  profile?.role === 'admin' || SEED_IMPORT_EMAILS.includes((user?.email || '').toLowerCase());
+
 const LOADING_MESSAGES = {
   planner: [
     "Dando uma olhada no tema...",
@@ -106,6 +126,9 @@ const formatApiError = (error: any, defaultMsg: string): string => {
     try { msg = JSON.stringify(error); } catch (e) {}
   }
 
+  if (msg.startsWith('[IA_FORMATO]')) {
+    return 'A IA respondeu num formato inesperado. Toque em gerar de novo que normalmente resolve.';
+  }
   if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
     return 'Muita gente usando a IA agora. Já estou tentando de novo. Se continuar, aguarde 1 minuto.';
   }
@@ -7396,14 +7419,14 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
         <span class="enigma-num">ENIGMA ${String(i + 1).padStart(2, '0')}</span>
         <span class="enigma-total">de ${data.enigmas.length}</span>
       </header>
-      ${en.imageUrl ? `<div class="enigma-art"><img src="${en.imageUrl}" alt="" crossorigin="anonymous" /></div>` : ''}
+      ${en.imageUrl ? `<div class="enigma-art"><img src="${escapeHtml(en.imageUrl)}" alt="" crossorigin="anonymous" /></div>` : ''}
       <div class="narrative-block">
         <div class="narrative-icon">${theme.ornament}</div>
-        <p class="narrative">${en.narrative}</p>
+        <p class="narrative">${escapeHtml(en.narrative)}</p>
       </div>
       <div class="challenge-block">
         <div class="challenge-label">DESAFIO</div>
-        <p class="challenge">${en.challenge}</p>
+        <p class="challenge">${escapeHtml(en.challenge)}</p>
       </div>
       <div class="answer-block">
         <div class="answer-label">🔑 SUA RESPOSTA</div>
@@ -7411,15 +7434,15 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
       </div>
       <div class="hint-block">
         <div class="hint-label">💡 DICA: USE APENAS SE PRECISAR</div>
-        <p class="hint-text">${en.hint}</p>
+        <p class="hint-text">${escapeHtml(en.hint)}</p>
       </div>
       <footer class="page-footer">
-        <span>${data.title}</span><span>${i + 1} / ${data.enigmas.length}</span>
+        <span>${escapeHtml(data.title)}</span><span>${i + 1} / ${data.enigmas.length}</span>
       </footer>
     </section>
   `).join('');
 
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${data.title}</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(data.title)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=JetBrains+Mono:wght@400;700&family=Courier+Prime:wght@400;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
   <style>
     @page { size: A4; margin: 0; }
@@ -7495,31 +7518,31 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
     <div class="cover-top">
       <div class="cover-badge">${theme.badge}</div>
       <div class="cover-subtitle">Escape Room Educacional</div>
-      <h1 class="cover-title">${data.title}</h1>
+      <h1 class="cover-title">${escapeHtml(data.title)}</h1>
       <div class="cover-ornament">${theme.ornament}  ${theme.ornament}  ${theme.ornament}</div>
     </div>
 
     <div class="cover-info">
-      <div class="info-box"><div class="info-label">Turma</div><div class="info-value">${opts.className || '—'}</div></div>
-      <div class="info-box"><div class="info-label">Tempo</div><div class="info-value">${data.timeLimit || '45 min'}</div></div>
-      <div class="info-box"><div class="info-label">Professor</div><div class="info-value">${opts.teacherName || '—'}</div></div>
+      <div class="info-box"><div class="info-label">Turma</div><div class="info-value">${escapeHtml(opts.className || '—')}</div></div>
+      <div class="info-box"><div class="info-label">Tempo</div><div class="info-value">${escapeHtml(data.timeLimit || '45 min')}</div></div>
+      <div class="info-box"><div class="info-label">Professor</div><div class="info-value">${escapeHtml(opts.teacherName || '—')}</div></div>
       <div class="info-box"><div class="info-label">Enigmas</div><div class="info-value">${data.enigmas.length} desafios</div></div>
     </div>
 
     <div class="cover-briefing">
       <div class="cover-briefing-label">▸ Briefing da Missão</div>
-      <p class="cover-briefing-text">${data.briefing}</p>
+      <p class="cover-briefing-text">${escapeHtml(data.briefing)}</p>
     </div>
 
     ${data.rules && data.rules.length ? `<div class="cover-rules">
       <div class="cover-rules-title">Regras do Jogo</div>
       <ul class="cover-rules-list">
-        ${data.rules.map(r => `<li>${r}</li>`).join('')}
+        ${data.rules.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
       </ul>
     </div>` : ''}
 
     <div class="cover-footer">
-      ${opts.schoolName || ''} ${opts.subject ? '· ' + opts.subject : ''} ${opts.level ? '· ' + opts.level : ''} · ${todayStr}
+      ${escapeHtml(opts.schoolName || '')} ${opts.subject ? '· ' + escapeHtml(opts.subject) : ''} ${opts.level ? '· ' + escapeHtml(opts.level) : ''} · ${todayStr}
     </div>
   </section>
 
@@ -7538,8 +7561,8 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
         <div class="key-item">
           <div class="key-num">${String(i + 1).padStart(2, '0')}</div>
           <div class="key-content">
-            <p class="key-challenge">${en.challenge}</p>
-            <p class="key-answer">→ ${en.answer}</p>
+            <p class="key-challenge">${escapeHtml(en.challenge)}</p>
+            <p class="key-answer">→ ${escapeHtml(en.answer)}</p>
           </div>
         </div>
       `).join('')}
@@ -7788,6 +7811,11 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         const raw = response.text || '';
         const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
         const parsed = JSON.parse(cleaned);
+        if (!parsed || typeof parsed.title !== 'string' || !Array.isArray(parsed.enigmas) || parsed.enigmas.length === 0 ||
+            parsed.enigmas.some((en: any) => typeof en?.narrative !== 'string' || typeof en?.challenge !== 'string' || typeof en?.answer !== 'string')) {
+          throw new Error('[IA_FORMATO] escape room sem title/enigmas válidos');
+        }
+        parsed.enigmas = parsed.enigmas.map((en: any) => ({ ...en, hint: typeof en.hint === 'string' ? en.hint : '' }));
         const apiKey = process.env.PIXABAY_API_KEY;
         if (apiKey && parsed.enigmas) {
           const withImages = await Promise.all(parsed.enigmas.map(async (en: any) => {
@@ -7816,12 +7844,21 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
         const parsed = JSON.parse(cleaned);
         if (activeMode === 'wordsearch') {
+          if (!Array.isArray(parsed?.words) || parsed.words.some((w: any) => typeof w?.word !== 'string')) {
+            throw new Error('[IA_FORMATO] caça-palavras sem lista de words válida');
+          }
           const built = buildWordSearchGrid(parsed.words.map((w: any) => w.word), wsGridSize);
           finalResult = { ...parsed, grid: built.grid };
         } else if (activeMode === 'bingo') {
+          if (!Array.isArray(parsed?.items) || parsed.items.length === 0) {
+            throw new Error('[IA_FORMATO] bingo sem lista de items válida');
+          }
           const cards = buildBingoCards(parsed.items, bingoCardCount, bingoSize, bingoFreeText);
           finalResult = { ...parsed, cards, bingoSize };
         } else if (activeMode === 'crossword') {
+          if (parsed?.words != null && !Array.isArray(parsed.words)) {
+            throw new Error('[IA_FORMATO] cruzadinha com words em formato inválido');
+          }
           const crossword = buildCrosswordGrid(parsed.words || []);
           finalResult = { ...parsed, crossword };
         } else {
@@ -8439,9 +8476,11 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string) => {
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
-  const typeLabel = ({ plan: 'Plano de Aula', activities: 'Atividades', exam: 'Avaliação' } as Record<string, string>)[type] || type;
+  const typeLabel = ({ plan: 'Plano de Aula', activities: 'Atividades', exam: 'Avaliação' } as Record<string, string>)[type] || escapeHtml(type);
   const today = new Date().toLocaleDateString('pt-BR');
-  const htmlContent = content
+  // Escapa o texto ANTES das transformações de markdown: só o HTML gerado aqui
+  // dentro (h1/ul/table/…) chega vivo ao document.write.
+  const htmlContent = escapeHtml(content)
     // Tabelas markdown (GFM) → <table>
     .replace(/(^\|.+\|[ \t]*\n\|[-:| \t]+\|[ \t]*\n(?:^\|.+\|[ \t]*\n?)*)/gm, (tbl) => {
       const rows = tbl.trim().split('\n').filter(r => r.trim().startsWith('|'));
@@ -8461,7 +8500,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
     .replace(/\n/g, '<br>');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
     @page { size: A4; margin: 2cm; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.6; margin: 0; font-size: 12px; }
@@ -8489,12 +8528,12 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
   <div class="header">
     <div class="header-left">
       <div class="tag">${typeLabel}</div>
-      <h1>${title}</h1>
+      <h1>${escapeHtml(title)}</h1>
       <div class="header-meta">Gerado pelo Prof. Corujão · ${today}</div>
       <div class="fields">
-        <div class="field"><div class="field-label">PROFESSOR(A)</div><div class="field-val">${teacherName || ''}</div></div>
+        <div class="field"><div class="field-label">PROFESSOR(A)</div><div class="field-val">${escapeHtml(teacherName || '')}</div></div>
         <div class="field"><div class="field-label">DATA</div><div class="field-val"></div></div>
-        <div class="field"><div class="field-label">ESCOLA</div><div class="field-val">${schoolName || ''}</div></div>
+        <div class="field"><div class="field-label">ESCOLA</div><div class="field-val">${escapeHtml(schoolName || '')}</div></div>
         <div class="field"><div class="field-label">TURMA</div><div class="field-val"></div></div>
       </div>
     </div>
@@ -13506,7 +13545,7 @@ function AppInner() {
 
   const isLimitReached = useMemo(() => {
     if (!user) return false;
-    if (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') return false;
+    if (isAdminAccount(profile, user)) return false;
     if (profile?.isPro) return false;
     return (profile?.generationsUsed ?? 0) >= FREE_GENERATION_LIMIT;
   }, [user, profile]);
@@ -14484,7 +14523,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         )}
       </AnimatePresence>
 
-      {(profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com' || user?.email?.toLowerCase() === 'slilica69@gmail.com') && (
+      {canSeedTurmas(profile, user) && (
         <div className="fixed bottom-24 right-4 z-[55]">
           <button
             onClick={seedAdminData}
@@ -14693,7 +14732,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
           {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} />}
           {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
-          {screen === 'admin' && (profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com') && <AdminScreen key="admin" />}
+          {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" />}
         </AnimatePresence>
 
         <GlobalTaskIndicator 
@@ -14712,7 +14751,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             removeTask(task.id);
           }}
         />
-        <BottomNav activeScreen={screen} setScreen={setScreen} isAdmin={profile?.role === 'admin' || user?.email?.toLowerCase() === 'lyelsonmf520@gmail.com'} />
+        <BottomNav activeScreen={screen} setScreen={setScreen} isAdmin={isAdminAccount(profile, user)} />
       </div>
       
       {/* Background decoration */}

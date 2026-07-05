@@ -31,6 +31,16 @@ service cloud.firestore {
     function noPrivilegedRoleCreated() {
       return !('role' in request.resource.data) || request.resource.data.role != 'admin';
     }
+    // Campos de cobrança: o dono não pode se dar PRO nem baixar o contador de
+    // gerações (só incrementá-lo). Apenas admins escrevem esses campos livremente.
+    function billingFieldsProtected() {
+      return (!('isPro' in request.resource.data) || request.resource.data.isPro == resource.data.get('isPro', false))
+          && (!('generationsUsed' in request.resource.data) || request.resource.data.generationsUsed >= resource.data.get('generationsUsed', 0));
+    }
+    function noBillingPrivilegeCreated() {
+      return (!('isPro' in request.resource.data) || request.resource.data.isPro == false)
+          && (!('generationsUsed' in request.resource.data) || request.resource.data.generationsUsed == 0);
+    }
 
     match /feedback/{feedbackId} {
       allow create: if isAuthenticated() && uidUnchanged();
@@ -58,11 +68,11 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
       
       // For create, resource does not exist.
-      allow create: if (isOwner(userId) && uidUnchanged() && noPrivilegedRoleCreated()) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
-      
-      // For update, they can update their own if they don't modify role/uid, OR they are admin.
+      allow create: if (isOwner(userId) && uidUnchanged() && noPrivilegedRoleCreated() && noBillingPrivilegeCreated()) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+
+      // For update, they can update their own if they don't modify role/uid/billing, OR they are admin.
       // Use uidUnchanged() instead of uidNotModified() so owners can set uid even on old docs that lack it.
-      allow update: if (isOwner(userId) && uidUnchanged() && roleNotModified()) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow update: if (isOwner(userId) && uidUnchanged() && roleNotModified() && billingFieldsProtected()) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
       
       allow delete: if isOwner(userId) || isAdminWithoutGet() || (userId != request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
       
