@@ -4130,7 +4130,7 @@ const ChatScreen = ({
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
               >
                 {msg.role !== 'user' && (
-                  <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-7 h-7 object-contain shrink-0 mb-5" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                  <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-11 h-11 object-contain shrink-0 mb-4" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 )}
                 <div
                   onTouchStart={() => startLongPress(cleanText)}
@@ -4177,7 +4177,7 @@ const ChatScreen = ({
               transition={{ type: 'spring', stiffness: 380, damping: 28 }}
               className="flex justify-start items-end gap-2"
             >
-              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-7 h-7 object-contain shrink-0 mb-1" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-11 h-11 object-contain shrink-0 mb-1" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-50 flex flex-col gap-1.5 max-w-[240px]">
                 <div className="flex gap-2 items-center">
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
