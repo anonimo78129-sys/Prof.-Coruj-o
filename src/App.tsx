@@ -11266,19 +11266,21 @@ const GamificacaoScreen = ({
         </div>
       )}
 
-      {/* Summary strip */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="bg-indigo-50 rounded-2xl p-3 text-center">
-          <p className="text-xl font-black text-indigo-700">{currentCls.students.length}</p>
-          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Alunos</p>
+      {/* Summary strip — faixa fina única */}
+      <div className="flex items-center justify-around bg-white rounded-2xl border border-gray-100 shadow-sm py-2.5 px-3 mb-4">
+        <div className="text-center px-2">
+          <span className="text-lg font-black text-indigo-700 tabular-nums">{currentCls.students.length}</span>
+          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wide">Alunos</span>
         </div>
-        <div className="bg-amber-50 rounded-2xl p-3 text-center">
-          <p className="text-xl font-black text-amber-600">{currentCls.students.reduce((a, s) => a + weekXpOf(s), 0)}</p>
-          <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wide">XP semana</p>
+        <div className="w-px h-7 bg-gray-100" />
+        <div className="text-center px-2">
+          <span className="text-lg font-black text-amber-600 tabular-nums">{currentCls.students.reduce((a, s) => a + weekXpOf(s), 0)}</span>
+          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wide">XP semana</span>
         </div>
-        <div className="bg-emerald-50 rounded-2xl p-3 text-center">
-          <p className="text-xl font-black text-emerald-600">{currentCls.teams.length}</p>
-          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Equipes</p>
+        <div className="w-px h-7 bg-gray-100" />
+        <div className="text-center px-2">
+          <span className="text-lg font-black text-emerald-600 tabular-nums">{currentCls.teams.length}</span>
+          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wide">Equipes</span>
         </div>
       </div>
 
@@ -11590,11 +11592,12 @@ const GamificacaoScreen = ({
         {/* ── Config ─────────────────────────────────────────────────────────── */}
         {tab === 'config' && (
           <motion.div key="config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest px-1">Configurar turma</p>
             <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-1 px-1">
               {([
-                { id: 'students', label: 'Alunos' },
-                { id: 'teams', label: 'Equipes' },
-                { id: 'behaviors', label: 'Ações' },
+                { id: 'students', label: 'Cadastrar alunos' },
+                { id: 'teams', label: 'Criar equipes' },
+                { id: 'behaviors', label: 'Pontuações' },
                 { id: 'rewards', label: 'Loja' },
                 { id: 'season', label: 'Temporada' },
               ] as const).map(cs => (
