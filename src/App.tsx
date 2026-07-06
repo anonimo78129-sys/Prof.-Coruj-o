@@ -11053,17 +11053,13 @@ const GamificacaoScreen = ({
 }) => {
   const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(schedules[0]?.id ?? null);
-  const [tab, setTab] = useState<'alunos' | 'equipes' | 'missao' | 'loja' | 'log' | 'config'>('alunos');
+  const [tab, setTab] = useState<'alunos' | 'equipes' | 'loja' | 'ajustes'>('alunos');
   const [liveTool, setLiveTool] = useState<string | null>(null);
   const [kitExpanded, setKitExpanded] = useState(false);
   const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
   const [shopStudentId, setShopStudentId] = useState<string | null>(null);
-  const [configSection, setConfigSection] = useState<'students' | 'behaviors' | 'rewards' | 'teams' | 'season'>('students');
   const [newStudentName, setNewStudentName] = useState('');
   const [showSeasonEnd, setShowSeasonEnd] = useState(false);
-  const [editingMission, setEditingMission] = useState(false);
-  const [missionGoal, setMissionGoal] = useState('50');
-  const [missionReward, setMissionReward] = useState('Recreio livre 5 min');
   const [teamStudentId, setTeamStudentId] = useState<string | null>(null);
   const [newBehaviorLabel, setNewBehaviorLabel] = useState('');
   const [newBehaviorPoints, setNewBehaviorPoints] = useState('3');
@@ -11291,10 +11287,8 @@ const GamificacaoScreen = ({
         tabs={[
           { id: 'alunos', label: 'Alunos', icon: Users },
           { id: 'equipes', label: 'Equipes', icon: Trophy },
-          { id: 'missao', label: 'Missão', icon: Star },
           { id: 'loja', label: 'Loja', icon: Gift },
-          { id: 'log', label: 'Log', icon: ScrollText },
-          { id: 'config', label: 'Config', icon: Settings },
+          { id: 'ajustes', label: 'Ajustes', icon: Settings },
         ]}
         active={tab}
         onChange={id => setTab(id as any)}
@@ -11305,15 +11299,12 @@ const GamificacaoScreen = ({
 
         {/* ── Alunos ─────────────────────────────────────────────────────────── */}
         {tab === 'alunos' && (
-          <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
             {currentCls.students.length === 0 ? (
-              <div className="text-center py-16">
+              <div className="text-center py-10">
                 <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 <p className="text-gray-500 mt-3 text-sm font-bold">Nenhum aluno ainda</p>
-                <p className="text-gray-400 text-xs mt-1">Adicione alunos em ⚙️ Config → Alunos</p>
-                <button onClick={() => { setTab('config'); setConfigSection('students'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">
-                  + Adicionar alunos
-                </button>
+                <p className="text-gray-400 text-xs mt-1">Adicione alunos abaixo para começar.</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
@@ -11345,6 +11336,92 @@ const GamificacaoScreen = ({
                 })}
               </div>
             )}
+
+            {/* Gerenciar alunos (inline) */}
+            <div className="pt-1 space-y-2">
+              <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Gerenciar alunos</p>
+              {/* Modo individual vs. lista em lote */}
+              <div className="flex gap-2 mb-1">
+                <button onClick={() => { setBulkMode(false); setBulkNames(''); }} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${!bulkMode ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                  Um por vez
+                </button>
+                <button onClick={() => setBulkMode(true)} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${bulkMode ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                  Lista em lote
+                </button>
+              </div>
+
+              {!bulkMode ? (
+                <div className="flex gap-2">
+                  <input
+                    value={newStudentName}
+                    onChange={e => setNewStudentName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addStudent()}
+                    placeholder="Nome do aluno (Enter para adicionar)"
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400"
+                  />
+                  <button onClick={addStudent} className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold">
+                    <Plus size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <textarea
+                    value={bulkNames}
+                    onChange={e => setBulkNames(e.target.value)}
+                    rows={8}
+                    placeholder={"Cole ou escreva os nomes, um por linha:\n\nAna Beatriz\nCarlos Eduardo\nMariana\nPedro Henrique\n..."}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 resize-none bg-white"
+                  />
+                  {(() => {
+                    const names = bulkNames.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+                    const newNames = names.filter(n => !currentCls.students.some(s => s.name.toLowerCase() === n.toLowerCase()));
+                    return (
+                      <button
+                        onClick={() => {
+                          if (newNames.length === 0) return;
+                          updateCls(cls => ({
+                            ...cls,
+                            students: [
+                              ...cls.students,
+                              ...newNames.map(name => ({ id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }))
+                            ]
+                          }));
+                          setBulkNames('');
+                          setBulkMode(false);
+                          toast.success(`${newNames.length} aluno${newNames.length > 1 ? 's' : ''} adicionado${newNames.length > 1 ? 's' : ''}!`);
+                        }}
+                        disabled={newNames.length === 0}
+                        className="w-full bg-indigo-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform"
+                      >
+                        {newNames.length > 0 ? `+ Adicionar ${newNames.length} aluno${newNames.length > 1 ? 's' : ''}` : 'Digite nomes acima'}
+                      </button>
+                    );
+                  })()}
+                  {bulkNames.split('\n').some(n => {
+                    const t = n.trim();
+                    return t.length > 0 && currentCls.students.some(s => s.name.toLowerCase() === t.toLowerCase());
+                  }) && (
+                    <p className="text-[11px] text-amber-600 font-medium px-1">Nomes já cadastrados serão ignorados automaticamente.</p>
+                  )}
+                </div>
+              )}
+
+              {currentCls.students.length > 0 && (
+                <p className="text-[11px] text-gray-400 px-1">{currentCls.students.length} aluno{currentCls.students.length !== 1 ? 's' : ''} cadastrado{currentCls.students.length !== 1 ? 's' : ''}. Ficam salvos automaticamente.</p>
+              )}
+              {currentCls.students.map(s => (
+                <div key={s.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{skin[gamiLevel(s.totalXp)]}</span>
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">{s.name}</p>
+                      <p className="text-[10px] text-gray-400">{GAMI_LEVELS[gamiLevel(s.totalXp)].name} · {s.totalXp} XP · 🪙{s.coins}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => removeStudent(s.id)} className="text-red-300 hover:text-red-500 p-1.5 transition-colors"><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
           </motion.div>
         )}
 
@@ -11352,13 +11429,10 @@ const GamificacaoScreen = ({
         {tab === 'equipes' && (
           <motion.div key="equipes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
             {currentCls.teams.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-10">
                 <span className="text-4xl">🏆</span>
                 <p className="text-gray-500 mt-2 text-sm font-bold">Nenhuma equipe configurada</p>
-                <p className="text-gray-400 text-xs mt-1">Configure em ⚙️ Config → Equipes</p>
-                <button onClick={() => { setTab('config'); setConfigSection('teams'); }} className="mt-4 bg-indigo-600 text-white text-sm font-bold px-5 py-2.5 rounded-2xl">
-                  Criar equipes
-                </button>
+                <p className="text-gray-400 text-xs mt-1">Crie equipes abaixo.</p>
               </div>
             ) : (
               <>
@@ -11405,100 +11479,67 @@ const GamificacaoScreen = ({
                 )}
               </>
             )}
-          </motion.div>
-        )}
 
-        {/* ── Missão ─────────────────────────────────────────────────────────── */}
-        {tab === 'missao' && (
-          <motion.div key="missao" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-            {currentCls.mission && currentCls.mission.weekKey === wk ? (
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <div className="flex items-start justify-between mb-1">
-                  <div>
-                    <p className="font-black text-gray-900">🎯 Missão da Semana</p>
-                    <p className="text-sm text-indigo-600 font-bold mt-0.5">{currentCls.mission.reward}</p>
+            {/* Gerenciar equipes (inline) */}
+            <div className="pt-1 space-y-3">
+              <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Gerenciar equipes</p>
+              {currentCls.teams.length === 0 ? (
+                <button onClick={() => updateCls(cls => ({ ...cls, teams: GAMI_TEAM_PRESETS.slice(0, 4).map(t => ({ ...t, id: gamiRid() })) }))} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform">
+                  + Criar 4 equipes padrão
+                </button>
+              ) : (
+                <div className="flex gap-2 flex-wrap">
+                  {GAMI_TEAM_PRESETS.filter(p => !currentCls.teams.some(t => t.name === p.name)).map(p => (
+                    <button
+                      key={p.name}
+                      onClick={() => updateCls(cls => ({ ...cls, teams: [...cls.teams, { ...p, id: gamiRid() }] }))}
+                      className="flex items-center gap-1 bg-white border border-gray-200 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95 transition-transform"
+                    >
+                      {p.emoji} + {p.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {currentCls.teams.map(team => {
+                const members = currentCls.students.filter(s => s.teamId === team.id);
+                return (
+                  <div key={team.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-black text-gray-800">{team.emoji} {team.name}</span>
+                      <button onClick={() => updateCls(cls => ({ ...cls, teams: cls.teams.filter(t => t.id !== team.id), students: cls.students.map(s => s.teamId === team.id ? { ...s, teamId: undefined } : s) }))} className="text-red-300 hover:text-red-500 transition-colors p-1">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {members.map(s => <span key={s.id} className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{s.name}</span>)}
+                      {members.length === 0 && <span className="text-xs text-gray-300 italic">Sem membros</span>}
+                    </div>
                   </div>
-                  <button onClick={() => updateCls(c => ({ ...c, mission: null }))} className="text-gray-300 hover:text-red-400 transition-colors p-1"><X size={16} /></button>
+                );
+              })}
+              {currentCls.students.some(s => !s.teamId) && currentCls.teams.length > 0 && (
+                <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100 space-y-2">
+                  <p className="text-xs font-bold text-amber-700">Atribuir equipe:</p>
+                  {currentCls.students.filter(s => !s.teamId).map(s => (
+                    <div key={s.id} className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-gray-700 shrink-0">{s.name}:</span>
+                      {currentCls.teams.map(t => (
+                        <button key={t.id} onClick={() => updateCls(cls => ({ ...cls, students: cls.students.map(x => x.id === s.id ? { ...x, teamId: t.id } : x) }))} className="text-xs bg-white font-bold px-2 py-0.5 rounded-full border border-amber-200 active:scale-95 transition-transform">
+                          {t.emoji} {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center justify-between mt-4 mb-2">
-                  <span className="text-xs font-bold text-gray-500">Progresso da turma</span>
-                  <span className="text-sm font-black text-gray-800 tabular-nums">{Math.min(currentCls.mission.progress, currentCls.mission.goal)} / {currentCls.mission.goal} XP</span>
-                </div>
-                <div className="h-5 bg-gray-100 rounded-full overflow-hidden">
-                  <motion.div
-                    className={`h-full rounded-full ${currentCls.mission.progress >= currentCls.mission.goal ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, (currentCls.mission.progress / currentCls.mission.goal) * 100)}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                  />
-                </div>
-                {currentCls.mission.progress >= currentCls.mission.goal && (
-                  <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-emerald-500 font-black text-center mt-3 text-sm">🎉 MISSÃO CONCLUÍDA! Parabéns à turma!</motion.p>
-                )}
-              </div>
-            ) : (
-              <div className="bg-indigo-50 rounded-2xl p-5 text-center border border-indigo-100">
-                <p className="text-3xl mb-2">🎯</p>
-                <p className="text-sm font-bold text-gray-700">Nenhuma missão ativa esta semana</p>
-                <p className="text-xs text-gray-400 mt-1">Crie uma missão de grupo para motivar a turma</p>
-              </div>
-            )}
-
-            {!editingMission ? (
-              <button onClick={() => setEditingMission(true)} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl text-sm active:scale-[0.98] transition-transform">
-                {currentCls.mission && currentCls.mission.weekKey === wk ? 'Substituir missão' : '+ Nova Missão da Semana'}
-              </button>
-            ) : (
-              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-                <p className="font-black text-gray-900 text-sm">Nova Missão</p>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">Meta de XP coletivo</label>
-                  <input type="number" value={missionGoal} onChange={e => setMissionGoal(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-indigo-400" placeholder="50" min={1} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">Recompensa da turma</label>
-                  <input value={missionReward} onChange={e => setMissionReward(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400" placeholder="Ex: Aula livre 5 min" />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setEditingMission(false)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-2.5 rounded-xl text-sm">Cancelar</button>
-                  <button
-                    onClick={() => {
-                      const goal = parseInt(missionGoal);
-                      if (!goal || goal < 1 || !missionReward.trim()) return;
-                      updateCls(cls => ({ ...cls, mission: { goal, reward: missionReward.trim(), progress: 0, weekKey: wk } }));
-                      setEditingMission(false);
-                      toast.success('🎯 Missão criada!');
-                    }}
-                    className="flex-1 bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm"
-                  >
-                    Criar Missão
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {(currentCls.hallOfFame ?? []).length > 0 && (
-              <div className="space-y-2 mt-2">
-                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">🏛️ Hall da Fama</p>
-                {[...(currentCls.hallOfFame ?? [])].reverse().map((entry, i) => (
-                  <div key={i} className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
-                    <p className="text-xs font-bold text-amber-600 mb-2">Temporada {entry.season} · {new Date(entry.date).toLocaleDateString('pt-BR')}</p>
-                    {entry.top.map((t, j) => (
-                      <div key={j} className="flex items-center justify-between py-0.5">
-                        <span className="text-xs font-bold text-gray-700">{j === 0 ? '🥇' : j === 1 ? '🥈' : j === 2 ? '🥉' : `${j + 1}°`} {t.name}</span>
-                        <span className="text-xs font-black text-amber-600 tabular-nums">{t.xp} XP</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
+              )}
+            </div>
           </motion.div>
         )}
 
         {/* ── Loja ─────────────────────────────────────────────────────────── */}
         {tab === 'loja' && (
           <motion.div key="loja" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Resgatar</p>
             <p className="text-xs text-gray-400 font-medium">Alunos trocam 🪙 corujinhas por privilégios. Selecione um aluno e depois resgate.</p>
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
               {currentCls.students.map(s => (
@@ -11512,13 +11553,13 @@ const GamificacaoScreen = ({
                   <span className={`font-black ${shopStudentId === s.id ? 'text-amber-300' : 'text-amber-500'}`}>🪙{s.coins}</span>
                 </button>
               ))}
-              {currentCls.students.length === 0 && <p className="text-xs text-gray-400 py-1">Adicione alunos em Config.</p>}
+              {currentCls.students.length === 0 && <p className="text-xs text-gray-400 py-1">Adicione alunos na aba Alunos.</p>}
             </div>
             {currentCls.rewards.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
                 <Gift size={36} className="mx-auto text-gray-300" />
                 <p className="mt-2 font-bold">Sem recompensas configuradas</p>
-                <button onClick={() => { setTab('config'); setConfigSection('rewards'); }} className="mt-3 bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-xl">Configurar loja</button>
+                <p className="text-xs mt-1">Adicione recompensas abaixo.</p>
               </div>
             ) : (
               currentCls.rewards.map(r => {
@@ -11548,214 +11589,56 @@ const GamificacaoScreen = ({
                 );
               })
             )}
-          </motion.div>
-        )}
 
-        {/* ── Log ─────────────────────────────────────────────────────────── */}
-        {tab === 'log' && (
-          <motion.div key="log" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-2">
-            {currentCls.log.length === 0 ? (
-              <div className="text-center py-16 text-gray-400">
-                <span className="text-4xl">📜</span>
-                <p className="mt-2 text-sm font-bold">Nenhuma ação registrada ainda</p>
-                <p className="text-xs mt-1">Pontue alunos na aba Alunos para começar.</p>
-              </div>
-            ) : (
-              <>
-                {currentCls.log.slice(0, 60).map(entry => {
-                  const names = entry.studentIds.map(id => currentCls.students.find(s => s.id === id)?.name ?? 'Aluno').join(', ');
-                  return (
-                    <div key={entry.id} className="bg-white rounded-xl p-3 flex items-center gap-3 shadow-sm border border-gray-100">
-                      <span className="text-xl shrink-0">{entry.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-gray-800 truncate">{names}</p>
-                        <p className="text-xs text-gray-500 truncate">{entry.label}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        {entry.kind !== 'purchase' && entry.points !== 0 && (
-                          <p className={`text-xs font-black tabular-nums ${entry.points > 0 ? 'text-emerald-500' : 'text-red-400'}`}>{entry.points > 0 ? '+' : ''}{entry.points} XP</p>
-                        )}
-                        {entry.kind === 'purchase' && (
-                          <p className="text-xs font-black text-amber-500 tabular-nums">-{Math.abs(entry.coins ?? 0)}🪙</p>
-                        )}
-                        <p className="text-[10px] text-gray-300">{new Date(entry.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {currentCls.log.length > 60 && <p className="text-center text-xs text-gray-300 pb-2">Mostrando últimas 60 ações</p>}
-              </>
-            )}
-          </motion.div>
-        )}
-
-        {/* ── Config ─────────────────────────────────────────────────────────── */}
-        {tab === 'config' && (
-          <motion.div key="config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest px-1">Configurar turma</p>
-            <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-1 px-1">
-              {([
-                { id: 'students', label: 'Cadastrar alunos' },
-                { id: 'teams', label: 'Criar equipes' },
-                { id: 'behaviors', label: 'Pontuações' },
-                { id: 'rewards', label: 'Loja' },
-                { id: 'season', label: 'Temporada' },
-              ] as const).map(cs => (
-                <button
-                  key={cs.id}
-                  onClick={() => setConfigSection(cs.id)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${configSection === cs.id ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`}
-                >
-                  {cs.label}
-                </button>
-              ))}
-            </div>
-
-            {configSection === 'students' && (
-              <div className="space-y-2">
-                {/* Modo individual vs. lista em lote */}
-                <div className="flex gap-2 mb-1">
-                  <button onClick={() => { setBulkMode(false); setBulkNames(''); }} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${!bulkMode ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
-                    Um por vez
-                  </button>
-                  <button onClick={() => setBulkMode(true)} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${bulkMode ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
-                    Lista em lote
-                  </button>
+            {/* Configurar recompensas (inline) */}
+            <div className="pt-1 space-y-2">
+              <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Configurar recompensas</p>
+              <p className="text-xs text-gray-400">Recompensas que alunos resgatam com 🪙 corujinhas.</p>
+              {currentCls.rewards.map(r => (
+                <div key={r.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-3 shadow-sm border border-gray-100">
+                  <span className="text-xl">{r.emoji}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-800">{r.label}</p>
+                    <p className="text-xs text-amber-500 font-black">🪙 {r.cost}</p>
+                  </div>
+                  <button onClick={() => updateCls(cls => ({ ...cls, rewards: cls.rewards.filter(x => x.id !== r.id) }))} className="text-red-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
                 </div>
-
-                {!bulkMode ? (
-                  <div className="flex gap-2">
-                    <input
-                      value={newStudentName}
-                      onChange={e => setNewStudentName(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addStudent()}
-                      placeholder="Nome do aluno (Enter para adicionar)"
-                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400"
-                    />
-                    <button onClick={addStudent} className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold">
-                      <Plus size={16} />
-                    </button>
+              ))}
+              {currentCls.rewards.length === 0 && (
+                <button onClick={() => updateCls(cls => ({ ...cls, rewards: GAMI_DEFAULT_REWARDS }))} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm">
+                  + Restaurar recompensas padrão
+                </button>
+              )}
+              <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-200">
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Nova recompensa personalizada</p>
+                <input value={newRewardLabel} onChange={e => setNewRewardLabel(e.target.value)} placeholder="Ex: Jogar jogo no computador..." maxLength={60} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-bold text-gray-400 mb-0.5 block">Custo em 🪙 corujinhas</label>
+                    <input type="number" value={newRewardCost} onChange={e => setNewRewardCost(e.target.value)} min={1} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <textarea
-                      value={bulkNames}
-                      onChange={e => setBulkNames(e.target.value)}
-                      rows={8}
-                      placeholder={"Cole ou escreva os nomes, um por linha:\n\nAna Beatriz\nCarlos Eduardo\nMariana\nPedro Henrique\n..."}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 resize-none bg-white"
-                    />
-                    {(() => {
-                      const names = bulkNames.split('\n').map(n => n.trim()).filter(n => n.length > 0);
-                      const newNames = names.filter(n => !currentCls.students.some(s => s.name.toLowerCase() === n.toLowerCase()));
-                      return (
-                        <button
-                          onClick={() => {
-                            if (newNames.length === 0) return;
-                            updateCls(cls => ({
-                              ...cls,
-                              students: [
-                                ...cls.students,
-                                ...newNames.map(name => ({ id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }))
-                              ]
-                            }));
-                            setBulkNames('');
-                            setBulkMode(false);
-                            toast.success(`${newNames.length} aluno${newNames.length > 1 ? 's' : ''} adicionado${newNames.length > 1 ? 's' : ''}!`);
-                          }}
-                          disabled={newNames.length === 0}
-                          className="w-full bg-indigo-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform"
-                        >
-                          {newNames.length > 0 ? `+ Adicionar ${newNames.length} aluno${newNames.length > 1 ? 's' : ''}` : 'Digite nomes acima'}
-                        </button>
-                      );
-                    })()}
-                    {bulkNames.split('\n').some(n => {
-                      const t = n.trim();
-                      return t.length > 0 && currentCls.students.some(s => s.name.toLowerCase() === t.toLowerCase());
-                    }) && (
-                      <p className="text-[11px] text-amber-600 font-medium px-1">Nomes já cadastrados serão ignorados automaticamente.</p>
-                    )}
-                  </div>
-                )}
-
-                {currentCls.students.length === 0 && (
-                  <p className="text-center text-gray-400 text-sm py-4">Adicione alunos para começar a gamificação.</p>
-                )}
-                {currentCls.students.length > 0 && (
-                  <p className="text-[11px] text-gray-400 px-1">{currentCls.students.length} aluno{currentCls.students.length !== 1 ? 's' : ''} cadastrado{currentCls.students.length !== 1 ? 's' : ''}. Ficam salvos automaticamente.</p>
-                )}
-                {currentCls.students.map(s => (
-                  <div key={s.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{skin[gamiLevel(s.totalXp)]}</span>
-                      <div>
-                        <p className="text-sm font-bold text-gray-800">{s.name}</p>
-                        <p className="text-[10px] text-gray-400">{GAMI_LEVELS[gamiLevel(s.totalXp)].name} · {s.totalXp} XP · 🪙{s.coins}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => removeStudent(s.id)} className="text-red-300 hover:text-red-500 p-1.5 transition-colors"><Trash2 size={14} /></button>
-                  </div>
-                ))}
+                  <button
+                    onClick={() => {
+                      const label = newRewardLabel.trim();
+                      const cost = parseInt(newRewardCost) || 1;
+                      if (!label) return;
+                      updateCls(cls => ({ ...cls, rewards: [...cls.rewards, { id: gamiRid(), label, cost, emoji: '🎁' }] }));
+                      setNewRewardLabel(''); setNewRewardCost('15');
+                      toast.success('Recompensa adicionada!');
+                    }}
+                    className="self-end bg-amber-500 text-white px-4 py-2 rounded-lg font-bold text-sm"
+                  >+ Add</button>
+                </div>
               </div>
-            )}
+            </div>
+          </motion.div>
+        )}
 
-            {configSection === 'teams' && (
-              <div className="space-y-3">
-                {currentCls.teams.length === 0 ? (
-                  <button onClick={() => updateCls(cls => ({ ...cls, teams: GAMI_TEAM_PRESETS.slice(0, 4).map(t => ({ ...t, id: gamiRid() })) }))} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform">
-                    + Criar 4 equipes padrão
-                  </button>
-                ) : (
-                  <div className="flex gap-2 flex-wrap">
-                    {GAMI_TEAM_PRESETS.filter(p => !currentCls.teams.some(t => t.name === p.name)).map(p => (
-                      <button
-                        key={p.name}
-                        onClick={() => updateCls(cls => ({ ...cls, teams: [...cls.teams, { ...p, id: gamiRid() }] }))}
-                        className="flex items-center gap-1 bg-white border border-gray-200 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95 transition-transform"
-                      >
-                        {p.emoji} + {p.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {currentCls.teams.map(team => {
-                  const members = currentCls.students.filter(s => s.teamId === team.id);
-                  return (
-                    <div key={team.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-black text-gray-800">{team.emoji} {team.name}</span>
-                        <button onClick={() => updateCls(cls => ({ ...cls, teams: cls.teams.filter(t => t.id !== team.id), students: cls.students.map(s => s.teamId === team.id ? { ...s, teamId: undefined } : s) }))} className="text-red-300 hover:text-red-500 transition-colors p-1">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {members.map(s => <span key={s.id} className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{s.name}</span>)}
-                        {members.length === 0 && <span className="text-xs text-gray-300 italic">Sem membros</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-                {currentCls.students.some(s => !s.teamId) && currentCls.teams.length > 0 && (
-                  <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100 space-y-2">
-                    <p className="text-xs font-bold text-amber-700">Atribuir equipe:</p>
-                    {currentCls.students.filter(s => !s.teamId).map(s => (
-                      <div key={s.id} className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-gray-700 shrink-0">{s.name}:</span>
-                        {currentCls.teams.map(t => (
-                          <button key={t.id} onClick={() => updateCls(cls => ({ ...cls, students: cls.students.map(x => x.id === s.id ? { ...x, teamId: t.id } : x) }))} className="text-xs bg-white font-bold px-2 py-0.5 rounded-full border border-amber-200 active:scale-95 transition-transform">
-                            {t.emoji} {t.name}
-                          </button>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {configSection === 'behaviors' && (
-              <div className="space-y-2">
+        {/* ── Ajustes ─────────────────────────────────────────────────────────── */}
+        {tab === 'ajustes' && (
+          <motion.div key="ajustes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Pontuações</p>
+            <div className="space-y-2">
                 <p className="text-xs text-gray-400">Ações disponíveis ao pontuar alunos.</p>
                 {currentCls.behaviors.map(b => (
                   <div key={b.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-3 shadow-sm border border-gray-100">
@@ -11793,52 +11676,9 @@ const GamificacaoScreen = ({
                   </div>
                 </div>
               </div>
-            )}
 
-            {configSection === 'rewards' && (
-              <div className="space-y-2">
-                <p className="text-xs text-gray-400">Recompensas que alunos resgatam com 🪙 corujinhas.</p>
-                {currentCls.rewards.map(r => (
-                  <div key={r.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-3 shadow-sm border border-gray-100">
-                    <span className="text-xl">{r.emoji}</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-gray-800">{r.label}</p>
-                      <p className="text-xs text-amber-500 font-black">🪙 {r.cost}</p>
-                    </div>
-                    <button onClick={() => updateCls(cls => ({ ...cls, rewards: cls.rewards.filter(x => x.id !== r.id) }))} className="text-red-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
-                  </div>
-                ))}
-                {currentCls.rewards.length === 0 && (
-                  <button onClick={() => updateCls(cls => ({ ...cls, rewards: GAMI_DEFAULT_REWARDS }))} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm">
-                    + Restaurar recompensas padrão
-                  </button>
-                )}
-                <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-200">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Nova recompensa personalizada</p>
-                  <input value={newRewardLabel} onChange={e => setNewRewardLabel(e.target.value)} placeholder="Ex: Jogar jogo no computador..." maxLength={60} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold text-gray-400 mb-0.5 block">Custo em 🪙 corujinhas</label>
-                      <input type="number" value={newRewardCost} onChange={e => setNewRewardCost(e.target.value)} min={1} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
-                    </div>
-                    <button
-                      onClick={() => {
-                        const label = newRewardLabel.trim();
-                        const cost = parseInt(newRewardCost) || 1;
-                        if (!label) return;
-                        updateCls(cls => ({ ...cls, rewards: [...cls.rewards, { id: gamiRid(), label, cost, emoji: '🎁' }] }));
-                        setNewRewardLabel(''); setNewRewardCost('15');
-                        toast.success('Recompensa adicionada!');
-                      }}
-                      className="self-end bg-amber-500 text-white px-4 py-2 rounded-lg font-bold text-sm"
-                    >+ Add</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {configSection === 'season' && (
-              <div className="space-y-4">
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1 pt-2">Temporada e visual</p>
+            <div className="space-y-4">
                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                   <p className="font-black text-gray-900 mb-1">Temporada {currentCls.season}</p>
                   <p className="text-xs text-gray-500 mb-4">Encerrar salva o pódio no Hall da Fama e zera XP e moedas de todos os alunos. Use no fim do bimestre.</p>
@@ -11861,8 +11701,23 @@ const GamificacaoScreen = ({
                     ))}
                   </div>
                 </div>
+                {(currentCls.hallOfFame ?? []).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">🏛️ Hall da Fama</p>
+                    {[...(currentCls.hallOfFame ?? [])].reverse().map((entry, i) => (
+                      <div key={i} className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+                        <p className="text-xs font-bold text-amber-600 mb-2">Temporada {entry.season} · {new Date(entry.date).toLocaleDateString('pt-BR')}</p>
+                        {entry.top.map((t, j) => (
+                          <div key={j} className="flex items-center justify-between py-0.5">
+                            <span className="text-xs font-bold text-gray-700">{j === 0 ? '🥇' : j === 1 ? '🥈' : j === 2 ? '🥉' : `${j + 1}°`} {t.name}</span>
+                            <span className="text-xs font-black text-amber-600 tabular-nums">{t.xp} XP</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
