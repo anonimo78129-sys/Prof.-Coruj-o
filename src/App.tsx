@@ -930,7 +930,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, p
   // Enquanto o Firestore não respondeu (profileLoaded false), não renderizamos
   // um nome — evita o flash do placeholder antes do nome real chegar.
   const firstName = getDisplayName(profile?.name || '');
-  const headerTitle = profileLoaded === false && !profile?.name ? 'Olá!' : `${firstName}!`;
+  const headerTitle = profileLoaded === false && !profile?.name ? 'Prof. Corujão' : `${firstName}!`;
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
