@@ -393,16 +393,17 @@ const PillTabs = ({ tabs, active, onChange, layoutKey, stretch, className = '' }
           {is && (
             <motion.div
               layoutId={`pill-tabs-${layoutKey}`}
-              className="absolute inset-0 bg-indigo-600 rounded-xl shadow-md"
-              style={{ zIndex: -1 }}
+              className="absolute inset-0 bg-indigo-600 rounded-xl shadow-md z-0"
               transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             />
           )}
-          {t.icon && <t.icon size={13} />}
-          {t.label}
-          {typeof t.badge === 'number' && t.badge > 0 && (
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${is ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{t.badge}</span>
-          )}
+          <span className="relative z-10 flex items-center gap-1.5">
+            {t.icon && <t.icon size={13} />}
+            {t.label}
+            {typeof t.badge === 'number' && t.badge > 0 && (
+              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${is ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{t.badge}</span>
+            )}
+          </span>
         </button>
       );
     })}
