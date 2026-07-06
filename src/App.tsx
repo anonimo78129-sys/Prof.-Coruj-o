@@ -12014,7 +12014,7 @@ const GamificacaoScreen = ({
         </AnimatePresence>
         <button
           onClick={() => setKitExpanded(e => !e)}
-          className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-transform"
+          className="w-full bg-gradient-to-br from-indigo-600 to-indigo-800 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-transform"
         >
           <Zap size={16} />
           <span className="text-sm">Kit ao Vivo</span>
@@ -13819,7 +13819,7 @@ function AppInner() {
                 <button
                   type="submit"
                   disabled={isAuthProcessing}
-                  className={`w-full text-white font-bold py-3 px-6 rounded-xl transition-all ${isAuthProcessing ? 'bg-gray-400 cursor-not-allowed shadow-md' : 'bg-gradient-to-r from-indigo-600 to-violet-600 shadow-lg shadow-indigo-600/30 active:scale-[0.98]'}`}
+                  className={`w-full text-white font-bold py-3 px-6 rounded-xl transition-all ${isAuthProcessing ? 'bg-gray-400 cursor-not-allowed shadow-md' : 'bg-gradient-to-br from-indigo-600 to-indigo-800 shadow-lg shadow-indigo-600/30 active:scale-[0.98]'}`}
                 >
                   {isAuthProcessing ? 'Processando...' : (isResetMode ? 'Enviar link' : (isLoginMode ? 'Entrar' : 'Cadastrar'))}
                 </button>
