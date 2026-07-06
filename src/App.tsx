@@ -11284,6 +11284,7 @@ const GamificacaoScreen = ({
       <PillTabs
         layoutKey="gami"
         className="mb-4"
+        stretch
         tabs={[
           { id: 'alunos', label: 'Alunos', icon: Users },
           { id: 'equipes', label: 'Equipes', icon: Trophy },
