@@ -688,7 +688,7 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
     <div className={`flex justify-between items-start ${typeof bannerImage === 'string' || bannerPlaceholder ? 'pt-28' : 'pt-2'}`}>
       <div className="px-2">
         <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
-        <h1 className="text-2xl font-black text-gray-900 drop-shadow-sm">{title}</h1>
+        <h1 className="text-2xl font-black text-gray-900">{title}</h1>
       </div>
       <div className="flex gap-3 relative">
         {children}
