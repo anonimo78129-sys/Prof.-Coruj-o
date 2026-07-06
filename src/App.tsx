@@ -373,7 +373,7 @@ const DynamicIcon = ({ name, size = 20, color = 'currentColor', className = '', 
 
 // Seletor padrão do app: trilho branco com pílulas, a ativa preenchida de índigo
 // (mesmo estilo das abas do Painel Admin). Use em abas e filtros de tela.
-const PillTabs = ({ tabs, active, onChange, layoutKey, stretch, className = '' }: {
+const PillTabs = ({ tabs, active, onChange, layoutKey, className = '' }: {
   tabs: { id: string; label: string; icon?: any; badge?: number }[];
   active: string;
   onChange: (id: string) => void;
@@ -388,7 +388,7 @@ const PillTabs = ({ tabs, active, onChange, layoutKey, stretch, className = '' }
         <button
           key={t.id}
           onClick={() => onChange(t.id)}
-          className={`relative ${stretch ? 'flex-1' : 'flex-none'} px-3 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 ${is ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`relative flex-1 min-w-max px-3 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 ${is ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
         >
           {is && (
             <motion.div
