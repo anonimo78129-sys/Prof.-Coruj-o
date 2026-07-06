@@ -2760,7 +2760,7 @@ const PlannerScreen = ({
   };
 
   const exportPPTX = async () => {
-    if (!presentationData) return;
+    if (!presentationData || isExporting) return;
     setIsExporting(true);
     try {
       const { default: pptxgen } = await import('pptxgenjs');
@@ -2837,11 +2837,12 @@ const PlannerScreen = ({
       );
       const addSlideImage = (slide: any, url: string, opts: any) => {
         const dataUrl = imageCache.get(url);
-        if (dataUrl) {
-          slide.addImage({ data: dataUrl, ...opts });
-        } else {
-          slide.addImage({ path: url, ...opts });
-        }
+        // Se a imagem não pôde ser baixada em base64 (CORS/hotlink), NÃO usamos
+        // `path: url` como fallback: o pptxgen tentaria buscar a URL ao gerar o
+        // arquivo e uma única falha derruba o PPTX inteiro. Melhor um slide sem a
+        // imagem do que um download que falha.
+        if (!dataUrl) return;
+        slide.addImage({ data: dataUrl, ...opts });
       };
 
       // Pre-render every icon used in topics/stats to white PNGs (sit on colored circles).
