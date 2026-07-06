@@ -2819,7 +2819,7 @@ const PlannerScreen = ({
         // Número do slide — canto inferior esquerdo, muito discreto
         slide.addText(`${slideNum} / ${totalSlides}`, { x: 0.15, y: 5.22, w: 0.8, h: 0.22, fontSize: 7, color: fg, align: 'left' as const, transparency: 35 });
         // Marca d'água "Prof. Corujão" — canto inferior direito, discreta
-        slide.addText('Prof. Corujão', { x: 7.25, y: 5.22, w: 2.6, h: 0.22, fontSize: 7, color: darkBg ? 'FFFFFF' : 'B0B7C3', transparency: darkBg ? 35 : 45, italic: true, align: 'right' as const, fontFace: 'Calibri' });
+        slide.addText('Prof. Corujão', { x: 7.25, y: 5.22, w: 2.6, h: 0.22, fontSize: 7, color: darkBg ? 'FFFFFF' : 'B0B7C3', transparency: darkBg ? 35 : 45, italic: true, align: 'right' as const, fontFace: FONT_B });
       };
 
       // Pre-fetch all images as base64 to avoid CORS failures when pptxgenjs
@@ -2857,6 +2857,24 @@ const PlannerScreen = ({
       // Cabeçalho consistente: eyebrow (rótulo) + título + traço de acento.
       // Title uses INK (dark slate) for light-bg slides — readable regardless of user's chosen primary colour.
       // region {x,w} confines the header to a column so it never overlaps a side image.
+      // Títulos: os marcadores ==destaque==/[[termo]]/**bold** vazavam LITERAIS
+      // nos títulos (só o corpo passava pelo parser rico). Agora viram runs:
+      // ==x== ganha a cor de acento, [[x]] a cor primária; {Icon}/(Icon) somem.
+      const stripIconTokens = (t: string) => (t || '').replace(/\{[A-Za-z0-9]+\}\s*/g, '').replace(/\(([A-Z][a-zA-Z0-9]+)\)\s*/g, '');
+      const cleanTitleText = (t: string) => stripIconTokens(t).replace(/\*+/g, '').replace(/==/g, '').replace(/\[\[|\]\]/g, '').trim();
+      const titleRuns = (t: string, baseColor: string): any[] => {
+        const parts = stripIconTokens(t).split(/(\*\*[^*\n]+\*\*|==[^=\n]+==|\[\[[^\]\n]+\]\])/g);
+        const runs: any[] = [];
+        parts.forEach(pt => {
+          if (!pt) return;
+          if (/^\*\*[^*\n]+\*\*$/.test(pt)) runs.push({ text: pt.slice(2, -2), options: { color: baseColor } });
+          else if (/^==[^=\n]+==$/.test(pt)) runs.push({ text: pt.slice(2, -2), options: { color: ac } });
+          else if (/^\[\[[^\]\n]+\]\]$/.test(pt)) runs.push({ text: pt.slice(2, -2), options: { color: pc } });
+          else { const c = pt.replace(/\*+/g, '').replace(/==+/g, ''); if (c) runs.push({ text: c, options: { color: baseColor } }); }
+        });
+        return runs.length ? runs : [{ text: cleanTitleText(t), options: { color: baseColor } }];
+      };
+
       const addHeader = (slide: any, kicker: string | undefined, title: string, darkBg = false, region?: { x: number; w: number }) => {
         const hx = region?.x ?? LEFT;
         const hw = region?.w ?? (9.0 - LEFT);
@@ -2867,7 +2885,7 @@ const PlannerScreen = ({
         const titleY = hasKick ? 0.74 : 0.5;
         // Use high-contrast INK for light-background slides; white for dark-background slides
         const titleColor = darkBg ? 'FFFFFF' : INK;
-        slide.addText(title || '', { x: hx, y: titleY, w: hw, h: 0.85, fontSize: 30, color: titleColor, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
+        slide.addText(titleRuns(title || '', titleColor), { x: hx, y: titleY, w: hw, h: 0.85, fontSize: 30, color: titleColor, bold: true, fontFace: FONT_T, valign: 'top', fit: 'shrink' as const });
         // Bar BELOW the title box (box ends at titleY+0.85; bar at +0.90 = 0.05" gap).
         // Previously at +0.78 (inside the box) which caused the bar to cross the 2nd line.
         slide.addShape(pres.ShapeType.rect, { x: hx, y: titleY + 0.90, w: 0.9, h: 0.055, fill: { color: ac } });
@@ -2897,14 +2915,14 @@ const PlannerScreen = ({
           // Title: single box at fontSize 36, valign:top, fit:shrink.
           // coverBarY is estimated from char count so the bar never overlaps the title text.
           // At 36pt in 4.7" width, roughly 18 chars fit per line; each line ≈ 0.62" tall.
-          const rawCoverTitle = (slideData.data.title || '').trim();
+          const rawCoverTitle = cleanTitleText(slideData.data.title || '');
           const ctEstLines = Math.max(1, Math.min(Math.ceil(rawCoverTitle.length / 18), 4));
           const ctLineH = 0.62; // 36pt × 1.2 line-spacing / 72pt-per-inch ≈ 0.60"
           const ctTitleBoxH = ctEstLines * ctLineH + 0.06; // small buffer so shrink stays slight
           const coverBarY = parseFloat((0.86 + ctTitleBoxH + 0.08).toFixed(2)); // 0.08" gap after box
           slide.addText(rawCoverTitle, { x: 0.5, y: 0.86, w: 4.7, h: ctTitleBoxH, fontSize: 36, fontFace: FONT_T, color: 'FFFFFF', bold: true, align: 'left', valign: 'top', charSpacing: -0.5, ...shrink });
           slide.addShape(pres.ShapeType.rect, { x: 0.55, y: coverBarY, w: 1.2, h: 0.06, fill: { color: ac } });
-          slide.addText(slideData.data.subtitle || '', { x: 0.55, y: coverBarY + 0.16, w: 4.6, h: 0.55, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
+          slide.addText(cleanTitleText(slideData.data.subtitle || ''), { x: 0.55, y: coverBarY + 0.16, w: 4.6, h: 0.55, fontSize: 14, fontFace: FONT_B, color: 'E2E8F0', align: 'left', ...shrink });
           slide.addText(`${teacherLabel ? `Prof. ${teacherLabel}` : ''}${schoolLabel ? `  ·  ${schoolLabel}` : ''}`.trim(), { x: 0.55, y: 5.05, w: 4.6, h: 0.35, fontSize: 9, fontFace: FONT_B, color: 'A5B4FC', align: 'left' });
 
           if (slideData.data.imageUrl) {
@@ -2938,14 +2956,16 @@ const PlannerScreen = ({
           const ctKickerY = 0.34;
           const ctTitleY = ctHasKick ? ctKickerY + 0.28 : ctKickerY;
           if (ctHasKick) slide.addText(kicker!.toUpperCase(), { x: LEFT, y: ctKickerY, w: 9.0 - LEFT, h: 0.26, fontSize: 11, color: ac, bold: true, charSpacing: 3, fontFace: FONT_B });
-          slide.addText(slideData.data.title || '', { x: LEFT, y: ctTitleY, w: 9.0 - LEFT, h: 0.62, fontSize: 30, color: INK, bold: true, fontFace: FONT_T, valign: 'top', ...shrink });
+          slide.addText(titleRuns(slideData.data.title || '', INK), { x: LEFT, y: ctTitleY, w: 9.0 - LEFT, h: 0.62, fontSize: 30, color: INK, bold: true, fontFace: FONT_T, valign: 'top', ...shrink });
           // Bar BELOW the 0.62" title box (box ends at ctTitleY+0.62; bar at +0.66 = 0.04" gap).
           slide.addShape(pres.ShapeType.rect, { x: LEFT, y: ctTitleY + 0.66, w: 0.9, h: 0.055, fill: { color: ac } });
           const ctBodyY = ctTitleY + 0.80;
-          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: 13 });
-          slide.addText(parsedText, { x: LEFT, y: ctBodyY, w: 9.0 - LEFT, h: 1.05, valign: 'top', align: 'left', lineSpacing: 22, ...shrink });
+          // Sem imagem embutível, o texto ocupa a área toda (antes sobravam ~2.9" vazias)
+          const ctHasImg = !!(slideData.data.imageUrl && imageCache.get(slideData.data.imageUrl));
+          const parsedText = parseMarkdown(slideData.data.text || '', { ...bodyOpts, fontSize: ctHasImg ? 13 : 15 });
+          slide.addText(parsedText, { x: LEFT, y: ctBodyY, w: 9.0 - LEFT, h: ctHasImg ? 1.05 : 5.05 - ctBodyY, valign: 'top', align: 'left', lineSpacing: ctHasImg ? 22 : 26, ...shrink });
           const ctImgY = ctBodyY + 1.15;
-          if (slideData.data.imageUrl) {
+          if (ctHasImg) {
             const ctImgH = 5.22 - ctImgY;
             addSlideImage(slide, slideData.data.imageUrl, { x: LEFT, y: ctImgY, w: 9.0 - LEFT, h: ctImgH, sizing: { type: 'cover', w: 9.0 - LEFT, h: ctImgH }, shadow: imgShadow });
           }
@@ -3049,13 +3069,20 @@ const PlannerScreen = ({
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_FULL_IMAGE') {
-          slide.background = { color: '111111' };
-          if (slideData.data.imageUrl) {
+          // Sem imagem embutível, o slide não fica preto vazio: usa a cor primária
+          // com círculos decorativos suaves (visual intencional, não "quebrado").
+          const fiHasImg = !!(slideData.data.imageUrl && imageCache.get(slideData.data.imageUrl));
+          if (fiHasImg) {
+            slide.background = { color: '111111' };
             addSlideImage(slide, slideData.data.imageUrl, { x: 0, y: 0, w: 10, h: 5.63, sizing: { type: 'cover', w: 10, h: 5.63 } });
+            // Dark gradient overlay via semi-transparent rect
+            slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.43, fill: { color: '000000', transparency: 25 } });
+            slide.addShape(pres.ShapeType.rect, { x: 0, y: 3.5, w: 10, h: 2.13, fill: { color: '000000', transparency: 10 } });
+          } else {
+            slide.background = { color: pc };
+            slide.addShape(pres.ShapeType.ellipse, { x: 6.8, y: -1.4, w: 4.6, h: 4.6, fill: { color: 'FFFFFF', transparency: 88 } });
+            slide.addShape(pres.ShapeType.ellipse, { x: -1.6, y: 3.4, w: 4.0, h: 4.0, fill: { color: 'FFFFFF', transparency: 92 } });
           }
-          // Dark gradient overlay via semi-transparent rect
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 2.2, w: 10, h: 3.43, fill: { color: '000000', transparency: 25 } });
-          slide.addShape(pres.ShapeType.rect, { x: 0, y: 3.5, w: 10, h: 2.13, fill: { color: '000000', transparency: 10 } });
           // Left accent bar
           slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 0.12, h: 5.63, fill: { color: ac } });
           // Eyebrow above title
@@ -3063,7 +3090,7 @@ const PlannerScreen = ({
           // Accent line above title
           slide.addShape(pres.ShapeType.rect, { x: 0.55, y: kicker ? 3.32 : 3.2, w: 1.0, h: 0.07, fill: { color: ac } });
           // Title
-          slide.addText(slideData.data.title || '', { x: 0.5, y: kicker ? 3.45 : 3.35, w: 9, h: 1.2, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: FONT_T, valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000' }, ...shrink });
+          slide.addText(titleRuns(slideData.data.title || '', 'FFFFFF'), { x: 0.5, y: kicker ? 3.45 : 3.35, w: 9, h: 1.2, fontSize: 40, color: 'FFFFFF', bold: true, fontFace: FONT_T, valign: 'middle', shadow: { type: 'outer', blur: 8, offset: 2, angle: 45, color: '000000' }, ...shrink });
           // Subtitle
           if (slideData.data.subtitle) {
             slide.addText(slideData.data.subtitle, { x: 0.55, y: 4.75, w: 9, h: 0.4, fontSize: 15, color: 'E2E8F0', fontFace: FONT_B, shadow: { type: 'outer', blur: 4, offset: 1, angle: 45, color: '000000' }, ...shrink });
@@ -3110,13 +3137,14 @@ const PlannerScreen = ({
 
         } else if (slideData.layoutID === 'LAYOUT_TIMELINE') {
           slide.background = { color: bg };
-          addHeader(slide, kicker, slideData.data.title || '', false);
+          const tlStartY = addHeader(slide, kicker, slideData.data.title || '', false);
 
           const events = (slideData.data.events || []).slice(0, 5);
           if (events.length > 0) {
             const cols = events.length;
             const colW = (9.0 - LEFT) / cols;
-            const lineY = 2.55;
+            // O ano fica 1.0" acima da linha — ancorar no fim do cabeçalho evita colisão com o título
+            const lineY = Math.max(2.55, tlStartY + 1.0);
             // Horizontal timeline line
             slide.addShape(pres.ShapeType.rect, { x: LEFT + colW * 0.5, y: lineY, w: colW * (cols - 1), h: 0.05, fill: { color: ac, transparency: 30 } });
             events.forEach((ev: any, i: number) => {
