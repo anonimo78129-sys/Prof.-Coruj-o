@@ -2025,11 +2025,17 @@ const buildDocx = async (
       { label: 'REFERÊNCIAS', keys: ['REFERÊNCIAS', 'REFERENCIAS'] },
     ];
 
+    const sectionBox = {
+      top: { style: BorderStyle.SINGLE, size: 4, color: ac },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: ac },
+      left: { style: BorderStyle.SINGLE, size: 4, color: ac },
+      right: { style: BorderStyle.SINGLE, size: 4, color: ac },
+    };
     for (const { label, keys } of secDefs) {
       const content = get(...keys);
       docChildren.push(new Paragraph({
-        children: [new TextRun({ text: label, bold: true, size: 22, color: 'FFFFFF' })],
-        shading: { fill: ac, type: ShadingType.CLEAR, color: 'auto' },
+        children: [new TextRun({ text: label, bold: true, size: 22, color: dk })],
+        border: sectionBox,
         spacing: { before: 140, after: 60 },
         indent: { left: 80, right: 80 },
       }));
@@ -2081,8 +2087,13 @@ const buildDocx = async (
 
       if (line.startsWith('## ')) {
         docChildren.push(new Paragraph({
-          children: [new TextRun({ text: line.slice(3), bold: true, color: 'FFFFFF', size: 24 })],
-          shading: { fill: ac, type: ShadingType.CLEAR, color: 'auto' },
+          children: [new TextRun({ text: line.slice(3), bold: true, color: dk, size: 24 })],
+          border: {
+            top: { style: BorderStyle.SINGLE, size: 4, color: ac },
+            bottom: { style: BorderStyle.SINGLE, size: 4, color: ac },
+            left: { style: BorderStyle.SINGLE, size: 4, color: ac },
+            right: { style: BorderStyle.SINGLE, size: 4, color: ac },
+          },
           spacing: { before: 200, after: 100 },
           indent: { left: 80, right: 80 },
         }));
@@ -2246,7 +2257,23 @@ const sanitizeSlideData = (parsed: any): any => {
 // Generic blob download — appends a temporary <a> to document.body so the
 // browser treats it as a real anchor click (avoids the "ghost click" problem
 // where some browsers silently block programmatic downloads after the first).
-const downloadBlob = (blob: Blob, filename: string): void => {
+const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
+  // Em PWA no celular (standalone) o download de blob via <a download> é
+  // frequentemente bloqueado em silêncio. Tentamos primeiro o menu nativo de
+  // compartilhar/salvar (Arquivos, Drive, etc.), que funciona no mobile.
+  try {
+    const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+    const nav = navigator as any;
+    if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+      await nav.share({ files: [file], title: filename });
+      return;
+    }
+  } catch (e: any) {
+    // Usuário cancelou o menu de compartilhamento → não cai no fallback
+    if (e?.name === 'AbortError') return;
+    // Qualquer outro erro → tenta o download clássico abaixo
+  }
+  // Fallback (desktop e navegadores sem Web Share de arquivos)
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -2260,8 +2287,6 @@ const downloadBlob = (blob: Blob, filename: string): void => {
     URL.revokeObjectURL(url);
   }, 30_000);
 };
-
-const downloadDocx = (blob: Blob, filename: string): void => downloadBlob(blob, filename);
 
 const buildDocHtml = (
   rawMd: string,
@@ -3175,7 +3200,7 @@ const PlannerScreen = ({
       const repaired = await repairPptxContentTypes(rawBlob);
       const blob = new Blob([repaired], { type: PPTX_MIME });
       const safeName = presentationData.presentationTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'Apresentacao';
-      downloadBlob(blob, `Aula_${safeName}.pptx`);
+      await downloadBlob(blob, `Aula_${safeName}.pptx`);
     } catch (e) {
       console.error(e);
       toast.error('A apresentação não saiu dessa vez. Confere a conexão e tenta de novo.');
@@ -3493,7 +3518,7 @@ const PlannerScreen = ({
                           });
                           const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
                           const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                          downloadBlob(blob, filename);
+                          await downloadBlob(blob, filename);
                         } catch (e) {
                           console.error('Erro ao exportar Word:', e);
                           toast.error('O documento Word fugiu! Tenta gerar de novo.');
@@ -14112,10 +14137,10 @@ ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteú
 
 **Questão 1 (${mcPts} pts)** [enunciado claro e objetivo]
 
-( ) A) [alternativa incorreta]
-( ) B) [alternativa correta]
-( ) C) [alternativa incorreta]
-( ) D) [alternativa incorreta]
+( ) A) [alternativa plausível]
+( ) B) [alternativa plausível]
+( ) C) [alternativa plausível]
+( ) D) [alternativa plausível]
 
 **Questão 2 (${mcPts} pts)** [enunciado]
 
@@ -14182,7 +14207,10 @@ _______________________________________________________________________________
 **Q6:** [elementos essenciais esperados na resposta: liste 2-3 pontos chave]
 **Q7:** [elementos essenciais esperados na resposta: liste 2-3 pontos chave]
 
-REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`
+REGRAS CRÍTICAS:
+- A resposta correta aparece SOMENTE na seção GABARITO (após ---GABARITO---). Na Parte I, as 4 alternativas de cada questão devem ser TODAS plausíveis, SEM nenhuma marca, asterisco, negrito, "(correta)", nem qualquer pista de qual é a certa.
+- Distribua a alternativa correta aleatoriamente entre A, B, C e D ao longo das 5 questões (não deixe sempre na mesma letra).
+- Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`
           : `Você é um professor especialista. Gere ${plannerQuestionCount} QUESTÕES sobre "${targetTopic}" para a turma "${className}" (nível: ${complexityLabel}).
 Tipo de questão: ${qtInstruction}
 
