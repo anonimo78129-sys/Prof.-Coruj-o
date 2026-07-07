@@ -14217,7 +14217,9 @@ ${avaliacaoBlock}
 ## REFERÊNCIAS
 [2 ou 3 referências bibliográficas em formato ABNT${isEarlyChildhood ? ' — inclua documentos BNCC e Referencial Curricular Nacional para Educação Infantil (RCNEI)' : ''}]`;
 
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+      // Plano de aula exige raciocínio pedagógico real (sequência didática,
+      // BNCC, adequação de nível) — vale a pena um orçamento extra de "pensar antes de responder".
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
       const planDraft = response.text || '';
 
       // ── Validação local determinística das habilidades BNCC ──────────────
@@ -14259,7 +14261,9 @@ ${avaliacaoBlock}
 
       if (type === 'slides') {
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount, selectedClass?.level);
-        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+        // Coreografia de layouts + planejamento do arco do deck se beneficiam de
+        // um orçamento extra de raciocínio antes de responder.
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
         const firstBrace = text.indexOf('{');
