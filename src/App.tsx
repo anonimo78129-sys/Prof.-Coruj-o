@@ -9720,16 +9720,16 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const HpBox = ({ side, corner }: { side: 0 | 1; corner: string }) => (
     <div className={`absolute ${corner} w-[46%] bg-[#f8f0dc] rounded-xl border-2 border-[#5a4a3a] px-2.5 py-1.5 z-10 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_8px_rgba(0,0,0,0.4)]`}>
       <div className="flex items-center justify-between gap-1">
-        <p className="font-black text-[#3a3020] text-sm truncate">{fighters[side].emoji} {fighters[side].name}</p>
-        {hp[side] <= TEAM_MAX / 2 && hp[side] > 0 && <span className="text-[8px] font-black text-red-600 animate-pulse shrink-0">FÚRIA +2</span>}
+        <p className="font-pixel text-[#3a3020] text-[10px] truncate leading-tight">{fighters[side].emoji} {fighters[side].name}</p>
+        {hp[side] <= TEAM_MAX / 2 && hp[side] > 0 && <span className="font-pixel text-[7px] text-red-600 animate-pulse shrink-0">FÚRIA +2</span>}
       </div>
       <div className="flex items-center gap-1 mt-1">
-        <span className="text-[8px] font-black text-[#c8641e] tracking-wider">HP</span>
+        <span className="font-pixel text-[7px] text-[#c8641e]">HP</span>
         <div className="flex-1 h-2 bg-[#4a3f30] rounded-full overflow-hidden border border-[#5a4a3a]">
           <div className="h-full rounded-full" style={{ width: `${(hp[side] / TEAM_MAX) * 100}%`, backgroundColor: hpColor(hp[side]), transition: 'width 0.45s ease, background-color 0.45s ease' }} />
         </div>
       </div>
-      <p className="text-right text-[11px] font-black text-[#3a3020] tabular-nums mt-0.5">{hp[side]}/{TEAM_MAX}</p>
+      <p className="text-right font-pixel text-[9px] text-[#3a3020] tabular-nums mt-1">{hp[side]}/{TEAM_MAX}</p>
     </div>
   );
 
@@ -9799,7 +9799,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   // Tema retrô (GBA) da batalha: arena verde-campo, painel azul profundo e
   // caixas creme — paleta própria, deliberadamente distinta do modo palco.
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col" style={{ fontFamily: "'Pixelify Sans', 'Courier New', monospace" }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
       {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras */}
       <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 48px 48px; } }`}</style>
       {/* ── Arena (tela cheia, clara) ── */}
@@ -9807,7 +9807,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
             <div className="absolute inset-0 pointer-events-none opacity-70" style={{ backgroundImage: 'repeating-linear-gradient(180deg, rgba(255,255,255,0.10) 0 26px, rgba(0,0,0,0.04) 26px 52px)' }} />
             <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.13) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0.13) 75%, transparent 75%, transparent 100%)', backgroundSize: '48px 48px', animation: 'gami-battle-stripes 3s linear infinite' }} />
             <button onClick={onClose} className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-[#1e3a2a]/85 text-emerald-100 border-2 border-emerald-100/30 rounded-lg px-3 py-1.5 text-[11px] font-black tracking-widest active:scale-95 transition-transform">
-              <X size={13} /> SAIR
+              <X size={13} /> <span className="font-pixel text-[9px]">SAIR</span>
             </button>
             {HpBox({ side: 1, corner: 'top-4 left-4' })}
             {HpBox({ side: 0, corner: 'bottom-4 right-4' })}
@@ -9828,7 +9828,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   >
                     <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
                     {phase !== 'intro' && turn === side && winner === null && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-widest text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-0.5 rounded-full whitespace-nowrap">Sua vez</span>
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
                     )}
                   </div>
                   <div className="-mt-4">
@@ -9872,9 +9872,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
             {phase === 'intro' && (
               <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/45">
                 <div className="flex items-center gap-4 px-4">
-                  <motion.p initial={{ x: -90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="text-white font-black text-lg text-right leading-tight max-w-[38%]">{fighters[0].emoji} {fighters[0].name}</motion.p>
-                  <motion.span initial={{ scale: 3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.35, type: 'spring', damping: 12 }} className="text-4xl font-black text-amber-400" style={{ textShadow: '0 0 26px rgba(251,191,36,0.8)' }}>VS</motion.span>
-                  <motion.p initial={{ x: 90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="text-white font-black text-lg leading-tight max-w-[38%]">{fighters[1].emoji} {fighters[1].name}</motion.p>
+                  <motion.p initial={{ x: -90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="font-pixel text-white text-[11px] text-right leading-relaxed max-w-[38%]">{fighters[0].emoji} {fighters[0].name}</motion.p>
+                  <motion.span initial={{ scale: 3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.35, type: 'spring', damping: 12 }} className="font-pixel text-3xl text-amber-400" style={{ textShadow: '0 0 26px rgba(251,191,36,0.8)' }}>VS</motion.span>
+                  <motion.p initial={{ x: 90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="font-pixel text-white text-[11px] leading-relaxed max-w-[38%]">{fighters[1].emoji} {fighters[1].name}</motion.p>
                 </div>
               </div>
             )}
@@ -9891,12 +9891,12 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       <Crown size={15} className="text-amber-900" />
                     </span>
                   </div>
-                  <h3 className="text-lg font-black text-[#3a3020]">{fighters[winner].name} venceu a batalha!</h3>
+                  <h3 className="font-pixel text-xs text-[#3a3020] leading-relaxed">{fighters[winner].name} venceu a batalha!</h3>
                   <div className="space-y-1.5 mt-3">
                     {([winner, (1 - winner) as 0 | 1]).map((i, pos) => (
                       <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-xl border-2 ${pos === 0 ? 'bg-amber-100 border-amber-500/60' : 'bg-[#efe5cc] border-[#5a4a3a]/30'}`}>
                         <span className="font-bold text-[#3a3020] text-xs">{pos === 0 ? '🏆' : '💔'} {fighters[i].emoji} {fighters[i].name}</span>
-                        <span className="font-black text-[#3a3020] text-xs tabular-nums">{hp[i]}/{TEAM_MAX} HP</span>
+                        <span className="font-pixel text-[#3a3020] text-[9px] tabular-nums">{hp[i]}/{TEAM_MAX} HP</span>
                       </div>
                     ))}
                   </div>
@@ -9911,8 +9911,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   )}
                   {awarded && <p className="text-emerald-700 text-sm font-bold mt-3">XP entregue! ✓</p>}
                   <div className="flex justify-center gap-6 mt-4">
-                    <button onClick={startBattle} className="text-[#8a5a1a] font-black text-sm"><Swords size={14} className="inline -mt-0.5 mr-1" />Revanche</button>
-                    <button onClick={() => setPhase('setup')} className="text-[#7a2a2a] font-black text-sm"><RotateCcw size={14} className="inline -mt-0.5 mr-1" />Nova batalha</button>
+                    <button onClick={startBattle} className="font-pixel text-[#8a5a1a] text-[9px] flex items-center gap-1.5"><Swords size={13} />Revanche</button>
+                    <button onClick={() => setPhase('setup')} className="font-pixel text-[#7a2a2a] text-[9px] flex items-center gap-1.5"><RotateCcw size={13} />Nova batalha</button>
                   </div>
                 </div>
               </div>
@@ -9922,10 +9922,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       {inBattle && (
         <div className="bg-[#3d4a7d] border-t-4 border-[#2c3763] px-3 pt-3 pb-6 shrink-0">
           <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3.5 min-h-[71px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
-            <p className="text-lg font-bold text-[#3a3020] leading-snug">
+            <p className="font-vt text-xl text-[#3a3020] leading-snug">
               {phase === 'intro' ? `${fighters[0].name} desafia ${fighters[1].name}! Que vença o conhecimento! ⚔️`
                 : phase === 'anim' ? msg
-                : current ? <>{current.q} <span className="block text-[13px] font-black uppercase tracking-widest text-[#8a7a5a] mt-1">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
+                : current ? <>{current.q} <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
             </p>
           </div>
           {current && phase !== 'intro' && (
@@ -9944,8 +9944,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all active:translate-y-0.5 active:shadow-none border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
                     style={{ backgroundColor: isWrongPick ? '#7f1d1d' : palette[i] }}
                   >
-                    <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center text-sm font-black text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
-                    <p className="flex-1 text-base font-black text-white leading-tight">{opt}</p>
+                    <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
+                    <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
                     {isCorrect && <span className="shrink-0 text-white font-black">✓</span>}
                     {isWrongPick && <span className="shrink-0 text-white font-black">✗</span>}
                   </button>
