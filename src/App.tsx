@@ -11,7 +11,7 @@ import {
   BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
   Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
-  Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, MonitorPlay, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
+  Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
   Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
 } from 'lucide-react';
@@ -8689,7 +8689,6 @@ interface ClassGamification {
   hallOfFame: GamiHallEntry[];
   mission?: GamiMission | null;
   missionDoneWeek?: string;
-  customEvents?: string[];
   skin: 'coruja' | 'emblema';
   soundOn: boolean;
 }
@@ -8752,24 +8751,6 @@ const GAMI_TEAM_PRESETS = [
   { name: 'Águias',   emoji: '🦅', color: '#f59e0b' },
   { name: 'Lobos',    emoji: '🐺', color: '#8b5cf6' },
 ];
-const GAMI_EVENTS: { text: string; emoji: string; quick?: number }[] = [
-  { text: 'Dia da Gentileza: pontos em dobro para quem ajudar um colega hoje!', emoji: '💜' },
-  { text: 'Quem trouxe todo o material hoje ganha pontos!', emoji: '🎒', quick: 2 },
-  { text: 'Desafio do Silêncio: 10 minutos de trabalho concentrado valem pontos para a turma toda.', emoji: '🤫' },
-  { text: 'Hoje é dia de elogiar: cada elogio sincero a um colega vale ponto extra.', emoji: '🌟' },
-  { text: 'Mesa organizada no fim da aula = pontos para a equipe!', emoji: '🧹' },
-  { text: 'Pergunta de Ouro: quem fizer a melhor pergunta da aula ganha pontos em dobro.', emoji: '❓' },
-  { text: 'Dia do Capricho: trabalhos com capricho extra valem pontos a mais.', emoji: '✍️' },
-  { text: 'Toda a turma chegou no horário? Pontos para todos!', emoji: '⏰', quick: 1 },
-  { text: 'Hoje quem lê em voz alta ganha ponto de coragem.', emoji: '📖' },
-  { text: 'Modo Espião: o professor vai observar em segredo quem mais colabora hoje.', emoji: '🕵️' },
-  { text: 'Dia da Dupla: trabalhem em duplas. As duplas que terminarem juntas ganham pontos.', emoji: '👥' },
-  { text: 'Energia positiva: a equipe mais animada (sem bagunça!) ganha pontos no fim da aula.', emoji: '🎉' },
-  { text: 'Quem usar a palavra mágica do dia em uma frase correta ganha ponto!', emoji: '🪄' },
-  { text: 'Recorde da turma: superem o número de participações da última aula e todos ganham!', emoji: '🏆' },
-  { text: 'Dia do Mestre Ajudante: quem explicar algo para um colega ganha pontos de mestre.', emoji: '🎓' },
-  { text: 'Sorteio surpresa no fim da aula entre quem completou tudo!', emoji: '🎁' },
-];
 
 const gamiRid = () => Math.random().toString(36).slice(2, 10);
 const gamiWeekKey = () => {
@@ -8823,7 +8804,6 @@ const gamiDefaultClass = (classId: string): ClassGamification => ({
   weekKey: gamiWeekKey(),
   hallOfFame: [],
   mission: null,
-  customEvents: [],
   skin: 'coruja',
   soundOn: true,
 });
@@ -9458,94 +9438,6 @@ const GamiPlacar = ({ teams, onClose }: { teams: GamiTeam[]; onClose: () => void
   );
 };
 
-const GamiEvento = ({ customEvents, onClose, onQuickAward }: { customEvents: string[]; onClose: () => void; onQuickAward: (points: number, label: string) => void }) => {
-  const bank = [...GAMI_EVENTS, ...customEvents.map(text => ({ text, emoji: '🎲' as string, quick: undefined as number | undefined }))];
-  const [result, setResult] = useState<{ text: string; emoji: string; quick?: number } | null>(null);
-  const [spinning, setSpinning] = useState(false);
-  const [display, setDisplay] = useState<{ text: string; emoji: string } | null>(null);
-  const [applied, setApplied] = useState(false);
-  const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
-  const spin = () => {
-    if (spinning) return;
-    setSpinning(true); setResult(null); setApplied(false);
-    let n = 0;
-    const tick = () => {
-      if (!alive.current) return;
-      setDisplay(bank[Math.floor(Math.random() * bank.length)]);
-      n++;
-      if (n >= 16) {
-        const r = bank[Math.floor(Math.random() * bank.length)];
-        setDisplay(r); setResult(r); setSpinning(false); playChime(true);
-        return;
-      }
-      setTimeout(tick, 50 + n * 14);
-    };
-    tick();
-  };
-  return (
-    <GamiToolShell title="Evento do Dia" subtitle="Surpresa da aula" icon={Zap} theme="fuchsia" onClose={onClose}>
-      {result && <ConfettiBurst />}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6">
-        <motion.div
-          key={display?.text || 'empty'}
-          initial={{ scale: 0.95, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }}
-          className={`w-full max-w-md rounded-[2rem] p-8 text-center border min-h-[180px] flex flex-col items-center justify-center gap-3 ${result ? 'bg-gradient-to-br from-fuchsia-500 to-pink-600 border-fuchsia-300/40 shadow-[0_0_70px_-10px_rgba(217,70,239,0.6)]' : 'bg-white/[0.06] border-white/10 backdrop-blur'}`}
-        >
-          <span className="text-5xl">{display?.emoji || '✨'}</span>
-          <p className={`text-lg font-black leading-snug ${result ? 'text-white' : spinning ? 'text-white/90' : 'text-white/50'}`}>
-            {display?.text || 'Sorteie o evento que abre a aula de hoje!'}
-          </p>
-        </motion.div>
-        {result?.quick !== undefined && !applied && (
-          <button
-            onClick={() => { onQuickAward(result.quick!, result.text); setApplied(true); }}
-            className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-6 py-3 rounded-2xl active:scale-95 transition-transform shadow-lg shadow-emerald-950/50"
-          >✨ Aplicar +{result.quick} para a turma toda</button>
-        )}
-        {applied && <p className="text-emerald-400 text-sm font-bold">Pontos aplicados! ✓</p>}
-      </div>
-      <button onClick={spin} disabled={spinning} className="w-full bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white font-black py-4 rounded-2xl text-lg disabled:opacity-60 shadow-lg shadow-fuchsia-950/60">
-        {spinning ? 'Sorteando…' : 'Sortear evento'}
-      </button>
-    </GamiToolShell>
-  );
-};
-
-const GamiParticipacao = ({ students, onToggle, onClose }: { students: GamiStudent[]; onToggle: (id: string) => void; onClose: () => void }) => {
-  const today = gamiTodayKey();
-  const done = students.filter(s => s.participatedDay === today);
-  return (
-    <GamiToolShell title="Participação de Hoje" subtitle="Toda voz conta" icon={Hand} theme="night" onClose={onClose}>
-      <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur mb-4 flex items-center justify-between">
-        <p className="text-sm font-bold text-white/85">{done.length} de {students.length} participaram</p>
-        <div className="w-28 h-2 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all" style={{ width: `${students.length ? (done.length / students.length) * 100 : 0}%` }} />
-        </div>
-      </div>
-      <div className="space-y-2">
-        {students.map(s => {
-          const did = s.participatedDay === today;
-          return (
-            <button
-              key={s.id}
-              onClick={() => onToggle(s.id)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-colors ${did ? 'bg-emerald-500/15 border-emerald-400/40' : 'bg-white/[0.06] border-white/10'}`}
-            >
-              <span className={`text-sm font-bold ${did ? 'text-emerald-300' : 'text-white/80'}`}>{s.name}</span>
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${did ? 'bg-emerald-500 text-white shadow-[0_0_14px_rgba(16,185,129,0.5)]' : 'bg-white/10 text-white/25'}`}>
-                <CheckCircle2 size={15} />
-              </span>
-            </button>
-          );
-        })}
-        {students.length === 0 && <p className="text-center text-sm text-white/40 py-8">Cadastre os alunos da turma primeiro.</p>}
-      </div>
-      <p className="text-[11px] text-white/35 text-center mt-4">Dica: marque quem participa e dê voz a quem ainda está em branco. A lista zera todo dia.</p>
-    </GamiToolShell>
-  );
-};
-
 type GamiBattleQ = { q: string; options: string[]; correct: number };
 
 const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: {
@@ -10024,84 +9916,6 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           )}
         </div>
       )}
-    </motion.div>
-  );
-};
-
-const GamiProjetor = ({ cls, schedule, onClose }: { cls: ClassGamification; schedule?: ClassSchedule; onClose: () => void }) => {
-  const wk = gamiWeekKey();
-  const weekXpOf = (s: GamiStudent) => cls.weekKey === wk ? (s.weekXp || 0) : 0;
-  const skin = GAMI_SKINS[cls.skin || 'coruja'];
-  const teamTotals = cls.teams.map(t => ({
-    team: t,
-    xp: cls.students.filter(s => s.teamId === t.id).reduce((a, s) => a + s.xp, 0),
-    week: cls.students.filter(s => s.teamId === t.id).reduce((a, s) => a + weekXpOf(s), 0),
-  })).sort((a, b) => b.week - a.week || b.xp - a.xp);
-  const maxTeam = Math.max(1, ...teamTotals.map(t => t.week));
-  const topWeek = [...cls.students].sort((a, b) => weekXpOf(b) - weekXpOf(a)).slice(0, 3).filter(s => weekXpOf(s) > 0);
-  const missionProgress = cls.mission ? (cls.mission.weekKey === wk ? cls.mission.progress : 0) : 0;
-
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] bg-gradient-to-b from-[#312e81] via-[#1e1b4b] to-[#12102b] flex flex-col overflow-y-auto">
-      <div className="flex items-center justify-between px-6 pt-6">
-        <div className="flex items-center gap-3">
-          <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
-          <div>
-            <h2 className="text-white font-black text-xl leading-tight">{schedule?.name || 'Turma'}</h2>
-            <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Temporada {cls.season}</p>
-          </div>
-        </div>
-        <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center"><X size={20} /></button>
-      </div>
-      <div className="flex-1 px-6 py-6 space-y-5 max-w-2xl w-full mx-auto">
-        {cls.mission && (
-          <div className="bg-white/10 backdrop-blur rounded-[2rem] p-5 border border-white/15">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-white font-black text-sm">🎯 Missão da Semana: {cls.mission.reward}</p>
-              <p className="text-indigo-100 font-black text-sm tabular-nums">{Math.min(missionProgress, cls.mission.goal)} / {cls.mission.goal}</p>
-            </div>
-            <div className="h-4 bg-white/15 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-700 ${missionProgress >= cls.mission.goal ? 'bg-emerald-400' : 'bg-amber-300'}`} style={{ width: `${Math.min(100, (missionProgress / cls.mission.goal) * 100)}%` }} />
-            </div>
-            {missionProgress >= cls.mission.goal && <p className="text-emerald-300 font-black text-center mt-2 text-sm">🎉 MISSÃO CONCLUÍDA!</p>}
-          </div>
-        )}
-        {teamTotals.length > 0 && (
-          <div className="bg-white/10 backdrop-blur rounded-[2rem] p-5 border border-white/15">
-            <p className="text-white font-black text-sm mb-4">🏆 Pódio das Equipes (semana)</p>
-            <div className="space-y-3">
-              {teamTotals.map((t, i) => (
-                <div key={t.team.id}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-white font-bold text-sm">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '·'} {t.team.emoji} {t.team.name}</span>
-                    <span className="text-indigo-100 font-black text-sm tabular-nums">{t.week} XP</span>
-                  </div>
-                  <div className="h-3.5 bg-white/15 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(t.week / maxTeam) * 100}%`, backgroundColor: t.team.color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="bg-white/10 backdrop-blur rounded-[2rem] p-5 border border-white/15">
-          <p className="text-white font-black text-sm mb-4">⚡ Destaques da Semana</p>
-          {topWeek.length === 0 ? (
-            <p className="text-indigo-200 text-sm text-center py-3">Os destaques aparecem aqui conforme a turma ganha pontos!</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              {topWeek.map((s, i) => (
-                <div key={s.id} className={`rounded-2xl p-3 text-center ${i === 0 ? 'bg-amber-300/25 border border-amber-300/40' : 'bg-white/10'}`}>
-                  <span className="text-3xl">{skin[gamiLevel(s.totalXp)]}</span>
-                  <p className="text-white font-bold text-xs mt-1 truncate">{s.name}</p>
-                  <p className="text-indigo-100 font-black text-sm">+{weekXpOf(s)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <p className="text-center text-indigo-200/70 text-[11px] font-bold uppercase tracking-widest pb-4">Prof. Corujão · Turma Gamificada</p>
-      </div>
     </motion.div>
   );
 };
@@ -11296,10 +11110,7 @@ const GamificacaoScreen = ({
     { id: 'semaforo', icon: Siren, grad: 'from-emerald-400 via-amber-400 to-red-500', label: 'Semáforo' },
     { id: 'dado', icon: Dices, grad: 'from-slate-500 to-slate-700', label: 'Dado' },
     { id: 'placar', icon: Trophy, grad: 'from-amber-500 to-orange-600', label: 'Placar' },
-    { id: 'evento', icon: Zap, grad: 'from-fuchsia-500 to-pink-600', label: 'Evento' },
-    { id: 'participacao', icon: Hand, grad: 'from-sky-500 to-blue-600', label: 'Chamada' },
     { id: 'batalha', icon: Swords, grad: 'from-rose-500 to-red-600', label: 'Batalha' },
-    { id: 'projetor', icon: MonitorPlay, grad: 'from-indigo-500 to-purple-600', label: 'Projetar' },
   ];
 
   if (schedules.length === 0) {
@@ -12005,20 +11816,6 @@ const GamificacaoScreen = ({
         {liveTool === 'semaforo' && <GamiSemaforo onClose={() => setLiveTool(null)} />}
         {liveTool === 'dado' && <GamiDado onClose={() => setLiveTool(null)} />}
         {liveTool === 'placar' && <GamiPlacar teams={currentCls.teams} onClose={() => setLiveTool(null)} />}
-        {liveTool === 'evento' && (
-          <GamiEvento
-            customEvents={currentCls.customEvents ?? []}
-            onClose={() => setLiveTool(null)}
-            onQuickAward={(points, label) => awardPoints(currentCls.students.map(s => s.id), { id: 'event', label, points, emoji: '⚡' })}
-          />
-        )}
-        {liveTool === 'participacao' && (
-          <GamiParticipacao
-            students={currentCls.students}
-            onToggle={id => updateCls(cls => ({ ...cls, students: cls.students.map(s => s.id === id ? { ...s, participatedDay: s.participatedDay === gamiTodayKey() ? undefined : gamiTodayKey() } : s) }))}
-            onClose={() => setLiveTool(null)}
-          />
-        )}
         {liveTool === 'batalha' && (
           <GamiBatalha
             teams={currentCls.teams}
@@ -12034,9 +11831,6 @@ const GamificacaoScreen = ({
               awardPoints(ids, { id: 'batalha', label: 'Batalha de Revisão', points, emoji: '⚔️' });
             }}
           />
-        )}
-        {liveTool === 'projetor' && (
-          <GamiProjetor cls={currentCls} schedule={selectedSchedule} onClose={() => setLiveTool(null)} />
         )}
       </AnimatePresence>
     </motion.div>
