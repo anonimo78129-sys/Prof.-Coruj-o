@@ -9557,6 +9557,8 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: 
   onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
 }) => {
   const TEAM_MAX = 40, HIT = 10, WRONG_HIT = 9, FURY_BONUS = 2;
+  const CRIT_BONUS = 4, CRIT_TIME_MS = 3000, HEAL_AMOUNT = 5, HEAL_STREAK = 3, LOW_HP = 10;
+  type Pose = 'idle' | 'attack' | 'hit' | 'faint' | 'cast' | 'crit' | 'thinking' | 'wrong-cast' | 'heal';
   const hasRealTeams = teams.length >= 2;
   const [pick, setPick] = useState<number[]>([0, 1]);
   const fighters = useMemo(() => hasRealTeams
@@ -9576,16 +9578,20 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: 
   const [selected, setSelected] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
   const [winner, setWinner] = useState<0 | 1 | null>(null);
-  const [poses, setPoses] = useState<('idle' | 'attack' | 'hit' | 'faint')[]>(['idle', 'idle']);
+  const [poses, setPoses] = useState<Pose[]>(['idle', 'idle']);
+  const [smoke, setSmoke] = useState<{ side: 0 | 1; key: number } | null>(null);
   const [proj, setProj] = useState<{ from: 0 | 1; key: number } | null>(null);
   const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string } | null>(null);
-  const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string }[]>([]);
+  const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string; heal?: boolean }[]>([]);
   const [awarded, setAwarded] = useState(false);
 
   const questionsRef = useRef<GamiBattleQ[]>([]);
   const bagRef = useRef<GamiBattleQ[]>([]);
   const lastQRef = useRef('');
   const fxKey = useRef(0);
+  const qShownAt = useRef(0);
+  const streak = useRef<[number, number]>([0, 0]);
+  const awaiting = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const after = (ms: number, fn: () => void) => { timers.current.push(setTimeout(fn, ms)); };
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -9615,8 +9621,9 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: 
     setHp([TEAM_MAX, TEAM_MAX]); setPoses(['idle', 'idle']); setWinner(null); setAwarded(false);
     setSelected(null); setQNum(0); setTurn(0); setProj(null); setRing(null); setPops([]);
     bagRef.current = [];
+    streak.current = [0, 0]; awaiting.current = false; setSmoke(null);
     setPhase('intro');
-    after(2600, () => { drawQuestion(); setPhase('question'); });
+    after(2600, () => { drawQuestion(); setPhase('question'); beginQuestionTimers(0); });
   };
 
   const generate = async () => {
@@ -9642,8 +9649,15 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     }
   };
 
-  const setPose = (side: 0 | 1, p: 'idle' | 'attack' | 'hit' | 'faint') =>
-    setPoses(prev => prev.map((v, i) => i === side ? p : v) as typeof poses);
+  const setPose = (side: 0 | 1, p: Pose) =>
+    setPoses(prev => prev.map((v, i) => i === side ? p : v) as Pose[]);
+
+  // Cronômetro da pergunta + pose 'thinking' após 8s sem responder
+  const beginQuestionTimers = (t: 0 | 1) => {
+    qShownAt.current = performance.now();
+    awaiting.current = true;
+    after(8000, () => { if (awaiting.current) setPose(t, 'thinking'); });
+  };
 
   const impact = (target: 0 | 1, dmg: number, color: string) => {
     setProj(null);
@@ -9665,35 +9679,60 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     const nt = (1 - prev) as 0 | 1;
     setTurn(nt);
     setSelected(null);
+    setPose(nt, 'idle');
     drawQuestion();
     setPhase('question');
+    beginQuestionTimers(nt);
+  };
+
+  const healPop = (side: 0 | 1) => {
+    const id = ++fxKey.current;
+    setPops(pp => [...pp, { id, side, val: HEAL_AMOUNT, color: '#22c55e', heal: true }]);
+    after(900, () => setPops(pp => pp.filter(x => x.id !== id)));
+    setRing({ side, key: ++fxKey.current, color: '#22c55e' });
+    setPose(side, 'heal');
+    setHp(h => h.map((v, i) => i === side ? Math.min(TEAM_MAX, v + HEAL_AMOUNT) : v) as [number, number]);
   };
 
   const answer = (i: number) => {
     if (phase !== 'question' || !current) return;
+    awaiting.current = false;
+    const elapsed = performance.now() - qShownAt.current;
     setSelected(i);
     setPhase('anim');
     const other = (1 - turn) as 0 | 1;
     if (i === current.correct) {
       playChime(true);
       const fury = hp[turn] <= TEAM_MAX / 2;
-      const dmg = HIT + (fury ? FURY_BONUS : 0);
+      const crit = elapsed < CRIT_TIME_MS;
+      const dmg = HIT + (fury ? FURY_BONUS : 0) + (crit ? CRIT_BONUS : 0);
       const newHp = Math.max(0, hp[other] - dmg);
-      setMsg(`Resposta certa! ${fighters[turn].name} lança um ataque${fury ? ' furioso' : ''}!`);
-      after(500, () => { setPose(turn, 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
+      // Sequência de acertos → cura ao atingir HEAL_STREAK
+      streak.current[turn] += 1;
+      const willHeal = streak.current[turn] >= HEAL_STREAK && hp[turn] > 0;
+      if (willHeal) streak.current[turn] = 0;
+      setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
+      setPose(turn, 'cast'); // carregando mágica no delay antes do projétil
+      after(500, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
       after(950, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color); });
+      if (willHeal) after(1250, () => healPop(turn));
       if (newHp <= 0) {
-        after(1500, () => finish(turn, other));
+        after(1600, () => finish(turn, other));
       } else {
-        after(1500, () => setPose(other, 'idle'));
-        after(1700, () => nextTurn(turn));
+        after(1700, () => setPose(other, 'idle'));
+        after(1900, () => nextTurn(turn));
       }
     } else {
       playChime(false);
+      streak.current[turn] = 0;
       const fury = hp[other] <= TEAM_MAX / 2;
       const dmg = WRONG_HIT + (fury ? FURY_BONUS : 0);
       const newHp = Math.max(0, hp[turn] - dmg);
       setMsg(`Errou! A certa era "${current.options[current.correct]}". ${fighters[other].name} contra-ataca${fury ? ' com fúria' : ''}!`);
+      // magia falhando: fumacinha + susto antes do contra-ataque
+      setPose(turn, 'wrong-cast');
+      setSmoke({ side: turn, key: ++fxKey.current });
+      after(900, () => setSmoke(null));
       after(1400, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current }); });
       after(1850, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
       if (newHp <= 0) {
@@ -9705,11 +9744,17 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     }
   };
 
-  const poseAnim = (p: string, side: 0 | 1): any =>
-    p === 'attack' ? { x: side === 0 ? 26 : -26, y: side === 0 ? -14 : 14, opacity: 1, rotate: 0, transition: { duration: 0.2 } }
-    : p === 'hit' ? { x: [0, -10, 10, -7, 7, 0], y: 0, opacity: 1, rotate: 0, transition: { duration: 0.5 } }
-    : p === 'faint' ? { y: 48, opacity: 0, rotate: side === 0 ? -16 : 16, transition: { duration: 0.7 } }
-    : { x: 0, y: [0, -7, 0], opacity: 1, rotate: 0, transition: { y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 0.2 } } };
+  const poseAnim = (p: string, side: 0 | 1, low = false): any =>
+    p === 'attack' ? { x: side === 0 ? 26 : -26, y: side === 0 ? -14 : 14, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.2 } }
+    : p === 'crit' ? { x: side === 0 ? 44 : -44, y: side === 0 ? -24 : 24, scale: 1.12, opacity: 1, rotate: 0, transition: { duration: 0.18 } }
+    : p === 'cast' ? { x: 0, y: [0, -4, -2], scale: [1, 1.07, 1.04], opacity: 1, rotate: 0, transition: { duration: 0.5 } }
+    : p === 'hit' ? { x: [0, -10, 10, -7, 7, 0], y: 0, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.5 } }
+    : p === 'wrong-cast' ? { x: side === 0 ? -14 : 14, y: 6, scale: 0.94, opacity: 1, rotate: 0, transition: { duration: 0.4 } }
+    : p === 'heal' ? { x: 0, y: [0, -16, 0], scale: [1, 1.12, 1], opacity: 1, rotate: 0, transition: { duration: 0.6 } }
+    : p === 'thinking' ? { x: 0, y: [0, -5, 0], scale: 1, opacity: 1, rotate: [0, -4, 4, 0], transition: { y: { duration: 1.6, repeat: Infinity }, rotate: { duration: 2, repeat: Infinity } } }
+    : p === 'faint' ? { y: 48, opacity: 0, scale: 1, rotate: side === 0 ? -16 : 16, transition: { duration: 0.7 } }
+    : low ? { x: [0, -2, 2, -1, 0], y: [0, -3, 0], scale: 1, opacity: 1, rotate: 0, transition: { x: { duration: 0.4, repeat: Infinity }, y: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' } } }
+    : { x: 0, y: [0, -7, 0], scale: 1, opacity: 1, rotate: 0, transition: { y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 0.2 } } };
 
   const hpColor = (v: number) => v / TEAM_MAX > 0.5 ? '#4ade80' : v / TEAM_MAX > 0.25 ? '#facc15' : '#ef4444';
   const winnerIds = winner !== null && hasRealTeams
@@ -9738,7 +9783,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       {phase === 'setup' && (
         <div className="space-y-4">
           <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur">
-            <p className="text-sm text-white/75 leading-relaxed"><b className="text-white">Batalha em turnos:</b> a IA gera perguntas do seu conteúdo e cada equipe responde na sua vez. <b className="text-emerald-300">Acertou = ataque de {HIT} de dano.</b> <b className="text-red-300">Errou = contra-ataque de {WRONG_HIT}.</b> Equipe com menos da metade do HP entra em <b className="text-amber-300">Fúria (+{FURY_BONUS} de dano)</b>. Vence quem zerar o HP do rival!</p>
+            <p className="text-sm text-white/75 leading-relaxed"><b className="text-white">Batalha em turnos:</b> a IA gera perguntas e cada equipe responde na sua vez. <b className="text-emerald-300">Acertou = ataque de {HIT}.</b> <b className="text-red-300">Errou = contra-ataque de {WRONG_HIT}.</b> <b className="text-amber-300">Resposta em até 3s = CRÍTICO (+{CRIT_BONUS})</b>. <b className="text-emerald-300">{HEAL_STREAK} acertos seguidos curam {HEAL_AMOUNT} HP</b>. Abaixo de metade do HP entra em <b className="text-amber-300">Fúria (+{FURY_BONUS})</b>. Vence quem zerar o HP do rival!</p>
           </div>
           {error && <p className="text-sm text-red-300 font-medium bg-red-500/15 border border-red-400/25 rounded-xl p-3">{error}</p>}
           <div>
@@ -9816,18 +9861,33 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
               <div key={side} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${ANCHORS[side].x}%`, top: `${ANCHORS[side].y}%` }}>
                 <motion.div
                   initial={{ x: side === 0 ? -140 : 140, opacity: 0 }}
-                  animate={poseAnim(poses[side], side)}
+                  animate={poseAnim(poses[side], side, hp[side] > 0 && hp[side] <= LOW_HP)}
                   className="relative flex flex-col items-center"
                 >
+                  {/* aura de carregamento (cast/crit) */}
+                  {(poses[side] === 'cast' || poses[side] === 'crit') && (
+                    <motion.div
+                      initial={{ scale: 0.5, opacity: 0.9 }} animate={{ scale: [0.6, 1.35, 0.9], opacity: [0.9, 0.35, 0.8] }} transition={{ duration: 0.5, repeat: Infinity }}
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 w-24 h-24 sm:w-28 sm:h-28 rounded-full pointer-events-none"
+                      style={{ boxShadow: `0 0 26px 10px ${fighters[side].color}`, border: `2px solid ${fighters[side].color}` }}
+                    />
+                  )}
                   <div
                     className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
                     style={{
                       background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}e8, ${fighters[side].color}55 62%, transparent 78%)`,
-                      filter: `drop-shadow(0 0 ${hp[side] <= TEAM_MAX / 2 ? 22 : 10}px ${fighters[side].color}99)`,
+                      filter: poses[side] === 'heal'
+                        ? 'drop-shadow(0 0 26px #22c55e)'
+                        : `drop-shadow(0 0 ${poses[side] === 'cast' || poses[side] === 'crit' ? 30 : hp[side] <= TEAM_MAX / 2 ? 22 : 10}px ${fighters[side].color}99)`,
                     }}
                   >
                     <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
-                    {phase !== 'intro' && turn === side && winner === null && (
+                    {poses[side] === 'thinking' ? (
+                      <motion.span
+                        initial={{ scale: 0, y: 4 }} animate={{ scale: 1, y: 0 }}
+                        className="absolute -top-4 -right-1 w-6 h-6 rounded-full bg-white border-2 border-[#5a4a3a] flex items-center justify-center font-pixel text-[9px] text-[#3a3020] shadow"
+                      >?</motion.span>
+                    ) : phase !== 'intro' && turn === side && winner === null && (
                       <span className="absolute -top-3 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
                     )}
                   </div>
@@ -9859,14 +9919,23 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, borderColor: ring.color }}
               />
             )}
-            {/* dano flutuante */}
+            {/* fumaça da magia falhando (wrong-cast) */}
+            {smoke && (
+              <motion.div
+                key={smoke.key}
+                initial={{ scale: 0.4, opacity: 0.85, y: 0 }} animate={{ scale: 1.6, opacity: 0, y: -20 }} transition={{ duration: 0.85 }}
+                className="absolute w-12 h-12 -ml-6 -mt-6 rounded-full pointer-events-none z-20"
+                style={{ left: `${ANCHORS[smoke.side].x}%`, top: `${ANCHORS[smoke.side].y - 6}%`, background: 'radial-gradient(circle, rgba(60,60,60,0.9), rgba(40,40,40,0.2) 70%, transparent)' }}
+              />
+            )}
+            {/* dano / cura flutuante */}
             {pops.map(p => (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 1, y: 0, scale: 0.8 }} animate={{ opacity: 0, y: -48, scale: 1.15 }} transition={{ duration: 0.9 }}
                 className="absolute font-black text-2xl pointer-events-none z-40 -translate-x-1/2"
                 style={{ left: `${ANCHORS[p.side].x}%`, top: `${ANCHORS[p.side].y - 16}%`, color: p.color, textShadow: '0 2px 0 rgba(0,0,0,0.7), 0 0 14px rgba(0,0,0,0.5)' }}
-              >−{p.val}</motion.div>
+              >{p.heal ? '+' : '−'}{p.val}</motion.div>
             ))}
             {/* intro VS */}
             {phase === 'intro' && (
