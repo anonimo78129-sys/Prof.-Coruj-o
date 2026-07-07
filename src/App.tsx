@@ -11324,6 +11324,42 @@ const GamificacaoScreen = ({
         onChange={id => setTab(id as any)}
       />
 
+      {/* ── Kit ao Vivo — fixado logo abaixo das abas ── */}
+      <div className="mb-4">
+        <button
+          onClick={() => setKitExpanded(e => !e)}
+          className="w-full bg-gradient-to-br from-indigo-600 to-indigo-800 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-transform"
+        >
+          <Zap size={16} />
+          <span className="text-sm">Kit ao Vivo</span>
+          <ChevronDown size={14} className={`transition-transform duration-200 ${kitExpanded ? 'rotate-180' : ''}`} />
+        </button>
+        <AnimatePresence>
+          {kitExpanded && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+              className="bg-white rounded-3xl p-3 mt-2 shadow-xl border border-gray-100 grid grid-cols-4 gap-1.5"
+            >
+              {LIVE_TOOLS.map(tool => (
+                <button
+                  key={tool.id}
+                  onClick={() => { setLiveTool(tool.id); setKitExpanded(false); }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-2xl active:scale-90 transition-transform"
+                >
+                  <span className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${tool.grad} flex items-center justify-center shadow-md`}>
+                    <tool.icon size={19} className="text-white" strokeWidth={2.4} />
+                  </span>
+                  <span className="text-[9px] font-bold text-gray-600 leading-tight text-center">{tool.label}</span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* Tab content */}
       <AnimatePresence mode="wait">
 
@@ -11873,42 +11909,6 @@ const GamificacaoScreen = ({
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Kit ao Vivo dock ──────────────────────────────────────────────────── */}
-      <div className="fixed bottom-[146px] left-0 right-0 z-[60] px-4 max-w-md mx-auto">
-        <AnimatePresence>
-          {kitExpanded && (
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.97 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-              className="bg-white rounded-3xl p-3 mb-2 shadow-xl border border-gray-100 grid grid-cols-4 gap-1.5"
-            >
-              {LIVE_TOOLS.map(tool => (
-                <button
-                  key={tool.id}
-                  onClick={() => { setLiveTool(tool.id); setKitExpanded(false); }}
-                  className="flex flex-col items-center gap-1.5 p-2 rounded-2xl active:scale-90 transition-transform"
-                >
-                  <span className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${tool.grad} flex items-center justify-center shadow-md`}>
-                    <tool.icon size={19} className="text-white" strokeWidth={2.4} />
-                  </span>
-                  <span className="text-[9px] font-bold text-gray-600 leading-tight text-center">{tool.label}</span>
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button
-          onClick={() => setKitExpanded(e => !e)}
-          className="w-full bg-gradient-to-br from-indigo-600 to-indigo-800 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-transform"
-        >
-          <Zap size={16} />
-          <span className="text-sm">Kit ao Vivo</span>
-          <ChevronUp size={14} className={`transition-transform duration-200 ${kitExpanded ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
 
       {/* ── Live tool overlays ────────────────────────────────────────────────── */}
       <AnimatePresence>
