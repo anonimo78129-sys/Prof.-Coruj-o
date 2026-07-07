@@ -13893,10 +13893,16 @@ function AppInner() {
         11. LAYOUT_TIMELINE: Linha do tempo horizontal com 3 a 5 eventos. Ideal para cronologias e processos. Campos: title, events[{year,title,description}].
 
         REGRAS DE DESIGN:
-        - Use pelo menos 4 layouts diferentes para variar o ritmo visual.
-        - Use LAYOUT_QUOTE, LAYOUT_FULL_IMAGE ou LAYOUT_STATS para criar momentos de impacto.
-        - Use LAYOUT_TIMELINE para conteúdos históricos ou sequenciais.
-        - Use LAYOUT_TWO_COLUMNS para comparações ou definições contrastantes.
+        - COREOGRAFIA DE LAYOUTS (REGRA CRÍTICA — o ritmo visual importa tanto quanto o conteúdo):
+            • NUNCA repita o mesmo layoutID em dois slides consecutivos.
+            • LAYOUT_CONTENT_LEFT/RIGHT são o "arroz com feijão": use no MÁXIMO 40% do deck, sempre alternando LEFT e RIGHT entre si.
+            • Deck com 6+ slides DEVE conter: 1 LAYOUT_TOPICS (cards), 1 momento de impacto (LAYOUT_FULL_IMAGE, LAYOUT_QUOTE ou LAYOUT_STATS) no meio do deck, e um slide final de revisão/encerramento.
+            • Deck com 8+ slides DEVE usar pelo menos 6 layoutIDs diferentes.
+            • Conteúdo tem números, quantidades ou percentuais? → inclua 1 LAYOUT_STATS.
+            • Conteúdo tem processo, etapas, evolução ou datas? → inclua 1 LAYOUT_TIMELINE.
+            • Conteúdo compara dois conceitos/tipos/lados? → inclua 1 LAYOUT_TWO_COLUMNS.
+            • Use LAYOUT_FULL_IMAGE como "respiro" divisor entre blocos do conteúdo (funciona como capítulo).
+            • LAYOUT_QUOTE: ótimo para frase de impacto, citação de autor ou pergunta provocadora à turma.
         - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
         - KICKER (obrigatório em TODO slide): campo "kicker" com um rótulo editorial curto de 1-2 palavras em MAIÚSCULAS que aparece acima do título (ex: "CONCEITO", "CONTEXTO", "EXEMPLO", "APLICAÇÃO", "RESUMO", "DEFINIÇÃO"). Deve resumir o papel do slide.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
