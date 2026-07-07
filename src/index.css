@@ -116,3 +116,9 @@
 #game-print-area .answer-key-page::before { content: 'GABARITO DO PROFESSOR'; display: block; font-size: 10px; font-weight: 900; letter-spacing: 2px; color: #b45309; margin-bottom: 6px; }
 #game-print-area .answer-key-title { display: inline-block; background: #d97706; color: white; margin: 0 0 10px; }
 #game-print-area .answer-key-item { font-size: 12px; margin-bottom: 6px; padding: 7px 12px; background: white; border-radius: 8px; border-left: 4px solid #f59e0b; color: #1f2937; }
+
+/* ── Fontes da Batalha de Revisão ────────────────────────────────────────── */
+/* .font-pixel: Press Start 2P — títulos, HUD, labels, letras A/B/C/D (8-bit) */
+.font-pixel { font-family: 'Press Start 2P', 'Courier New', monospace; }
+/* .font-vt: VT323 — texto corrido (pergunta, alternativas, narração) */
+.font-vt { font-family: 'VT323', 'Courier New', monospace; }
