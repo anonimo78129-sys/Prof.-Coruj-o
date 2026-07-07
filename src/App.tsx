@@ -2403,7 +2403,7 @@ const buildDocHtml = (
   .doc-badge { background:${ac}; color:#fff; font-size:9pt; font-weight:700; padding:5px 16px; border-radius:20px; white-space:nowrap; letter-spacing:0.5px; }
   /* ── Typography (exam/activities) ── */
   h1 { font-size:15pt; font-weight:700; color:#111; margin:0 0 14px; text-align:center; }
-  h2 { font-size:10.5pt; font-weight:700; color:#fff; background:${ac}; padding:5px 12px; border-radius:4px; margin:22px 0 10px; }
+  h2 { font-size:10.5pt; font-weight:700; color:${ac}; border:1.5px solid ${ac}; padding:5px 12px; border-radius:4px; margin:22px 0 10px; }
   h3 { font-size:11pt; font-weight:700; color:${dk}; margin:14px 0 6px; padding-left:10px; border-left:4px solid ${ac}; }
   p { margin:6px 0; }
   strong { font-weight:700; }
@@ -2423,7 +2423,7 @@ const buildDocHtml = (
   .gab-meta { font-size:9pt; color:#a5b4fc; }
   .gab-body { font-size:11pt; line-height:1.9; }
   .gab-body strong { color:${ac}; }
-  .gab-body h2 { background:${dk}; color:#fff; padding:5px 12px; border-radius:4px; margin:16px 0 8px; font-size:10.5pt; }
+  .gab-body h2 { color:${dk}; border:1.5px solid ${dk}; padding:5px 12px; border-radius:4px; margin:16px 0 8px; font-size:10.5pt; }
   /* ── Plan table layout ── */
   .info-tbl { width:100%; border-collapse:collapse; margin-bottom:14px; font-size:10.5pt; }
   .info-cell { border:1px solid #555; padding:5px 10px; vertical-align:middle; }
@@ -6787,7 +6787,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     .px-deco svg { width:100%; height:100%; display:block; }
 
     /* ── GENERAL CONTENT ──────────────────────────────────── */
-    h2 { font-size:13px; margin:18px 0 8px; color:white; font-weight:900; padding:5px 12px; background:var(--ac,#4338ca); border-radius:6px; display:inline-block; }
+    h2 { font-size:13px; margin:18px 0 8px; color:var(--ac,#4338ca); font-weight:900; padding:5px 12px; border:1.5px solid var(--ac,#4338ca); border-radius:6px; display:inline-block; }
     h3 { font-size:12px; margin:10px 0 4px; color:#1f2937; font-weight:700; }
     p { margin:6px 0; }
 
@@ -8497,7 +8497,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .field-label { font-size: 7.5px; font-weight: 700; color: rgba(255,255,255,0.6); letter-spacing: 1px; text-transform: uppercase; }
     .field-val { font-size: 10px; color: white; font-weight: 600; min-height: 14px; }
     h1 { font-size: 16px; font-weight: 900; color: #1e293b; margin: 20px 0 6px; border-left: 4px solid #4338ca; padding-left: 10px; }
-    h2 { font-size: 13px; font-weight: 900; color: white; background: #4338ca; padding: 4px 12px; border-radius: 6px; display: inline-block; margin: 14px 0 6px; }
+    h2 { font-size: 13px; font-weight: 900; color: #4338ca; border: 1.5px solid #4338ca; padding: 4px 12px; border-radius: 6px; display: inline-block; margin: 14px 0 6px; }
     h3 { font-size: 12px; font-weight: 700; color: #334155; margin: 10px 0 4px; }
     p, li { margin: 4px 0; font-size: 11.5px; }
     ul { padding-left: 20px; margin: 4px 0; }
