@@ -1805,7 +1805,7 @@ const SlideCanvas = ({ slide, theme, onUpdate, schoolName, teacherName }: {
 const SlidePreviewList = ({
   presentationData, setPresentationData, profile,
   isExporting, regenLoading, setRegenLoading, setError,
-  exportPPTX, savedResources, setSavedResources,
+  exportPPTX,
   schedules, classes, setClasses, topic, selectedClassId
 }: {
   presentationData: PresentationData;
@@ -1816,8 +1816,6 @@ const SlidePreviewList = ({
   setRegenLoading: (v: boolean) => void;
   setError: (e: string) => void;
   exportPPTX: () => void;
-  savedResources: SavedResource[];
-  setSavedResources: (r: any) => void;
   schedules: ClassSchedule[];
   classes: ClassItem[];
   setClasses: (c: ClassItem[]) => void;
@@ -1911,19 +1909,11 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
           </div>
         ))}
       </div>
-      <div className="flex gap-2 mt-2">
+      <div className="mt-2">
         <button onClick={exportPPTX} disabled={isExporting}
-          className="flex-1 bg-indigo-600 text-white rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 transition-opacity">
+          className="w-full bg-indigo-600 text-white rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 transition-opacity">
           {isExporting ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
           {isExporting ? 'Gerando...' : 'Baixar PPTX'}
-        </button>
-        <button
-          onClick={() => {
-            const newResourceId = Math.random().toString(36).slice(2, 11);
-            setSavedResources((prev: SavedResource[]) => [...prev, { id: newResourceId, type: 'slides' as const, title: presentationData.presentationTitle, date: Date.now(), presentationData }]);
-          }}
-          className="flex-1 bg-indigo-50 text-indigo-600 rounded-2xl py-4 text-sm font-bold flex items-center justify-center gap-2 shadow-sm">
-          <Archive size={20} /> Salvar Histórico
         </button>
       </div>
     </div>
@@ -3445,8 +3435,6 @@ const PlannerScreen = ({
                 setRegenLoading={setRegenLoading}
                 setError={setError}
                 exportPPTX={exportPPTX}
-                savedResources={savedResources}
-                setSavedResources={setSavedResources}
                 schedules={schedules}
                 classes={classes}
                 setClasses={setClasses}
