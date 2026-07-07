@@ -9799,12 +9799,13 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   // Tema retrô (GBA) da batalha: arena verde-campo, painel azul profundo e
   // caixas creme — paleta própria, deliberadamente distinta do modo palco.
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col" style={{ fontFamily: "'VT323', 'Courier New', monospace" }}>
-      <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 72px 72px; } }`}</style>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col" style={{ fontFamily: "'Pixelify Sans', 'Courier New', monospace" }}>
+      {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras */}
+      <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 48px 48px; } }`}</style>
       {/* ── Arena (tela cheia, clara) ── */}
       <div className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
             <div className="absolute inset-0 pointer-events-none opacity-70" style={{ backgroundImage: 'repeating-linear-gradient(180deg, rgba(255,255,255,0.10) 0 26px, rgba(0,0,0,0.04) 26px 52px)' }} />
-            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.14) 0 20px, transparent 20px 40px)', animation: 'gami-battle-stripes 2.6s linear infinite' }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.13) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0.13) 75%, transparent 75%, transparent 100%)', backgroundSize: '48px 48px', animation: 'gami-battle-stripes 3s linear infinite' }} />
             <button onClick={onClose} className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-[#1e3a2a]/85 text-emerald-100 border-2 border-emerald-100/30 rounded-lg px-3 py-1.5 text-[11px] font-black tracking-widest active:scale-95 transition-transform">
               <X size={13} /> SAIR
             </button>
@@ -9928,7 +9929,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
             </p>
           </div>
           {current && phase !== 'intro' && (
-            <div className="grid grid-cols-2 gap-2 max-w-lg w-full mx-auto mt-[60px] mb-[60px]">
+            <div className="grid grid-cols-2 gap-2.5 max-w-lg w-full mx-auto my-5">
               {current.options.map((opt, i) => {
                 const palette = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
                 const locked = phase === 'anim';
@@ -9940,13 +9941,13 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     key={i}
                     onClick={() => answer(i)}
                     disabled={locked}
-                    className={`relative rounded-lg px-4 py-3.5 text-left transition-all active:translate-y-0.5 active:shadow-none border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                    className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all active:translate-y-0.5 active:shadow-none border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
                     style={{ backgroundColor: isWrongPick ? '#7f1d1d' : palette[i] }}
                   >
-                    <span className="text-[11px] font-black text-white/80">{['A', 'B', 'C', 'D'][i]}</span>
-                    <p className="text-lg font-black text-white leading-tight">{opt}</p>
-                    {isCorrect && <span className="absolute top-1.5 right-2 text-white font-black">✓</span>}
-                    {isWrongPick && <span className="absolute top-1.5 right-2 text-white font-black">✗</span>}
+                    <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center text-sm font-black text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
+                    <p className="flex-1 text-base font-black text-white leading-tight">{opt}</p>
+                    {isCorrect && <span className="shrink-0 text-white font-black">✓</span>}
+                    {isWrongPick && <span className="shrink-0 text-white font-black">✗</span>}
                   </button>
                 );
               })}
