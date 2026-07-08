@@ -9504,21 +9504,30 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
 
   const ANCHORS = [{ x: 24, y: 66 }, { x: 76, y: 30 }];
 
-  // Sprites reais por cor de time (fallback: emoji). Frames de respiração
-  // ciclam enquanto o lado estiver 'idle'; parado no último quadro nas outras poses.
-  const TEAM_SPRITES: Record<string, string[]> = {
-    '#ef4444': [
-      '/assets/battle/duck-red/idle-1.png',
-      '/assets/battle/duck-red/idle-2.png',
-      '/assets/battle/duck-red/idle-3.png',
-      '/assets/battle/duck-red/idle-4.png',
-      '/assets/battle/duck-red/idle-5.png',
-    ],
+  // Sprites reais por cor de time (fallback: emoji). Ciclam enquanto o lado
+  // estiver 'idle': respiração normal, ou "cansado" (ofegante) quando o HP
+  // está baixo. Parado no último quadro durante as outras poses.
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[] }> = {
+    '#ef4444': {
+      idle: [
+        '/assets/battle/duck-red/idle-1.png',
+        '/assets/battle/duck-red/idle-2.png',
+        '/assets/battle/duck-red/idle-3.png',
+        '/assets/battle/duck-red/idle-4.png',
+        '/assets/battle/duck-red/idle-5.png',
+      ],
+      tired: [
+        '/assets/battle/duck-red/tired-1.png',
+        '/assets/battle/duck-red/tired-2.png',
+      ],
+    },
   };
   const [breathFrame, setBreathFrame] = useState<[number, number]>([0, 0]);
   useEffect(() => {
     const id = setInterval(() => {
-      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' ? (f + 1) % 5 : f)) as [number, number]);
+      // Módulo alto (múltiplo de 2 e 5) — o índice real por conjunto de
+      // quadros é calculado na renderização com `% frames.length`.
+      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' ? (f + 1) % 60 : f)) as [number, number]);
     }, 260);
     return () => clearInterval(id);
   }, [poses]);
@@ -9820,7 +9829,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     />
                   )}
                   {(() => {
-                    const spriteFrames = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()];
+                    const spriteSet = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()];
+                    const isLowHp = hp[side] > 0 && hp[side] <= LOW_HP;
+                    const activeFrames = spriteSet
+                      ? (poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired : spriteSet.idle)
+                      : null;
                     const glowSize = poses[side] === 'heal' ? 20 : poses[side] === 'cast' || poses[side] === 'crit' ? 26 : hp[side] <= TEAM_MAX / 2 ? 18 : 9;
                     const glowColor = poses[side] === 'heal' ? '#22c55e' : fighters[side].color;
                     return (
@@ -9828,14 +9841,14 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                         className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
                         // Sprite real: sem disco de fundo nem brilho colorido — só a arte do
                         // personagem, sem decoração atrás.
-                        style={spriteFrames ? undefined : {
+                        style={activeFrames ? undefined : {
                               background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}e8, ${fighters[side].color}55 62%, transparent 78%)`,
                               filter: `drop-shadow(0 0 ${glowSize + (poses[side] === 'heal' ? 6 : 4)}px ${glowColor}99)`,
                             }}
                       >
-                        {spriteFrames ? (
+                        {activeFrames ? (
                           <img
-                            src={spriteFrames[breathFrame[side] % 5]}
+                            src={activeFrames[breathFrame[side] % activeFrames.length]}
                             alt={fighters[side].name}
                             draggable={false}
                             className="h-[250px] w-auto max-w-none object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
@@ -9913,7 +9926,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   <div className="relative inline-flex mb-3">
                     <span className="w-20 h-20 rounded-full flex items-center justify-center text-4xl overflow-visible" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)` }}>
                       {TEAM_SPRITES[(fighters[winner].color || '').toLowerCase()] ? (
-                        <img src={TEAM_SPRITES[fighters[winner].color.toLowerCase()][0]} alt={fighters[winner].name} draggable={false} className="h-24 w-auto object-contain select-none drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" />
+                        <img src={TEAM_SPRITES[fighters[winner].color.toLowerCase()].idle[0]} alt={fighters[winner].name} draggable={false} className="h-24 w-auto object-contain select-none drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" />
                       ) : fighters[winner].emoji}
                     </span>
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-white flex items-center justify-center shadow-lg">
