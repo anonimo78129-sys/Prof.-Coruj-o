@@ -9503,6 +9503,25 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: 
 
   const ANCHORS = [{ x: 24, y: 66 }, { x: 76, y: 30 }];
 
+  // Sprites reais por cor de time (fallback: emoji). Frames de respiração
+  // ciclam enquanto o lado estiver 'idle'; parado no último quadro nas outras poses.
+  const TEAM_SPRITES: Record<string, string[]> = {
+    '#ef4444': [
+      '/assets/battle/duck-red/idle-1.png',
+      '/assets/battle/duck-red/idle-2.png',
+      '/assets/battle/duck-red/idle-3.png',
+      '/assets/battle/duck-red/idle-4.png',
+      '/assets/battle/duck-red/idle-5.png',
+    ],
+  };
+  const [breathFrame, setBreathFrame] = useState<[number, number]>([0, 0]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' ? (f + 1) % 5 : f)) as [number, number]);
+    }, 260);
+    return () => clearInterval(id);
+  }, [poses]);
+
   const shuffleQ = (raw: GamiBattleQ): GamiBattleQ => {
     const order = shuffleArray(raw.options.map((_, i) => i));
     return { q: raw.q, options: order.map(i => raw.options[i]), correct: order.indexOf(raw.correct) };
@@ -9786,7 +9805,16 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                         : `drop-shadow(0 0 ${poses[side] === 'cast' || poses[side] === 'crit' ? 30 : hp[side] <= TEAM_MAX / 2 ? 22 : 10}px ${fighters[side].color}99)`,
                     }}
                   >
-                    <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
+                    {TEAM_SPRITES[(fighters[side].color || '').toLowerCase()] ? (
+                      <img
+                        src={TEAM_SPRITES[fighters[side].color.toLowerCase()][breathFrame[side] % 5]}
+                        alt={fighters[side].name}
+                        draggable={false}
+                        className="h-24 sm:h-28 w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
+                      />
+                    ) : (
+                      <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
+                    )}
                     {poses[side] === 'thinking' ? (
                       <motion.span
                         initial={{ scale: 0, y: 4 }} animate={{ scale: 1, y: 0 }}
@@ -9858,8 +9886,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 <ConfettiBurst />
                 <div className="relative bg-[#f8f0dc] border-4 border-[#5a4a3a] rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
                   <div className="relative inline-flex mb-3">
-                    <span className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)` }}>
-                      {fighters[winner].emoji}
+                    <span className="w-20 h-20 rounded-full flex items-center justify-center text-4xl overflow-visible" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)` }}>
+                      {TEAM_SPRITES[(fighters[winner].color || '').toLowerCase()] ? (
+                        <img src={TEAM_SPRITES[fighters[winner].color.toLowerCase()][0]} alt={fighters[winner].name} draggable={false} className="h-24 w-auto object-contain select-none drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" />
+                      ) : fighters[winner].emoji}
                     </span>
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-white flex items-center justify-center shadow-lg">
                       <Crown size={15} className="text-amber-900" />
