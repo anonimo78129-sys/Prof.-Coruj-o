@@ -9453,13 +9453,14 @@ const GamiPlacar = ({ teams, onClose }: { teams: GamiTeam[]; onClose: () => void
 
 type GamiBattleQ = { q: string; options: string[]; correct: number };
 
-const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam }: {
+const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
   teams: GamiTeam[];
   students: GamiStudent[];
   subject: string;
   level: string;
   onClose: () => void;
   onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
+  isAdmin?: boolean;
 }) => {
   const TEAM_MAX = 40, HIT = 10, WRONG_HIT = 9, FURY_BONUS = 2;
   const CRIT_BONUS = 4, CRIT_TIME_MS = 3000, HEAL_AMOUNT = 5, HEAL_STREAK = 3, LOW_HP = 10;
@@ -9571,6 +9572,23 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       setError('Não consegui gerar as perguntas. Tente novamente.');
       setPhase('setup');
     }
+  };
+
+  // Atalho só para admin: pula a chamada de IA com perguntas fixas, pra
+  // testar a coreografia da luta (poses, dano, fúria...) sem gastar tempo/tokens.
+  const DEV_QUESTIONS: GamiBattleQ[] = [
+    { q: '[TESTE] Pergunta 1 — escolha a alternativa B', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 1 },
+    { q: '[TESTE] Pergunta 2 — escolha a alternativa A', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 0 },
+    { q: '[TESTE] Pergunta 3 — escolha a alternativa D', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 3 },
+    { q: '[TESTE] Pergunta 4 — escolha a alternativa C', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 2 },
+    { q: '[TESTE] Pergunta 5 — escolha a alternativa B', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 1 },
+    { q: '[TESTE] Pergunta 6 — escolha a alternativa A', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 0 },
+  ];
+  const startDevTest = () => {
+    if (hasRealTeams && pick.length !== 2) { setError('Escolha exatamente 2 equipes para a batalha.'); return; }
+    setError('');
+    questionsRef.current = DEV_QUESTIONS;
+    startBattle();
   };
 
   const setPose = (side: 0 | 1, p: Pose) =>
@@ -9754,6 +9772,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           <button onClick={generate} className="w-full bg-gradient-to-r from-rose-500 to-red-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-lg shadow-rose-950/60">
             <Swords size={20} /> Começar batalha
           </button>
+          {isAdmin && (
+            <button onClick={startDevTest} className="w-full bg-white/[0.08] border border-dashed border-white/25 text-white/70 font-bold py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2">
+              🧪 Teste rápido (dev) — pula a IA, perguntas fixas
+            </button>
+          )}
         </div>
       )}
       {phase === 'loading' && (
@@ -11861,6 +11884,7 @@ const GamificacaoScreen = ({
         {liveTool === 'placar' && <GamiPlacar teams={currentCls.teams} onClose={() => setLiveTool(null)} />}
         {liveTool === 'batalha' && (
           <GamiBatalha
+            isAdmin={isAdminAccount(profile, user)}
             teams={currentCls.teams}
             students={currentCls.students}
             subject={selectedSchedule?.subject ?? selectedSchedule?.name ?? 'Geral'}
