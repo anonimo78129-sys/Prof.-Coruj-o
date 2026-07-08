@@ -9819,25 +9819,33 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       style={{ boxShadow: `0 0 26px 10px ${fighters[side].color}`, border: `2px solid ${fighters[side].color}` }}
                     />
                   )}
-                  <div
-                    className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
-                    style={{
-                      background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}e8, ${fighters[side].color}55 62%, transparent 78%)`,
-                      filter: poses[side] === 'heal'
-                        ? 'drop-shadow(0 0 26px #22c55e)'
-                        : `drop-shadow(0 0 ${poses[side] === 'cast' || poses[side] === 'crit' ? 30 : hp[side] <= TEAM_MAX / 2 ? 22 : 10}px ${fighters[side].color}99)`,
-                    }}
-                  >
-                    {TEAM_SPRITES[(fighters[side].color || '').toLowerCase()] ? (
-                      <img
-                        src={TEAM_SPRITES[fighters[side].color.toLowerCase()][breathFrame[side] % 5]}
-                        alt={fighters[side].name}
-                        draggable={false}
-                        className="h-24 sm:h-28 w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
-                      />
-                    ) : (
-                      <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
-                    )}
+                  {(() => {
+                    const spriteFrames = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()];
+                    const glowSize = poses[side] === 'heal' ? 20 : poses[side] === 'cast' || poses[side] === 'crit' ? 26 : hp[side] <= TEAM_MAX / 2 ? 18 : 9;
+                    const glowColor = poses[side] === 'heal' ? '#22c55e' : fighters[side].color;
+                    return (
+                      <div
+                        className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
+                        style={spriteFrames
+                          // Sprite real: sem disco de fundo — só um brilho que acompanha o
+                          // contorno transparente do personagem (senão a bolinha colorida
+                          // "vaza" atrás da arte, que é maior que o círculo).
+                          ? { filter: `drop-shadow(0 0 ${glowSize}px ${glowColor}bb)` }
+                          : {
+                              background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}e8, ${fighters[side].color}55 62%, transparent 78%)`,
+                              filter: `drop-shadow(0 0 ${glowSize + (poses[side] === 'heal' ? 6 : 4)}px ${glowColor}99)`,
+                            }}
+                      >
+                        {spriteFrames ? (
+                          <img
+                            src={spriteFrames[breathFrame[side] % 5]}
+                            alt={fighters[side].name}
+                            draggable={false}
+                            className="h-24 sm:h-28 w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
+                          />
+                        ) : (
+                          <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
+                        )}
                     {poses[side] === 'thinking' ? (
                       <motion.span
                         initial={{ scale: 0, y: 4 }} animate={{ scale: 1, y: 0 }}
@@ -9846,7 +9854,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     ) : phase !== 'intro' && turn === side && winner === null && (
                       <span className="absolute -top-3 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
                     )}
-                  </div>
+                      </div>
+                    );
+                  })()}
                   <div className="-mt-4">
                     <div className="w-28 h-7 rounded-[50%] bg-gradient-to-b from-[#7ec850] to-[#57a33b] border-2 border-[#3f7c2b] shadow-md" />
                     <div className="mx-auto -mt-2.5 w-20 h-7 rounded-b-[2.5rem] bg-gradient-to-b from-[#8a5a33] to-[#5f3d22]" />
