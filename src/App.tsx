@@ -9841,7 +9841,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                             src={spriteFrames[breathFrame[side] % 5]}
                             alt={fighters[side].name}
                             draggable={false}
-                            className="h-24 sm:h-28 w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
+                            className="h-[115px] sm:h-[134px] w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
                           />
                         ) : (
                           <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
@@ -9857,10 +9857,6 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       </div>
                     );
                   })()}
-                  <div className="-mt-4">
-                    <div className="w-28 h-7 rounded-[50%] bg-gradient-to-b from-[#7ec850] to-[#57a33b] border-2 border-[#3f7c2b] shadow-md" />
-                    <div className="mx-auto -mt-2.5 w-20 h-7 rounded-b-[2.5rem] bg-gradient-to-b from-[#8a5a33] to-[#5f3d22]" />
-                  </div>
                 </motion.div>
                 <div className="mx-auto mt-2 w-24 h-4 rounded-[50%] bg-black/20 blur-[3px]" />
               </div>
