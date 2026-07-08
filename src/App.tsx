@@ -9838,7 +9838,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                             src={spriteFrames[breathFrame[side] % 5]}
                             alt={fighters[side].name}
                             draggable={false}
-                            className="h-[min(38vh,260px)] w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
+                            className="h-[250px] w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
                           />
                         ) : (
                           <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
