@@ -9826,12 +9826,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     return (
                       <div
                         className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
-                        style={spriteFrames
-                          // Sprite real: sem disco de fundo — só um brilho que acompanha o
-                          // contorno transparente do personagem (senão a bolinha colorida
-                          // "vaza" atrás da arte, que é maior que o círculo).
-                          ? { filter: `drop-shadow(0 0 ${glowSize}px ${glowColor}bb)` }
-                          : {
+                        // Sprite real: sem disco de fundo nem brilho colorido — só a arte do
+                        // personagem, sem decoração atrás.
+                        style={spriteFrames ? undefined : {
                               background: `radial-gradient(circle at 32% 28%, ${fighters[side].color}e8, ${fighters[side].color}55 62%, transparent 78%)`,
                               filter: `drop-shadow(0 0 ${glowSize + (poses[side] === 'heal' ? 6 : 4)}px ${glowColor}99)`,
                             }}
@@ -9841,7 +9838,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                             src={spriteFrames[breathFrame[side] % 5]}
                             alt={fighters[side].name}
                             draggable={false}
-                            className="h-[115px] sm:h-[134px] w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
+                            className="h-[138px] sm:h-[161px] w-auto object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
                           />
                         ) : (
                           <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
@@ -9858,7 +9855,6 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     );
                   })()}
                 </motion.div>
-                <div className="mx-auto mt-2 w-24 h-4 rounded-[50%] bg-black/20 blur-[3px]" />
               </div>
             ))}
             {/* projétil */}
