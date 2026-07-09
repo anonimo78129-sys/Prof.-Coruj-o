@@ -9506,9 +9506,10 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
 
   // Sprites reais por cor de time (fallback: emoji). Ciclam enquanto o lado
   // estiver 'idle': respiração normal, "cansado" (ofegante) quando o HP está
-  // baixo, "atacando" durante cast/attack, ou o golpe especial durante crit.
-  // Parado no último quadro durante as demais poses (hit, wrong-cast, heal, faint, thinking).
-  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; attack?: string[]; crit?: string[] }> = {
+  // baixo, "carregando poder" durante cast, ou o golpe (normal/crítico)
+  // durante attack/crit. Parado no último quadro durante as demais poses
+  // (hit, wrong-cast, heal, faint, thinking).
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; cast?: string[]; attack?: string[]; crit?: string[] }> = {
     '#ef4444': {
       idle: [
         '/assets/battle/duck-red/idle-1.png',
@@ -9520,6 +9521,16 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
       tired: [
         '/assets/battle/duck-red/tired-1.png',
         '/assets/battle/duck-red/tired-2.png',
+      ],
+      cast: [
+        '/assets/battle/duck-red/cast-1.png',
+        '/assets/battle/duck-red/cast-2.png',
+        '/assets/battle/duck-red/cast-3.png',
+        '/assets/battle/duck-red/cast-4.png',
+        '/assets/battle/duck-red/cast-5.png',
+        '/assets/battle/duck-red/cast-6.png',
+        '/assets/battle/duck-red/cast-7.png',
+        '/assets/battle/duck-red/cast-8.png',
       ],
       attack: [
         '/assets/battle/duck-red/attack-1.png',
@@ -9845,6 +9856,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     const isAttacking = ATTACK_POSES.includes(poses[side]);
                     const activeFrames = spriteSet
                       ? (poses[side] === 'crit' && spriteSet.crit ? spriteSet.crit
+                        : poses[side] === 'cast' && spriteSet.cast ? spriteSet.cast
                         : isAttacking && spriteSet.attack ? spriteSet.attack
                         : poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired
                         : spriteSet.idle)
