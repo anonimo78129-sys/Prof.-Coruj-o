@@ -9507,9 +9507,10 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   // Sprites reais por cor de time (fallback: emoji). Ciclam enquanto o lado
   // estiver 'idle': respiração normal, "cansado" (ofegante) quando o HP está
   // baixo, "carregando poder" durante cast, ou o golpe (normal/crítico)
-  // durante attack/crit. Parado no último quadro durante as demais poses
-  // (hit, wrong-cast, heal, faint, thinking).
-  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; cast?: string[]; attack?: string[]; crit?: string[] }> = {
+  // durante attack/crit. 'hit' toca os quadros uma vez só (sem loop) e
+  // congela no último. Parado no último quadro durante as demais poses
+  // (wrong-cast, heal, faint, thinking).
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; cast?: string[]; attack?: string[]; crit?: string[]; hit?: string[] }> = {
     '#ef4444': {
       idle: [
         '/assets/battle/duck-red/idle-1.png',
@@ -9541,6 +9542,11 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         '/assets/battle/duck-red/crit-2.png',
         '/assets/battle/duck-red/crit-3.png',
       ],
+      hit: [
+        '/assets/battle/duck-red/hit-1.png',
+        '/assets/battle/duck-red/hit-2.png',
+        '/assets/battle/duck-red/hit-3.png',
+      ],
     },
   };
   const ATTACK_POSES: Pose[] = ['cast', 'attack', 'crit'];
@@ -9553,6 +9559,25 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
     }, 220);
     return () => clearInterval(id);
   }, [poses]);
+
+  // 'hit' não cicla como as outras poses: avança pelos quadros uma única
+  // vez (sem voltar ao início) e para no último até a pose mudar.
+  const HIT_FRAME_MS = 90;
+  const [hitFrame, setHitFrame] = useState<[number, number]>([0, 0]);
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    ([0, 1] as const).forEach(side => {
+      if (poses[side] !== 'hit') return;
+      setHitFrame(prev => { const next = [...prev] as [number, number]; next[side] = 0; return next; });
+      const frameCount = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()]?.hit?.length ?? 1;
+      for (let f = 1; f < frameCount; f++) {
+        timers.push(setTimeout(() => {
+          setHitFrame(prev => { const next = [...prev] as [number, number]; next[side] = f; return next; });
+        }, f * HIT_FRAME_MS));
+      }
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [poses[0], poses[1]]);
 
   const shuffleQ = (raw: GamiBattleQ): GamiBattleQ => {
     const order = shuffleArray(raw.options.map((_, i) => i));
@@ -9855,12 +9880,16 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     const isLowHp = hp[side] > 0 && hp[side] <= LOW_HP;
                     const isAttacking = ATTACK_POSES.includes(poses[side]);
                     const activeFrames = spriteSet
-                      ? (poses[side] === 'crit' && spriteSet.crit ? spriteSet.crit
+                      ? (poses[side] === 'hit' && spriteSet.hit ? spriteSet.hit
+                        : poses[side] === 'crit' && spriteSet.crit ? spriteSet.crit
                         : poses[side] === 'cast' && spriteSet.cast ? spriteSet.cast
                         : isAttacking && spriteSet.attack ? spriteSet.attack
                         : poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired
                         : spriteSet.idle)
                       : null;
+                    const frameIdx = poses[side] === 'hit' && spriteSet?.hit
+                      ? Math.min(hitFrame[side], activeFrames!.length - 1)
+                      : breathFrame[side] % (activeFrames?.length || 1);
                     const glowSize = poses[side] === 'heal' ? 20 : poses[side] === 'cast' || poses[side] === 'crit' ? 26 : hp[side] <= TEAM_MAX / 2 ? 18 : 9;
                     const glowColor = poses[side] === 'heal' ? '#22c55e' : fighters[side].color;
                     return (
@@ -9875,7 +9904,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       >
                         {activeFrames ? (
                           <img
-                            src={activeFrames[breathFrame[side] % activeFrames.length]}
+                            src={activeFrames[frameIdx]}
                             alt={fighters[side].name}
                             draggable={false}
                             className="h-[250px] w-auto max-w-none object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
