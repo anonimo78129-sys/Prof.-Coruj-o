@@ -9506,9 +9506,9 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
 
   // Sprites reais por cor de time (fallback: emoji). Ciclam enquanto o lado
   // estiver 'idle': respiração normal, "cansado" (ofegante) quando o HP está
-  // baixo, ou "atacando" durante cast/attack/crit. Parado no último quadro
-  // durante as demais poses (hit, wrong-cast, heal, faint, thinking).
-  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; attack?: string[] }> = {
+  // baixo, "atacando" durante cast/attack, ou o golpe especial durante crit.
+  // Parado no último quadro durante as demais poses (hit, wrong-cast, heal, faint, thinking).
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; attack?: string[]; crit?: string[] }> = {
     '#ef4444': {
       idle: [
         '/assets/battle/duck-red/idle-1.png',
@@ -9524,6 +9524,11 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
       attack: [
         '/assets/battle/duck-red/attack-1.png',
         '/assets/battle/duck-red/attack-2.png',
+      ],
+      crit: [
+        '/assets/battle/duck-red/crit-1.png',
+        '/assets/battle/duck-red/crit-2.png',
+        '/assets/battle/duck-red/crit-3.png',
       ],
     },
   };
@@ -9839,7 +9844,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     const isLowHp = hp[side] > 0 && hp[side] <= LOW_HP;
                     const isAttacking = ATTACK_POSES.includes(poses[side]);
                     const activeFrames = spriteSet
-                      ? (isAttacking && spriteSet.attack ? spriteSet.attack
+                      ? (poses[side] === 'crit' && spriteSet.crit ? spriteSet.crit
+                        : isAttacking && spriteSet.attack ? spriteSet.attack
                         : poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired
                         : spriteSet.idle)
                       : null;
