@@ -9505,9 +9505,10 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   const ANCHORS = [{ x: 24, y: 66 }, { x: 76, y: 30 }];
 
   // Sprites reais por cor de time (fallback: emoji). Ciclam enquanto o lado
-  // estiver 'idle': respiração normal, ou "cansado" (ofegante) quando o HP
-  // está baixo. Parado no último quadro durante as outras poses.
-  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[] }> = {
+  // estiver 'idle': respiração normal, "cansado" (ofegante) quando o HP está
+  // baixo, ou "atacando" durante cast/attack/crit. Parado no último quadro
+  // durante as demais poses (hit, wrong-cast, heal, faint, thinking).
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; attack?: string[] }> = {
     '#ef4444': {
       idle: [
         '/assets/battle/duck-red/idle-1.png',
@@ -9520,15 +9521,20 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         '/assets/battle/duck-red/tired-1.png',
         '/assets/battle/duck-red/tired-2.png',
       ],
+      attack: [
+        '/assets/battle/duck-red/attack-1.png',
+        '/assets/battle/duck-red/attack-2.png',
+      ],
     },
   };
+  const ATTACK_POSES: Pose[] = ['cast', 'attack', 'crit'];
   const [breathFrame, setBreathFrame] = useState<[number, number]>([0, 0]);
   useEffect(() => {
     const id = setInterval(() => {
       // Módulo alto (múltiplo de 2 e 5) — o índice real por conjunto de
       // quadros é calculado na renderização com `% frames.length`.
-      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' ? (f + 1) % 60 : f)) as [number, number]);
-    }, 260);
+      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' || ATTACK_POSES.includes(poses[i]) ? (f + 1) % 60 : f)) as [number, number]);
+    }, 220);
     return () => clearInterval(id);
   }, [poses]);
 
@@ -9831,8 +9837,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   {(() => {
                     const spriteSet = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()];
                     const isLowHp = hp[side] > 0 && hp[side] <= LOW_HP;
+                    const isAttacking = ATTACK_POSES.includes(poses[side]);
                     const activeFrames = spriteSet
-                      ? (poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired : spriteSet.idle)
+                      ? (isAttacking && spriteSet.attack ? spriteSet.attack
+                        : poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired
+                        : spriteSet.idle)
                       : null;
                     const glowSize = poses[side] === 'heal' ? 20 : poses[side] === 'cast' || poses[side] === 'crit' ? 26 : hp[side] <= TEAM_MAX / 2 ? 18 : 9;
                     const glowColor = poses[side] === 'heal' ? '#22c55e' : fighters[side].color;
