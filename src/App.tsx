@@ -9507,11 +9507,12 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   // Sprites reais por cor de time (fallback: emoji). Ciclam enquanto o lado
   // estiver 'idle': respiração normal, "cansado" (ofegante) quando o HP está
   // baixo, "confuso" (coçando a cabeça) durante thinking, "derrotado"
-  // (caído, olhos em X) durante faint, "carregando poder" durante cast, ou
-  // o golpe (normal/crítico) durante attack/crit. 'hit' toca os quadros
-  // uma vez só (sem loop) e congela no último. Parado no último quadro
-  // durante as demais poses (wrong-cast, heal).
-  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; thinking?: string[]; faint?: string[]; cast?: string[]; attack?: string[]; crit?: string[]; hit?: string[] }> = {
+  // (caído, olhos em X) durante faint, "magia falhando" (orbe piscando e
+  // fumaçando) durante wrong-cast, "carregando poder" durante cast, ou o
+  // golpe (normal/crítico) durante attack/crit. 'hit' toca os quadros uma
+  // vez só (sem loop) e congela no último. Parado no último quadro durante
+  // a pose restante (heal).
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; thinking?: string[]; faint?: string[]; wrongCast?: string[]; cast?: string[]; attack?: string[]; crit?: string[]; hit?: string[] }> = {
     '#ef4444': {
       idle: [
         '/assets/battle/duck-red/idle-1.png',
@@ -9532,6 +9533,11 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         '/assets/battle/duck-red/faint-1.png',
         '/assets/battle/duck-red/faint-2.png',
         '/assets/battle/duck-red/faint-3.png',
+      ],
+      wrongCast: [
+        '/assets/battle/duck-red/wrong-cast-1.png',
+        '/assets/battle/duck-red/wrong-cast-2.png',
+        '/assets/battle/duck-red/wrong-cast-3.png',
       ],
       cast: [
         '/assets/battle/duck-red/cast-1.png',
@@ -9565,7 +9571,7 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
     const id = setInterval(() => {
       // Módulo alto (múltiplo de 2 e 5) — o índice real por conjunto de
       // quadros é calculado na renderização com `% frames.length`.
-      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' || poses[i] === 'thinking' || poses[i] === 'faint' || ATTACK_POSES.includes(poses[i]) ? (f + 1) % 60 : f)) as [number, number]);
+      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' || poses[i] === 'thinking' || poses[i] === 'faint' || poses[i] === 'wrong-cast' || ATTACK_POSES.includes(poses[i]) ? (f + 1) % 60 : f)) as [number, number]);
     }, 220);
     return () => clearInterval(id);
   }, [poses]);
@@ -9896,6 +9902,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                         : isAttacking && spriteSet.attack ? spriteSet.attack
                         : poses[side] === 'thinking' && spriteSet.thinking ? spriteSet.thinking
                         : poses[side] === 'faint' && spriteSet.faint ? spriteSet.faint
+                        : poses[side] === 'wrong-cast' && spriteSet.wrongCast ? spriteSet.wrongCast
                         : poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired
                         : spriteSet.idle)
                       : null;
