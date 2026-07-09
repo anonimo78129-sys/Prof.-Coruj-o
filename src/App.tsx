@@ -9889,7 +9889,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                         className="absolute -top-4 -right-1 w-6 h-6 rounded-full bg-white border-2 border-[#5a4a3a] flex items-center justify-center font-pixel text-[9px] text-[#3a3020] shadow"
                       >?</motion.span>
                     ) : phase !== 'intro' && turn === side && winner === null && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
+                      <span className="absolute -bottom-28 sm:-bottom-24 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
                     )}
                       </div>
                     );
