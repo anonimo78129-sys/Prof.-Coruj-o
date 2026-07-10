@@ -10202,15 +10202,66 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 style={{ left: `${ANCHORS[p.side].x}%`, top: `${ANCHORS[p.side].y - 16}%`, color: p.color, textShadow: '0 2px 0 rgba(0,0,0,0.7), 0 0 14px rgba(0,0,0,0.5)' }}
               >{p.heal ? '+' : '−'}{p.val}</motion.div>
             ))}
-            {/* intro VS */}
+            {/* intro VS — nome de cima (lutador da ilha de cima), VS no meio, nome de baixo.
+                Faixas coloridas entram de lados opostos, o VS estampa com onda de choque + flash. */}
             {phase === 'intro' && (
-              <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/45">
-                <div className="flex items-center gap-4 px-4">
-                  <motion.p initial={{ x: -90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="font-pixel text-white text-[11px] text-right leading-relaxed max-w-[38%]">{fighters[0].emoji} {fighters[0].name}</motion.p>
-                  <motion.span initial={{ scale: 3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.35, type: 'spring', damping: 12 }} className="font-pixel text-3xl text-amber-400" style={{ textShadow: '0 0 26px rgba(251,191,36,0.8)' }}>VS</motion.span>
-                  <motion.p initial={{ x: 90, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ type: 'spring', damping: 14 }} className="font-pixel text-white text-[11px] leading-relaxed max-w-[38%]">{fighters[1].emoji} {fighters[1].name}</motion.p>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="absolute inset-0 z-40 overflow-hidden bg-black/55">
+                {/* faixa de cima — desliza da esquerda com a cor do time */}
+                <motion.div
+                  initial={{ x: '-110%' }} animate={{ x: 0 }} transition={{ type: 'spring', damping: 17, stiffness: 130 }}
+                  className="absolute top-[16%] inset-x-0"
+                >
+                  <div className="py-4 text-center -skew-y-2" style={{ background: `linear-gradient(90deg, transparent 2%, ${fighters[1].color}e0 22%, ${fighters[1].color}e0 78%, transparent 98%)`, boxShadow: '0 5px 20px rgba(0,0,0,0.4)' }}>
+                    <p className="font-pixel text-white text-[13px] leading-relaxed px-6" style={{ textShadow: '0 2px 0 rgba(0,0,0,0.6)' }}>{fighters[1].emoji} {fighters[1].name}</p>
+                  </div>
+                </motion.div>
+                {/* faixa de baixo — desliza da direita */}
+                <motion.div
+                  initial={{ x: '110%' }} animate={{ x: 0 }} transition={{ type: 'spring', damping: 17, stiffness: 130 }}
+                  className="absolute bottom-[16%] inset-x-0"
+                >
+                  <div className="py-4 text-center skew-y-2" style={{ background: `linear-gradient(90deg, transparent 2%, ${fighters[0].color}e0 22%, ${fighters[0].color}e0 78%, transparent 98%)`, boxShadow: '0 -5px 20px rgba(0,0,0,0.4)' }}>
+                    <p className="font-pixel text-white text-[13px] leading-relaxed px-6" style={{ textShadow: '0 2px 0 rgba(0,0,0,0.6)' }}>{fighters[0].emoji} {fighters[0].name}</p>
+                  </div>
+                </motion.div>
+                {/* flash branco no momento em que o VS estampa */}
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: [0, 0.55, 0] }} transition={{ delay: 0.5, duration: 0.4, times: [0, 0.25, 1] }}
+                  className="absolute inset-0 bg-white pointer-events-none"
+                />
+                {/* onda de choque atrás do VS */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <motion.div
+                    initial={{ scale: 0.2, opacity: 0 }} animate={{ scale: 2.8, opacity: [0.9, 0] }} transition={{ delay: 0.52, duration: 0.65, ease: 'easeOut' }}
+                    className="w-28 h-28 rounded-full border-4 border-amber-300"
+                  />
                 </div>
-              </div>
+                {/* VS gigante estampando com giro */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <motion.span
+                    initial={{ scale: 4.5, opacity: 0, rotate: -20 }} animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                    transition={{ delay: 0.45, type: 'spring', damping: 12, stiffness: 220 }}
+                    className="font-pixel text-5xl text-amber-400"
+                    style={{ textShadow: '0 0 32px rgba(251,191,36,0.9), 0 5px 0 rgba(0,0,0,0.55)' }}
+                  >VS</motion.span>
+                </div>
+                {/* faíscas saindo do impacto do VS */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  {Array.from({ length: 8 }).map((_, i) => {
+                    const angle = (i / 8) * Math.PI * 2 + 0.4;
+                    return (
+                      <motion.span
+                        key={i}
+                        initial={{ x: 0, y: 0, opacity: 0, scale: 1 }}
+                        animate={{ x: Math.cos(angle) * 90, y: Math.sin(angle) * 70, opacity: [0, 1, 0], scale: 0.2 }}
+                        transition={{ delay: 0.55, duration: 0.7, ease: 'easeOut' }}
+                        className="absolute w-2 h-2 rounded-full bg-amber-300"
+                        style={{ boxShadow: '0 0 8px 2px rgba(251,191,36,0.8)' }}
+                      />
+                    );
+                  })}
+                </div>
+              </motion.div>
             )}
             {/* ── Vitória ── */}
             {phase === 'end' && winner !== null && (
