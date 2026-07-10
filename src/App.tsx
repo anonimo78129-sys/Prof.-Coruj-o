@@ -10155,10 +10155,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
         @keyframes gami-tilt-kf { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-4deg); } }
         .gami-tilt { animation: gami-tilt-kf 1.21s ease-in-out infinite; transform-origin: 50% 90%; }
       `}</style>
-      {/* ── Arena (tela cheia, clara) ── */}
-      <div ref={arenaRef} className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
-            <div className="absolute inset-0 pointer-events-none opacity-70" style={{ backgroundImage: 'repeating-linear-gradient(180deg, rgba(255,255,255,0.10) 0 26px, rgba(0,0,0,0.04) 26px 52px)' }} />
-            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.13) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0.13) 75%, transparent 75%, transparent 100%)', backgroundSize: '48px 48px', animation: 'gami-battle-stripes 3s linear infinite' }} />
+      {/* ── Arena (tela cheia) — cenário pixel-art de lago/montanhas ── */}
+      <div ref={arenaRef} className="relative flex-1 overflow-hidden" style={{ backgroundImage: "url('/assets/battle/arena-bg.jpg')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
             <div ref={flashRef} className="absolute inset-0 pointer-events-none z-50 bg-white opacity-0" />
             <button onClick={onClose} className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-[#1e3a2a]/85 text-emerald-100 border-2 border-emerald-100/30 rounded-lg px-3 py-1.5 text-[11px] font-black tracking-widest active:scale-95 transition-transform">
               <X size={13} /> <span className="font-pixel text-[9px]">SAIR</span>
