@@ -7592,6 +7592,7 @@ const EstudioScreen = ({
   const [wsGridSize, setWsGridSize] = useState<10 | 15 | 20>(15);
   const [escapeTheme, setEscapeTheme] = useState<EscapeTheme>('medieval');
   const [escapeEnigmaCount, setEscapeEnigmaCount] = useState<4 | 5 | 6>(5);
+  const [showBattle, setShowBattle] = useState(false);
 
   const studioLoadingMsg = useFunnyLoadingMessage(isGenerating, 'studio');
   const selectedClass = (schedules || []).find(s => s.id === classId);
@@ -7849,34 +7850,34 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
     flashcard: { title: 'Flashcards', icon: Layers, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', desc: 'Cartões de revisão frente e verso para imprimir' },
   };
 
-  const smallActivities: GameMode[] = ['sequencia', 'flashcard', 'story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
+  const smallActivities: GameMode[] = ['sequencia', 'escape', 'story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
 
       <div className="px-1 mb-6">
-        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em sequências didáticas, flashcards e atividades gamificadas que prendem a atenção da turma.</p>
+        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {/* ESCAPE ROOM — destaque */}
+      {/* BATALHA DE REVISÃO — destaque */}
       <button
-        onClick={() => setActiveMode('escape')}
+        onClick={() => setShowBattle(true)}
         className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-rose-600 via-red-600 to-orange-500 active:scale-[0.98] transition-transform"
       >
         <div className="absolute -top-6 -right-6 opacity-20">
-          <KeyRound size={130} className="text-white" />
+          <Swords size={130} className="text-white" />
         </div>
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[10px] font-black tracking-widest uppercase text-yellow-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Principal</span>
           </div>
-          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Escape Room</h2>
+          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Batalha de Revisão</h2>
           <p className="text-sm text-rose-100 max-w-[80%] leading-relaxed mb-4">
-            Crie enigmas encadeados temáticos para imprimir e jogar em sala. Desafio a resolver em equipe.
+            Duelo em turnos: a IA gera perguntas e as equipes se enfrentam. Acertou ataca, errou leva contra-ataque. Vence quem zerar o HP do rival!
           </p>
           <div className="inline-flex items-center gap-2 bg-white text-rose-700 font-bold px-4 py-2 rounded-full text-sm">
-            <KeyRound size={16} /> Criar escape room
+            <Swords size={16} /> Começar batalha
           </div>
         </div>
       </button>
@@ -8444,6 +8445,19 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Batalha de Revisão em tela cheia — sem equipes reais (usa Time Azul
+          × Time Vermelho padrão), então não há XP a premiar aqui. */}
+      {showBattle && (
+        <GamiBatalha
+          teams={[]}
+          students={[]}
+          subject={profile.subject || 'Geral'}
+          level={defaultLevel}
+          onClose={() => setShowBattle(false)}
+          onAwardTeam={() => {}}
+        />
+      )}
     </motion.div>
   );
 };
