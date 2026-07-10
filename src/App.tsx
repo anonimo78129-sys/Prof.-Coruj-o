@@ -9562,7 +9562,7 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
 }) => {
   const TEAM_MAX = 40, HIT = 10, WRONG_HIT = 9, FURY_BONUS = 2;
   const CRIT_BONUS = 4, CRIT_TIME_MS = 3000, HEAL_AMOUNT = 5, HEAL_STREAK = 3, LOW_HP = 10;
-  type Pose = 'idle' | 'attack' | 'hit' | 'faint' | 'cast' | 'crit' | 'thinking' | 'wrong-cast' | 'heal';
+  type Pose = 'idle' | 'attack' | 'hit' | 'faint' | 'cast' | 'crit' | 'thinking' | 'wrong-cast' | 'heal' | 'victory';
   const hasRealTeams = teams.length >= 2;
   const [pick, setPick] = useState<number[]>([0, 1]);
   const fighters = useMemo(() => hasRealTeams
@@ -9634,7 +9634,7 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   // heal, "carregando poder" durante cast, ou o golpe (normal/crítico)
   // durante attack/crit. 'hit' toca os quadros uma vez só (sem loop) e
   // congela no último.
-  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; thinking?: string[]; faint?: string[]; wrongCast?: string[]; heal?: string[]; cast?: string[]; attack?: string[]; crit?: string[]; hit?: string[] }> = {
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; thinking?: string[]; faint?: string[]; wrongCast?: string[]; heal?: string[]; cast?: string[]; attack?: string[]; crit?: string[]; hit?: string[]; victory?: string[] }> = {
     '#ef4444': {
       idle: [
         '/assets/battle/duck-red/idle-1.png',
@@ -9689,6 +9689,10 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         '/assets/battle/duck-red/hit-1.png',
         '/assets/battle/duck-red/hit-2.png',
         '/assets/battle/duck-red/hit-3.png',
+      ],
+      victory: [
+        '/assets/battle/duck-red/victory-1.png',
+        '/assets/battle/duck-red/victory-2.png',
       ],
     },
     // Mesma arte do pato vermelho sem o espelhamento (olha pra esquerda,
@@ -9749,6 +9753,10 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         '/assets/battle/duck-blue/hit-2.png',
         '/assets/battle/duck-blue/hit-3.png',
       ],
+      victory: [
+        '/assets/battle/duck-blue/victory-1.png',
+        '/assets/battle/duck-blue/victory-2.png',
+      ],
     },
   };
   const ATTACK_POSES: Pose[] = ['cast', 'attack', 'crit'];
@@ -9767,7 +9775,7 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
       // Módulo alto (múltiplo de 2 e 5) — o índice real por conjunto de
       // quadros é calculado na renderização com `% frames.length`.
       const ps = posesRef.current;
-      setBreathFrame(prev => prev.map((f, i) => (ps[i] === 'idle' || ps[i] === 'thinking' || ps[i] === 'faint' || ps[i] === 'wrong-cast' || ps[i] === 'heal' || ATTACK_POSES.includes(ps[i]) ? (f + 1) % 60 : f)) as [number, number]);
+      setBreathFrame(prev => prev.map((f, i) => (ps[i] === 'idle' || ps[i] === 'thinking' || ps[i] === 'faint' || ps[i] === 'wrong-cast' || ps[i] === 'heal' || ps[i] === 'victory' || ATTACK_POSES.includes(ps[i]) ? (f + 1) % 60 : f)) as [number, number]);
     }, 220);
     return () => clearInterval(id);
   }, [battleRunning]);
@@ -9914,6 +9922,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
 
   const finish = (win: 0 | 1, faint: 0 | 1) => {
     setPose(faint, 'faint');
+    setPose(win, 'victory'); // vencedor comemora (acenando, cajado erguido)
     setMsg(`${fighters[faint].name} não aguenta mais!`);
     // Segura ~4s no derrotado (visível, só cai/gira) antes da tela de
     // vitória cobrir a arena — o fade do próprio sprite (poseAnim 'faint')
@@ -10010,6 +10019,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     : p === 'wrong-cast' ? { x: side === 0 ? -14 : 14, y: 6, scale: 0.94, opacity: 1, rotate: 0, transition: { duration: 0.44 } }
     : p === 'heal' ? { x: 0, y: [0, -16, 0], scale: [1, 1.12, 1], opacity: 1, rotate: 0, transition: { duration: 0.66 } }
     : p === 'thinking' ? { x: 0, y: [0, -5, 0], scale: 1, opacity: 1, rotate: [0, -4, 4, 0], transition: { y: { duration: 1.76, repeat: Infinity }, rotate: { duration: 2.2, repeat: Infinity } } }
+    // Vencedor: pulinhos alegres de comemoração, em loop.
+    : p === 'victory' ? { x: 0, y: [0, -18, 0], scale: [1, 1.05, 1], opacity: 1, rotate: 0, transition: { duration: 0.7, repeat: Infinity, ease: 'easeOut' } }
     // Fica parado no lugar (a arte do sprite já mostra o pato caído) e só
     // desaparece perto do fim da espera de 4s do finish(), pouco antes da
     // tela de vitória cobrir tudo — sem tombar nem escorregar pra fora.
@@ -10193,6 +10204,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                         : poses[side] === 'faint' && spriteSet.faint ? spriteSet.faint
                         : poses[side] === 'wrong-cast' && spriteSet.wrongCast ? spriteSet.wrongCast
                         : poses[side] === 'heal' && spriteSet.heal ? spriteSet.heal
+                        : poses[side] === 'victory' && spriteSet.victory ? spriteSet.victory
                         : poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired
                         : spriteSet.idle)
                       : null;
@@ -10376,7 +10388,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   <div className="relative inline-flex mb-3">
                     <span className="w-20 h-20 rounded-full flex items-center justify-center text-4xl overflow-visible" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)` }}>
                       {TEAM_SPRITES[(fighters[winner].color || '').toLowerCase()] ? (
-                        <img src={TEAM_SPRITES[fighters[winner].color.toLowerCase()].idle[0]} alt={fighters[winner].name} draggable={false} className="h-24 w-auto object-contain select-none drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" />
+                        <motion.img
+                          animate={{ y: [0, -6, 0], rotate: [0, -3, 3, 0] }} transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+                          src={(TEAM_SPRITES[fighters[winner].color.toLowerCase()].victory ?? TEAM_SPRITES[fighters[winner].color.toLowerCase()].idle)[0]}
+                          alt={fighters[winner].name} draggable={false} className="h-24 w-auto object-contain select-none drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]"
+                        />
                       ) : fighters[winner].emoji}
                     </span>
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-white flex items-center justify-center shadow-lg">
