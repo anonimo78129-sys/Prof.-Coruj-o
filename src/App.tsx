@@ -8806,6 +8806,104 @@ const playChime = (positive = true) => {
   } catch { /* sem áudio disponível */ }
 };
 
+// Buffer de ruído branco compartilhado (whoosh/impacto) — gerado uma vez e
+// reutilizado, mesma lógica de reaproveitamento do chimeCtx acima.
+let noiseBuffer: AudioBuffer | null = null;
+const getNoiseBuffer = (ctx: AudioContext): AudioBuffer => {
+  if (!noiseBuffer || noiseBuffer.sampleRate !== ctx.sampleRate) {
+    const len = Math.floor(ctx.sampleRate * 0.5);
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuffer;
+};
+const getChimeCtx = (): AudioContext | null => {
+  const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!Ctx) return null;
+  if (!chimeCtx || chimeCtx.state === 'closed') chimeCtx = new Ctx();
+  if (chimeCtx.state === 'suspended') chimeCtx.resume().catch(() => {});
+  return chimeCtx;
+};
+
+// Sopro de vento subindo de tom — dispara junto do windup de 'cast'.
+const playWhoosh = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 0.7;
+    filter.frequency.setValueAtTime(350, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + 0.4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+    src.connect(filter); filter.connect(g); g.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.5);
+    setTimeout(() => { try { src.disconnect(); filter.disconnect(); g.disconnect(); } catch {} }, 700);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Baque grave (tom caindo + ruído filtrado) — dispara no momento do impacto;
+// mais pesado quando o golpe foi crítico.
+const playImpactThud = (heavy = false) => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(heavy ? 170 : 120, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(38, ctx.currentTime + 0.18);
+    g.gain.setValueAtTime(heavy ? 0.30 : 0.20, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.25);
+
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(heavy ? 1000 : 650, ctx.currentTime);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(heavy ? 0.24 : 0.14, ctx.currentTime);
+    ng.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+    src.connect(filter); filter.connect(ng); ng.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.15);
+
+    setTimeout(() => { try { o.disconnect(); g.disconnect(); src.disconnect(); filter.disconnect(); ng.disconnect(); } catch {} }, 400);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Arpejo ascendente e brilhante — dispara na cura por sequência de acertos.
+const playHealChime = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    [660, 880, 1320].forEach((freq, i) => {
+      const t = ctx!.currentTime + i * 0.09;
+      const o = ctx!.createOscillator();
+      const g = ctx!.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(g); g.connect(ctx!.destination);
+      o.start(t);
+      o.stop(t + 0.32);
+      setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, (i * 90) + 500);
+    });
+  } catch { /* sem áudio disponível */ }
+};
+
 const gamiDefaultClass = (classId: string): ClassGamification => ({
   id: classId,
   students: [],
@@ -9486,10 +9584,29 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   const [winner, setWinner] = useState<0 | 1 | null>(null);
   const [poses, setPoses] = useState<Pose[]>(['idle', 'idle']);
   const [smoke, setSmoke] = useState<{ side: 0 | 1; key: number } | null>(null);
-  const [proj, setProj] = useState<{ from: 0 | 1; key: number } | null>(null);
-  const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string } | null>(null);
+  const [proj, setProj] = useState<{ from: 0 | 1; key: number; crit?: boolean; fury?: boolean } | null>(null);
+  const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string; crit?: boolean } | null>(null);
   const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string; heal?: boolean }[]>([]);
   const [awarded, setAwarded] = useState(false);
+
+  // Tremor de tela + flash branco no impacto crítico: manipulação direta de
+  // classe CSS (via ref) em vez de estado, pra reiniciar a animação mesmo em
+  // críticos consecutivos sem esperar um re-render.
+  const arenaRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
+  const triggerCritFx = () => {
+    const arena = arenaRef.current, flash = flashRef.current;
+    if (arena) { arena.classList.remove('gami-crit-shake'); void arena.offsetWidth; arena.classList.add('gami-crit-shake'); }
+    if (flash) { flash.classList.remove('gami-crit-flash'); void flash.offsetWidth; flash.classList.add('gami-crit-flash'); }
+  };
+
+  // Flash branco no próprio sprite ao tomar dano — mesma técnica (classList
+  // via ref, não estado) pra funcionar em impactos seguidos.
+  const spriteImgRefs = useRef<[HTMLImageElement | null, HTMLImageElement | null]>([null, null]);
+  const triggerHitFlash = (side: 0 | 1) => {
+    const el = spriteImgRefs.current[side];
+    if (el) { el.classList.remove('gami-hit-flash'); void el.offsetWidth; el.classList.add('gami-hit-flash'); }
+  };
 
   const questionsRef = useRef<GamiBattleQ[]>([]);
   const bagRef = useRef<GamiBattleQ[]>([]);
@@ -9506,9 +9623,13 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
 
   // Sprites reais por cor de time (fallback: emoji). Ciclam enquanto o lado
   // estiver 'idle': respiração normal, "cansado" (ofegante) quando o HP está
-  // baixo, ou "atacando" durante cast/attack/crit. Parado no último quadro
-  // durante as demais poses (hit, wrong-cast, heal, faint, thinking).
-  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; attack?: string[] }> = {
+  // baixo, "confuso" (coçando a cabeça) durante thinking, "derrotado"
+  // (caído, olhos em X) durante faint, "magia falhando" (orbe piscando e
+  // fumaçando) durante wrong-cast, "curando" (olhos de coração) durante
+  // heal, "carregando poder" durante cast, ou o golpe (normal/crítico)
+  // durante attack/crit. 'hit' toca os quadros uma vez só (sem loop) e
+  // congela no último.
+  const TEAM_SPRITES: Record<string, { idle: string[]; tired?: string[]; thinking?: string[]; faint?: string[]; wrongCast?: string[]; heal?: string[]; cast?: string[]; attack?: string[]; crit?: string[]; hit?: string[] }> = {
     '#ef4444': {
       idle: [
         '/assets/battle/duck-red/idle-1.png',
@@ -9521,9 +9642,48 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         '/assets/battle/duck-red/tired-1.png',
         '/assets/battle/duck-red/tired-2.png',
       ],
+      thinking: [
+        '/assets/battle/duck-red/thinking-1.png',
+        '/assets/battle/duck-red/thinking-2.png',
+      ],
+      faint: [
+        '/assets/battle/duck-red/faint-1.png',
+        '/assets/battle/duck-red/faint-2.png',
+        '/assets/battle/duck-red/faint-3.png',
+      ],
+      wrongCast: [
+        '/assets/battle/duck-red/wrong-cast-1.png',
+        '/assets/battle/duck-red/wrong-cast-2.png',
+        '/assets/battle/duck-red/wrong-cast-3.png',
+      ],
+      heal: [
+        '/assets/battle/duck-red/heal-1.png',
+        '/assets/battle/duck-red/heal-2.png',
+        '/assets/battle/duck-red/heal-3.png',
+      ],
+      cast: [
+        '/assets/battle/duck-red/cast-1.png',
+        '/assets/battle/duck-red/cast-2.png',
+        '/assets/battle/duck-red/cast-3.png',
+        '/assets/battle/duck-red/cast-4.png',
+        '/assets/battle/duck-red/cast-5.png',
+        '/assets/battle/duck-red/cast-6.png',
+        '/assets/battle/duck-red/cast-7.png',
+        '/assets/battle/duck-red/cast-8.png',
+      ],
       attack: [
         '/assets/battle/duck-red/attack-1.png',
         '/assets/battle/duck-red/attack-2.png',
+      ],
+      crit: [
+        '/assets/battle/duck-red/crit-1.png',
+        '/assets/battle/duck-red/crit-2.png',
+        '/assets/battle/duck-red/crit-3.png',
+      ],
+      hit: [
+        '/assets/battle/duck-red/hit-1.png',
+        '/assets/battle/duck-red/hit-2.png',
+        '/assets/battle/duck-red/hit-3.png',
       ],
     },
   };
@@ -9533,10 +9693,49 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
     const id = setInterval(() => {
       // Módulo alto (múltiplo de 2 e 5) — o índice real por conjunto de
       // quadros é calculado na renderização com `% frames.length`.
-      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' || ATTACK_POSES.includes(poses[i]) ? (f + 1) % 60 : f)) as [number, number]);
+      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' || poses[i] === 'thinking' || poses[i] === 'faint' || poses[i] === 'wrong-cast' || poses[i] === 'heal' || ATTACK_POSES.includes(poses[i]) ? (f + 1) % 60 : f)) as [number, number]);
     }, 220);
     return () => clearInterval(id);
   }, [poses]);
+
+  // 'hit' não cicla como as outras poses: avança pelos quadros uma única
+  // vez (sem voltar ao início) e para no último até a pose mudar.
+  const HIT_FRAME_MS = 100;
+  const [hitFrame, setHitFrame] = useState<[number, number]>([0, 0]);
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    ([0, 1] as const).forEach(side => {
+      if (poses[side] !== 'hit') return;
+      setHitFrame(prev => { const next = [...prev] as [number, number]; next[side] = 0; return next; });
+      const frameCount = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()]?.hit?.length ?? 1;
+      for (let f = 1; f < frameCount; f++) {
+        timers.push(setTimeout(() => {
+          setHitFrame(prev => { const next = [...prev] as [number, number]; next[side] = f; return next; });
+        }, f * HIT_FRAME_MS));
+      }
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [poses[0], poses[1]]);
+
+  // 'cast' também toca uma vez só, mas pra frente ao ritmo dos 8 quadros de
+  // carregamento (não do ciclo lento de respiração) — termina no quadro do
+  // brilho máximo bem quando o projétil sai.
+  const CAST_FRAME_MS = 80;
+  const [castFrame, setCastFrame] = useState<[number, number]>([0, 0]);
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    ([0, 1] as const).forEach(side => {
+      if (poses[side] !== 'cast') return;
+      setCastFrame(prev => { const next = [...prev] as [number, number]; next[side] = 0; return next; });
+      const frameCount = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()]?.cast?.length ?? 1;
+      for (let f = 1; f < frameCount; f++) {
+        timers.push(setTimeout(() => {
+          setCastFrame(prev => { const next = [...prev] as [number, number]; next[side] = f; return next; });
+        }, f * CAST_FRAME_MS));
+      }
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [poses[0], poses[1]]);
 
   const shuffleQ = (raw: GamiBattleQ): GamiBattleQ => {
     const order = shuffleArray(raw.options.map((_, i) => i));
@@ -9616,20 +9815,23 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     after(8000, () => { if (awaiting.current) setPose(t, 'thinking'); });
   };
 
-  const impact = (target: 0 | 1, dmg: number, color: string) => {
+  const impact = (target: 0 | 1, dmg: number, color: string, crit = false) => {
     setProj(null);
-    setRing({ side: target, key: ++fxKey.current, color });
+    setRing({ side: target, key: ++fxKey.current, color, crit });
     const id = ++fxKey.current;
     setPops(p => [...p, { id, side: target, val: dmg, color }]);
     after(900, () => setPops(p => p.filter(x => x.id !== id)));
     setPose(target, 'hit');
     setHp(h => h.map((v, i) => i === target ? Math.max(0, v - dmg) : v) as [number, number]);
+    playImpactThud(crit);
+    triggerHitFlash(target);
+    if (crit) triggerCritFx();
   };
 
   const finish = (win: 0 | 1, faint: 0 | 1) => {
     setPose(faint, 'faint');
     setMsg(`${fighters[faint].name} não aguenta mais!`);
-    after(1100, () => { setWinner(win); setPhase('end'); playChime(true); });
+    after(1350, () => { setWinner(win); setPhase('end'); playChime(true); });
   };
 
   const nextTurn = (prev: 0 | 1) => {
@@ -9649,6 +9851,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     setRing({ side, key: ++fxKey.current, color: '#22c55e' });
     setPose(side, 'heal');
     setHp(h => h.map((v, i) => i === side ? Math.min(TEAM_MAX, v + HEAL_AMOUNT) : v) as [number, number]);
+    playHealChime();
   };
 
   const answer = (i: number) => {
@@ -9669,15 +9872,16 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       const willHeal = streak.current[turn] >= HEAL_STREAK && hp[turn] > 0;
       if (willHeal) streak.current[turn] = 0;
       setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
-      setPose(turn, 'cast'); // carregando mágica no delay antes do projétil
-      after(500, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
-      after(950, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color); });
-      if (willHeal) after(1250, () => healPop(turn));
+      setPose(turn, 'cast'); // carregando mágica no delay antes do projétil — dá tempo do loop de 8 quadros tocar inteiro
+      playWhoosh();
+      after(650, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); });
+      after(1150, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
+      if (willHeal) after(1500, () => healPop(turn));
       if (newHp <= 0) {
-        after(1600, () => finish(turn, other));
+        after(1950, () => finish(turn, other));
       } else {
-        after(1700, () => setPose(other, 'idle'));
-        after(1900, () => nextTurn(turn));
+        after(2050, () => setPose(other, 'idle'));
+        after(2250, () => nextTurn(turn));
       }
     } else {
       playChime(false);
@@ -9689,14 +9893,14 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       // magia falhando: fumacinha + susto antes do contra-ataque
       setPose(turn, 'wrong-cast');
       setSmoke({ side: turn, key: ++fxKey.current });
-      after(900, () => setSmoke(null));
-      after(1400, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current }); });
-      after(1850, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
+      after(950, () => setSmoke(null));
+      after(1650, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current, fury }); });
+      after(2150, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
       if (newHp <= 0) {
-        after(2400, () => finish(other, turn));
+        after(2800, () => finish(other, turn));
       } else {
-        after(2400, () => setPose(turn, 'idle'));
-        after(2600, () => nextTurn(turn));
+        after(2800, () => setPose(turn, 'idle'));
+        after(3000, () => nextTurn(turn));
       }
     }
   };
@@ -9807,12 +10011,34 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   // caixas creme — paleta própria, deliberadamente distinta do modo palco.
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
-      {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras */}
-      <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 48px 48px; } }`}</style>
+      {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras.
+          gami-crit-shake/gami-crit-flash são disparadas via classList (não estado),
+          pra reiniciar mesmo em críticos consecutivos sem esperar re-render. */}
+      <style>{`
+        @keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 48px 48px; } }
+        @keyframes gami-crit-shake-kf { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-10px, 3px); } 30% { transform: translate(9px, -3px); } 45% { transform: translate(-7px, 2px); } 60% { transform: translate(6px, -2px); } 75% { transform: translate(-3px, 1px); } 90% { transform: translate(2px, 0); } }
+        .gami-crit-shake { animation: gami-crit-shake-kf 0.4s ease-out; }
+        @keyframes gami-crit-flash-kf { 0% { opacity: 0; } 12% { opacity: 0.7; } 100% { opacity: 0; } }
+        .gami-crit-flash { animation: gami-crit-flash-kf 0.35s ease-out; }
+        @keyframes gami-proj-tremor-kf { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1.5px, -1.5px); } 50% { transform: translate(-1.5px, 1.5px); } 75% { transform: translate(1.5px, 1px); } }
+        .gami-proj-tremor { animation: gami-proj-tremor-kf 0.09s linear infinite; }
+        @keyframes gami-hit-flash-kf { 0%, 100% { filter: brightness(1) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } 25% { filter: brightness(2.6) saturate(0.25) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } }
+        .gami-hit-flash { animation: gami-hit-flash-kf 0.28s ease-out; }
+        @keyframes gami-glitch-kf {
+          0%, 60%, 90%, 100% { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, 0); }
+          15%, 75% { filter: drop-shadow(-3px 0 #ef4444cc) drop-shadow(3px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(-1px, 0); }
+          30% { filter: drop-shadow(2px 0 #ef4444cc) drop-shadow(-2px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(1px, 0); }
+          45% { filter: drop-shadow(-2px 0 #ef4444cc) drop-shadow(2px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, -1px); }
+        }
+        .gami-glitch { animation: gami-glitch-kf 1.1s steps(1) infinite; }
+        @keyframes gami-tilt-kf { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-4deg); } }
+        .gami-tilt { animation: gami-tilt-kf 1.1s ease-in-out infinite; transform-origin: 50% 90%; }
+      `}</style>
       {/* ── Arena (tela cheia, clara) ── */}
-      <div className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
+      <div ref={arenaRef} className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
             <div className="absolute inset-0 pointer-events-none opacity-70" style={{ backgroundImage: 'repeating-linear-gradient(180deg, rgba(255,255,255,0.10) 0 26px, rgba(0,0,0,0.04) 26px 52px)' }} />
             <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.13) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0.13) 75%, transparent 75%, transparent 100%)', backgroundSize: '48px 48px', animation: 'gami-battle-stripes 3s linear infinite' }} />
+            <div ref={flashRef} className="absolute inset-0 pointer-events-none z-50 bg-white opacity-0" />
             <button onClick={onClose} className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-[#1e3a2a]/85 text-emerald-100 border-2 border-emerald-100/30 rounded-lg px-3 py-1.5 text-[11px] font-black tracking-widest active:scale-95 transition-transform">
               <X size={13} /> <span className="font-pixel text-[9px]">SAIR</span>
             </button>
@@ -9826,12 +10052,12 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   animate={poseAnim(poses[side], side, hp[side] > 0 && hp[side] <= LOW_HP)}
                   className="relative flex flex-col items-center"
                 >
-                  {/* aura de carregamento (cast/crit) */}
-                  {(poses[side] === 'cast' || poses[side] === 'crit') && (
+                  {/* aura de carregamento (cast/crit) e halo de cura (heal, em verde) */}
+                  {(poses[side] === 'cast' || poses[side] === 'crit' || poses[side] === 'heal') && (
                     <motion.div
                       initial={{ scale: 0.5, opacity: 0.9 }} animate={{ scale: [0.6, 1.35, 0.9], opacity: [0.9, 0.35, 0.8] }} transition={{ duration: 0.5, repeat: Infinity }}
                       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 w-24 h-24 sm:w-28 sm:h-28 rounded-full pointer-events-none"
-                      style={{ boxShadow: `0 0 26px 10px ${fighters[side].color}`, border: `2px solid ${fighters[side].color}` }}
+                      style={{ boxShadow: `0 0 26px 10px ${poses[side] === 'heal' ? '#22c55e' : fighters[side].color}`, border: `2px solid ${poses[side] === 'heal' ? '#22c55e' : fighters[side].color}` }}
                     />
                   )}
                   {(() => {
@@ -9839,10 +10065,22 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     const isLowHp = hp[side] > 0 && hp[side] <= LOW_HP;
                     const isAttacking = ATTACK_POSES.includes(poses[side]);
                     const activeFrames = spriteSet
-                      ? (isAttacking && spriteSet.attack ? spriteSet.attack
+                      ? (poses[side] === 'hit' && spriteSet.hit ? spriteSet.hit
+                        : poses[side] === 'crit' && spriteSet.crit ? spriteSet.crit
+                        : poses[side] === 'cast' && spriteSet.cast ? spriteSet.cast
+                        : isAttacking && spriteSet.attack ? spriteSet.attack
+                        : poses[side] === 'thinking' && spriteSet.thinking ? spriteSet.thinking
+                        : poses[side] === 'faint' && spriteSet.faint ? spriteSet.faint
+                        : poses[side] === 'wrong-cast' && spriteSet.wrongCast ? spriteSet.wrongCast
+                        : poses[side] === 'heal' && spriteSet.heal ? spriteSet.heal
                         : poses[side] === 'idle' && isLowHp && spriteSet.tired ? spriteSet.tired
                         : spriteSet.idle)
                       : null;
+                    const frameIdx = poses[side] === 'hit' && spriteSet?.hit
+                      ? Math.min(hitFrame[side], activeFrames!.length - 1)
+                      : poses[side] === 'cast' && spriteSet?.cast
+                      ? Math.min(castFrame[side], activeFrames!.length - 1)
+                      : breathFrame[side] % (activeFrames?.length || 1);
                     const glowSize = poses[side] === 'heal' ? 20 : poses[side] === 'cast' || poses[side] === 'crit' ? 26 : hp[side] <= TEAM_MAX / 2 ? 18 : 9;
                     const glowColor = poses[side] === 'heal' ? '#22c55e' : fighters[side].color;
                     return (
@@ -9857,10 +10095,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       >
                         {activeFrames ? (
                           <img
-                            src={activeFrames[breathFrame[side] % activeFrames.length]}
+                            ref={el => { spriteImgRefs.current[side] = el; }}
+                            src={activeFrames[frameIdx]}
                             alt={fighters[side].name}
                             draggable={false}
-                            className="h-[250px] w-auto max-w-none object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
+                            className={`h-[250px] w-auto max-w-none object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]${poses[side] === 'wrong-cast' ? ' gami-glitch' : ''}${poses[side] === 'thinking' ? ' gami-tilt' : ''}`}
                           />
                         ) : (
                           <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
@@ -9871,7 +10110,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                         className="absolute -top-4 -right-1 w-6 h-6 rounded-full bg-white border-2 border-[#5a4a3a] flex items-center justify-center font-pixel text-[9px] text-[#3a3020] shadow"
                       >?</motion.span>
                     ) : phase !== 'intro' && turn === side && winner === null && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
+                      <span className="absolute -bottom-28 sm:-bottom-24 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
                     )}
                       </div>
                     );
@@ -9879,16 +10118,33 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 </motion.div>
               </div>
             ))}
-            {/* projétil */}
+            {/* rastro de partículas atrás do projétil */}
+            {proj && [3, 2, 1].map(i => (
+              <motion.div
+                key={`${proj.key}-trail-${i}`}
+                initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.35, opacity: 0.55 }}
+                animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 0.12, opacity: 0 }}
+                transition={{ duration: 0.44, ease: 'easeIn', delay: i * 0.045 }}
+                className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full pointer-events-none z-10"
+                style={{ background: proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color }}
+              />
+            ))}
+            {/* projétil: gira em voo (mais rápido no crítico) e tremula se for fúria */}
             {proj && (
               <motion.div
                 key={proj.key}
-                initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.4, opacity: 0.9 }}
-                animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 1.05, opacity: 1 }}
+                initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.4, opacity: 0.9, rotate: 0 }}
+                animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 1.05, opacity: 1, rotate: proj.crit ? 720 : 360 }}
                 transition={{ duration: 0.44, ease: 'easeIn' }}
-                className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full pointer-events-none z-20"
-                style={{ background: `radial-gradient(circle, #fff 15%, ${fighters[proj.from].color})`, boxShadow: `0 0 20px 7px ${fighters[proj.from].color}aa` }}
-              />
+                className="absolute w-6 h-6 -ml-3 -mt-3 pointer-events-none z-20"
+              >
+                <div
+                  className={`absolute inset-0 rounded-full${proj.fury ? ' gami-proj-tremor' : ''}`}
+                  style={{ background: `radial-gradient(circle, #fff 15%, ${proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color})`, boxShadow: `0 0 20px 7px ${(proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color)}aa` }}
+                />
+                <span className="absolute w-1.5 h-1.5 -ml-[3px] rounded-full bg-white/95" style={{ top: 1, left: '50%' }} />
+                {proj.crit && <span className="absolute w-1.5 h-1.5 -ml-[3px] rounded-full bg-white/95" style={{ bottom: 1, left: '50%' }} />}
+              </motion.div>
             )}
             {/* anel de impacto */}
             {ring && (
@@ -9899,6 +10155,20 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, borderColor: ring.color }}
               />
             )}
+            {/* estilhaços do impacto crítico */}
+            {ring && ring.crit && Array.from({ length: 6 }).map((_, i) => {
+              const angle = (i / 6) * Math.PI * 2;
+              return (
+                <motion.div
+                  key={`${ring.key}-frag-${i}`}
+                  initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                  animate={{ x: Math.cos(angle) * 46, y: Math.sin(angle) * 46, opacity: 0, scale: 0.3 }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  className="absolute w-2 h-2 -ml-1 -mt-1 rounded-sm pointer-events-none z-30"
+                  style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, background: ring.color }}
+                />
+              );
+            })}
             {/* fumaça da magia falhando (wrong-cast) */}
             {smoke && (
               <motion.div
