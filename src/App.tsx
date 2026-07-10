@@ -9691,17 +9691,86 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         '/assets/battle/duck-red/hit-3.png',
       ],
     },
+    // Mesma arte do pato vermelho sem o espelhamento (olha pra esquerda,
+    // encarando o adversário a partir da ilha de cima) e com a túnica
+    // recolorida de vermelho pra azul.
+    '#3b82f6': {
+      idle: [
+        '/assets/battle/duck-blue/idle-1.png',
+        '/assets/battle/duck-blue/idle-2.png',
+        '/assets/battle/duck-blue/idle-3.png',
+        '/assets/battle/duck-blue/idle-4.png',
+        '/assets/battle/duck-blue/idle-5.png',
+      ],
+      tired: [
+        '/assets/battle/duck-blue/tired-1.png',
+        '/assets/battle/duck-blue/tired-2.png',
+      ],
+      thinking: [
+        '/assets/battle/duck-blue/thinking-1.png',
+        '/assets/battle/duck-blue/thinking-2.png',
+      ],
+      faint: [
+        '/assets/battle/duck-blue/faint-1.png',
+        '/assets/battle/duck-blue/faint-2.png',
+        '/assets/battle/duck-blue/faint-3.png',
+      ],
+      wrongCast: [
+        '/assets/battle/duck-blue/wrong-cast-1.png',
+        '/assets/battle/duck-blue/wrong-cast-2.png',
+        '/assets/battle/duck-blue/wrong-cast-3.png',
+      ],
+      heal: [
+        '/assets/battle/duck-blue/heal-1.png',
+        '/assets/battle/duck-blue/heal-2.png',
+        '/assets/battle/duck-blue/heal-3.png',
+      ],
+      cast: [
+        '/assets/battle/duck-blue/cast-1.png',
+        '/assets/battle/duck-blue/cast-2.png',
+        '/assets/battle/duck-blue/cast-3.png',
+        '/assets/battle/duck-blue/cast-4.png',
+        '/assets/battle/duck-blue/cast-5.png',
+        '/assets/battle/duck-blue/cast-6.png',
+        '/assets/battle/duck-blue/cast-7.png',
+        '/assets/battle/duck-blue/cast-8.png',
+      ],
+      attack: [
+        '/assets/battle/duck-blue/attack-1.png',
+        '/assets/battle/duck-blue/attack-2.png',
+      ],
+      crit: [
+        '/assets/battle/duck-blue/crit-1.png',
+        '/assets/battle/duck-blue/crit-2.png',
+        '/assets/battle/duck-blue/crit-3.png',
+      ],
+      hit: [
+        '/assets/battle/duck-blue/hit-1.png',
+        '/assets/battle/duck-blue/hit-2.png',
+        '/assets/battle/duck-blue/hit-3.png',
+      ],
+    },
   };
   const ATTACK_POSES: Pose[] = ['cast', 'attack', 'crit'];
   const [breathFrame, setBreathFrame] = useState<[number, number]>([0, 0]);
+  // Poses lidas via ref dentro do intervalo: a cadência de 220ms não
+  // reinicia a cada troca de pose, e o intervalo nem existe fora da luta
+  // (setup/loading/end não pagam por ele).
+  const posesRef = useRef(poses);
+  posesRef.current = poses;
+  // 'end' incluso: a arena (e o vencedor respirando) continua visível
+  // atrás do overlay translúcido de vitória.
+  const battleRunning = phase === 'intro' || phase === 'question' || phase === 'anim' || phase === 'end';
   useEffect(() => {
+    if (!battleRunning) return;
     const id = setInterval(() => {
       // Módulo alto (múltiplo de 2 e 5) — o índice real por conjunto de
       // quadros é calculado na renderização com `% frames.length`.
-      setBreathFrame(prev => prev.map((f, i) => (poses[i] === 'idle' || poses[i] === 'thinking' || poses[i] === 'faint' || poses[i] === 'wrong-cast' || poses[i] === 'heal' || ATTACK_POSES.includes(poses[i]) ? (f + 1) % 60 : f)) as [number, number]);
+      const ps = posesRef.current;
+      setBreathFrame(prev => prev.map((f, i) => (ps[i] === 'idle' || ps[i] === 'thinking' || ps[i] === 'faint' || ps[i] === 'wrong-cast' || ps[i] === 'heal' || ATTACK_POSES.includes(ps[i]) ? (f + 1) % 60 : f)) as [number, number]);
     }, 220);
     return () => clearInterval(id);
-  }, [poses]);
+  }, [battleRunning]);
 
   // 'hit' não cicla como as outras poses: avança pelos quadros uma única
   // vez (sem voltar ao início) e para no último até a pose mudar.
@@ -9761,6 +9830,13 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   };
 
   const startBattle = () => {
+    // Pré-carrega todos os quadros dos dois lutadores — sem isso a primeira
+    // exibição de cada pose (crítico, hit...) pode piscar em branco enquanto
+    // o PNG baixa, na primeira batalha antes do service worker cachear.
+    fighters.forEach(f => {
+      const set = TEAM_SPRITES[(f.color || '').toLowerCase()];
+      if (set) Object.values(set).forEach(frames => frames.forEach(src => { const img = new Image(); img.src = src; }));
+    });
     // Cancela a coreografia pendente da luta anterior (Revanche no meio de uma animação).
     timers.current.forEach(clearTimeout);
     timers.current = [];
@@ -9849,7 +9925,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     const nt = (1 - prev) as 0 | 1;
     setTurn(nt);
     setSelected(null);
-    setPose(nt, 'idle');
+    // Ambos os lados voltam pra idle — sem isso a pose 'heal' (olhos de
+    // coração) de quem curou ficava presa durante todo o turno do adversário.
+    setPoses(['idle', 'idle']);
     drawQuestion();
     setPhase('question');
     beginQuestionTimers(nt);
@@ -9883,16 +9961,22 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       const willHeal = streak.current[turn] >= HEAL_STREAK && hp[turn] > 0;
       if (willHeal) streak.current[turn] = 0;
       setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
-      setPose(turn, 'cast'); // carregando mágica: o loop de 8 quadros toca 2x inteiras antes do projétil sair
+      setPose(turn, 'cast'); // carregando mágica: o loop de quadros toca CAST_LOOPS vezes inteiras antes do projétil sair
+      // Janela do windup derivada do nº real de quadros do set — se a arte
+      // mudar de tamanho, o disparo continua sincronizado com o fim do loop.
+      const castLen = TEAM_SPRITES[(fighters[turn].color || '').toLowerCase()]?.cast?.length ?? 8;
+      const loopMs = castLen * CAST_FRAME_MS;
+      const tAttack = CAST_LOOPS * loopMs + 45;
       playWhoosh();
-      after(1450, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); });
-      after(2000, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
-      if (willHeal) after(2385, () => healPop(turn));
+      for (let l = 1; l < CAST_LOOPS; l++) after(l * loopMs, playWhoosh); // um sopro por volta do loop
+      after(tAttack, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); });
+      after(tAttack + 550, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
+      if (willHeal) after(tAttack + 935, () => healPop(turn));
       if (newHp <= 0) {
-        after(2880, () => finish(turn, other));
+        after(tAttack + 1430, () => finish(turn, other));
       } else {
-        after(2990, () => setPose(other, 'idle'));
-        after(3210, () => nextTurn(turn));
+        after(tAttack + 1540, () => setPose(other, 'idle'));
+        after(tAttack + 1760, () => nextTurn(turn));
       }
     } else {
       playChime(false);
@@ -10037,8 +10121,6 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
         .gami-crit-flash { animation: gami-crit-flash-kf 0.39s ease-out; }
         @keyframes gami-proj-tremor-kf { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1.5px, -1.5px); } 50% { transform: translate(-1.5px, 1.5px); } 75% { transform: translate(1.5px, 1px); } }
         .gami-proj-tremor { animation: gami-proj-tremor-kf 0.1s linear infinite; }
-        @keyframes gami-hit-flash-kf { 0%, 100% { filter: brightness(1) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } 25% { filter: brightness(2.6) saturate(0.25) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } }
-        .gami-hit-flash { animation: gami-hit-flash-kf 0.31s ease-out; }
         @keyframes gami-glitch-kf {
           0%, 60%, 90%, 100% { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, 0); }
           15%, 75% { filter: drop-shadow(-3px 0 #ef4444cc) drop-shadow(3px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(-1px, 0); }
@@ -10046,6 +10128,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           45% { filter: drop-shadow(-2px 0 #ef4444cc) drop-shadow(2px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, -1px); }
         }
         .gami-glitch { animation: gami-glitch-kf 1.21s steps(1) infinite; }
+        @keyframes gami-hit-flash-kf { 0%, 100% { filter: brightness(1) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } 25% { filter: brightness(2.6) saturate(0.25) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } }
+        /* Definida DEPOIS de .gami-glitch de propósito: se as duas classes
+           coexistirem por um frame (impacto em quem estava em wrong-cast),
+           o flash de dano vence a disputa pela propriedade animation. */
+        .gami-hit-flash { animation: gami-hit-flash-kf 0.31s ease-out; }
         @keyframes gami-tilt-kf { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-4deg); } }
         .gami-tilt { animation: gami-tilt-kf 1.21s ease-in-out infinite; transform-origin: 50% 90%; }
       `}</style>
@@ -10124,7 +10211,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                         initial={{ scale: 0, y: 4 }} animate={{ scale: 1, y: 0 }}
                         className="absolute -top-4 -right-1 w-6 h-6 rounded-full bg-white border-2 border-[#5a4a3a] flex items-center justify-center font-pixel text-[9px] text-[#3a3020] shadow"
                       >?</motion.span>
-                    ) : phase !== 'intro' && turn === side && winner === null && (
+                    ) : phase !== 'intro' && turn === side && winner === null && poses[side] !== 'faint' && (
                       <span className="absolute -bottom-28 sm:-bottom-24 left-1/2 -translate-x-1/2 font-pixel text-[7px] uppercase text-white bg-[#1e3a2a]/85 border border-white/30 px-2 py-1 rounded-full whitespace-nowrap">Sua vez</span>
                     )}
                       </div>
@@ -10180,7 +10267,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   animate={{ x: Math.cos(angle) * 46, y: Math.sin(angle) * 46, opacity: 0, scale: 0.3 }}
                   transition={{ duration: 0.55, ease: 'easeOut' }}
                   className="absolute w-2 h-2 -ml-1 -mt-1 rounded-sm pointer-events-none z-30"
-                  style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, background: ring.color }}
+                  style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, background: '#fbbf24' }}
                 />
               );
             })}
