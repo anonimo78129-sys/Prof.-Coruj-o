@@ -9700,7 +9700,7 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
 
   // 'hit' não cicla como as outras poses: avança pelos quadros uma única
   // vez (sem voltar ao início) e para no último até a pose mudar.
-  const HIT_FRAME_MS = 100;
+  const HIT_FRAME_MS = 110; // +10% (respiração/breathFrame acima fica de fora, é o ciclo de respiração)
   const [hitFrame, setHitFrame] = useState<[number, number]>([0, 0]);
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -9720,7 +9720,7 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   // 'cast' também toca uma vez só, mas pra frente ao ritmo dos 8 quadros de
   // carregamento (não do ciclo lento de respiração) — termina no quadro do
   // brilho máximo bem quando o projétil sai.
-  const CAST_FRAME_MS = 80;
+  const CAST_FRAME_MS = 88; // +10%
   const [castFrame, setCastFrame] = useState<[number, number]>([0, 0]);
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -9831,7 +9831,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const finish = (win: 0 | 1, faint: 0 | 1) => {
     setPose(faint, 'faint');
     setMsg(`${fighters[faint].name} não aguenta mais!`);
-    after(1350, () => { setWinner(win); setPhase('end'); playChime(true); });
+    after(1485, () => { setWinner(win); setPhase('end'); playChime(true); }); // +10%
   };
 
   const nextTurn = (prev: 0 | 1) => {
@@ -9874,14 +9874,14 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
       setPose(turn, 'cast'); // carregando mágica no delay antes do projétil — dá tempo do loop de 8 quadros tocar inteiro
       playWhoosh();
-      after(650, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); });
-      after(1150, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
-      if (willHeal) after(1500, () => healPop(turn));
+      after(715, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); }); // +10%
+      after(1265, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
+      if (willHeal) after(1650, () => healPop(turn));
       if (newHp <= 0) {
-        after(1950, () => finish(turn, other));
+        after(2145, () => finish(turn, other));
       } else {
-        after(2050, () => setPose(other, 'idle'));
-        after(2250, () => nextTurn(turn));
+        after(2255, () => setPose(other, 'idle'));
+        after(2475, () => nextTurn(turn));
       }
     } else {
       playChime(false);
@@ -9893,27 +9893,29 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       // magia falhando: fumacinha + susto antes do contra-ataque
       setPose(turn, 'wrong-cast');
       setSmoke({ side: turn, key: ++fxKey.current });
-      after(950, () => setSmoke(null));
-      after(1650, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current, fury }); });
-      after(2150, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
+      after(1045, () => setSmoke(null)); // +10%
+      after(1815, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current, fury }); });
+      after(2365, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
       if (newHp <= 0) {
-        after(2800, () => finish(other, turn));
+        after(3080, () => finish(other, turn));
       } else {
-        after(2800, () => setPose(turn, 'idle'));
-        after(3000, () => nextTurn(turn));
+        after(3080, () => setPose(turn, 'idle'));
+        after(3300, () => nextTurn(turn));
       }
     }
   };
 
+  // Durações +10% em toda pose de ação (menos a respiração de idle/tired
+  // no final da cadeia — essa fica no ritmo original de propósito).
   const poseAnim = (p: string, side: 0 | 1, low = false): any =>
-    p === 'attack' ? { x: side === 0 ? 26 : -26, y: side === 0 ? -14 : 14, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.2 } }
-    : p === 'crit' ? { x: side === 0 ? 44 : -44, y: side === 0 ? -24 : 24, scale: 1.12, opacity: 1, rotate: 0, transition: { duration: 0.18 } }
-    : p === 'cast' ? { x: 0, y: [0, -4, -2], scale: [1, 1.07, 1.04], opacity: 1, rotate: 0, transition: { duration: 0.5 } }
-    : p === 'hit' ? { x: [0, -10, 10, -7, 7, 0], y: 0, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.5 } }
-    : p === 'wrong-cast' ? { x: side === 0 ? -14 : 14, y: 6, scale: 0.94, opacity: 1, rotate: 0, transition: { duration: 0.4 } }
-    : p === 'heal' ? { x: 0, y: [0, -16, 0], scale: [1, 1.12, 1], opacity: 1, rotate: 0, transition: { duration: 0.6 } }
-    : p === 'thinking' ? { x: 0, y: [0, -5, 0], scale: 1, opacity: 1, rotate: [0, -4, 4, 0], transition: { y: { duration: 1.6, repeat: Infinity }, rotate: { duration: 2, repeat: Infinity } } }
-    : p === 'faint' ? { y: 48, opacity: 0, scale: 1, rotate: side === 0 ? -16 : 16, transition: { duration: 0.7 } }
+    p === 'attack' ? { x: side === 0 ? 26 : -26, y: side === 0 ? -14 : 14, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.22 } }
+    : p === 'crit' ? { x: side === 0 ? 44 : -44, y: side === 0 ? -24 : 24, scale: 1.12, opacity: 1, rotate: 0, transition: { duration: 0.2 } }
+    : p === 'cast' ? { x: 0, y: [0, -4, -2], scale: [1, 1.07, 1.04], opacity: 1, rotate: 0, transition: { duration: 0.55 } }
+    : p === 'hit' ? { x: [0, -10, 10, -7, 7, 0], y: 0, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.55 } }
+    : p === 'wrong-cast' ? { x: side === 0 ? -14 : 14, y: 6, scale: 0.94, opacity: 1, rotate: 0, transition: { duration: 0.44 } }
+    : p === 'heal' ? { x: 0, y: [0, -16, 0], scale: [1, 1.12, 1], opacity: 1, rotate: 0, transition: { duration: 0.66 } }
+    : p === 'thinking' ? { x: 0, y: [0, -5, 0], scale: 1, opacity: 1, rotate: [0, -4, 4, 0], transition: { y: { duration: 1.76, repeat: Infinity }, rotate: { duration: 2.2, repeat: Infinity } } }
+    : p === 'faint' ? { y: 48, opacity: 0, scale: 1, rotate: side === 0 ? -16 : 16, transition: { duration: 0.77 } }
     : low ? { x: [0, -2, 2, -1, 0], y: [0, -3, 0], scale: 1, opacity: 1, rotate: 0, transition: { x: { duration: 0.4, repeat: Infinity }, y: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' } } }
     : { x: 0, y: [0, -7, 0], scale: 1, opacity: 1, rotate: 0, transition: { y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 0.2 } } };
 
@@ -10017,22 +10019,22 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       <style>{`
         @keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 48px 48px; } }
         @keyframes gami-crit-shake-kf { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-10px, 3px); } 30% { transform: translate(9px, -3px); } 45% { transform: translate(-7px, 2px); } 60% { transform: translate(6px, -2px); } 75% { transform: translate(-3px, 1px); } 90% { transform: translate(2px, 0); } }
-        .gami-crit-shake { animation: gami-crit-shake-kf 0.4s ease-out; }
+        .gami-crit-shake { animation: gami-crit-shake-kf 0.44s ease-out; }
         @keyframes gami-crit-flash-kf { 0% { opacity: 0; } 12% { opacity: 0.7; } 100% { opacity: 0; } }
-        .gami-crit-flash { animation: gami-crit-flash-kf 0.35s ease-out; }
+        .gami-crit-flash { animation: gami-crit-flash-kf 0.39s ease-out; }
         @keyframes gami-proj-tremor-kf { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1.5px, -1.5px); } 50% { transform: translate(-1.5px, 1.5px); } 75% { transform: translate(1.5px, 1px); } }
-        .gami-proj-tremor { animation: gami-proj-tremor-kf 0.09s linear infinite; }
+        .gami-proj-tremor { animation: gami-proj-tremor-kf 0.1s linear infinite; }
         @keyframes gami-hit-flash-kf { 0%, 100% { filter: brightness(1) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } 25% { filter: brightness(2.6) saturate(0.25) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } }
-        .gami-hit-flash { animation: gami-hit-flash-kf 0.28s ease-out; }
+        .gami-hit-flash { animation: gami-hit-flash-kf 0.31s ease-out; }
         @keyframes gami-glitch-kf {
           0%, 60%, 90%, 100% { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, 0); }
           15%, 75% { filter: drop-shadow(-3px 0 #ef4444cc) drop-shadow(3px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(-1px, 0); }
           30% { filter: drop-shadow(2px 0 #ef4444cc) drop-shadow(-2px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(1px, 0); }
           45% { filter: drop-shadow(-2px 0 #ef4444cc) drop-shadow(2px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, -1px); }
         }
-        .gami-glitch { animation: gami-glitch-kf 1.1s steps(1) infinite; }
+        .gami-glitch { animation: gami-glitch-kf 1.21s steps(1) infinite; }
         @keyframes gami-tilt-kf { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-4deg); } }
-        .gami-tilt { animation: gami-tilt-kf 1.1s ease-in-out infinite; transform-origin: 50% 90%; }
+        .gami-tilt { animation: gami-tilt-kf 1.21s ease-in-out infinite; transform-origin: 50% 90%; }
       `}</style>
       {/* ── Arena (tela cheia, clara) ── */}
       <div ref={arenaRef} className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
@@ -10055,7 +10057,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   {/* aura de carregamento (cast/crit) e halo de cura (heal, em verde) */}
                   {(poses[side] === 'cast' || poses[side] === 'crit' || poses[side] === 'heal') && (
                     <motion.div
-                      initial={{ scale: 0.5, opacity: 0.9 }} animate={{ scale: [0.6, 1.35, 0.9], opacity: [0.9, 0.35, 0.8] }} transition={{ duration: 0.5, repeat: Infinity }}
+                      initial={{ scale: 0.5, opacity: 0.9 }} animate={{ scale: [0.6, 1.35, 0.9], opacity: [0.9, 0.35, 0.8] }} transition={{ duration: 0.55, repeat: Infinity }}
                       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 w-24 h-24 sm:w-28 sm:h-28 rounded-full pointer-events-none"
                       style={{ boxShadow: `0 0 26px 10px ${poses[side] === 'heal' ? '#22c55e' : fighters[side].color}`, border: `2px solid ${poses[side] === 'heal' ? '#22c55e' : fighters[side].color}` }}
                     />
@@ -10124,7 +10126,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 key={`${proj.key}-trail-${i}`}
                 initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.35, opacity: 0.55 }}
                 animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 0.12, opacity: 0 }}
-                transition={{ duration: 0.44, ease: 'easeIn', delay: i * 0.045 }}
+                transition={{ duration: 0.48, ease: 'easeIn', delay: i * 0.05 }}
                 className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full pointer-events-none z-10"
                 style={{ background: proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color }}
               />
@@ -10135,7 +10137,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 key={proj.key}
                 initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.4, opacity: 0.9, rotate: 0 }}
                 animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 1.05, opacity: 1, rotate: proj.crit ? 720 : 360 }}
-                transition={{ duration: 0.44, ease: 'easeIn' }}
+                transition={{ duration: 0.48, ease: 'easeIn' }}
                 className="absolute w-6 h-6 -ml-3 -mt-3 pointer-events-none z-20"
               >
                 <div
@@ -10150,7 +10152,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
             {ring && (
               <motion.div
                 key={ring.key}
-                initial={{ scale: 0.2, opacity: 0.95 }} animate={{ scale: 2.4, opacity: 0 }} transition={{ duration: 0.5 }}
+                initial={{ scale: 0.2, opacity: 0.95 }} animate={{ scale: 2.4, opacity: 0 }} transition={{ duration: 0.55 }}
                 className="absolute w-16 h-16 -ml-8 -mt-8 rounded-full border-4 pointer-events-none z-30"
                 style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, borderColor: ring.color }}
               />
@@ -10163,7 +10165,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   key={`${ring.key}-frag-${i}`}
                   initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
                   animate={{ x: Math.cos(angle) * 46, y: Math.sin(angle) * 46, opacity: 0, scale: 0.3 }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  transition={{ duration: 0.55, ease: 'easeOut' }}
                   className="absolute w-2 h-2 -ml-1 -mt-1 rounded-sm pointer-events-none z-30"
                   style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, background: ring.color }}
                 />
@@ -10173,7 +10175,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
             {smoke && (
               <motion.div
                 key={smoke.key}
-                initial={{ scale: 0.4, opacity: 0.85, y: 0 }} animate={{ scale: 1.6, opacity: 0, y: -20 }} transition={{ duration: 0.85 }}
+                initial={{ scale: 0.4, opacity: 0.85, y: 0 }} animate={{ scale: 1.6, opacity: 0, y: -20 }} transition={{ duration: 0.94 }}
                 className="absolute w-12 h-12 -ml-6 -mt-6 rounded-full pointer-events-none z-20"
                 style={{ left: `${ANCHORS[smoke.side].x}%`, top: `${ANCHORS[smoke.side].y - 6}%`, background: 'radial-gradient(circle, rgba(60,60,60,0.9), rgba(40,40,40,0.2) 70%, transparent)' }}
               />
@@ -10182,7 +10184,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
             {pops.map(p => (
               <motion.div
                 key={p.id}
-                initial={{ opacity: 1, y: 0, scale: 0.8 }} animate={{ opacity: 0, y: -48, scale: 1.15 }} transition={{ duration: 0.9 }}
+                initial={{ opacity: 1, y: 0, scale: 0.8 }} animate={{ opacity: 0, y: -48, scale: 1.15 }} transition={{ duration: 0.99 }}
                 className="absolute font-black text-2xl pointer-events-none z-40 -translate-x-1/2"
                 style={{ left: `${ANCHORS[p.side].x}%`, top: `${ANCHORS[p.side].y - 16}%`, color: p.color, textShadow: '0 2px 0 rgba(0,0,0,0.7), 0 0 14px rgba(0,0,0,0.5)' }}
               >{p.heal ? '+' : '−'}{p.val}</motion.div>
