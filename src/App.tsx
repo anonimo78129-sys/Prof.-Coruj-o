@@ -7861,26 +7861,13 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {/* BATALHA DE REVISÃO — destaque (atalho pra batalha do Kit da Turma) */}
+      {/* BATALHA DE REVISÃO — destaque: só a arte, clicável (atalho pra batalha do Kit) */}
       <button
         onClick={() => openBattle?.()}
-        className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-rose-600 via-red-600 to-orange-500 active:scale-[0.98] transition-transform"
+        aria-label="Abrir Batalha de Revisão"
+        className="w-full relative overflow-hidden rounded-[2rem] mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
-        <div className="absolute -top-6 -right-6 opacity-20">
-          <Swords size={130} className="text-white" />
-        </div>
-        <div className="relative">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] font-black tracking-widest uppercase text-yellow-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Principal</span>
-          </div>
-          <h2 className="text-3xl font-black text-white mb-2 leading-tight">Batalha de Revisão</h2>
-          <p className="text-sm text-rose-100 max-w-[80%] leading-relaxed mb-4">
-            Duelo em turnos: a IA gera perguntas e as equipes se enfrentam. Acertou ataca, errou leva contra-ataque. Vence quem zerar o HP do rival!
-          </p>
-          <div className="inline-flex items-center gap-2 bg-white text-rose-700 font-bold px-4 py-2 rounded-full text-sm">
-            <Swords size={16} /> Começar batalha
-          </div>
-        </div>
+        <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
       {/* Atividades menores */}
