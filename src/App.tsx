@@ -7556,6 +7556,7 @@ const EstudioScreen = ({
   removeTask,
   studioReopenTaskId,
   setStudioReopenTaskId,
+  openBattle,
 }: {
   estudioContext: string,
   setEstudioContext: (c: string | ((prev: string) => string)) => void,
@@ -7573,6 +7574,7 @@ const EstudioScreen = ({
   removeTask: (id: string) => void,
   studioReopenTaskId: string | null,
   setStudioReopenTaskId: (id: string | null) => void,
+  openBattle?: () => void,
 }) => {
   const [activeMode, setActiveMode] = useState<GameMode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -7592,7 +7594,6 @@ const EstudioScreen = ({
   const [wsGridSize, setWsGridSize] = useState<10 | 15 | 20>(15);
   const [escapeTheme, setEscapeTheme] = useState<EscapeTheme>('medieval');
   const [escapeEnigmaCount, setEscapeEnigmaCount] = useState<4 | 5 | 6>(5);
-  const [showBattle, setShowBattle] = useState(false);
 
   const studioLoadingMsg = useFunnyLoadingMessage(isGenerating, 'studio');
   const selectedClass = (schedules || []).find(s => s.id === classId);
@@ -7860,9 +7861,9 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {/* BATALHA DE REVISÃO — destaque */}
+      {/* BATALHA DE REVISÃO — destaque (atalho pra batalha do Kit da Turma) */}
       <button
-        onClick={() => setShowBattle(true)}
+        onClick={() => openBattle?.()}
         className="w-full relative overflow-hidden rounded-[2rem] p-6 mb-4 shadow-xl text-left bg-gradient-to-br from-rose-600 via-red-600 to-orange-500 active:scale-[0.98] transition-transform"
       >
         <div className="absolute -top-6 -right-6 opacity-20">
@@ -8446,18 +8447,6 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         )}
       </AnimatePresence>
 
-      {/* Batalha de Revisão em tela cheia — sem equipes reais (usa Time Azul
-          × Time Vermelho padrão), então não há XP a premiar aqui. */}
-      {showBattle && (
-        <GamiBatalha
-          teams={[]}
-          students={[]}
-          subject={profile.subject || 'Geral'}
-          level={defaultLevel}
-          onClose={() => setShowBattle(false)}
-          onAwardTeam={() => {}}
-        />
-      )}
     </motion.div>
   );
 };
@@ -11519,11 +11508,15 @@ const GamificacaoScreen = ({
   user,
   profile,
   setScreen,
+  initialLiveTool,
+  clearInitialLiveTool,
 }: {
   schedules: ClassSchedule[];
   user: any;
   profile: UserProfile;
   setScreen: (s: Screen) => void;
+  initialLiveTool?: string | null;
+  clearInitialLiveTool?: () => void;
 }) => {
   const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(schedules[0]?.id ?? null);
@@ -11549,6 +11542,13 @@ const GamificacaoScreen = ({
       setSelectedClassId(schedules[0].id);
     }
   }, [schedules, selectedClassId]);
+
+  // Abre direto uma ferramenta ao vivo (ex.: atalho "Batalha" vindo da aba Jogos).
+  useEffect(() => {
+    if (!initialLiveTool) return;
+    setLiveTool(initialLiveTool);
+    clearInitialLiveTool?.();
+  }, [initialLiveTool, clearInitialLiveTool]);
 
   const selectedSchedule = schedules.find(s => s.id === selectedClassId);
   const wk = gamiWeekKey();
@@ -13539,6 +13539,7 @@ function AppInner() {
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
   const [ferramentasTool, setFerramentasTool] = useState<string | null>(null);
+  const [gamiInitialTool, setGamiInitialTool] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -15224,9 +15225,9 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               }
             }
           }} onImportSyllabus={(cls) => setImportRequest({ mode: 'syllabus', targetClass: cls })} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} openBattle={() => { setGamiInitialTool('batalha'); setScreen('gamificacao'); }} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
-          {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} />}
+          {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} initialLiveTool={gamiInitialTool} clearInitialLiveTool={() => setGamiInitialTool(null)} />}
           {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" />}
