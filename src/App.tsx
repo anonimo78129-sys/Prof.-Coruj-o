@@ -7865,7 +7865,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
       <button
         onClick={() => openBattle?.()}
         aria-label="Abrir Batalha de Revisão"
-        className="w-full relative overflow-hidden rounded-[2rem] mb-4 shadow-xl active:scale-[0.98] transition-transform"
+        className="w-full relative overflow-hidden rounded-[2rem] border-4 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
         <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" className="w-full h-auto block select-none" draggable={false} />
       </button>
