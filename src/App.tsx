@@ -8806,6 +8806,104 @@ const playChime = (positive = true) => {
   } catch { /* sem áudio disponível */ }
 };
 
+// Buffer de ruído branco compartilhado (whoosh/impacto) — gerado uma vez e
+// reutilizado, mesma lógica de reaproveitamento do chimeCtx acima.
+let noiseBuffer: AudioBuffer | null = null;
+const getNoiseBuffer = (ctx: AudioContext): AudioBuffer => {
+  if (!noiseBuffer || noiseBuffer.sampleRate !== ctx.sampleRate) {
+    const len = Math.floor(ctx.sampleRate * 0.5);
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuffer;
+};
+const getChimeCtx = (): AudioContext | null => {
+  const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!Ctx) return null;
+  if (!chimeCtx || chimeCtx.state === 'closed') chimeCtx = new Ctx();
+  if (chimeCtx.state === 'suspended') chimeCtx.resume().catch(() => {});
+  return chimeCtx;
+};
+
+// Sopro de vento subindo de tom — dispara junto do windup de 'cast'.
+const playWhoosh = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 0.7;
+    filter.frequency.setValueAtTime(350, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + 0.4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+    src.connect(filter); filter.connect(g); g.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.5);
+    setTimeout(() => { try { src.disconnect(); filter.disconnect(); g.disconnect(); } catch {} }, 700);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Baque grave (tom caindo + ruído filtrado) — dispara no momento do impacto;
+// mais pesado quando o golpe foi crítico.
+const playImpactThud = (heavy = false) => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(heavy ? 170 : 120, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(38, ctx.currentTime + 0.18);
+    g.gain.setValueAtTime(heavy ? 0.30 : 0.20, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.25);
+
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(heavy ? 1000 : 650, ctx.currentTime);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(heavy ? 0.24 : 0.14, ctx.currentTime);
+    ng.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+    src.connect(filter); filter.connect(ng); ng.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.15);
+
+    setTimeout(() => { try { o.disconnect(); g.disconnect(); src.disconnect(); filter.disconnect(); ng.disconnect(); } catch {} }, 400);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Arpejo ascendente e brilhante — dispara na cura por sequência de acertos.
+const playHealChime = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    [660, 880, 1320].forEach((freq, i) => {
+      const t = ctx!.currentTime + i * 0.09;
+      const o = ctx!.createOscillator();
+      const g = ctx!.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(g); g.connect(ctx!.destination);
+      o.start(t);
+      o.stop(t + 0.32);
+      setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, (i * 90) + 500);
+    });
+  } catch { /* sem áudio disponível */ }
+};
+
 const gamiDefaultClass = (classId: string): ClassGamification => ({
   id: classId,
   students: [],
@@ -9491,6 +9589,17 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string; heal?: boolean }[]>([]);
   const [awarded, setAwarded] = useState(false);
 
+  // Tremor de tela + flash branco no impacto crítico: manipulação direta de
+  // classe CSS (via ref) em vez de estado, pra reiniciar a animação mesmo em
+  // críticos consecutivos sem esperar um re-render.
+  const arenaRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
+  const triggerCritFx = () => {
+    const arena = arenaRef.current, flash = flashRef.current;
+    if (arena) { arena.classList.remove('gami-crit-shake'); void arena.offsetWidth; arena.classList.add('gami-crit-shake'); }
+    if (flash) { flash.classList.remove('gami-crit-flash'); void flash.offsetWidth; flash.classList.add('gami-crit-flash'); }
+  };
+
   const questionsRef = useRef<GamiBattleQ[]>([]);
   const bagRef = useRef<GamiBattleQ[]>([]);
   const lastQRef = useRef('');
@@ -9698,7 +9807,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     after(8000, () => { if (awaiting.current) setPose(t, 'thinking'); });
   };
 
-  const impact = (target: 0 | 1, dmg: number, color: string) => {
+  const impact = (target: 0 | 1, dmg: number, color: string, crit = false) => {
     setProj(null);
     setRing({ side: target, key: ++fxKey.current, color });
     const id = ++fxKey.current;
@@ -9706,6 +9815,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     after(900, () => setPops(p => p.filter(x => x.id !== id)));
     setPose(target, 'hit');
     setHp(h => h.map((v, i) => i === target ? Math.max(0, v - dmg) : v) as [number, number]);
+    playImpactThud(crit);
+    if (crit) triggerCritFx();
   };
 
   const finish = (win: 0 | 1, faint: 0 | 1) => {
@@ -9731,6 +9842,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     setRing({ side, key: ++fxKey.current, color: '#22c55e' });
     setPose(side, 'heal');
     setHp(h => h.map((v, i) => i === side ? Math.min(TEAM_MAX, v + HEAL_AMOUNT) : v) as [number, number]);
+    playHealChime();
   };
 
   const answer = (i: number) => {
@@ -9752,8 +9864,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       if (willHeal) streak.current[turn] = 0;
       setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
       setPose(turn, 'cast'); // carregando mágica no delay antes do projétil — dá tempo do loop de 8 quadros tocar inteiro
+      playWhoosh();
       after(650, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
-      after(1150, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color); });
+      after(1150, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
       if (willHeal) after(1500, () => healPop(turn));
       if (newHp <= 0) {
         after(1950, () => finish(turn, other));
@@ -9889,12 +10002,21 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   // caixas creme — paleta própria, deliberadamente distinta do modo palco.
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
-      {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras */}
-      <style>{`@keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 48px 48px; } }`}</style>
+      {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras.
+          gami-crit-shake/gami-crit-flash são disparadas via classList (não estado),
+          pra reiniciar mesmo em críticos consecutivos sem esperar re-render. */}
+      <style>{`
+        @keyframes gami-battle-stripes { from { background-position: 0 0; } to { background-position: 48px 48px; } }
+        @keyframes gami-crit-shake-kf { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-10px, 3px); } 30% { transform: translate(9px, -3px); } 45% { transform: translate(-7px, 2px); } 60% { transform: translate(6px, -2px); } 75% { transform: translate(-3px, 1px); } 90% { transform: translate(2px, 0); } }
+        .gami-crit-shake { animation: gami-crit-shake-kf 0.4s ease-out; }
+        @keyframes gami-crit-flash-kf { 0% { opacity: 0; } 12% { opacity: 0.7; } 100% { opacity: 0; } }
+        .gami-crit-flash { animation: gami-crit-flash-kf 0.35s ease-out; }
+      `}</style>
       {/* ── Arena (tela cheia, clara) ── */}
-      <div className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
+      <div ref={arenaRef} className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
             <div className="absolute inset-0 pointer-events-none opacity-70" style={{ backgroundImage: 'repeating-linear-gradient(180deg, rgba(255,255,255,0.10) 0 26px, rgba(0,0,0,0.04) 26px 52px)' }} />
             <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.13) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0.13) 75%, transparent 75%, transparent 100%)', backgroundSize: '48px 48px', animation: 'gami-battle-stripes 3s linear infinite' }} />
+            <div ref={flashRef} className="absolute inset-0 pointer-events-none z-50 bg-white opacity-0" />
             <button onClick={onClose} className="absolute top-4 right-4 z-40 flex items-center gap-1.5 bg-[#1e3a2a]/85 text-emerald-100 border-2 border-emerald-100/30 rounded-lg px-3 py-1.5 text-[11px] font-black tracking-widest active:scale-95 transition-transform">
               <X size={13} /> <span className="font-pixel text-[9px]">SAIR</span>
             </button>
