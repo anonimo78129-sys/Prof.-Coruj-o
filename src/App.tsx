@@ -10010,9 +10010,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     : p === 'wrong-cast' ? { x: side === 0 ? -14 : 14, y: 6, scale: 0.94, opacity: 1, rotate: 0, transition: { duration: 0.44 } }
     : p === 'heal' ? { x: 0, y: [0, -16, 0], scale: [1, 1.12, 1], opacity: 1, rotate: 0, transition: { duration: 0.66 } }
     : p === 'thinking' ? { x: 0, y: [0, -5, 0], scale: 1, opacity: 1, rotate: [0, -4, 4, 0], transition: { y: { duration: 1.76, repeat: Infinity }, rotate: { duration: 2.2, repeat: Infinity } } }
-    // Cai/gira rápido e fica visível — só desaparece perto do fim da
-    // espera de 4s do finish(), pouco antes da tela de vitória cobrir tudo.
-    : p === 'faint' ? { y: 48, opacity: 0, scale: 1, rotate: side === 0 ? -16 : 16, transition: { y: { duration: 0.6 }, rotate: { duration: 0.6 }, scale: { duration: 0.6 }, opacity: { delay: 3.3, duration: 0.5 } } }
+    // Fica parado no lugar (a arte do sprite já mostra o pato caído) e só
+    // desaparece perto do fim da espera de 4s do finish(), pouco antes da
+    // tela de vitória cobrir tudo — sem tombar nem escorregar pra fora.
+    : p === 'faint' ? { x: 0, y: 0, opacity: 0, scale: 1, rotate: 0, transition: { opacity: { delay: 3.3, duration: 0.5 } } }
     : low ? { x: [0, -2, 2, -1, 0], y: [0, -3, 0], scale: 1, opacity: 1, rotate: 0, transition: { x: { duration: 0.4, repeat: Infinity }, y: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' } } }
     : { x: 0, y: [0, -7, 0], scale: 1, opacity: 1, rotate: 0, transition: { y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 0.2 } } };
 
