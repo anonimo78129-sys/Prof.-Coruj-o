@@ -9583,7 +9583,7 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
 
   // 'hit' não cicla como as outras poses: avança pelos quadros uma única
   // vez (sem voltar ao início) e para no último até a pose mudar.
-  const HIT_FRAME_MS = 90;
+  const HIT_FRAME_MS = 100;
   const [hitFrame, setHitFrame] = useState<[number, number]>([0, 0]);
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -9595,6 +9595,26 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
         timers.push(setTimeout(() => {
           setHitFrame(prev => { const next = [...prev] as [number, number]; next[side] = f; return next; });
         }, f * HIT_FRAME_MS));
+      }
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [poses[0], poses[1]]);
+
+  // 'cast' também toca uma vez só, mas pra frente ao ritmo dos 8 quadros de
+  // carregamento (não do ciclo lento de respiração) — termina no quadro do
+  // brilho máximo bem quando o projétil sai.
+  const CAST_FRAME_MS = 80;
+  const [castFrame, setCastFrame] = useState<[number, number]>([0, 0]);
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    ([0, 1] as const).forEach(side => {
+      if (poses[side] !== 'cast') return;
+      setCastFrame(prev => { const next = [...prev] as [number, number]; next[side] = 0; return next; });
+      const frameCount = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()]?.cast?.length ?? 1;
+      for (let f = 1; f < frameCount; f++) {
+        timers.push(setTimeout(() => {
+          setCastFrame(prev => { const next = [...prev] as [number, number]; next[side] = f; return next; });
+        }, f * CAST_FRAME_MS));
       }
     });
     return () => timers.forEach(clearTimeout);
@@ -9691,7 +9711,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const finish = (win: 0 | 1, faint: 0 | 1) => {
     setPose(faint, 'faint');
     setMsg(`${fighters[faint].name} não aguenta mais!`);
-    after(1100, () => { setWinner(win); setPhase('end'); playChime(true); });
+    after(1350, () => { setWinner(win); setPhase('end'); playChime(true); });
   };
 
   const nextTurn = (prev: 0 | 1) => {
@@ -9731,15 +9751,15 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       const willHeal = streak.current[turn] >= HEAL_STREAK && hp[turn] > 0;
       if (willHeal) streak.current[turn] = 0;
       setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
-      setPose(turn, 'cast'); // carregando mágica no delay antes do projétil
-      after(500, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
-      after(950, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color); });
-      if (willHeal) after(1250, () => healPop(turn));
+      setPose(turn, 'cast'); // carregando mágica no delay antes do projétil — dá tempo do loop de 8 quadros tocar inteiro
+      after(650, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
+      after(1150, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color); });
+      if (willHeal) after(1500, () => healPop(turn));
       if (newHp <= 0) {
-        after(1600, () => finish(turn, other));
+        after(1950, () => finish(turn, other));
       } else {
-        after(1700, () => setPose(other, 'idle'));
-        after(1900, () => nextTurn(turn));
+        after(2050, () => setPose(other, 'idle'));
+        after(2250, () => nextTurn(turn));
       }
     } else {
       playChime(false);
@@ -9751,14 +9771,14 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       // magia falhando: fumacinha + susto antes do contra-ataque
       setPose(turn, 'wrong-cast');
       setSmoke({ side: turn, key: ++fxKey.current });
-      after(900, () => setSmoke(null));
-      after(1400, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current }); });
-      after(1850, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
+      after(950, () => setSmoke(null));
+      after(1650, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current }); });
+      after(2150, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
       if (newHp <= 0) {
-        after(2400, () => finish(other, turn));
+        after(2800, () => finish(other, turn));
       } else {
-        after(2400, () => setPose(turn, 'idle'));
-        after(2600, () => nextTurn(turn));
+        after(2800, () => setPose(turn, 'idle'));
+        after(3000, () => nextTurn(turn));
       }
     }
   };
@@ -9914,6 +9934,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       : null;
                     const frameIdx = poses[side] === 'hit' && spriteSet?.hit
                       ? Math.min(hitFrame[side], activeFrames!.length - 1)
+                      : poses[side] === 'cast' && spriteSet?.cast
+                      ? Math.min(castFrame[side], activeFrames!.length - 1)
                       : breathFrame[side] % (activeFrames?.length || 1);
                     const glowSize = poses[side] === 'heal' ? 20 : poses[side] === 'cast' || poses[side] === 'crit' ? 26 : hp[side] <= TEAM_MAX / 2 ? 18 : 9;
                     const glowColor = poses[side] === 'heal' ? '#22c55e' : fighters[side].color;
