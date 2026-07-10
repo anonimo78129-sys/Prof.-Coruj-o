@@ -11698,7 +11698,11 @@ const GamificacaoScreen = ({
   const topStudent = [...currentCls.students].sort((a, b) => (b.totalXp ?? b.xp ?? 0) - (a.totalXp ?? a.xp ?? 0))[0];
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-44">
+    // Chegando por atalho (card Batalha da aba Jogos) monta já no estado
+    // final, sem o 'y' de entrada: esse transform de animação vira ancestral
+    // transformado e prende o overlay `fixed` da batalha (que fica enquadrado
+    // na página até o transform zerar). Sem ele, a batalha abre em tela cheia.
+    <motion.div initial={initialLiveTool ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-44">
       {/* Placeholder no topo (mesmo padrão do Header bannerPlaceholder) */}
       <div className="mb-3 relative z-50">
         <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] overflow-hidden">
