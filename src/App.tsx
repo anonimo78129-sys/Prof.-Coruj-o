@@ -9600,6 +9600,14 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
     if (flash) { flash.classList.remove('gami-crit-flash'); void flash.offsetWidth; flash.classList.add('gami-crit-flash'); }
   };
 
+  // Flash branco no próprio sprite ao tomar dano — mesma técnica (classList
+  // via ref, não estado) pra funcionar em impactos seguidos.
+  const spriteImgRefs = useRef<[HTMLImageElement | null, HTMLImageElement | null]>([null, null]);
+  const triggerHitFlash = (side: 0 | 1) => {
+    const el = spriteImgRefs.current[side];
+    if (el) { el.classList.remove('gami-hit-flash'); void el.offsetWidth; el.classList.add('gami-hit-flash'); }
+  };
+
   const questionsRef = useRef<GamiBattleQ[]>([]);
   const bagRef = useRef<GamiBattleQ[]>([]);
   const lastQRef = useRef('');
@@ -9816,6 +9824,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     setPose(target, 'hit');
     setHp(h => h.map((v, i) => i === target ? Math.max(0, v - dmg) : v) as [number, number]);
     playImpactThud(crit);
+    triggerHitFlash(target);
     if (crit) triggerCritFx();
   };
 
@@ -10013,6 +10022,17 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
         .gami-crit-flash { animation: gami-crit-flash-kf 0.35s ease-out; }
         @keyframes gami-proj-tremor-kf { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1.5px, -1.5px); } 50% { transform: translate(-1.5px, 1.5px); } 75% { transform: translate(1.5px, 1px); } }
         .gami-proj-tremor { animation: gami-proj-tremor-kf 0.09s linear infinite; }
+        @keyframes gami-hit-flash-kf { 0%, 100% { filter: brightness(1) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } 25% { filter: brightness(2.6) saturate(0.25) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); } }
+        .gami-hit-flash { animation: gami-hit-flash-kf 0.28s ease-out; }
+        @keyframes gami-glitch-kf {
+          0%, 60%, 90%, 100% { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, 0); }
+          15%, 75% { filter: drop-shadow(-3px 0 #ef4444cc) drop-shadow(3px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(-1px, 0); }
+          30% { filter: drop-shadow(2px 0 #ef4444cc) drop-shadow(-2px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(1px, 0); }
+          45% { filter: drop-shadow(-2px 0 #ef4444cc) drop-shadow(2px 0 #38bdf8cc) drop-shadow(0 6px 8px rgba(0,0,0,0.4)); transform: translate(0, -1px); }
+        }
+        .gami-glitch { animation: gami-glitch-kf 1.1s steps(1) infinite; }
+        @keyframes gami-tilt-kf { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-4deg); } }
+        .gami-tilt { animation: gami-tilt-kf 1.1s ease-in-out infinite; transform-origin: 50% 90%; }
       `}</style>
       {/* ── Arena (tela cheia, clara) ── */}
       <div ref={arenaRef} className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
@@ -10032,12 +10052,12 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   animate={poseAnim(poses[side], side, hp[side] > 0 && hp[side] <= LOW_HP)}
                   className="relative flex flex-col items-center"
                 >
-                  {/* aura de carregamento (cast/crit) */}
-                  {(poses[side] === 'cast' || poses[side] === 'crit') && (
+                  {/* aura de carregamento (cast/crit) e halo de cura (heal, em verde) */}
+                  {(poses[side] === 'cast' || poses[side] === 'crit' || poses[side] === 'heal') && (
                     <motion.div
                       initial={{ scale: 0.5, opacity: 0.9 }} animate={{ scale: [0.6, 1.35, 0.9], opacity: [0.9, 0.35, 0.8] }} transition={{ duration: 0.5, repeat: Infinity }}
                       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 w-24 h-24 sm:w-28 sm:h-28 rounded-full pointer-events-none"
-                      style={{ boxShadow: `0 0 26px 10px ${fighters[side].color}`, border: `2px solid ${fighters[side].color}` }}
+                      style={{ boxShadow: `0 0 26px 10px ${poses[side] === 'heal' ? '#22c55e' : fighters[side].color}`, border: `2px solid ${poses[side] === 'heal' ? '#22c55e' : fighters[side].color}` }}
                     />
                   )}
                   {(() => {
@@ -10075,10 +10095,11 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                       >
                         {activeFrames ? (
                           <img
+                            ref={el => { spriteImgRefs.current[side] = el; }}
                             src={activeFrames[frameIdx]}
                             alt={fighters[side].name}
                             draggable={false}
-                            className="h-[250px] w-auto max-w-none object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"
+                            className={`h-[250px] w-auto max-w-none object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]${poses[side] === 'wrong-cast' ? ' gami-glitch' : ''}${poses[side] === 'thinking' ? ' gami-tilt' : ''}`}
                           />
                         ) : (
                           <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
