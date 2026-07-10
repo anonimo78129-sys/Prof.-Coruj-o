@@ -10017,6 +10017,23 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     : { x: 0, y: [0, -7, 0], scale: 1, opacity: 1, rotate: 0, transition: { y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 0.2 } } };
 
   const hpColor = (v: number) => v / TEAM_MAX > 0.5 ? '#4ade80' : v / TEAM_MAX > 0.25 ? '#facc15' : '#ef4444';
+
+  // Clareia uma cor hex misturando com branco (amt 0..1). Usado no projétil
+  // crítico: em vez de dourado fixo, um tom mais claro da própria cor do
+  // time — o golpe do time azul sai azul, o do vermelho sai vermelho, e o
+  // crítico ainda se destaca por ser mais brilhante (além do giro/faíscas).
+  const lightenHex = (hex: string, amt: number) => {
+    const n = parseInt(hex.replace('#', ''), 16);
+    if (Number.isNaN(n)) return hex;
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const L = (c: number) => Math.round(c + (255 - c) * amt);
+    return `#${((L(r) << 16) | (L(g) << 8) | L(b)).toString(16).padStart(6, '0')}`;
+  };
+  // Cor do projétil/rastro de um lado: cor do time; no crítico, versão
+  // clareada da mesma cor (não mais dourado). Fúria mantém a cor base — o
+  // tremor já a distingue.
+  const projColor = (p: { from: 0 | 1; crit?: boolean }) =>
+    p.crit ? lightenHex(fighters[p.from].color, 0.5) : fighters[p.from].color;
   const winnerIds = winner !== null && hasRealTeams
     ? students.filter(s => s.teamId === teams[pick[winner]]?.id).map(s => s.id)
     : [];
@@ -10228,7 +10245,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 0.12, opacity: 0 }}
                 transition={{ duration: 0.48, ease: 'easeIn', delay: i * 0.05 }}
                 className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full pointer-events-none z-10"
-                style={{ background: proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color }}
+                style={{ background: projColor(proj) }}
               />
             ))}
             {/* projétil: gira em voo (mais rápido no crítico) e tremula se for fúria */}
@@ -10242,7 +10259,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
               >
                 <div
                   className={`absolute inset-0 rounded-full${proj.fury ? ' gami-proj-tremor' : ''}`}
-                  style={{ background: `radial-gradient(circle, #fff 15%, ${proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color})`, boxShadow: `0 0 20px 7px ${(proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color)}aa` }}
+                  style={{ background: `radial-gradient(circle, #fff 15%, ${projColor(proj)})`, boxShadow: `0 0 20px 7px ${projColor(proj)}aa` }}
                 />
                 <span className="absolute w-1.5 h-1.5 -ml-[3px] rounded-full bg-white/95" style={{ top: 1, left: '50%' }} />
                 {proj.crit && <span className="absolute w-1.5 h-1.5 -ml-[3px] rounded-full bg-white/95" style={{ bottom: 1, left: '50%' }} />}
@@ -10267,7 +10284,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   animate={{ x: Math.cos(angle) * 46, y: Math.sin(angle) * 46, opacity: 0, scale: 0.3 }}
                   transition={{ duration: 0.55, ease: 'easeOut' }}
                   className="absolute w-2 h-2 -ml-1 -mt-1 rounded-sm pointer-events-none z-30"
-                  style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, background: '#fbbf24' }}
+                  style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, background: lightenHex(ring.color, 0.5) }}
                 />
               );
             })}
