@@ -9616,8 +9616,13 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   const streak = useRef<[number, number]>([0, 0]);
   const awaiting = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const after = (ms: number, fn: () => void) => { timers.current.push(setTimeout(fn, ms)); };
+  const after = (ms: number, fn: () => void) => { const id = setTimeout(fn, ms); timers.current.push(id); return id; };
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  // Timer pendente do gatilho de 'thinking' — cancelado sempre que uma nova
+  // pergunta começa, pra um turno atrasado não deixar o OUTRO lado (que já
+  // não está mais respondendo) marcado como confuso quando o timer antigo
+  // finalmente dispara.
+  const thinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ANCHORS = [{ x: 24, y: 66 }, { x: 76, y: 30 }];
 
@@ -9717,10 +9722,11 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
     return () => timers.forEach(clearTimeout);
   }, [poses[0], poses[1]]);
 
-  // 'cast' também toca uma vez só, mas pra frente ao ritmo dos 8 quadros de
-  // carregamento (não do ciclo lento de respiração) — termina no quadro do
+  // 'cast' toca o loop de 8 quadros de carregamento 2 vezes inteiras antes
+  // do ataque sair (não o ciclo lento de respiração) — termina no quadro do
   // brilho máximo bem quando o projétil sai.
   const CAST_FRAME_MS = 88; // +10%
+  const CAST_LOOPS = 2;
   const [castFrame, setCastFrame] = useState<[number, number]>([0, 0]);
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -9728,9 +9734,10 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
       if (poses[side] !== 'cast') return;
       setCastFrame(prev => { const next = [...prev] as [number, number]; next[side] = 0; return next; });
       const frameCount = TEAM_SPRITES[(fighters[side].color || '').toLowerCase()]?.cast?.length ?? 1;
-      for (let f = 1; f < frameCount; f++) {
+      const totalSteps = frameCount * CAST_LOOPS;
+      for (let f = 1; f < totalSteps; f++) {
         timers.push(setTimeout(() => {
-          setCastFrame(prev => { const next = [...prev] as [number, number]; next[side] = f; return next; });
+          setCastFrame(prev => { const next = [...prev] as [number, number]; next[side] = f % frameCount; return next; });
         }, f * CAST_FRAME_MS));
       }
     });
@@ -9812,7 +9819,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const beginQuestionTimers = (t: 0 | 1) => {
     qShownAt.current = performance.now();
     awaiting.current = true;
-    after(8000, () => { if (awaiting.current) setPose(t, 'thinking'); });
+    if (thinkTimerRef.current) clearTimeout(thinkTimerRef.current);
+    thinkTimerRef.current = after(8000, () => { if (awaiting.current) setPose(t, 'thinking'); });
   };
 
   const impact = (target: 0 | 1, dmg: number, color: string, crit = false) => {
@@ -9831,7 +9839,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const finish = (win: 0 | 1, faint: 0 | 1) => {
     setPose(faint, 'faint');
     setMsg(`${fighters[faint].name} não aguenta mais!`);
-    after(1485, () => { setWinner(win); setPhase('end'); playChime(true); }); // +10%
+    // Segura ~4s no derrotado (visível, só cai/gira) antes da tela de
+    // vitória cobrir a arena — o fade do próprio sprite (poseAnim 'faint')
+    // está temporizado pra sumir perto do fim dessa espera.
+    after(4000, () => { setWinner(win); setPhase('end'); playChime(true); });
   };
 
   const nextTurn = (prev: 0 | 1) => {
@@ -9872,16 +9883,16 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       const willHeal = streak.current[turn] >= HEAL_STREAK && hp[turn] > 0;
       if (willHeal) streak.current[turn] = 0;
       setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
-      setPose(turn, 'cast'); // carregando mágica no delay antes do projétil — dá tempo do loop de 8 quadros tocar inteiro
+      setPose(turn, 'cast'); // carregando mágica: o loop de 8 quadros toca 2x inteiras antes do projétil sair
       playWhoosh();
-      after(715, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); }); // +10%
-      after(1265, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
-      if (willHeal) after(1650, () => healPop(turn));
+      after(1450, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); });
+      after(2000, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
+      if (willHeal) after(2385, () => healPop(turn));
       if (newHp <= 0) {
-        after(2145, () => finish(turn, other));
+        after(2880, () => finish(turn, other));
       } else {
-        after(2255, () => setPose(other, 'idle'));
-        after(2475, () => nextTurn(turn));
+        after(2990, () => setPose(other, 'idle'));
+        after(3210, () => nextTurn(turn));
       }
     } else {
       playChime(false);
@@ -9910,12 +9921,14 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const poseAnim = (p: string, side: 0 | 1, low = false): any =>
     p === 'attack' ? { x: side === 0 ? 26 : -26, y: side === 0 ? -14 : 14, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.22 } }
     : p === 'crit' ? { x: side === 0 ? 44 : -44, y: side === 0 ? -24 : 24, scale: 1.12, opacity: 1, rotate: 0, transition: { duration: 0.2 } }
-    : p === 'cast' ? { x: 0, y: [0, -4, -2], scale: [1, 1.07, 1.04], opacity: 1, rotate: 0, transition: { duration: 0.55 } }
+    : p === 'cast' ? { x: 0, y: [0, -4, -2, 0], scale: [1, 1.07, 1.04, 1], opacity: 1, rotate: 0, transition: { duration: 0.55, repeat: Infinity } }
     : p === 'hit' ? { x: [0, -10, 10, -7, 7, 0], y: 0, scale: 1, opacity: 1, rotate: 0, transition: { duration: 0.55 } }
     : p === 'wrong-cast' ? { x: side === 0 ? -14 : 14, y: 6, scale: 0.94, opacity: 1, rotate: 0, transition: { duration: 0.44 } }
     : p === 'heal' ? { x: 0, y: [0, -16, 0], scale: [1, 1.12, 1], opacity: 1, rotate: 0, transition: { duration: 0.66 } }
     : p === 'thinking' ? { x: 0, y: [0, -5, 0], scale: 1, opacity: 1, rotate: [0, -4, 4, 0], transition: { y: { duration: 1.76, repeat: Infinity }, rotate: { duration: 2.2, repeat: Infinity } } }
-    : p === 'faint' ? { y: 48, opacity: 0, scale: 1, rotate: side === 0 ? -16 : 16, transition: { duration: 0.77 } }
+    // Cai/gira rápido e fica visível — só desaparece perto do fim da
+    // espera de 4s do finish(), pouco antes da tela de vitória cobrir tudo.
+    : p === 'faint' ? { y: 48, opacity: 0, scale: 1, rotate: side === 0 ? -16 : 16, transition: { y: { duration: 0.6 }, rotate: { duration: 0.6 }, scale: { duration: 0.6 }, opacity: { delay: 3.3, duration: 0.5 } } }
     : low ? { x: [0, -2, 2, -1, 0], y: [0, -3, 0], scale: 1, opacity: 1, rotate: 0, transition: { x: { duration: 0.4, repeat: Infinity }, y: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' } } }
     : { x: 0, y: [0, -7, 0], scale: 1, opacity: 1, rotate: 0, transition: { y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 0.2 } } };
 
