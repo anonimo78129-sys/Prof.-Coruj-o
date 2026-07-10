@@ -9924,10 +9924,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     setPose(faint, 'faint');
     setPose(win, 'victory'); // vencedor comemora (acenando, cajado erguido)
     setMsg(`${fighters[faint].name} não aguenta mais!`);
-    // Segura ~4s no derrotado (visível, só cai/gira) antes da tela de
-    // vitória cobrir a arena — o fade do próprio sprite (poseAnim 'faint')
-    // está temporizado pra sumir perto do fim dessa espera.
-    after(4000, () => { setWinner(win); setPhase('end'); playChime(true); });
+    // Segura ~6s comemorando na arena antes da tela de vitória cobrir tudo.
+    // O derrotado fica parado ~3,3s e some (fade da poseAnim 'faint'),
+    // enquanto o vencedor segue comemorando o resto do tempo.
+    after(6000, () => { setWinner(win); setPhase('end'); playChime(true); });
   };
 
   const nextTurn = (prev: 0 | 1) => {
