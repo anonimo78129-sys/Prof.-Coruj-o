@@ -908,7 +908,7 @@ const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, 
 
 const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, profileLoaded, inboxMessages, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, profileLoaded?: boolean, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
   const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
-    { title: 'Estúdio', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
+    { title: 'Jogos', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
     { title: 'Kit IA', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => openFerramenta?.(null) },
@@ -7853,7 +7853,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Estúdio" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
+      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
 
       <div className="px-1 mb-6">
         <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em sequências didáticas, flashcards e atividades gamificadas que prendem a atenção da turma.</p>
@@ -8632,7 +8632,7 @@ const AcervoScreen = ({ savedResources, setSavedResources, profile, setScreen, n
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${meta.color}`}>{meta.label}</span>
                       <span className="text-[10px] text-gray-400">{new Date(resource.date).toLocaleDateString('pt-BR')}</span>
-                      {!hasTextContent && <span className="text-[10px] text-gray-400 italic">sem prévia — gere de novo no Estúdio para editar</span>}
+                      {!hasTextContent && <span className="text-[10px] text-gray-400 italic">sem prévia — gere de novo em Jogos para editar</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
