@@ -9584,8 +9584,8 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   const [winner, setWinner] = useState<0 | 1 | null>(null);
   const [poses, setPoses] = useState<Pose[]>(['idle', 'idle']);
   const [smoke, setSmoke] = useState<{ side: 0 | 1; key: number } | null>(null);
-  const [proj, setProj] = useState<{ from: 0 | 1; key: number } | null>(null);
-  const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string } | null>(null);
+  const [proj, setProj] = useState<{ from: 0 | 1; key: number; crit?: boolean; fury?: boolean } | null>(null);
+  const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string; crit?: boolean } | null>(null);
   const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string; heal?: boolean }[]>([]);
   const [awarded, setAwarded] = useState(false);
 
@@ -9809,7 +9809,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
 
   const impact = (target: 0 | 1, dmg: number, color: string, crit = false) => {
     setProj(null);
-    setRing({ side: target, key: ++fxKey.current, color });
+    setRing({ side: target, key: ++fxKey.current, color, crit });
     const id = ++fxKey.current;
     setPops(p => [...p, { id, side: target, val: dmg, color }]);
     after(900, () => setPops(p => p.filter(x => x.id !== id)));
@@ -9865,7 +9865,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       setMsg(`${crit ? 'CRÍTICO! ' : 'Resposta certa! '}${fighters[turn].name} ${crit ? 'acerta em cheio' : 'lança um ataque' + (fury ? ' furioso' : '')}!`);
       setPose(turn, 'cast'); // carregando mágica no delay antes do projétil — dá tempo do loop de 8 quadros tocar inteiro
       playWhoosh();
-      after(650, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current }); });
+      after(650, () => { setPose(turn, crit ? 'crit' : 'attack'); setProj({ from: turn, key: ++fxKey.current, crit, fury }); });
       after(1150, () => { setPose(turn, 'idle'); impact(other, dmg, fighters[turn].color, crit); });
       if (willHeal) after(1500, () => healPop(turn));
       if (newHp <= 0) {
@@ -9885,7 +9885,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
       setPose(turn, 'wrong-cast');
       setSmoke({ side: turn, key: ++fxKey.current });
       after(950, () => setSmoke(null));
-      after(1650, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current }); });
+      after(1650, () => { setPose(other, 'attack'); setProj({ from: other, key: ++fxKey.current, fury }); });
       after(2150, () => { setPose(other, 'idle'); impact(turn, dmg, fighters[other].color); });
       if (newHp <= 0) {
         after(2800, () => finish(other, turn));
@@ -10011,6 +10011,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
         .gami-crit-shake { animation: gami-crit-shake-kf 0.4s ease-out; }
         @keyframes gami-crit-flash-kf { 0% { opacity: 0; } 12% { opacity: 0.7; } 100% { opacity: 0; } }
         .gami-crit-flash { animation: gami-crit-flash-kf 0.35s ease-out; }
+        @keyframes gami-proj-tremor-kf { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1.5px, -1.5px); } 50% { transform: translate(-1.5px, 1.5px); } 75% { transform: translate(1.5px, 1px); } }
+        .gami-proj-tremor { animation: gami-proj-tremor-kf 0.09s linear infinite; }
       `}</style>
       {/* ── Arena (tela cheia, clara) ── */}
       <div ref={arenaRef} className="relative flex-1 overflow-hidden" style={{ background: 'linear-gradient(180deg, #9fe3da 0%, #86d6be 16%, #7fd39a 30%, #77c96f 44%, #93d268 58%, #aadd6f 72%, #c3e57c 86%, #b0da6a 100%)' }}>
@@ -10095,16 +10097,33 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 </motion.div>
               </div>
             ))}
-            {/* projétil */}
+            {/* rastro de partículas atrás do projétil */}
+            {proj && [3, 2, 1].map(i => (
+              <motion.div
+                key={`${proj.key}-trail-${i}`}
+                initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.35, opacity: 0.55 }}
+                animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 0.12, opacity: 0 }}
+                transition={{ duration: 0.44, ease: 'easeIn', delay: i * 0.045 }}
+                className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full pointer-events-none z-10"
+                style={{ background: proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color }}
+              />
+            ))}
+            {/* projétil: gira em voo (mais rápido no crítico) e tremula se for fúria */}
             {proj && (
               <motion.div
                 key={proj.key}
-                initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.4, opacity: 0.9 }}
-                animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 1.05, opacity: 1 }}
+                initial={{ left: `${ANCHORS[proj.from].x}%`, top: `${ANCHORS[proj.from].y}%`, scale: 0.4, opacity: 0.9, rotate: 0 }}
+                animate={{ left: `${ANCHORS[1 - proj.from].x}%`, top: `${ANCHORS[1 - proj.from].y}%`, scale: 1.05, opacity: 1, rotate: proj.crit ? 720 : 360 }}
                 transition={{ duration: 0.44, ease: 'easeIn' }}
-                className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full pointer-events-none z-20"
-                style={{ background: `radial-gradient(circle, #fff 15%, ${fighters[proj.from].color})`, boxShadow: `0 0 20px 7px ${fighters[proj.from].color}aa` }}
-              />
+                className="absolute w-6 h-6 -ml-3 -mt-3 pointer-events-none z-20"
+              >
+                <div
+                  className={`absolute inset-0 rounded-full${proj.fury ? ' gami-proj-tremor' : ''}`}
+                  style={{ background: `radial-gradient(circle, #fff 15%, ${proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color})`, boxShadow: `0 0 20px 7px ${(proj.crit ? '#fbbf24' : proj.fury ? '#f97316' : fighters[proj.from].color)}aa` }}
+                />
+                <span className="absolute w-1.5 h-1.5 -ml-[3px] rounded-full bg-white/95" style={{ top: 1, left: '50%' }} />
+                {proj.crit && <span className="absolute w-1.5 h-1.5 -ml-[3px] rounded-full bg-white/95" style={{ bottom: 1, left: '50%' }} />}
+              </motion.div>
             )}
             {/* anel de impacto */}
             {ring && (
@@ -10115,6 +10134,20 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, borderColor: ring.color }}
               />
             )}
+            {/* estilhaços do impacto crítico */}
+            {ring && ring.crit && Array.from({ length: 6 }).map((_, i) => {
+              const angle = (i / 6) * Math.PI * 2;
+              return (
+                <motion.div
+                  key={`${ring.key}-frag-${i}`}
+                  initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                  animate={{ x: Math.cos(angle) * 46, y: Math.sin(angle) * 46, opacity: 0, scale: 0.3 }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  className="absolute w-2 h-2 -ml-1 -mt-1 rounded-sm pointer-events-none z-30"
+                  style={{ left: `${ANCHORS[ring.side].x}%`, top: `${ANCHORS[ring.side].y}%`, background: ring.color }}
+                />
+              );
+            })}
             {/* fumaça da magia falhando (wrong-cast) */}
             {smoke && (
               <motion.div
