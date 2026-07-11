@@ -7687,6 +7687,7 @@ REGRAS: fidelidade conceitual absoluta — a metáfora NUNCA pode ensinar o conc
           const mc = Math.ceil(count * 0.65), vf = count - Math.ceil(count * 0.65);
           prompt = `Gere um quiz MISTO sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
 ${mc} questões de múltipla escolha (4 alternativas) e ${vf} questões de Verdadeiro/Falso.
+REGRA CRÍTICA (múltipla escolha): apenas UMA alternativa pode ser defensável. As 3 incorretas devem ser inequivocamente erradas para quem domina o conteúdo — nunca use como distratores outros fatores verdadeiros ou parcialmente corretos do mesmo tema.
 Retorne APENAS JSON válido:
 {"title":"...","questions":[{"type":"multipla"|"vf","q":"...","options":[...],"correct":0,"explain":"..."}]}
 Para questões "vf": options deve ser ["Verdadeiro","Falso"]. "correct" é 0 (Verdadeiro) ou 1 (Falso).`;
@@ -7694,7 +7695,7 @@ Para questões "vf": options deve ser ["Verdadeiro","Falso"]. "correct" é 0 (Ve
           prompt = `Gere um quiz de múltipla escolha sobre "${topic}" para ${defaultLevel}, disciplina ${defaultSubject}, dificuldade ${difficulty}.
 Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
 {"title":"...","questions":[{"q":"pergunta","options":["a","b","c","d"],"correct":0,"explain":"justificativa breve"}]}
-Gere exatamente ${count} perguntas. As 4 opções devem ser plausíveis. "correct" é o índice 0-3.`;
+Gere exatamente ${count} perguntas. As 4 opções devem ser plausíveis, mas apenas UMA defensável: as 3 incorretas devem ser inequivocamente erradas para quem domina o conteúdo — nunca use como distratores outros fatores verdadeiros ou parcialmente corretos do mesmo tema. "correct" é o índice 0-3.`;
         }
       } else if (activeMode === 'wordsearch') {
         const wsMax = wsGridSize === 10 ? 10 : wsGridSize === 15 ? 15 : 20;
@@ -7708,7 +7709,7 @@ Retorne APENAS JSON: {"title":"...","words":[{"word":"PALAVRA","clue":"definiç�
       } else if (activeMode === 'bingo') {
         prompt = `Liste 40 termos/conceitos importantes sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para bingo educativo.
 Cada termo: 1 a 3 palavras, claros e didáticos.
-Retorne APENAS JSON: {"title":"Bingo de ${topic}","items":["termo1","termo2",...]}`;
+Retorne APENAS JSON: {"title":"Bingo: ${topic}","items":["termo1","termo2",...]}`;
       } else if (activeMode === 'escape') {
         const themeLabel = { medieval: 'Medieval / Fantasia', lab: 'Laboratório Científico', detective: 'Detetive / Investigação', space: 'Espacial / Sci-Fi' }[escapeTheme];
         prompt = `Você é um designer de Escape Rooms educacionais. Crie um escape room IMERSIVO sobre "${topic}" (${defaultSubject}, ${defaultLevel}), dificuldade ${difficulty}, ambientação ${themeLabel}.
@@ -7718,7 +7719,7 @@ Estrutura:
 - briefing: narrativa de abertura em 3-4 frases imersivas, na 2ª pessoa ("Você é..."), conectando ao tema "${topic}"
 - timeLimit: tempo sugerido (ex: "45 minutos")
 - rules: array com 3-4 regras curtas
-- enigmas: array com EXATAMENTE ${escapeEnigmaCount} enigmas encadeados sobre "${topic}". Cada enigma DEVE testar conhecimento REAL e específico de "${topic}", não trivial. Tipos variados: pergunta direta, charada, cálculo, anagrama, código, sequência. Cada um com:
+- enigmas: array com EXATAMENTE ${escapeEnigmaCount} enigmas encadeados sobre "${topic}". Cada enigma DEVE testar conhecimento REAL e específico de "${topic}", não trivial. Cada enigma aborda um ASPECTO DIFERENTE do tema (nunca dois enigmas sobre o mesmo sub-assunto). PRECISÃO FACTUAL ABSOLUTA: toda afirmação científica no enunciado e na dica deve estar correta — cuidado especial com superlativos ("o maior", "o principal", "o mais abundante"), que costumam introduzir erros. Tipos variados: pergunta direta, charada, cálculo, anagrama, código, sequência. Cada um com:
   - narrative: 1-2 frases situando o enigma na história
   - challenge: o desafio em si (claro e específico)
   - answer: resposta curta (1-3 palavras), em MAIÚSCULAS
