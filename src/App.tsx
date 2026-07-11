@@ -2235,7 +2235,9 @@ const sanitizeSlideData = (parsed: any): any => {
           title: stripSlideMarkup(d.title),
           kicker: stripSlideMarkup(d.kicker),
           subtitle: stripSlideMarkup(d.subtitle),
-          author: stripSlideMarkup(d.author),
+          // Autor sem hífen/travessão inicial — o render (preview e PPTX) já
+          // prefixa "—", então "- Fulano" vindo da IA viraria "— - Fulano".
+          author: stripSlideMarkup(d.author).replace(/^[-–—\s]+/, ''),
           quote: stripSlideMarkup(d.quote),
           // text / column1 / column2 intentionally kept — parsed by parseRichHtml
           topics: Array.isArray(d.topics)
@@ -3050,8 +3052,12 @@ const PlannerScreen = ({
           // Quote
           slide.addText(slideData.data.quote || '', { x: 1, y: 1.25, w: 8, h: 2.55, fontSize: 27, fontFace: FONT_Q, color: pc, bold: false, italic: true, align: 'center', valign: 'middle', lineSpacing: 38, ...shrink });
           slide.addShape(pres.ShapeType.rect, { x: 4.5, y: 3.95, w: 1.0, h: 0.05, fill: { color: ac } });
-          // Author
-          slide.addText(`— ${slideData.data.author || ''}`, { x: 1, y: 4.15, w: 8, h: 0.4, fontSize: 14, color: INK_SOFT, align: 'center', bold: true, charSpacing: 1, fontFace: FONT_B });
+          // Autor — strip defensivo de travessão digitado à mão (o placeholder
+          // do editor sugere "— Autor"); sem autor, sem linha "— " órfã.
+          const quoteAuthor = (slideData.data.author || '').replace(/^[-–—\s]+/, '');
+          if (quoteAuthor) {
+            slide.addText(`— ${quoteAuthor}`, { x: 1, y: 4.15, w: 8, h: 0.4, fontSize: 14, color: INK_SOFT, align: 'center', bold: true, charSpacing: 1, fontFace: FONT_B });
+          }
           addFooter(slide, si + 1);
 
         } else if (slideData.layoutID === 'LAYOUT_TWO_COLUMNS') {
@@ -14302,7 +14308,7 @@ function AppInner() {
         4. LAYOUT_CONTENT_TOP: Horizontal. Título + texto no topo, imagem larga embaixo. Campos: title, text, illustrationQuery.
         5. LAYOUT_TOPICS: 3 colunas de tópicos com ícone Lucide, título e texto curto. Campos: title, topics[{title,content,icon}].
         6. LAYOUT_REFERENCES: Referências com fundo na cor primária. Campos: title, references[].
-        7. LAYOUT_QUOTE: Citação impactante centralizada com aspas gigantes. Ideal para abrir ou fechar seções. Campos: title, quote, author.
+        7. LAYOUT_QUOTE: Citação impactante centralizada com aspas gigantes. Ideal para abrir ou fechar seções. Campos: title, quote, author. IMPORTANTE: "title" é apenas um RÓTULO curto de 1-3 palavras (ex: "REFLEXÃO", "PARA PENSAR"); a frase de impacto vai SEMPRE no campo "quote". "author" sem travessão nem hífen no início (o layout já adiciona "—" automaticamente).
         8. LAYOUT_TWO_COLUMNS: Dois blocos de texto lado a lado. Ideal para comparação, prós/contras, causa/efeito. Campos: title, column1, column2.
         9. LAYOUT_FULL_IMAGE: Imagem em tela cheia com sobreposição de gradiente escuro e título em destaque. Máximo impacto visual. Campos: title, subtitle, illustrationQuery.
         10. LAYOUT_STATS: 3 ou 4 cards de estatísticas/dados com valor em destaque, rótulo e ícone. Ideal para dados numéricos. Campos: title, stats[{value,label,icon}].
@@ -14318,7 +14324,7 @@ function AppInner() {
             • Conteúdo tem processo, etapas, evolução ou datas? → inclua 1 LAYOUT_TIMELINE.
             • Conteúdo compara dois conceitos/tipos/lados? → inclua 1 LAYOUT_TWO_COLUMNS.
             • Use LAYOUT_FULL_IMAGE como "respiro" divisor entre blocos do conteúdo (funciona como capítulo).
-            • LAYOUT_QUOTE: ótimo para frase de impacto, citação de autor ou pergunta provocadora à turma.
+            • LAYOUT_QUOTE: ótimo para frase de impacto, citação de autor ou pergunta provocadora à turma — a frase forte vai no campo "quote" (nunca no "title", que é só o rótulo).
         - PALETA MONOCROMÁTICA: escolha UMA única cor base (primaryColor) adequada ao tema. Acento e fundo devem ser tons da MESMA cor (mais claro/mais escuro). NUNCA combine cores de matizes diferentes (ex: azul com amarelo, azul com verde). primaryColor deve ser escura o suficiente para texto branco por cima.
         - KICKER (obrigatório em TODO slide): campo "kicker" com um rótulo editorial curto de 1-2 palavras em MAIÚSCULAS que aparece acima do título (ex: "CONCEITO", "CONTEXTO", "EXEMPLO", "APLICAÇÃO", "RESUMO", "DEFINIÇÃO"). Deve resumir o papel do slide.
         - ALTO CONTRASTE: nunca texto claro sobre fundo claro.
@@ -14657,9 +14663,13 @@ ${avaliacaoBlock}
         const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
         const mcPts  = parseFloat((plannerExamValue / 10).toFixed(1));
         const dissPts = parseFloat((plannerExamValue / 4).toFixed(1));
+        // Pontuação em pt-BR ("1 pt", "2,5 pts") — o modelo copia o template
+        // literalmente, então o formato certo aqui sai certo no documento.
+        const fmtPts = (n: number) => `${n.toLocaleString('pt-BR')} pt${n === 1 ? '' : 's'}`;
+        const fmtTotal = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
         const examDurStr = plannerExamDuration < 60 ? `${plannerExamDuration} min` : plannerExamDuration === 60 ? '1 hora' : `${Math.floor(plannerExamDuration/60)}h${plannerExamDuration%60 > 0 ? plannerExamDuration%60+'min' : ''}`;
 
-        const qtLabel: Record<string, string> = { mista: 'Varie os tipos entre as questões: múltipla escolha, completar lacunas, V/F com justificativa, relacionar colunas, produção textual ou resolução de problema.', multipla_escolha: 'Todas as questões são de MÚLTIPLA ESCOLHA com 4 alternativas (A, B, C, D), apenas uma correta.', dissertativa: 'Todas as questões são DISSERTATIVAS (resposta aberta), com 5 linhas de resposta.' };
+        const qtLabel: Record<string, string> = { mista: 'Varie os tipos entre as questões: múltipla escolha, completar lacunas, V/F com justificativa, relacionar colunas, produção textual ou resolução de problema. Em questões de relacionar colunas, numere os itens da Coluna A e prefixe CADA item da Coluna B com "(   ) " para o aluno escrever o número.', multipla_escolha: 'Todas as questões são de MÚLTIPLA ESCOLHA com 4 alternativas (A, B, C, D), apenas uma correta.', dissertativa: 'Todas as questões são DISSERTATIVAS (resposta aberta), com 5 linhas de resposta.' };
         const qtInstruction = resIsEarlyChildhood
           ? 'Use atividades LÚDICAS e visuais adequadas à Ed. Infantil: colorir, ligar com setas, identificar figuras, completar com desenho, circular a resposta correta com imagens. SEM leitura extensa ou escrita formal.'
           : qtLabel[plannerQuestionType] || qtLabel.mista;
@@ -14672,37 +14682,37 @@ ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteú
 
 # Avaliação: ${targetTopic}
 
-## Parte I — Questões de Múltipla Escolha *(${mcPts} pts cada — total: ${(mcPts*5).toFixed(1)} pts)*
+## Parte I — Questões de Múltipla Escolha *(${fmtPts(mcPts)} cada — total: ${fmtTotal(mcPts*5)} pts)*
 
-**Questão 1 (${mcPts} pts)** [enunciado claro e objetivo]
+**Questão 1 (${fmtPts(mcPts)})** [enunciado claro e objetivo]
 
 ( ) A) [alternativa plausível]
 ( ) B) [alternativa plausível]
 ( ) C) [alternativa plausível]
 ( ) D) [alternativa plausível]
 
-**Questão 2 (${mcPts} pts)** [enunciado]
+**Questão 2 (${fmtPts(mcPts)})** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 3 (${mcPts} pts)** [enunciado]
+**Questão 3 (${fmtPts(mcPts)})** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 4 (${mcPts} pts)** [enunciado]
+**Questão 4 (${fmtPts(mcPts)})** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
 ( ) C) [alternativa]
 ( ) D) [alternativa]
 
-**Questão 5 (${mcPts} pts)** [enunciado]
+**Questão 5 (${fmtPts(mcPts)})** [enunciado]
 
 ( ) A) [alternativa]
 ( ) B) [alternativa]
@@ -14711,9 +14721,9 @@ ESTRUTURA OBRIGATÓRIA — siga EXATAMENTE (substitua tudo entre [ ] por conteú
 
 ---
 
-## Parte II — Questões Dissertativas *(${dissPts} pts cada — total: ${(dissPts*2).toFixed(1)} pts)*
+## Parte II — Questões Dissertativas *(${fmtPts(dissPts)} cada — total: ${fmtTotal(dissPts*2)} pts)*
 
-**Questão 6 (${dissPts} pts)** [enunciado que exige desenvolvimento e reflexão]
+**Questão 6 (${fmtPts(dissPts)})** [enunciado que exige desenvolvimento e reflexão]
 
 _______________________________________________________________________________
 _______________________________________________________________________________
@@ -14721,7 +14731,7 @@ _______________________________________________________________________________
 _______________________________________________________________________________
 _______________________________________________________________________________
 
-**Questão 7 (${dissPts} pts)** [enunciado que exige desenvolvimento]
+**Questão 7 (${fmtPts(dissPts)})** [enunciado que exige desenvolvimento]
 
 _______________________________________________________________________________
 _______________________________________________________________________________
