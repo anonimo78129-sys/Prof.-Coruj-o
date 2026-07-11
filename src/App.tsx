@@ -5225,12 +5225,17 @@ const formatEventDate = (dateStr: string) => {
 };
 
 const getEventsForDay = (allEvents: any[], year: number, month: number, day: number) => {
+  const monthAbbrs = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   return allEvents.filter(e => {
     if (e.date.includes('-')) {
       const [yearStr, monthStr, dayStr] = e.date.split(' ')[0].split('-');
       return parseInt(yearStr) === year && parseInt(monthStr) === month + 1 && parseInt(dayStr) === day;
     }
-    return parseInt(e.date.split(' ')[0]) === day;
+    // Formato legado "15 Jul": confere dia E mês (antes o mês era ignorado
+    // e o evento aparecia no dia 15 de todos os meses).
+    const parts = e.date.split(' ');
+    if (parseInt(parts[0]) !== day) return false;
+    return parts.length < 2 || parts[1] === monthAbbrs[month];
   });
 };
 
@@ -5350,6 +5355,8 @@ const DayDetailScreen = ({
   currentMonth,
   currentYear,
   allEvents,
+  realCustomEvents,
+  realClasses,
   setScreen,
   notifications,
   setNotifications,
@@ -5363,6 +5370,11 @@ const DayDetailScreen = ({
   currentMonth: number,
   currentYear: number,
   allEvents: any[],
+  // Arrays REAIS persistidos (sem os feriados padrão sintetizados que o
+  // allEvents inclui) — qualquer escrita deve partir deles, senão feriados
+  // gerados viram eventos salvos e itens de outros dias são apagados.
+  realCustomEvents: any[],
+  realClasses: ClassItem[],
   setScreen: (s: Screen) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
@@ -5374,8 +5386,6 @@ const DayDetailScreen = ({
   const monthName = new Date(currentYear, currentMonth).toLocaleString('pt-BR', { month: 'long' });
   const selectedDayEvents = getEventsForDay(allEvents, currentYear, currentMonth, selectedDate);
   const holiday = selectedDayEvents.find(e => e.type === 'holiday' || e.type === 'commemorative' || e.type === 'admin');
-  const customEvents = allEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday' || e.type === 'commemorative');
-  const classes = allEvents.filter(e => e.type === 'class');
 
   const getEventColor = (e: any) => {
     if (e.type === 'class') {
@@ -5405,11 +5415,18 @@ const DayDetailScreen = ({
         {holiday && <HolidaySuggestion holidayName={holiday.title} />}
         {selectedDayEvents.length > 0 ? (
           <Reorder.Group axis="y" values={selectedDayEvents} onReorder={(newEvents) => {
-            const reorderedCustom = newEvents.filter(e => e.type === 'prep' || e.type === 'admin' || e.type === 'holiday' || e.type === 'commemorative') as any[];
-            const reorderedClasses = newEvents.filter(e => e.type === 'class') as any[];
-
-            setCustomEvents(reorderedCustom);
-            setClasses(reorderedClasses);
+            // Reordena SÓ os itens deste dia dentro dos arrays completos.
+            // (Antes, os arrays globais eram substituídos pelos eventos do
+            // dia — apagava todas as aulas/eventos dos outros dias e gravava
+            // os feriados sintetizados como eventos reais.)
+            const realCustomIds = new Set(realCustomEvents.map((e: any) => e.id));
+            const realClassIds = new Set(realClasses.map(c => c.id));
+            const dayCustom = newEvents.filter((e: any) => realCustomIds.has(e.id));
+            const dayClasses = newEvents.filter((e: any) => e.type === 'class' && realClassIds.has(e.id)).map(({ type: _t, ...rest }: any) => rest);
+            const dayCustomIds = new Set(dayCustom.map((e: any) => e.id));
+            const dayClassIds = new Set(dayClasses.map((e: any) => e.id));
+            setCustomEvents([...realCustomEvents.filter((e: any) => !dayCustomIds.has(e.id)), ...dayCustom]);
+            setClasses([...realClasses.filter(c => !dayClassIds.has(c.id)), ...dayClasses]);
           }} className="space-y-4">
             {selectedDayEvents.map((e) => (
               <Reorder.Item key={e.id} value={e} className="w-full" dragListener={true}>
@@ -5418,9 +5435,9 @@ const DayDetailScreen = ({
                   color={getEventColor(e)}
                   onComplete={() => {
                     if (e.type === 'class') {
-                      setClasses(classes.map(c => c.id === e.id ? { ...c, status: 'done' } : c));
+                      setClasses(realClasses.map(c => c.id === e.id ? { ...c, status: 'done' } : c));
                     } else {
-                      setCustomEvents(customEvents.map(ce => ce.id === e.id ? { ...ce, status: 'done' } : ce));
+                      setCustomEvents(realCustomEvents.map((ce: any) => ce.id === e.id ? { ...ce, status: 'done' } : ce));
                     }
                   }}
                   onPrepare={e.type === 'class' && onPrepareLesson ? () => {
@@ -6226,7 +6243,9 @@ const CalendarScreen = ({
     const newEvent = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2),
       title: newEventTitle,
-      date: `${selectedDate} ${monthAbbrNames[currentMonth]}`,
+      // Data ISO completa (com ano) — o formato antigo "15 Jul" fazia o
+      // evento reaparecer todo ano e quebrava as notificações automáticas.
+      date: fmt(new Date(currentYear, currentMonth, selectedDate)),
       type: newEventType,
       status: 'pending' as const
     };
@@ -13657,7 +13676,20 @@ function AppInner() {
 
     // Upcoming events (holidays, prep, admin) within 7 days
     customEvents.forEach(e => {
-      const eventDate = new Date(e.date + 'T00:00:00');
+      // Parse tolerante aos 3 formatos de data em uso: "YYYY-MM-DD",
+      // "YYYY-MM-DD HH:MM" e o legado "15 Jul" (assume o ano corrente).
+      // Antes, "YYYY-MM-DD HH:MM"+"T00:00:00" virava Invalid Date, o diff
+      // NaN passava pelo guard e saía "Em NaN dias — Invalid Date" todo dia.
+      let eventDate: Date;
+      const isoMatch = e.date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoMatch) {
+        eventDate = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+      } else {
+        const parts = e.date.split(' ');
+        const monthAbbrs = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        eventDate = new Date(today.getFullYear(), monthAbbrs.indexOf(parts[1]), parseInt(parts[0]));
+      }
+      if (isNaN(eventDate.getTime())) return;
       const diff = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       if (diff < 0 || diff > 7) return;
       const id = `auto-event-${e.id}-${todayStr}`;
@@ -15164,6 +15196,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             currentMonth={currentMonth}
             currentYear={currentYear}
             allEvents={[...classes.map(c => ({...c, type: 'class' as const})), ...customEvents, ...getDefaultHolidays(currentYear).filter(h => !customEvents.some(ce => ce.title === h.title && ce.date.startsWith(h.date.split(' ')[0])))]}
+            realCustomEvents={customEvents}
+            realClasses={classes}
             setScreen={setScreen}
             setCustomEvents={setCustomEvents}
             setClasses={setClasses}
