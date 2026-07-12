@@ -17,7 +17,7 @@ Fora isso, o projeto tem práticas boas e visíveis: regras do Firestore bem pen
 | 3 | 🟠 Alta | Reset da cota free via delete + recreate do próprio documento de usuário | ✅ Corrigido |
 | 4 | 🟠 Alta | Dependências com vulnerabilidades conhecidas (1 crítica, 3 altas) | ✅ Corrigido (2 resíduos aceitos) |
 | 5 | 🟡 Média | `PIXABAY_API_KEY` também exposta no bundle | ✅ Corrigido |
-| 6 | 🟡 Média | Ausência de headers de segurança (CSP etc.) no deploy | ✅ Corrigido (CSP pendente) |
+| 6 | 🟡 Média | Ausência de headers de segurança (CSP etc.) no deploy | ✅ Corrigido (CSP em Report-Only) |
 | 7 | 🟡 Média | Escrita em `config/stats` pelo cliente é negada pelas regras (bug funcional) | ✅ Corrigido |
 | 8 | 🔵 Baixa | E-mail do admin hardcoded nas regras e no bundle público | ✅ Mitigado (suporte a custom claim) |
 | 9 | 🔵 Baixa | Assets críticos hospedados em terceiros (i.ibb.co) sem controle | ⚠️ Pendente (passo manual) |
@@ -48,10 +48,13 @@ Todos os itens foram tratados nos commits desta branch. Resumo do que mudou:
   chave no servidor; a `PIXABAY_API_KEY` saiu do bundle. Os 3 pontos do cliente
   usam o helper `pixabaySearchHits`.
 - **#6 — Headers.** `vercel.json` passa a enviar `X-Content-Type-Options`,
-  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS. A `CSP`
-  ficou como próximo passo (precisa ser afinada em modo `Report-Only` por causa
-  de Google Fonts, i.ibb.co, endpoints do Firebase/Gemini e das janelas de
-  impressão via `document.write`).
+  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS. Agora
+  também há uma **`Content-Security-Policy-Report-Only`** cobrindo Google Fonts,
+  os endpoints do Firebase (Auth/Firestore/Functions/Storage/FCM), Pixabay e
+  imagens externas. Está em `Report-Only` de propósito: não bloqueia nada, só
+  reporta violações no console do navegador — assim dá para observar as janelas
+  de impressão (`document.write`) e outros pontos antes de promover para
+  `Content-Security-Policy` (bloqueante).
 - **#8 — Admin por custom claim.** `firestore.rules` e `storage.rules` passam a
   aceitar `request.auth.token.admin == true` como sinal de admin (caminho
   preferido, atribuído pelo Admin SDK), mantendo e-mail/role como *fallback*
