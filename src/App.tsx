@@ -13805,6 +13805,45 @@ function AppInner() {
     return () => { cancelled = true; };
   }, [user, schedules]);
 
+  // ── Lembrete local "Aula em X min" (sem servidor, sem chave VAPID) ────────
+  // Enquanto o app estiver aberto com permissão concedida, checa a cada
+  // minuto se alguma aula começa em até 30 min e dispara a notificação do
+  // sistema. Usa a MESMA tag da Cloud Function de push (aula-{id}-{data}):
+  // se o FCM for ativado no futuro, o sistema deduplica em vez de duplicar.
+  useEffect(() => {
+    if (!user || !('Notification' in window)) return;
+    const check = async () => {
+      if (Notification.permission !== 'granted') return;
+      const now = new Date();
+      const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      let fired: string[] = [];
+      try { fired = JSON.parse(localStorage.getItem('firedClassReminders') || '[]'); } catch { /* começa vazio */ }
+      fired = fired.filter(t => t.endsWith(dateKey)); // poda dias anteriores
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      for (const s of schedules) {
+        if (!s.days?.includes(now.getDay()) || !s.time) continue;
+        const [h, m] = s.time.split(':').map(n => parseInt(n, 10));
+        if (isNaN(h) || isNaN(m)) continue;
+        const diff = h * 60 + m - nowMin;
+        if (diff <= 0 || diff > 30) continue;
+        const tag = `aula-${s.id}-${dateKey}`;
+        if (fired.includes(tag)) continue;
+        fired.push(tag);
+        const title = `Aula em ${diff} min`;
+        const body = `${s.subject ? s.subject + ' — ' : ''}${s.name}${s.time ? ' às ' + s.time : ''}`;
+        try {
+          const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
+          if (reg) await reg.showNotification(title, { body, tag, icon: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png', data: { url: '/' } });
+          else new Notification(title, { body, tag });
+        } catch { /* ambiente sem suporte — segue sem lembrete */ }
+      }
+      try { localStorage.setItem('firedClassReminders', JSON.stringify(fired)); } catch { /* storage cheio/indisponível */ }
+    };
+    check();
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
+  }, [user, schedules]);
+
   // ── Onboarding ────────────────────────────────────────────────────────────
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
   const [onboardingName, setOnboardingName] = useState('');
