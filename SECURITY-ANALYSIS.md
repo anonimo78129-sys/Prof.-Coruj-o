@@ -10,17 +10,62 @@ O ponto mais grave é que a **chave da API do Gemini é embutida no bundle JavaS
 
 Fora isso, o projeto tem práticas boas e visíveis: regras do Firestore bem pensadas (proteção de `role`, `uid` e campos de billing), uso de `DOMPurify` e `escapeHtml` nos caminhos de HTML dinâmico, `.env*` fora do git e validação de tamanho/tipo no upload de fotos.
 
-| # | Severidade | Achado |
-|---|-----------|--------|
-| 1 | 🔴 Crítica | `GEMINI_API_KEY` exposta no bundle do cliente |
-| 2 | 🔴 Alta | Limite de gerações free aplicado apenas no cliente |
-| 3 | 🟠 Alta | Reset da cota free via delete + recreate do próprio documento de usuário |
-| 4 | 🟠 Alta | Dependências com vulnerabilidades conhecidas (1 crítica, 3 altas) |
-| 5 | 🟡 Média | `PIXABAY_API_KEY` também exposta no bundle |
-| 6 | 🟡 Média | Ausência de headers de segurança (CSP etc.) no deploy |
-| 7 | 🟡 Média | Escrita em `config/stats` pelo cliente é negada pelas regras (bug funcional) |
-| 8 | 🔵 Baixa | E-mail do admin hardcoded nas regras e no bundle público |
-| 9 | 🔵 Baixa | Assets críticos hospedados em terceiros (i.ibb.co) sem controle |
+| # | Severidade | Achado | Status |
+|---|-----------|--------|--------|
+| 1 | 🔴 Crítica | `GEMINI_API_KEY` exposta no bundle do cliente | ✅ Corrigido |
+| 2 | 🔴 Alta | Limite de gerações free aplicado apenas no cliente | ✅ Corrigido |
+| 3 | 🟠 Alta | Reset da cota free via delete + recreate do próprio documento de usuário | ✅ Corrigido |
+| 4 | 🟠 Alta | Dependências com vulnerabilidades conhecidas (1 crítica, 3 altas) | ✅ Corrigido (2 resíduos aceitos) |
+| 5 | 🟡 Média | `PIXABAY_API_KEY` também exposta no bundle | ✅ Corrigido |
+| 6 | 🟡 Média | Ausência de headers de segurança (CSP etc.) no deploy | ✅ Corrigido (CSP pendente) |
+| 7 | 🟡 Média | Escrita em `config/stats` pelo cliente é negada pelas regras (bug funcional) | ✅ Corrigido |
+| 8 | 🔵 Baixa | E-mail do admin hardcoded nas regras e no bundle público | ✅ Mitigado (suporte a custom claim) |
+| 9 | 🔵 Baixa | Assets críticos hospedados em terceiros (i.ibb.co) sem controle | ⚠️ Pendente (passo manual) |
+
+---
+
+## Correções aplicadas (2026-07-12)
+
+Todos os itens foram tratados nos commits desta branch. Resumo do que mudou:
+
+- **#1 / #2 / #7 — Proxy de IA no backend.** Nova Cloud Function `generateAi`
+  (`functions/index.js`) guarda a `GEMINI_API_KEY` como *secret* do servidor,
+  exige Firebase Auth, retenta 503/429 no servidor e contabiliza tokens +
+  estatísticas globais via Admin SDK (o que também conserta o `config/stats` do
+  #7). O cliente (`src/App.tsx`) agora chama essa function em vez de instanciar o
+  Gemini no navegador; o `define` da chave saiu do `vite.config.ts`.
+  ⚠️ **Rotacione a `GEMINI_API_KEY`** — ela esteve em builds públicos.
+- **#2 / #3 — Cota inviolável.** O contador da fonte da verdade vive em
+  `usage/{uid}`, coleção que as regras (`firestore.rules`) tornam **somente‑leitura
+  para o cliente** (escrita apenas pelo backend). Isso elimina o bypass de
+  delete+recreate. As gerações "billable" (plano, slides, atividades/prova)
+  passam `billable: true`; o backend valida o limite e incrementa atomicamente.
+- **#4 — Dependências.** `npm audit fix` na raiz e em `functions/`. Restaram
+  dois resíduos aceitos por exigirem *major* com breaking change: `esbuild`
+  (baixa, só afeta o dev‑server no Windows) e `uuid` transitivo do
+  `firebase-admin` (moderada; correção pede `firebase-admin@14`).
+- **#5 — Pixabay no backend.** Nova function `pixabaySearch` faz a busca com a
+  chave no servidor; a `PIXABAY_API_KEY` saiu do bundle. Os 3 pontos do cliente
+  usam o helper `pixabaySearchHits`.
+- **#6 — Headers.** `vercel.json` passa a enviar `X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS. A `CSP`
+  ficou como próximo passo (precisa ser afinada em modo `Report-Only` por causa
+  de Google Fonts, i.ibb.co, endpoints do Firebase/Gemini e das janelas de
+  impressão via `document.write`).
+- **#8 — Admin por custom claim.** `firestore.rules` e `storage.rules` passam a
+  aceitar `request.auth.token.admin == true` como sinal de admin (caminho
+  preferido, atribuído pelo Admin SDK), mantendo e-mail/role como *fallback*
+  legado. Recomendação: migrar o admin para custom claim e remover o e-mail fixo.
+- **#9 — Assets de terceiros.** Requer baixar ~18 imagens do `i.ibb.co` e
+  servi-las do próprio domínio (`public/`). A política de rede deste ambiente
+  bloqueia o download desses hosts, então é um passo manual de operação (não foi
+  automatizado aqui para não substituir imagens boas por quebradas).
+
+> **Risco residual (documentado):** como o cliente decide o que é uma geração
+> "billable", um atacante que monte requisições cruas à callable poderia marcar
+> `billable: false` e burlar o paywall (não a chave, que está segura). A
+> mitigação recomendada é habilitar **Firebase App Check** na function `generateAi`
+> para bloquear clientes que não sejam o app oficial.
 
 ---
 

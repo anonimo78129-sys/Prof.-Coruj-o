@@ -18,7 +18,7 @@ import {
 import { Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { auth, db, storage, logOut, getFcmToken, generateAiCallable, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
+import { auth, db, storage, logOut, getFcmToken, generateAiCallable, pixabaySearchCallable, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -396,34 +396,35 @@ const getImageUrl = (query: string | undefined, width: number, height: number) =
   return `https://source.unsplash.com/${width}x${height}/?${cleanQuery}`;
 };
 
+// Busca imagens via Cloud Function `pixabaySearch` — a chave do Pixabay fica no
+// backend. Retorna [] em qualquer falha (rede/sem-chave), para o chamador cair
+// no fallback local. `hits` já vem enxuto (só as URLs) do servidor.
+const pixabaySearchHits = async (
+  query: string,
+  opts: { imageType?: 'photo' | 'illustration'; minWidth?: number; order?: string } = {},
+): Promise<{ webformatURL?: string; largeImageURL?: string }[]> => {
+  try {
+    const { data } = await pixabaySearchCallable({ query, ...opts });
+    return data?.hits || [];
+  } catch {
+    return [];
+  }
+};
+
 const fetchPixabayImage = async (query: string | undefined, width: number, height: number): Promise<string> => {
   const fallback = getImageUrl(query, width, height);
   if (!query || query.trim().length === 0) return fallback;
 
-  const apiKey = process.env.PIXABAY_API_KEY;
-  if (!apiKey) return fallback;
-
   const cacheKey = `${query.trim().toLowerCase()}|${width}x${height}`;
   if (pixabayCache.has(cacheKey)) return pixabayCache.get(cacheKey)!;
 
-  try {
-    const cleanQuery = encodeURIComponent(query.replace(/,/g, ' ').trim());
-    const url = `https://pixabay.com/api/?key=${apiKey}&q=${cleanQuery}&image_type=photo&safesearch=true&orientation=horizontal&per_page=20&min_width=${Math.min(width, 1280)}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-    if (!res.ok) return fallback;
-    const data = await res.json();
-    if (!data.hits || data.hits.length === 0) return fallback;
-    const pool = data.hits.slice(0, 5);
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    const chosen = pick.largeImageURL || pick.webformatURL || fallback;
-    pixabayCache.set(cacheKey, chosen);
-    return chosen;
-  } catch {
-    return fallback;
-  }
+  const hits = await pixabaySearchHits(query, { imageType: 'photo', minWidth: Math.min(width, 1280) });
+  if (hits.length === 0) return fallback;
+  const pool = hits.slice(0, 5);
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const chosen = pick.largeImageURL || pick.webformatURL || fallback;
+  pixabayCache.set(cacheKey, chosen);
+  return chosen;
 };
 
 // --- Types ---
@@ -6375,8 +6376,6 @@ const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
 const STORY_SECTIONS = ['🗺️ Quem é Quem', '📖 A História', '🎬 Atividade'];
 
 const generateStoryImages = async (topic: string, popTheme: string): Promise<Record<string, string>> => {
-  const apiKey = process.env.PIXABAY_API_KEY;
-  if (!apiKey) return {};
   try {
     const keywordPrompt = `For an educational narrative-metaphor story that teaches "${topic}" set in the pop-culture universe of "${popTheme}", generate one short English search keyword (2-4 words) per section to find an illustration on Pixabay.
 Return ONLY valid JSON with these exact keys:
@@ -6392,17 +6391,12 @@ Return ONLY valid JSON with these exact keys:
         if (!q) return [section, ''] as [string, string];
         const cacheKey = `illus|${q.trim().toLowerCase()}`;
         if (pixabayCache.has(cacheKey)) return [section, pixabayCache.get(cacheKey)!] as [string, string];
-        try {
-          const url = `https://pixabay.com/api/?key=${apiKey}&q=${encodeURIComponent(q.trim())}&image_type=illustration&safesearch=true&orientation=horizontal&per_page=20&order=popular`;
-          const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-          if (!res.ok) return [section, ''] as [string, string];
-          const data = await res.json();
-          if (!data.hits?.length) return [section, ''] as [string, string];
-          const hit = data.hits[Math.floor(Math.random() * Math.min(5, data.hits.length))];
-          const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
-          if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
-          return [section, imgUrl] as [string, string];
-        } catch { return [section, ''] as [string, string]; }
+        const hits = await pixabaySearchHits(q, { imageType: 'illustration', order: 'popular' });
+        if (!hits.length) return [section, ''] as [string, string];
+        const hit = hits[Math.floor(Math.random() * Math.min(5, hits.length))];
+        const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
+        if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
+        return [section, imgUrl] as [string, string];
       })
     );
     return Object.fromEntries(entries.filter(([, v]) => v));
@@ -7464,24 +7458,18 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
           throw new Error('[IA_FORMATO] escape room sem title/enigmas válidos');
         }
         parsed.enigmas = parsed.enigmas.map((en: any) => ({ ...en, hint: typeof en.hint === 'string' ? en.hint : '' }));
-        const apiKey = process.env.PIXABAY_API_KEY;
-        if (apiKey && parsed.enigmas) {
+        if (parsed.enigmas) {
           const withImages = await Promise.all(parsed.enigmas.map(async (en: any) => {
             const q = en.keyword;
             if (!q) return en;
             const cacheKey = `illus|${q.trim().toLowerCase()}`;
             if (pixabayCache.has(cacheKey)) return { ...en, imageUrl: pixabayCache.get(cacheKey) };
-            try {
-              const url = `https://pixabay.com/api/?key=${apiKey}&q=${encodeURIComponent(q.trim())}&image_type=illustration&safesearch=true&orientation=horizontal&per_page=20&order=popular`;
-              const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-              if (!res.ok) return en;
-              const data = await res.json();
-              if (!data.hits?.length) return en;
-              const hit = data.hits[Math.floor(Math.random() * Math.min(5, data.hits.length))];
-              const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
-              if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
-              return { ...en, imageUrl: imgUrl };
-            } catch { return en; }
+            const hits = await pixabaySearchHits(q, { imageType: 'illustration', order: 'popular' });
+            if (!hits.length) return en;
+            const hit = hits[Math.floor(Math.random() * Math.min(5, hits.length))];
+            const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
+            if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
+            return { ...en, imageUrl: imgUrl };
           }));
           parsed.enigmas = withImages;
         }

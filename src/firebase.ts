@@ -24,6 +24,12 @@ export const generateAiCallable = httpsCallable<
   { text: string; functionCalls?: unknown }
 >(functions, 'generateAi');
 
+// Busca de imagens do Pixabay — a chave fica no backend (não no bundle).
+export const pixabaySearchCallable = httpsCallable<
+  { query: string; imageType?: 'photo' | 'illustration'; minWidth?: number; order?: string },
+  { hits: { webformatURL?: string; largeImageURL?: string }[] }
+>(functions, 'pixabaySearch');
+
 export const signIn = () => signInWithPopup(auth, googleProvider);
 export const logOut = () => signOut(auth);
 export { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser };

@@ -12,7 +12,7 @@
 
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { defineSecret } = require('firebase-functions/params');
+const { defineSecret, defineString } = require('firebase-functions/params');
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -291,5 +291,55 @@ exports.generateAi = onCall(
     try { functionCalls = result.functionCalls || null; } catch (e) { functionCalls = null; }
 
     return { text: result.text || '', functionCalls };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proxy de busca de imagens (Pixabay)
+//
+// Mantém a PIXABAY_API_KEY fora do bundle público (achado #5). É opcional, então
+// usamos defineString (default '') para não travar o deploy quando não definida.
+// Retorna só os campos de URL que o cliente consome.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PIXABAY_API_KEY = defineString('PIXABAY_API_KEY', { default: '' });
+
+exports.pixabaySearch = onCall(
+  { timeoutSeconds: 20, memory: '256MiB', region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+    const key = PIXABAY_API_KEY.value();
+    if (!key) return { hits: [] };
+
+    const d = request.data || {};
+    const q = String(d.query || '').replace(/,/g, ' ').trim();
+    if (!q) return { hits: [] };
+
+    const params = new URLSearchParams({
+      key,
+      q,
+      image_type: d.imageType === 'illustration' ? 'illustration' : 'photo',
+      safesearch: 'true',
+      orientation: 'horizontal',
+      per_page: '20',
+    });
+    if (d.minWidth) params.set('min_width', String(Math.min(Number(d.minWidth) || 0, 1280)));
+    if (d.order) params.set('order', String(d.order));
+
+    try {
+      const res = await fetch(`https://pixabay.com/api/?${params.toString()}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return { hits: [] };
+      const data = await res.json();
+      const hits = (data.hits || [])
+        .slice(0, 10)
+        .map((h) => ({ webformatURL: h.webformatURL || '', largeImageURL: h.largeImageURL || '' }));
+      return { hits };
+    } catch (e) {
+      logger.warn('Falha na busca do Pixabay:', e);
+      return { hits: [] };
+    }
   }
 );
