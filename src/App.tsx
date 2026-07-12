@@ -13864,6 +13864,45 @@ function AppInner() {
     }
   }, [onboardingLsKey, profileLoaded, profile.onboarded]);
 
+  // ── Pedido proativo de permissão (notificações + som) ─────────────────────
+  // Navegadores só mostram o prompt nativo após um gesto do usuário, então o
+  // app pergunta primeiro com um cartão explicando o porquê. O mesmo toque
+  // que responde ao cartão destrava o áudio (AudioContext) dos jogos.
+  const [showPermissionAsk, setShowPermissionAsk] = useState(false);
+  useEffect(() => {
+    if (!user || !profileLoaded || showOnboarding) return;
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    try { if (localStorage.getItem(`notifAsked-${user.uid}`)) return; } catch { /* segue e pergunta */ }
+    const id = setTimeout(() => setShowPermissionAsk(true), 1500);
+    return () => clearTimeout(id);
+  }, [user, profileLoaded, showOnboarding]);
+
+  const answerPermissionAsk = async (accept: boolean) => {
+    setShowPermissionAsk(false);
+    try { localStorage.setItem(`notifAsked-${user?.uid}`, '1'); } catch { /* sem storage */ }
+    // O toque no cartão já é o gesto que desbloqueia o som neste carregamento.
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (Ctx) {
+        if (!chimeCtx || chimeCtx.state === 'closed') chimeCtx = new Ctx();
+        chimeCtx.resume().catch(() => {});
+      }
+    } catch { /* sem áudio no ambiente */ }
+    if (!accept) return;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        playChime(true);
+        const opts = { body: 'Você será avisado(a) 30 minutos antes de cada aula.', icon: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' };
+        const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
+        if (reg) await reg.showNotification('Notificações ativadas! 🦉', opts);
+        else new Notification('Notificações ativadas! 🦉', opts);
+      } else {
+        toast.error('Sem permissão. Dá pra ativar depois no sininho ou nas configurações do navegador.');
+      }
+    } catch { /* navegador sem suporte a Notification */ }
+  };
+
   const buildOnboardingClass = (): ClassSchedule => ({
     id: Math.random().toString(36).slice(2, 11),
     name: onboardingClass.name,
@@ -14911,6 +14950,33 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                   Entendi
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Pedido de permissão: notificações + som ─────────────────────── */}
+      <AnimatePresence>
+        {showPermissionAsk && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-[95] flex items-end justify-center p-0">
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+              className="bg-white w-full max-w-md rounded-t-[2.5rem] p-6 pb-10 shadow-2xl"
+            >
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3 text-3xl">🔔</div>
+                <h2 className="text-xl font-black text-gray-900 mb-2">Ative avisos e sons</h2>
+                <p className="text-sm text-gray-500 leading-relaxed max-w-[300px]">
+                  O Corujão te avisa <b className="text-gray-700">30 minutos antes de cada aula</b> e usa sons nos jogos da turma. Para isso, precisa da sua permissão de notificações.
+                </p>
+              </div>
+              <button onClick={() => answerPermissionAsk(true)} className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl active:scale-[0.98] transition-transform shadow-md mb-2">
+                Ativar agora
+              </button>
+              <button onClick={() => answerPermissionAsk(false)} className="w-full text-gray-400 font-bold py-2.5 text-sm">
+                Agora não
+              </button>
             </motion.div>
           </motion.div>
         )}
