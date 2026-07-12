@@ -15,10 +15,10 @@ import {
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
   Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
 } from 'lucide-react';
-import { Type } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { auth, db, storage, logOut, getFcmToken, generateAiCallable, pixabaySearchCallable, deleteUserDataCallable, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
+import { auth, db, storage, logOut, getFcmToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -30,9 +30,12 @@ import {
 } from './utils';
 import { INFORMATICA_LESSONS, JOGOS_LESSONS } from './seed-lessons';
 
-// A chave do Gemini NÃO existe mais no cliente: toda geração passa pela Cloud
-// Function `generateAi` (ver src/firebase.ts), que guarda a chave no servidor,
-// exige autenticação e controla a cota do plano free de forma inviolável.
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error("CRITICAL: GEMINI_API_KEY está ausente no ambiente!");
+}
+const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
+
 const AI_MODEL = 'gemini-2.5-flash';
 
 // ── Privacidade / LGPD ──────────────────────────────────────────────────────
@@ -183,8 +186,44 @@ function renderChatText(text: string): React.ReactNode {
 }
 
 
-// Retentativas de 503/429 agora acontecem no backend (Cloud Function
-// `generateAi`), para que a cota só seja debitada uma vez, em caso de sucesso.
+const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs = 2000): Promise<T> => {
+  let attempt = 0;
+  let rateLimit429Attempts = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      attempt++;
+      let msg = '';
+      if (typeof error === 'string') msg = error;
+      else if (error instanceof Error) msg = error.message;
+      else if (error?.error?.message) msg = error.error.message;
+      else if (error?.message) msg = Object.prototype.toString.call(error.message) === '[object String]' ? error.message : JSON.stringify(error.message);
+      else { try { msg = JSON.stringify(error); } catch (e) {} }
+
+      const status = error?.status || error?.error?.code || (typeof error?.error === 'object' ? error?.error?.status : null);
+      const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
+      const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+
+      if (is429) {
+        rateLimit429Attempts++;
+        if (rateLimit429Attempts <= 1) {
+          // Wait 30s for per-minute quota window to reset, then try once more
+          await new Promise(resolve => setTimeout(resolve, 30000 + Math.random() * 5000));
+          continue;
+        }
+        throw error; // Second 429: quota is exhausted, give up
+      } else if (is503 && attempt < maxRetries) {
+        const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + (Math.random() * 1000);
+        console.warn(`API overloaded (503). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Servidor da IA indisponível após várias tentativas. Tente novamente em alguns minutos.");
+};
 
 const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'): Promise<T> => {
   return new Promise<T>((resolve, reject) => {
@@ -198,28 +237,21 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'):
   });
 };
 
-type AiGenParams = { model?: string; contents: any; config?: any };
+let _pendingInputTokens = 0;
+let _pendingOutputTokens = 0;
 
-// Encaminha a geração para a Cloud Function autenticada. O backend cuida das
-// retentativas (503/429), contabiliza tokens/estatísticas e, quando
-// `billable` é true, debita e valida a cota do plano free — nada disso pode
-// ser burlado no cliente. Retorna só os campos que os chamadores consomem.
-const generateContentWithRetry = async (
-  params: AiGenParams,
-  billable = false,
-): Promise<{ text: string; functionCalls?: any }> => {
-  const result = await withTimeout(
-    generateAiCallable({
-      model: params.model || AI_MODEL,
-      contents: params.contents,
-      config: params.config,
-      billable,
-    }),
-    90000,
-    'geração de conteúdo',
-  );
-  const data = (result?.data || {}) as { text?: string; functionCalls?: any };
-  return { text: data.text || '', functionCalls: data.functionCalls || undefined };
+const generateContentWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0]) => {
+  if (!apiKey) {
+    throw new Error('Chave da IA não configurada. Contate o suporte.');
+  }
+  if (!params.model) params.model = AI_MODEL;
+  const result = await withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
+  const usage = (result as any).usageMetadata;
+  if (usage) {
+    _pendingInputTokens += usage.promptTokenCount || 0;
+    _pendingOutputTokens += usage.candidatesTokenCount || 0;
+  }
+  return result;
 };
 
 function useFirestoreSync<T extends { id: string }>(
@@ -481,35 +513,34 @@ const getImageUrl = (query: string | undefined, width: number, height: number) =
   return `https://source.unsplash.com/${width}x${height}/?${cleanQuery}`;
 };
 
-// Busca imagens via Cloud Function `pixabaySearch` — a chave do Pixabay fica no
-// backend. Retorna [] em qualquer falha (rede/sem-chave), para o chamador cair
-// no fallback local. `hits` já vem enxuto (só as URLs) do servidor.
-const pixabaySearchHits = async (
-  query: string,
-  opts: { imageType?: 'photo' | 'illustration'; minWidth?: number; order?: string } = {},
-): Promise<{ webformatURL?: string; largeImageURL?: string }[]> => {
-  try {
-    const { data } = await pixabaySearchCallable({ query, ...opts });
-    return data?.hits || [];
-  } catch {
-    return [];
-  }
-};
-
 const fetchPixabayImage = async (query: string | undefined, width: number, height: number): Promise<string> => {
   const fallback = getImageUrl(query, width, height);
   if (!query || query.trim().length === 0) return fallback;
 
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey) return fallback;
+
   const cacheKey = `${query.trim().toLowerCase()}|${width}x${height}`;
   if (pixabayCache.has(cacheKey)) return pixabayCache.get(cacheKey)!;
 
-  const hits = await pixabaySearchHits(query, { imageType: 'photo', minWidth: Math.min(width, 1280) });
-  if (hits.length === 0) return fallback;
-  const pool = hits.slice(0, 5);
-  const pick = pool[Math.floor(Math.random() * pool.length)];
-  const chosen = pick.largeImageURL || pick.webformatURL || fallback;
-  pixabayCache.set(cacheKey, chosen);
-  return chosen;
+  try {
+    const cleanQuery = encodeURIComponent(query.replace(/,/g, ' ').trim());
+    const url = `https://pixabay.com/api/?key=${apiKey}&q=${cleanQuery}&image_type=photo&safesearch=true&orientation=horizontal&per_page=20&min_width=${Math.min(width, 1280)}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    if (!data.hits || data.hits.length === 0) return fallback;
+    const pool = data.hits.slice(0, 5);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const chosen = pick.largeImageURL || pick.webformatURL || fallback;
+    pixabayCache.set(cacheKey, chosen);
+    return chosen;
+  } catch {
+    return fallback;
+  }
 };
 
 // --- Types ---
@@ -6537,6 +6568,8 @@ const buildCrosswordGrid = (rawWords: {word: string, clue: string}[]) => {
 const STORY_SECTIONS = ['🗺️ Quem é Quem', '📖 A História', '🎬 Atividade'];
 
 const generateStoryImages = async (topic: string, popTheme: string): Promise<Record<string, string>> => {
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey) return {};
   try {
     const keywordPrompt = `For an educational narrative-metaphor story that teaches "${topic}" set in the pop-culture universe of "${popTheme}", generate one short English search keyword (2-4 words) per section to find an illustration on Pixabay.
 Return ONLY valid JSON with these exact keys:
@@ -6552,12 +6585,17 @@ Return ONLY valid JSON with these exact keys:
         if (!q) return [section, ''] as [string, string];
         const cacheKey = `illus|${q.trim().toLowerCase()}`;
         if (pixabayCache.has(cacheKey)) return [section, pixabayCache.get(cacheKey)!] as [string, string];
-        const hits = await pixabaySearchHits(q, { imageType: 'illustration', order: 'popular' });
-        if (!hits.length) return [section, ''] as [string, string];
-        const hit = hits[Math.floor(Math.random() * Math.min(5, hits.length))];
-        const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
-        if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
-        return [section, imgUrl] as [string, string];
+        try {
+          const url = `https://pixabay.com/api/?key=${apiKey}&q=${encodeURIComponent(q.trim())}&image_type=illustration&safesearch=true&orientation=horizontal&per_page=20&order=popular`;
+          const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+          if (!res.ok) return [section, ''] as [string, string];
+          const data = await res.json();
+          if (!data.hits?.length) return [section, ''] as [string, string];
+          const hit = data.hits[Math.floor(Math.random() * Math.min(5, data.hits.length))];
+          const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
+          if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
+          return [section, imgUrl] as [string, string];
+        } catch { return [section, ''] as [string, string]; }
       })
     );
     return Object.fromEntries(entries.filter(([, v]) => v));
@@ -7619,18 +7657,24 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
           throw new Error('[IA_FORMATO] escape room sem title/enigmas válidos');
         }
         parsed.enigmas = parsed.enigmas.map((en: any) => ({ ...en, hint: typeof en.hint === 'string' ? en.hint : '' }));
-        if (parsed.enigmas) {
+        const apiKey = process.env.PIXABAY_API_KEY;
+        if (apiKey && parsed.enigmas) {
           const withImages = await Promise.all(parsed.enigmas.map(async (en: any) => {
             const q = en.keyword;
             if (!q) return en;
             const cacheKey = `illus|${q.trim().toLowerCase()}`;
             if (pixabayCache.has(cacheKey)) return { ...en, imageUrl: pixabayCache.get(cacheKey) };
-            const hits = await pixabaySearchHits(q, { imageType: 'illustration', order: 'popular' });
-            if (!hits.length) return en;
-            const hit = hits[Math.floor(Math.random() * Math.min(5, hits.length))];
-            const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
-            if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
-            return { ...en, imageUrl: imgUrl };
+            try {
+              const url = `https://pixabay.com/api/?key=${apiKey}&q=${encodeURIComponent(q.trim())}&image_type=illustration&safesearch=true&orientation=horizontal&per_page=20&order=popular`;
+              const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+              if (!res.ok) return en;
+              const data = await res.json();
+              if (!data.hits?.length) return en;
+              const hit = data.hits[Math.floor(Math.random() * Math.min(5, data.hits.length))];
+              const imgUrl: string = hit.webformatURL || hit.largeImageURL || '';
+              if (imgUrl) pixabayCache.set(cacheKey, imgUrl);
+              return { ...en, imageUrl: imgUrl };
+            } catch { return en; }
           }));
           parsed.enigmas = withImages;
         }
@@ -13940,9 +13984,26 @@ function AppInner() {
     return (profile?.generationsUsed ?? 0) >= FREE_GENERATION_LIMIT;
   }, [user, profile]);
 
-  // A contabilização de cota, tokens e estatísticas agora acontece no backend
-  // (Cloud Function `generateAi`), atomicamente e à prova de adulteração — as
-  // gerações "billable" passam `billable: true` ao generateContentWithRetry.
+  const recordGeneration = async () => {
+    if (!user) return;
+    // Pro/admin não gastam cota: o contador de gerações fica parado pra eles
+    // (o limite já os isenta), mas os tokens continuam registrados — são a
+    // métrica de custo real no painel admin.
+    const isPrivileged = profile?.isPro || profile?.role === 'admin';
+    const inputT = _pendingInputTokens; const outputT = _pendingOutputTokens;
+    _pendingInputTokens = 0; _pendingOutputTokens = 0;
+    try {
+      const userUpdate: any = { inputTokens: increment(inputT), outputTokens: increment(outputT) };
+      if (!isPrivileged) userUpdate.generationsUsed = increment(1);
+      await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
+      const monthKey = new Date().toISOString().slice(0, 7).replace('-', '_');
+      const statsPayload = { totalGenerations: increment(1), totalInputTokens: increment(inputT), totalOutputTokens: increment(outputT) };
+      await Promise.all([
+        setDoc(doc(db, 'config', 'stats'), statsPayload, { merge: true }),
+        setDoc(doc(db, 'config', `stats_${monthKey}`), statsPayload, { merge: true }),
+      ]);
+    } catch { /* best-effort */ }
+  };
 
   if (!isAuthLoaded) {
     return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FE]"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -14504,7 +14565,7 @@ ${avaliacaoBlock}
 
       // Plano de aula exige raciocínio pedagógico real (sequência didática,
       // BNCC, adequação de nível) — vale a pena um orçamento extra de "pensar antes de responder".
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } }, true);
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
       const planDraft = response.text || '';
 
       // ── Validação local determinística das habilidades BNCC ──────────────
@@ -14527,6 +14588,7 @@ ${avaliacaoBlock}
 
       setPlannerPlan(planResult);
       updateTask(taskId, { status: 'completed', result: planResult });
+      recordGeneration();
     } catch (error) {
       updateTask(taskId, { status: 'error', error: formatApiError(error, 'Não consegui montar o plano dessa vez. Tente novamente.') });
     }
@@ -14547,7 +14609,7 @@ ${avaliacaoBlock}
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount, selectedClass?.level);
         // Coreografia de layouts + planejamento do arco do deck se beneficiam de
         // um orçamento extra de raciocínio antes de responder.
-        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } }, true);
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
         const firstBrace = text.indexOf('{');
@@ -14584,6 +14646,7 @@ ${avaliacaoBlock}
         const sanitized = sanitizeSlideData(parsed);
         setPlannerPresentationData(sanitized);
         updateTask(taskId, { status: 'completed', result: sanitized });
+        recordGeneration();
       } else {
         const resClassLevel = selectedClass?.level || '';
         const resIsEarlyChildhood = resClassLevel.toLowerCase().includes('infantil');
@@ -14713,11 +14776,12 @@ _______________________________________________________________________________
 
 REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`;
           
-        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt }, true);
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
         const result = response.text || '';
         if (type === 'exam') setPlannerExam(result);
         else setPlannerActivity(result);
         updateTask(taskId, { status: 'completed', result });
+        recordGeneration();
       }
     } catch (error) {
       updateTask(taskId, { status: 'error', error: formatApiError(error, 'Esse material não saiu como esperado. Tente novamente.') });
@@ -15139,7 +15203,6 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                   await fbBatch.commit();
                 }
               } catch { /* sem feedbacks ou sem permissão */ }
-              try { await deleteUserDataCallable({}); } catch { /* backend limpa usage/{uid} */ }
               await deleteDoc(doc(db, 'users', uid));
               await deleteUser(user);
             } catch (e: any) {

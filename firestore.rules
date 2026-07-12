@@ -50,15 +50,6 @@ service cloud.firestore {
           && (!('generationsUsed' in request.resource.data) || request.resource.data.generationsUsed == 0);
     }
 
-    // Cota de gerações (fonte da verdade, à prova de adulteração).
-    // Escrita EXCLUSIVA do backend (Admin SDK ignora estas regras). O cliente
-    // pode ler o próprio contador para exibição, mas nunca criar/alterar/apagar
-    // — é isso que fecha o bypass de "delete + recreate" do documento do usuário.
-    match /usage/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if false;
-    }
-
     match /feedback/{feedbackId} {
       allow create: if isAuthenticated() && uidUnchanged();
       allow read, update: if isAdmin();

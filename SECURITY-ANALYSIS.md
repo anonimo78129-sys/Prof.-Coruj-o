@@ -14,15 +14,25 @@ Fora isso, o projeto tem práticas boas e visíveis: regras do Firestore bem pen
 
 | # | Severidade | Achado | Status |
 |---|-----------|--------|--------|
-| 1 | 🔴 Crítica | `GEMINI_API_KEY` exposta no bundle do cliente | ✅ Corrigido |
-| 2 | 🔴 Alta | Limite de gerações free aplicado apenas no cliente | ✅ Corrigido |
-| 3 | 🟠 Alta | Reset da cota free via delete + recreate do próprio documento de usuário | ✅ Corrigido |
+| 1 | 🔴 Crítica | `GEMINI_API_KEY` exposta no bundle do cliente | ↩️ Revertido por decisão do dono (ver nota) — mitigado por restrição de domínio |
+| 2 | 🔴 Alta | Limite de gerações free aplicado apenas no cliente | ↩️ Revertido por decisão do dono (custo) |
+| 3 | 🟠 Alta | Reset da cota free via delete + recreate do próprio documento de usuário | ↩️ Revertido por decisão do dono (custo) |
 | 4 | 🟠 Alta | Dependências com vulnerabilidades conhecidas (1 crítica, 3 altas) | ✅ Corrigido (2 resíduos aceitos) |
-| 5 | 🟡 Média | `PIXABAY_API_KEY` também exposta no bundle | ✅ Corrigido |
+| 5 | 🟡 Média | `PIXABAY_API_KEY` também exposta no bundle | ↩️ Revertido por decisão do dono (custo) |
 | 6 | 🟡 Média | Ausência de headers de segurança (CSP etc.) no deploy | ✅ Corrigido (CSP em Report-Only) |
-| 7 | 🟡 Média | Escrita em `config/stats` pelo cliente é negada pelas regras (bug funcional) | ✅ Corrigido |
+| 7 | 🟡 Média | Escrita em `config/stats` pelo cliente é negada pelas regras (bug funcional) | ⚠️ Reaberto (voltou a ser client-side; ver nota) |
 | 8 | 🔵 Baixa | E-mail do admin hardcoded nas regras e no bundle público | ✅ Mitigado (suporte a custom claim) |
 | 9 | 🔵 Baixa | Assets críticos hospedados em terceiros (i.ibb.co) sem controle | ⚠️ Pendente (passo manual) |
+
+> **Decisão do dono (2026-07-12):** o backend de IA (Cloud Functions) foi
+> **revertido** porque exige o plano Blaze/pago. As chamadas de IA e do Pixabay
+> voltaram a sair do navegador, com a `GEMINI_API_KEY` no bundle — protegida por
+> **restrição de referrer/domínio** no console do Google. Essa restrição barra o
+> uso casual da chave em outro site pelo navegador, mas **não impede** uso via
+> script que falsifique o cabeçalho `Referer` (é "melhor esforço", não segurança
+> forte). Consequentemente, os achados #1, #2, #3, #5 e #7 permanecem em aberto —
+> risco **aceito conscientemente** em troca de custo zero de servidor. As demais
+> correções sem custo (#4, #6, #8) e todas as medidas de LGPD foram **mantidas**.
 
 ---
 
@@ -257,7 +267,7 @@ O admin "bootstrap" (`lyelsonmf520@gmail.com`) está fixo em vários arquivos. F
 
 - **Política de Privacidade e Termos** (`PrivacyPolicyOverlay`): overlay acessível no login e no Perfil, cobrindo dados coletados, finalidade, IA/Google, transferência internacional, dados de menores (art. 14), direitos do titular e contato. **É um rascunho-base — revise com jurídico quando possível.**
 - **Consentimento no cadastro**: checkbox obrigatório com link para a política; o cadastro é bloqueado sem aceite e o consentimento (versão + data) é gravado em `users/{uid}.consent`.
-- **Exclusão de conta completa** (art. 18, VI): além das subcoleções, agora apaga a **foto no Storage**, os **feedbacks** do usuário e o contador `usage/{uid}` (via callable `deleteUserData`).
+- **Exclusão de conta completa** (art. 18, VI): além das subcoleções, agora apaga a **foto no Storage** e os **feedbacks** do usuário.
 - **Minimização da foto**: `storage.rules` restringe a leitura ao próprio dono (e admin), em vez de qualquer usuário logado.
 - **Portabilidade** (art. 18, V): botão **"Baixar meus dados"** no Perfil, que exporta um JSON com perfil + subcoleções.
 - **Avisos de transparência** (`LgpdNotice`) nas telas que coletam dados de alunos (perfil da turma, parecer, diário), lembrando a responsabilidade do professor e o processamento por IA. O placeholder que sugeria dado sensível ("2 alunos com TDAH") foi removido.
