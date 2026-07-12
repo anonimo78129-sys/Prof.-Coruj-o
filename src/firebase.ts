@@ -30,6 +30,13 @@ export const pixabaySearchCallable = httpsCallable<
   { hits: { webformatURL?: string; largeImageURL?: string }[] }
 >(functions, 'pixabaySearch');
 
+// Apaga os dados do usuário mantidos só pelo backend (usage/{uid}) na exclusão
+// de conta — o cliente não tem permissão de escrita nessa coleção.
+export const deleteUserDataCallable = httpsCallable<
+  Record<string, never>,
+  { ok: boolean }
+>(functions, 'deleteUserData');
+
 export const signIn = () => signInWithPopup(auth, googleProvider);
 export const logOut = () => signOut(auth);
 export { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser };

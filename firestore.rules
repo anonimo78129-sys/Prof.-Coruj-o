@@ -61,7 +61,10 @@ service cloud.firestore {
 
     match /feedback/{feedbackId} {
       allow create: if isAuthenticated() && uidUnchanged();
-      allow read, update, delete: if isAdmin();
+      allow read, update: if isAdmin();
+      // O dono pode apagar o próprio feedback (direito de eliminação — LGPD
+      // art. 18, VI; usado na exclusão de conta). Admin também pode.
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
     }
 
     match /library/{itemId} {

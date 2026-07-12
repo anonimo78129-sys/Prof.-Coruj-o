@@ -343,3 +343,25 @@ exports.pixabaySearch = onCall(
     }
   }
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exclusão dos dados do usuário mantidos só pelo backend (LGPD art. 18, VI)
+//
+// O contador de cota vive em `usage/{uid}`, que as regras tornam ilegível-para-
+// escrita ao cliente. Na exclusão de conta o cliente não consegue apagá-lo, então
+// esta callable (autenticada, sempre no próprio uid) faz essa limpeza.
+// ─────────────────────────────────────────────────────────────────────────────
+
+exports.deleteUserData = onCall(
+  { region: 'us-central1' },
+  async (request) => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Login necessário.');
+    try {
+      await db.doc(`usage/${uid}`).delete();
+    } catch (e) {
+      logger.warn('Falha ao apagar usage do usuário:', e);
+    }
+    return { ok: true };
+  }
+);

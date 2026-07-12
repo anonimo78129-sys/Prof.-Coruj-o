@@ -2,6 +2,8 @@
 
 **Data:** 2026-07-12 · **Escopo:** código do app (React/Vite), regras do Firestore/Storage, Cloud Functions, dependências e configuração de deploy.
 
+> Veja também a seção **[Conformidade com a LGPD](#conformidade-com-a-lgpd)** ao final.
+
 ---
 
 ## Resumo executivo
@@ -230,3 +232,40 @@ O admin "bootstrap" (`lyelsonmf520@gmail.com`) está fixo em vários arquivos. F
 2. **Corrigir o reset de cota** (#3): contador em documento não editável/recriável pelo dono.
 3. `npm audit fix` + atualizar `firebase`/`dompurify` (#4).
 4. Adicionar headers de segurança no `vercel.json` (#6) e avaliar #5, #8, #9.
+
+---
+
+## Conformidade com a LGPD
+
+**Contexto:** o app trata dados pessoais do **professor** (nome, e-mail, foto, celular, escola, uso) e — inserido pelo professor — dados de **alunos**, muitos deles menores, incluindo **dados sensíveis de saúde** (TDAH/TEA/dislexia em pareceres e perfil da turma). O professor/escola é *controlador* desses dados; o app é *operador*. Parte do tratamento é feita pela IA do Google (Gemini), fora do Brasil.
+
+### Achados e status
+
+| # | Severidade | Achado LGPD | Status |
+|---|-----------|-------------|--------|
+| L1 | 🔴 Crítica | Dados de crianças/adolescentes sem consentimento/aviso (art. 14) | 🟡 Mitigado (consentimento + aviso de responsabilidade) |
+| L2 | 🔴 Crítica/Alta | Dado sensível de saúde de menor enviado à IA no exterior (arts. 11, 33) | 🟡 Mitigado (avisos de minimização; decisão de base legal é do controlador) |
+| L3 | 🟠 Alta | Ausência de Política de Privacidade e aviso de tratamento (arts. 6º, 9º) | ✅ Corrigido (rascunho no app) |
+| L4 | 🟠 Alta | Sem consentimento/base legal registrada (arts. 7º, 8º) | ✅ Corrigido (aceite obrigatório + registro no doc) |
+| L5 | 🟡 Média | Direito de eliminação incompleto (art. 18, VI) | ✅ Corrigido (foto + feedback + usage) |
+| L6 | 🟡 Média | Foto legível por qualquer usuário autenticado | ✅ Corrigido (leitura só do dono/admin) |
+| L7 | 🟡 Média | Sem portabilidade para o próprio titular (art. 18, V) | ✅ Corrigido (botão "Baixar meus dados") |
+| L8 | 🟡 Média | Sem canal do titular / Encarregado (art. 41) | 🟡 Parcial (e-mail de contato na política — AJUSTAR) |
+| L9 | 🔵 Baixa | Sem política de retenção documentada (arts. 15, 16) | ⚠️ Pendente (decisão do negócio) |
+
+### O que foi implementado (código)
+
+- **Política de Privacidade e Termos** (`PrivacyPolicyOverlay`): overlay acessível no login e no Perfil, cobrindo dados coletados, finalidade, IA/Google, transferência internacional, dados de menores (art. 14), direitos do titular e contato. **É um rascunho-base — revise com jurídico quando possível.**
+- **Consentimento no cadastro**: checkbox obrigatório com link para a política; o cadastro é bloqueado sem aceite e o consentimento (versão + data) é gravado em `users/{uid}.consent`.
+- **Exclusão de conta completa** (art. 18, VI): além das subcoleções, agora apaga a **foto no Storage**, os **feedbacks** do usuário e o contador `usage/{uid}` (via callable `deleteUserData`).
+- **Minimização da foto**: `storage.rules` restringe a leitura ao próprio dono (e admin), em vez de qualquer usuário logado.
+- **Portabilidade** (art. 18, V): botão **"Baixar meus dados"** no Perfil, que exporta um JSON com perfil + subcoleções.
+- **Avisos de transparência** (`LgpdNotice`) nas telas que coletam dados de alunos (perfil da turma, parecer, diário), lembrando a responsabilidade do professor e o processamento por IA. O placeholder que sugeria dado sensível ("2 alunos com TDAH") foi removido.
+
+### O que ainda depende de você (não é código)
+
+- **Definir o e-mail/Encarregado** para o canal do titular: ajuste `PRIVACY_CONTACT_EMAIL` em `src/App.tsx` para o endereço oficial (hoje aponta para o e-mail do admin).
+- **Revisão jurídica** do texto da política e dos termos (o rascunho dá transparência mínima, mas não substitui um advogado).
+- **Base legal do tratamento de dados de alunos**: como controlador, você/escola deve definir e documentar a base legal (art. 7º/11) e, quando aplicável, obter o consentimento dos responsáveis (art. 14).
+- **Política de retenção** (por quanto tempo diário, notas e pareceres ficam guardados) e, idealmente, um **RIPD** por envolver menores e dados sensíveis.
+- **Contrato de operador (DPA)** com as escolas, quando houver.
