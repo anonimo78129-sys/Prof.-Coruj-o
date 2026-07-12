@@ -5,13 +5,13 @@ import DOMPurify from 'dompurify';
 import * as LucideIcons from 'lucide-react';
 import { 
   Search, Bell, Home, Calendar as CalendarIcon, User,
-  MoreHorizontal, Play, Clock, CheckCircle2, ChevronRight, ChevronUp, ChevronDown,
+  Play, Clock, CheckCircle2, ChevronRight, ChevronDown,
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
-  BrainCircuit, Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Headphones, Square, Upload, Paperclip, Shield, LogOut, Trash2,
+  Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
-  Wand2, Grid3x3, Puzzle, Dice5, Map as MapIcon, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
-  Volume2, Shuffle, Swords, Medal, Crown, Flame, Zap, Gift, Undo2, UserPlus, Pause, RotateCcw, Dices, Timer as TimerIcon, Star, Minus, ChevronLeft, Hand, Ticket, Siren,
+  Wand2, Grid3x3, Puzzle, Dice5, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
+  Volume2, Shuffle, Swords, Crown, Zap, Gift, Pause, RotateCcw, Dices, Timer as TimerIcon, Star, Minus, Hand, Ticket, Siren,
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
   Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
 } from 'lucide-react';
@@ -83,8 +83,7 @@ function useFunnyLoadingMessage(isLoading: boolean, context: keyof typeof LOADIN
   return msg;
 }
 
-function renderChatText(text: string, isUser: boolean): React.ReactNode {
-  const baseColor = isUser ? 'text-white' : 'text-gray-800';
+function renderChatText(text: string): React.ReactNode {
   return text.split('\n').map((line, li) => {
     const parts: React.ReactNode[] = [];
     const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
@@ -582,25 +581,6 @@ interface ClassItem {
 }
 
 // --- Components ---
-const FoxIllustration = ({ className, noBackground }: { className?: string, noBackground?: boolean }) => (
-  <div className={`relative flex items-center justify-center overflow-hidden ${!noBackground ? 'bg-indigo-50 rounded-3xl border border-indigo-100/50' : ''} ${className}`}>
-    {!noBackground && <div className="absolute top-[-10%] right-[-10%] w-1/2 h-1/2 bg-indigo-200/20 rounded-full blur-2xl" />}
-    <svg
-      viewBox="0 0 36 36"
-      className="w-full h-full relative z-10 drop-shadow-sm p-1"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      <path fill="#553788" d="M10 12c3 5 0 10.692-3 9.692s-4 2-1 3 9.465-.465 13-4c1-1 2-1 2-1L10 12z"/>
-      <path fill="#553788" d="M26 12c-3 5 0 10.692 3 9.692s4 2 1 3-9.465-.465-13-4c-1-1-2-1-2-1L26 12z"/>
-      <path fill="#744EAA" d="M30.188 16c-3 5 0 10.692 3 9.692s4 2 1 3-9.465-.465-13-4c-1-1-2-1-2-1l11-7.692zM5.812 16c3 5 0 10.692-3 9.692s-4 2-1 3 9.465-.465 13-4c1-1 2-1 2-1L5.812 16z"/>
-      <path fill="#9266CC" d="M33.188 31.375c-2.729.91-6.425-5.626-4.812-10.578C30.022 17.554 31 13.94 31 11c0-7.18-5.82-11-13-11S5 3.82 5 11c0 2.94.978 6.554 2.624 9.797 1.613 4.952-2.083 11.488-4.812 10.578-3-1-4 3-1 4s8.31-.627 12-4c2.189-2 4.189-2 4.189-2s2 0 4.188 2c3.69 3.373 9 5 12 4s1.999-5-1.001-4z"/>
-      <circle fill="#292F33" cx="14" cy="21" r="2"/>
-      <circle fill="#292F33" cx="22" cy="21" r="2"/>
-    </svg>
-  </div>
-);
 
 const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen, setScreen: (s: Screen) => void, isAdmin?: boolean }) => {
   const navItems: { id: Screen; icon: any; label: string }[] = [
@@ -827,39 +807,6 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
   );
 };
 
-const ReminderItem = ({ cls, setSelectedDate, setScreen, setClasses, classes }: { cls: ClassItem, setSelectedDate: (d: Date) => void, setScreen: (s: Screen) => void, setClasses: (c: ClassItem[]) => void, classes: ClassItem[] }) => {
-  const [isMarked, setIsMarked] = useState(false);
-
-  const handleComplete = () => {
-    setIsMarked(true);
-    setTimeout(() => {
-        setClasses(classes.map(c => c.id === cls.id ? {...c, status: 'completed'} : c));
-    }, 400);
-  };
-
-  return (
-    <div className={`w-full bg-white rounded-2xl p-4 border shadow-sm flex items-center gap-2 group transition-colors ${isMarked ? 'border-emerald-200' : 'border-gray-50 hover:border-indigo-100'}`}>
-      <GripVertical className="text-gray-300 group-hover:text-indigo-400 cursor-grab" size={20} />
-      <button onClick={() => { setSelectedDate(new Date(cls.timestamp)); setScreen('calendar'); }} className="flex items-center gap-4 flex-1 text-left">
-        <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center shrink-0 ${isMarked ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors'}`}>
-          <Clock size={16} className="mb-1 opacity-80" />
-          <span className="text-sm font-bold">{cls.date.split(' ')[0]}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-gray-900 text-base truncate">{cls.className}</h3>
-          <p className="text-gray-400 text-sm mt-0.5 truncate">{cls.title}</p>
-        </div>
-      </button>
-      <button 
-        onClick={handleComplete}
-        className={`p-3 rounded-xl transition-all duration-300 transform active:scale-90 ${isMarked ? 'bg-emerald-500 text-white scale-110' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
-      >
-        <CheckCircle2 size={20} />
-      </button>
-    </div>
-  );
-};
-
 const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, onComplete: () => void, color: string, onPrepare?: () => void, onReschedule?: () => void }) => {
   const [isMarked, setIsMarked] = useState(false);
   const handleComplete = () => {
@@ -906,7 +853,7 @@ const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, 
   );
 };
 
-const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, profileLoaded, inboxMessages, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], setClasses: (c: ClassItem[]) => void, profile: UserProfile, profileLoaded?: boolean, inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
+const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], profile: UserProfile, profileLoaded?: boolean, notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
   const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
     { title: 'Jogos', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
@@ -1101,17 +1048,6 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, setClasses, profile, p
       </div>
     </motion.div>
   );
-};
-
-const renderBoldText = (text?: string) => {
-  if (!text) return null;
-  const parts = text.split(/(\*\*.*?\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
-    }
-    return <span key={i}>{part}</span>;
-  });
 };
 
 const AdvancedSettings = ({
@@ -1806,7 +1742,6 @@ const SlidePreviewList = ({
   presentationData, setPresentationData, profile,
   isExporting, regenLoading, setRegenLoading, setError,
   exportPPTX,
-  schedules, classes, setClasses, topic, selectedClassId
 }: {
   presentationData: PresentationData;
   setPresentationData: (d: PresentationData | null) => void;
@@ -1816,11 +1751,6 @@ const SlidePreviewList = ({
   setRegenLoading: (v: boolean) => void;
   setError: (e: string) => void;
   exportPPTX: () => void;
-  schedules: ClassSchedule[];
-  classes: ClassItem[];
-  setClasses: (c: ClassItem[]) => void;
-  topic: string;
-  selectedClassId: string;
 }) => {
   const outerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -2290,167 +2220,6 @@ const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
   }, 30_000);
 };
 
-const buildDocHtml = (
-  rawMd: string,
-  docType: 'plan' | 'exam' | 'activities',
-  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
-): string => {
-  const SEP = '\n---GABARITO---\n';
-  const sepIdx = rawMd.indexOf(SEP);
-  const mainMd  = sepIdx >= 0 ? rawMd.slice(0, sepIdx)      : rawMd;
-  const gabMd   = sepIdx >= 0 ? rawMd.slice(sepIdx + SEP.length) : '';
-
-  const mdToHtml = (md: string) => md
-    .replace(/^---+$/gim, '<hr class="divider">')
-    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-    .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
-    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-    .replace(/^(\( \) [A-D]\) .+)$/gim, '<div class="mc-opt">$1</div>')
-    .replace(/^(_{10,})$/gim, '<div class="ans-line"></div>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>');
-
-  const labels = { plan: 'PLANO DE AULA', exam: 'AVALIAÇÃO', activities: 'ATIVIDADES' };
-  const accent = { plan: '#059669', exam: '#dc2626', activities: '#2563eb' };
-  const dark   = { plan: '#064e3b', exam: '#7f1d1d', activities: '#1e3a8a' };
-  const ac = accent[docType];
-  const dk = dark[docType];
-
-  const gabHtml = gabMd ? `
-    <div class="gab-page">
-      <div class="gab-hdr">
-        <div class="gab-badge">GABARITO</div>
-        <div>
-          <div class="gab-title">${opts.topic || 'Material Didático'}</div>
-          <div class="gab-meta">${opts.teacher ? `Prof. ${opts.teacher}` : ''}${opts.subject ? ` · ${opts.subject}` : ''}${opts.school ? ` · ${opts.school}` : ''}</div>
-        </div>
-      </div>
-      <div class="gab-body"><p>${mdToHtml(gabMd.replace(/^## Gabarito[^\n]*\n?/, ''))}</p></div>
-    </div>` : '';
-
-  // ── Plan: parse ## sections and render as PDF table layout ──────────────
-  let planBody = '';
-  if (docType === 'plan') {
-    const sections: Record<string, string> = {};
-    mainMd.split(/\n(?=## )/).forEach(part => {
-      const m = part.match(/^## (.+?)\n([\s\S]*)/);
-      if (m) sections[m[1].trim().toUpperCase()] = m[2].trim();
-    });
-    const get = (...keys: string[]) => {
-      for (const key of keys) {
-        const upper = key.toUpperCase();
-        const found = Object.keys(sections).find(k => k === upper || k.replace(/[^A-Z]/g, '').includes(upper.replace(/[^A-Z]/g, '')) || upper.replace(/[^A-Z]/g, '').includes(k.replace(/[^A-Z]/g, '')));
-        if (found && sections[found]) return mdToHtml(sections[found]);
-      }
-      return '&nbsp;';
-    };
-
-    planBody = `
-  <table class="info-tbl">
-    <tr><td class="info-cell" colspan="5"><strong>ÁREA DE CONHECIMENTO:</strong> ${get('ÁREA DE CONHECIMENTO', 'AREA DE CONHECIMENTO')}</td></tr>
-    <tr>
-      <td class="info-cell" colspan="2"><strong>EIXO/UNIDADE TEMÁTICA:</strong> ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}</td>
-      <td class="info-cell"><strong>ANO/SÉRIE:</strong> ${opts.className || '___________'}</td>
-      <td class="info-cell"><strong>TURMA:</strong> ___________</td>
-      <td class="info-cell"><strong>TURNO:</strong> ${opts.turn ? opts.turn.charAt(0).toUpperCase() + opts.turn.slice(1) : '___________'}</td>
-    </tr>
-    <tr><td class="info-cell" colspan="5"><strong>COMPONENTE CURRICULAR:</strong> ${opts.subject || '___________'}</td></tr>
-    <tr>
-      <td class="info-cell" colspan="2"><strong>QUANTIDADE DE AULAS:</strong> ${opts.duration ?? '___'}</td>
-      <td class="info-cell" colspan="3"><strong>DURAÇÃO:</strong> ${opts.lessonTime ? opts.lessonTime + ' min' : '___________'}</td>
-    </tr>
-    <tr><td class="info-cell" colspan="5"><strong>PROFESSOR(A):</strong> ${opts.teacher || '___________'}</td></tr>
-  </table>
-
-  <p class="plan-title">PLANO DE AULA</p>
-
-  <table class="plan-tbl">
-    <tr><td class="sec-hdr">CONTEÚDO:</td></tr>
-    <tr><td class="sec-body">${get('CONTEÚDO', 'CONTEUDO')}</td></tr>
-    <tr><td class="sec-hdr">OBJETIVOS:</td></tr>
-    <tr><td class="sec-body">${get('OBJETIVOS')}</td></tr>
-    <tr><td class="sec-hdr">PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM:</td></tr>
-    <tr><td class="sec-body">${get('PERGUNTAS MOBILIZADORAS DE APRENDIZAGEM', 'PERGUNTAS MOBILIZADORAS', 'PERGUNTAS')}</td></tr>
-    <tr><td class="sec-hdr">METODOLOGIA:</td></tr>
-    <tr><td class="sec-body">${get('METODOLOGIA')}</td></tr>
-    <tr><td class="sec-hdr">Habilidade (BNCC):</td></tr>
-    <tr><td class="sec-body">${get('HABILIDADE (BNCC)', 'HABILIDADE BNCC', 'HABILIDADES BNCC', 'HABILIDADE')}</td></tr>
-    <tr><td class="sec-hdr">RECURSOS DIDÁTICOS:</td></tr>
-    <tr><td class="sec-body">${get('RECURSOS DIDÁTICOS', 'RECURSOS DIDATICOS', 'RECURSOS')}</td></tr>
-    <tr><td class="sec-hdr">AVALIAÇÃO:</td></tr>
-    <tr><td class="sec-body">${get('AVALIAÇÃO', 'AVALIACAO')}</td></tr>
-    <tr><td class="sec-hdr">REFERÊNCIAS:</td></tr>
-    <tr><td class="sec-body">${get('REFERÊNCIAS', 'REFERENCIAS')}</td></tr>
-  </table>`;
-  }
-
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8"/>
-<title>${labels[docType]} — ${opts.topic || ''}</title>
-<style>
-  @page { size: A4; margin: 1.8cm 2.2cm 2.2cm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.7; color: #111; background: #fff; }
-  /* ── App header ── */
-  .doc-hdr { display:flex; align-items:center; gap:14px; border-bottom:4px solid ${ac}; padding-bottom:10px; margin-bottom:18px; }
-  .logo-box { width:54px; height:54px; border:2px solid #c7d2fe; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#818cf8; font-size:8pt; text-align:center; line-height:1.2; flex-shrink:0; }
-  .sch-block { flex:1; }
-  .sch-name { font-size:13pt; font-weight:700; color:#111; }
-  .sch-sub { font-size:9pt; color:#6b7280; margin-top:2px; }
-  .doc-badge { background:${ac}; color:#fff; font-size:9pt; font-weight:700; padding:5px 16px; border-radius:20px; white-space:nowrap; letter-spacing:0.5px; }
-  /* ── Typography (exam/activities) ── */
-  h1 { font-size:15pt; font-weight:700; color:#111; margin:0 0 14px; text-align:center; }
-  h2 { font-size:10.5pt; font-weight:700; color:${ac}; border:1.5px solid ${ac}; padding:5px 12px; border-radius:4px; margin:22px 0 10px; }
-  h3 { font-size:11pt; font-weight:700; color:${dk}; margin:14px 0 6px; padding-left:10px; border-left:4px solid ${ac}; }
-  p { margin:6px 0; }
-  strong { font-weight:700; }
-  em { font-style:italic; }
-  blockquote { border-left:4px solid ${ac}; padding:6px 14px; color:#4b5563; font-style:italic; background:#f9fafb; border-radius:0 6px 6px 0; margin:10px 0; }
-  ul, ol { padding-left:22px; margin:6px 0; }
-  li { margin-bottom:4px; }
-  /* ── Exam / Activity ── */
-  .mc-opt { padding:3px 0 3px 18px; font-size:11pt; }
-  .ans-line { border-bottom:1.5px solid #9ca3af; height:26px; margin:5px 0; }
-  .divider { border:none; border-top:1.5px solid #e5e7eb; margin:18px 0; }
-  /* ── Gabarito page ── */
-  .gab-page { page-break-before:always; padding-top:4px; }
-  .gab-hdr { background:${dk}; color:#fff; padding:18px 22px; border-radius:10px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
-  .gab-badge { background:#f59e0b; color:#1a1a1a; font-size:10pt; font-weight:800; padding:6px 18px; border-radius:20px; letter-spacing:1px; flex-shrink:0; }
-  .gab-title { font-size:14pt; font-weight:700; margin-bottom:3px; }
-  .gab-meta { font-size:9pt; color:#a5b4fc; }
-  .gab-body { font-size:11pt; line-height:1.9; }
-  .gab-body strong { color:${ac}; }
-  .gab-body h2 { color:${dk}; border:1.5px solid ${dk}; padding:5px 12px; border-radius:4px; margin:16px 0 8px; font-size:10.5pt; }
-  /* ── Plan table layout ── */
-  .info-tbl { width:100%; border-collapse:collapse; margin-bottom:14px; font-size:10.5pt; }
-  .info-cell { border:1px solid #555; padding:5px 10px; vertical-align:middle; }
-  .plan-title { text-align:center; font-weight:700; font-size:12pt; margin:8px 0 10px; text-decoration:underline; }
-  .plan-tbl { width:100%; border-collapse:collapse; font-size:10.5pt; }
-  .sec-hdr { border:1px solid #555; padding:5px 10px; font-weight:700; background:#f0f0f0; }
-  .sec-body { border:1px solid #555; padding:8px 10px 28px; vertical-align:top; }
-  .sec-body p, .sec-body br { display:inline; }
-  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
-</style>
-</head>
-<body>
-  <div class="doc-hdr">
-    <div class="logo-box">Logo<br/>Escola</div>
-    <div class="sch-block">
-      <div class="sch-name">${opts.school || 'Nome da Escola'}</div>
-      <div class="sch-sub">${opts.teacher ? `Prof. ${opts.teacher}` : ''}${opts.subject ? ` · ${opts.subject}` : ''}</div>
-    </div>
-    <div class="doc-badge">${labels[docType]}</div>
-  </div>
-  ${docType === 'plan' ? planBody : `<p>${mdToHtml(mainMd)}</p>`}
-  ${gabHtml}
-</body>
-</html>`;
-};
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PlannerScreen = ({
@@ -2458,16 +2227,9 @@ const PlannerScreen = ({
   setSchedules,
   addClassItems,
   classes,
-  setClasses,
   mode,
   profile,
-  estudioContext,
-  savedResources,
-  setSavedResources,
-  notifications,
-  setNotifications,
   setScreen,
-  addTask,
   updateTask,
   activeTasks,
   plannerTopic: topic,
@@ -2475,13 +2237,10 @@ const PlannerScreen = ({
   plannerSelectedClassId: selectedClassId,
   setPlannerSelectedClassId: setSelectedClassId,
   plannerPlan: plan,
-  setPlannerPlan: setPlan,
   plannerPresentationData: presentationData,
   setPlannerPresentationData: setPresentationData,
   plannerActivity: activity,
-  setPlannerActivity: setActivity,
   plannerExam: exam,
-  setPlannerExam: setExam,
   generatePlan,
   generateResource,
   plannerDuration: duration,
@@ -2519,16 +2278,9 @@ const PlannerScreen = ({
   setSchedules: (s: ClassSchedule[]) => void,
   addClassItems: (items: ClassItem[]) => void,
   classes: ClassItem[],
-  setClasses: (c: ClassItem[]) => void,
   mode: PlannerMode,
   profile: UserProfile,
-  estudioContext: string,
-  savedResources: SavedResource[],
-  setSavedResources: (r: SavedResource[]) => void,
-  notifications?: any[],
-  setNotifications?: (n: any[]) => void,
   setScreen: (s: Screen) => void,
-  addTask: (task: Omit<BackgroundTask, 'id' | 'status' | 'startTime'>) => string,
   updateTask: (id: string, updates: Partial<BackgroundTask>) => void,
   activeTasks: Record<string, BackgroundTask>,
   plannerTopic: string,
@@ -2536,13 +2288,10 @@ const PlannerScreen = ({
   plannerSelectedClassId: string,
   setPlannerSelectedClassId: (id: string) => void,
   plannerPlan: string,
-  setPlannerPlan: (p: string | ((prev: string) => string)) => void,
   plannerPresentationData: PresentationData | null,
   setPlannerPresentationData: (d: PresentationData | null) => void,
   plannerActivity: string,
-  setPlannerActivity: (a: string | ((prev: string) => string)) => void,
   plannerExam: string,
-  setPlannerExam: (e: string | ((prev: string) => string)) => void,
   generatePlan: (topic?: string, classId?: string) => Promise<void>,
   generateResource: (type: 'activities' | 'slides' | 'exam', topic?: string, classId?: string) => Promise<void>,
   plannerDuration: number,
@@ -2628,7 +2377,6 @@ const PlannerScreen = ({
   const visibleResult = hasGabarito && !showGabarito ? displayResult.slice(0, gabHeadingMatch!.index as number) : displayResult;
 
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
-  const [regenState, setRegenState] = useState<{ idx: number; prompt: string } | null>(null);
   const [scheduleStartDate, setScheduleStartDate] = useState<string>(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2697,11 +2445,6 @@ const PlannerScreen = ({
     setSelectedClassId(newClass.id);
     setNewClassName('');
     setIsAddingClass(false);
-  };
-
-  const deleteClass = (id: string) => {
-    setSchedules(schedules.filter(s => s.id !== id));
-    if (selectedClassId === id) setSelectedClassId('');
   };
 
   const handleMainAction = () => {
@@ -3067,7 +2810,7 @@ const PlannerScreen = ({
           const colH = 5.22 - colY;
           const cardW = 4.32;
           // Two soft cards side by side
-          [[LEFT, slideData.data.column1, '1'], [LEFT + cardW + 0.26, slideData.data.column2, '2']].forEach(([cx, content, num]: any, idx) => {
+          [[LEFT, slideData.data.column1], [LEFT + cardW + 0.26, slideData.data.column2]].forEach(([cx, content]: any, idx) => {
             const colColor = idx === 0 ? pc : ac;
             slide.addShape(pres.ShapeType.roundRect, { x: cx, y: colY, w: cardW, h: colH, fill: { color: 'FFFFFF' }, line: { color: 'EEF2F7', width: 1 }, rectRadius: 0.08, shadow: { type: 'outer', blur: 8, offset: 2, angle: 90, color: 'CBD5E1', opacity: 0.35 } });
 
@@ -3466,11 +3209,6 @@ const PlannerScreen = ({
                 setRegenLoading={setRegenLoading}
                 setError={setError}
                 exportPPTX={exportPPTX}
-                schedules={schedules}
-                classes={classes}
-                setClasses={setClasses}
-                topic={topic}
-                selectedClassId={selectedClassId}
               />
             )}
             
@@ -3628,7 +3366,7 @@ const PlannerScreen = ({
                 {generatedClassesBuffer.length === 0 && (
                   <p className="text-sm text-gray-500 italic text-center py-4">Nenhuma data disponível encontrada.</p>
                 )}
-                {generatedClassesBuffer.map((item, index) => (
+                {generatedClassesBuffer.map((item) => (
                   <div key={item.id} className="flex items-center justify-between bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
                     <span className="text-sm font-medium text-gray-800 line-clamp-1 flex-1 pr-2">{item.title}</span>
                     <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg shrink-0 border border-indigo-100">{item.date}</span>
@@ -3680,19 +3418,16 @@ const ChatScreen = ({
   savedResources,
   addClassItems,
   customEvents,
-  setCustomEvents,
   setScreen,
   notifications,
   setNotifications,
   generatePlan,
   generateResource,
-  plannerTopic,
   setPlannerTopic,
-  plannerSelectedClassId,
   setPlannerSelectedClassId,
   setPlannerMode,
   getScheduleBuffer
-}: { 
+}: {
   profile: UserProfile, 
   setProfile: (p: UserProfile) => void,
   estudioContext: string, 
@@ -3703,15 +3438,12 @@ const ChatScreen = ({
   savedResources: SavedResource[],
   addClassItems: (items: ClassItem[]) => void,
   customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
-  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   setScreen: (s: Screen) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   generatePlan: (topic?: string, classId?: string) => Promise<void>,
   generateResource: (type: 'activities' | 'slides' | 'exam', topic?: string, classId?: string) => Promise<void>,
-  plannerTopic: string,
   setPlannerTopic: (t: string) => void,
-  plannerSelectedClassId: string,
   setPlannerSelectedClassId: (id: string) => void,
   setPlannerMode: (m: PlannerMode) => void,
   getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[]
@@ -4205,7 +3937,7 @@ const ChatScreen = ({
                     </div>
                   )}
                   <div className="text-base leading-relaxed">
-                    {renderChatText(cleanText, msg.role === 'user' && !isError)}
+                    {renderChatText(cleanText)}
                   </div>
                   <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' && !isError ? 'text-indigo-200' : isError ? 'text-red-300' : 'text-gray-400'}`}>
                     {new Date(msg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -4316,8 +4048,6 @@ const ProfileScreen = ({
   savedResources,
   setScreen,
   onAddClass,
-  customEvents,
-  setCustomEvents,
   notifications,
   setNotifications,
   onResetAccount,
@@ -4332,8 +4062,6 @@ const ProfileScreen = ({
   savedResources: SavedResource[],
   setScreen: (s: Screen) => void,
   onAddClass: (c: ClassSchedule) => void,
-  customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
-  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   onResetAccount?: () => void,
@@ -4473,7 +4201,7 @@ const ProfileScreen = ({
         <div className="relative inline-block mb-4">
           <div className={`w-24 h-24 rounded-full overflow-hidden shadow-xl border-[3px] border-white/80 relative group cursor-pointer flex items-center justify-center ${profile.photo ? 'bg-gray-200' : 'bg-white/15'}`} onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}>
             {profile.photo ? (
-              <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { setProfile({ ...profile, photo: '' }); }} />
+              <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={() => { setProfile({ ...profile, photo: '' }); }} />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-white/10 text-white">
                 <User size={48} />
@@ -5217,7 +4945,7 @@ const ProfileScreen = ({
 
 const formatEventDate = (dateStr: string) => {
   if (dateStr.includes('-')) {
-    const [year, month, day] = dateStr.split(' ')[0].split('-');
+    const [, month, day] = dateStr.split(' ')[0].split('-');
     const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     return `${parseInt(day)} ${monthNames[parseInt(month)-1]}`;
   }
@@ -5358,8 +5086,6 @@ const DayDetailScreen = ({
   realCustomEvents,
   realClasses,
   setScreen,
-  notifications,
-  setNotifications,
   setCustomEvents,
   setClasses,
   onPrepareLesson,
@@ -5376,8 +5102,6 @@ const DayDetailScreen = ({
   realCustomEvents: any[],
   realClasses: ClassItem[],
   setScreen: (s: Screen) => void,
-  notifications?: any[],
-  setNotifications?: (n: any[]) => void,
   setCustomEvents: (c: any[]) => void,
   setClasses: (c: ClassItem[]) => void,
   onPrepareLesson?: (topic: string, classId: string) => void,
@@ -6107,10 +5831,8 @@ const ImportModal = ({ mode, targetClass, year, onClose, customEvents, setCustom
 
 const CalendarScreen = ({
   classes,
-  setClasses,
   schedules,
   profile,
-  inboxMessages,
   customEvents,
   setCustomEvents,
   selectedDate,
@@ -6125,10 +5847,8 @@ const CalendarScreen = ({
   onImport
 }: {
   classes: ClassItem[],
-  setClasses: (c: ClassItem[]) => void,
   schedules: ClassSchedule[],
   profile: UserProfile,
-  inboxMessages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[],
   customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
   setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   selectedDate: number,
@@ -6209,24 +5929,6 @@ const CalendarScreen = ({
     });
   };
 
-  const eventsThisMonth = allEvents.filter(e => {
-    if (e.date.includes('-')) {
-      const [yearStr, monthStr] = e.date.split(' ')[0].split('-');
-      return parseInt(yearStr) === currentYear && parseInt(monthStr) === currentMonth + 1;
-    }
-    const parts = e.date.split(' ');
-    if (parts.length > 1) {
-      return parts[1] === monthAbbrNames[currentMonth];
-    }
-    return true;
-  }).sort((a, b) => {
-    const dayA = a.date.includes('-') ? parseInt(a.date.split(' ')[0].split('-')[2]) : parseInt(a.date.split(' ')[0]);
-    const dayB = b.date.includes('-') ? parseInt(b.date.split(' ')[0].split('-')[2]) : parseInt(b.date.split(' ')[0]);
-    return (isNaN(dayA) ? 0 : dayA) - (isNaN(dayB) ? 0 : dayB);
-  });
-
-  const selectedDayEvents = getDayEvents(selectedDate);
-
   const [monthDir, setMonthDir] = useState(0);
   const changeMonth = (delta: number) => {
     setMonthDir(delta);
@@ -6296,26 +5998,6 @@ const CalendarScreen = ({
   };
 
   const ptDayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-
-  const getEventColor = (e: any) => {
-    if (e.type === 'class') {
-      const schedule = schedules.find(s => s.name === e.className);
-      return schedule?.color || '#4F46E5';
-    }
-    if (e.type === 'holiday') return '#EAB308';
-    if (e.type === 'commemorative') return '#A855F7';
-    if (e.type === 'prep') return '#10B981';
-    return '#F59E0B';
-  };
-
-  const formatEventDate = (dateStr: string) => {
-    if (dateStr.includes('-')) {
-      const [year, month, day] = dateStr.split(' ')[0].split('-');
-      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      return `${parseInt(day)} ${monthNames[parseInt(month)-1]}`;
-    }
-    return dateStr;
-  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
@@ -6397,6 +6079,26 @@ const CalendarScreen = ({
         </div>
       )}
       
+      {/* Filtro por turma — mostra só as aulas da turma escolhida no calendário */}
+      {schedules.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-4 -mx-1 px-1">
+          {['Todas', ...schedules.map(s => s.name)].map(name => {
+            const active = filter === name;
+            const color = name === 'Todas' ? '#4F46E5' : (schedules.find(s => s.name === name)?.color || '#4F46E5');
+            return (
+              <button
+                key={name}
+                onClick={() => setFilter(name)}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold border-2 transition-colors ${active ? 'text-white shadow-sm' : 'bg-white text-gray-500 border-gray-200'}`}
+                style={active ? { backgroundColor: color, borderColor: color } : {}}
+              >
+                {name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Calendar Grid */}
       <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 mb-8">
         <div className="flex justify-between items-center mb-6">
@@ -7565,13 +7267,8 @@ const printEscapeRoom = (data: EscapeRoomData, opts: { className?: string; teach
 };
 
 const EstudioScreen = ({
-  estudioContext,
-  setEstudioContext,
-  studioMessages,
-  setStudioMessages,
   profile,
   setScreen,
-  setPlannerMode,
   notifications,
   setNotifications,
   schedules,
@@ -7583,13 +7280,8 @@ const EstudioScreen = ({
   setStudioReopenTaskId,
   openBattle,
 }: {
-  estudioContext: string,
-  setEstudioContext: (c: string | ((prev: string) => string)) => void,
-  studioMessages: { id: string; role: 'user' | 'model'; text: string; date: number }[],
-  setStudioMessages: (m: { id: string; role: 'user' | 'model'; text: string; date: number }[] | ((prev: { id: string; role: 'user' | 'model'; text: string; date: number }[]) => { id: string; role: 'user' | 'model'; text: string; date: number }[])) => void,
   profile: UserProfile,
   setScreen: (s: Screen) => void,
-  setPlannerMode: (m: PlannerMode) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   schedules?: ClassSchedule[],
@@ -11704,10 +11396,6 @@ const GamificacaoScreen = ({
 
   const awardingStudent = currentCls.students.find(s => s.id === awardingStudentId) ?? null;
 
-  const bannerColor = selectedSchedule?.color || '#4F46E5';
-  const totalXp = currentCls.students.reduce((sum, s) => sum + (s.totalXp ?? s.xp ?? 0), 0);
-  const topStudent = [...currentCls.students].sort((a, b) => (b.totalXp ?? b.xp ?? 0) - (a.totalXp ?? a.xp ?? 0))[0];
-
   return (
     // Chegando por atalho (card Batalha da aba Jogos) monta já no estado
     // final, sem o 'y' de entrada: esse transform de animação vira ancestral
@@ -13720,7 +13408,7 @@ function AppInner() {
     { id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }
   ]);
   
-  const [estudioContext, setEstudioContext] = useState<string>('');
+  const [estudioContext] = useState<string>('');
 
   // ── Notificações locais de aula ───────────────────────────────────────────
   const scheduledNotifsRef = useRef(new Set<string>());
@@ -13934,10 +13622,6 @@ function AppInner() {
     setOnboardingCreatedClass(null);
     setOnboardingStep(0);
   };
-  const [studioMessages, setStudioMessages] = useFirestoreSync<{ id: string; role: 'user' | 'model'; text: string; date: number }>('studioMessages', user, [
-    { id: 'studio-welcome', role: 'model', text: 'Olá! Sou o assistente do seu material. O que você gostaria de saber sobre o conteúdo que você adicionou?', date: Date.now() }
-  ]);
-
   // Global Planner States (for persistence across screens)
   const [plannerTopic, setPlannerTopic] = useState('');
   const [plannerSelectedClassId, setPlannerSelectedClassId] = useState('');
@@ -13967,20 +13651,17 @@ function AppInner() {
         processedTasksRef.current.add(task.id);
         const topicLabel = task.title.replace(/^(Slides|Atividades|Plano|Prova): /, '');
         const newResourceId = Math.random().toString(36).slice(2, 11);
-        let saved = false;
         if (task.type === 'slides' && typeof task.result === 'object') {
           setSavedResources(prev => [...prev, {
             id: newResourceId, type: 'slides',
             title: (task.result as PresentationData).presentationTitle || topicLabel,
             date: Date.now(), presentationData: task.result as PresentationData
           }]);
-          saved = true;
         } else if ((task.type === 'activities' || task.type === 'exam' || task.type === 'plan') && typeof task.result === 'string' && task.result.trim()) {
           setSavedResources(prev => [...prev, {
             id: newResourceId, type: task.type as 'activities' | 'exam' | 'plan',
             title: topicLabel, date: Date.now(), content: task.result as string
           }]);
-          saved = true;
         }
       }
     });
@@ -14134,11 +13815,15 @@ function AppInner() {
 
   const recordGeneration = async () => {
     if (!user) return;
+    // Pro/admin não gastam cota: o contador de gerações fica parado pra eles
+    // (o limite já os isenta), mas os tokens continuam registrados — são a
+    // métrica de custo real no painel admin.
     const isPrivileged = profile?.isPro || profile?.role === 'admin';
     const inputT = _pendingInputTokens; const outputT = _pendingOutputTokens;
     _pendingInputTokens = 0; _pendingOutputTokens = 0;
     try {
-      const userUpdate: any = { generationsUsed: increment(1), inputTokens: increment(inputT), outputTokens: increment(outputT) };
+      const userUpdate: any = { inputTokens: increment(inputT), outputTokens: increment(outputT) };
+      if (!isPrivileged) userUpdate.generationsUsed = increment(1);
       await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
       const monthKey = new Date().toISOString().slice(0, 7).replace('-', '_');
       const statsPayload = { totalGenerations: increment(1), totalInputTokens: increment(inputT), totalOutputTokens: increment(outputT) };
@@ -14765,10 +14450,6 @@ ${avaliacaoBlock}
         updateTask(taskId, { status: 'completed', result: sanitized });
         recordGeneration();
       } else {
-        const escolaStr = selectedClass?.school || profile.schoolName || '_________________';
-        const professorStr = profile.name || '_________________';
-        const disciplinaStr = selectedClass?.subject || profile.subject || '_________________';
-        
         const resClassLevel = selectedClass?.level || '';
         const resIsEarlyChildhood = resClassLevel.toLowerCase().includes('infantil');
         const complexityLabel = { basic: 'Básico (Ensino Fundamental)', intermediate: 'Intermediário (Ensino Médio)', advanced: 'Avançado (Superior/Técnico)' }[plannerComplexity] || plannerComplexity;
@@ -15173,7 +14854,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
       )}
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
-          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} setClasses={setClasses} profile={profile} profileLoaded={profileLoaded} inboxMessages={inboxMessages} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} setSelectedDate={(d: Date) => {
+          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} profile={profile} profileLoaded={profileLoaded} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} setSelectedDate={(d: Date) => {
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
@@ -15184,58 +14865,20 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             schedules={schedules} 
             setSchedules={setSchedules} 
             addClassItems={addClassItems} 
-            classes={classes} 
-            setClasses={setClasses} 
-            mode={plannerMode} 
-            profile={profile} 
-            estudioContext={estudioContext} 
-            savedResources={savedResources} 
-            addTask={addTask} 
-            updateTask={updateTask} 
+            classes={classes}
+            mode={plannerMode}
+            profile={profile}
+            updateTask={updateTask}
             activeTasks={activeTasks}
             plannerTopic={plannerTopic}
             setPlannerTopic={setPlannerTopic}
             plannerSelectedClassId={plannerSelectedClassId}
             setPlannerSelectedClassId={setPlannerSelectedClassId}
             plannerPlan={plannerPlan}
-            setPlannerPlan={setPlannerPlan}
             plannerPresentationData={plannerPresentationData}
             setPlannerPresentationData={setPlannerPresentationData}
             plannerActivity={plannerActivity}
-            setPlannerActivity={setPlannerActivity}
             plannerExam={plannerExam}
-            setPlannerExam={setPlannerExam}
-            setSavedResources={(res) => {
-              setSavedResources(res);
-              if (res.length > savedResources.length) {
-                setNotifications([...notifications, {
-                  id: Math.random().toString(36).slice(2, 11),
-                  title: 'Material Salvo',
-                  message: 'Novo material gerado com sucesso.',
-                  date: Date.now(),
-                  read: false
-                }]);
-                // Auto-link new resource to next upcoming lesson for the selected class
-                if (plannerSelectedClassId) {
-                  const newResource = res[res.length - 1];
-                  const sched = schedules.find(s => s.id === plannerSelectedClassId);
-                  if (sched && newResource) {
-                    const now = Date.now();
-                    const nextLesson = classes
-                      .filter(c => c.className === sched.name && c.status === 'pending' && c.timestamp >= now)
-                      .sort((a, b) => a.timestamp - b.timestamp)[0];
-                    if (nextLesson) {
-                      setClasses(classes.map(c => c.id === nextLesson.id
-                        ? { ...c, resourceIds: [...(c.resourceIds || []), newResource.id] }
-                        : c
-                      ));
-                    }
-                  }
-                }
-              }
-            }}
-            notifications={allNotifications} 
-            setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
             plannerDuration={plannerDuration}
@@ -15281,20 +14924,17 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             schedules={schedules} 
             savedResources={savedResources} 
             addClassItems={addClassItems} 
-            customEvents={customEvents} 
-            setCustomEvents={setCustomEvents} 
-            notifications={allNotifications} 
+            customEvents={customEvents}
+            notifications={allNotifications}
             setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
             generateResource={generateResource}
-            plannerTopic={plannerTopic}
             setPlannerTopic={setPlannerTopic}
-            plannerSelectedClassId={plannerSelectedClassId}
             setPlannerSelectedClassId={setPlannerSelectedClassId}
             setPlannerMode={setPlannerMode}
             getScheduleBuffer={getScheduleBuffer}
           />}
-          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} setClasses={setClasses} schedules={schedules} profile={profile} inboxMessages={inboxMessages} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} onImport={() => setImportRequest({ mode: 'calendar' })} />}
+          {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} schedules={schedules} profile={profile} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} onImport={() => setImportRequest({ mode: 'calendar' })} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail"
             schedules={schedules}
             selectedDate={selectedDate}
@@ -15334,7 +14974,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               toast.success('Aula adiada para ' + next.toLocaleDateString('pt-BR'));
             }}
           />}
-          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} customEvents={customEvents} setCustomEvents={setCustomEvents} notifications={allNotifications} setNotifications={handleSetNotifications} onResetAccount={() => {
+          {screen === 'profile' && <ProfileScreen key="profile" user={user} schedules={schedules} setSchedules={setSchedules} profile={profile} setProfile={setProfile} savedResources={savedResources} setScreen={setScreen} onAddClass={handleAddClassWithTrigger} notifications={allNotifications} setNotifications={handleSetNotifications} onResetAccount={() => {
             setSchedules([]);
             setClasses([]);
             setCustomEvents([]);
@@ -15342,7 +14982,6 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setNotifications([]);
             setInboxMessages([{ id: 'welcome', role: 'model', text: 'Olá! Eu sou o assistente do **Prof. Corujão**. Envie ideias rápidas, lembretes ou faça perguntas. Eu organizo tudo para você!', date: Date.now() }]);
             setProfile({ name: 'Professor', subject: 'Sem disciplina', role: 'user', photo: '' });
-            setEstudioContext('');
           }} onDeleteAccount={async () => {
             if (!user) return;
             const uid = user.uid;
@@ -15364,7 +15003,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               }
             }
           }} onImportSyllabus={(cls) => setImportRequest({ mode: 'syllabus', targetClass: cls })} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" estudioContext={estudioContext} setEstudioContext={setEstudioContext} studioMessages={studioMessages} setStudioMessages={setStudioMessages} profile={profile} setScreen={setScreen} setPlannerMode={setPlannerMode} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} openBattle={() => { setGamiInitialTool('batalha'); setScreen('gamificacao'); }} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} openBattle={() => { setGamiInitialTool('batalha'); setScreen('gamificacao'); }} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} initialLiveTool={gamiInitialTool} clearInitialLiveTool={() => setGamiInitialTool(null)} />}
           {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
