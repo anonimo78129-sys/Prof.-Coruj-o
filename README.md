@@ -127,22 +127,30 @@ cd Prof.-Coruj-o
 # 2. Instale as dependências
 npm install
 
-# 3. Configure as variáveis de ambiente
+# 3. Configure as variáveis de ambiente (opcionais no cliente)
 cp .env.example .env.local
-# Edite .env.local e adicione sua GEMINI_API_KEY
+# Edite .env.local se quiser imagens do Pixabay nos slides (PIXABAY_API_KEY)
 
-# 4. Inicie o servidor de desenvolvimento
+# 4. Defina a chave do Gemini como secret das Cloud Functions (NÃO vai no cliente)
+firebase functions:secrets:set GEMINI_API_KEY
+
+# 5. Inicie o servidor de desenvolvimento
 npm run dev
 ```
+
+> ⚠️ **A `GEMINI_API_KEY` nunca fica no navegador.** Toda geração de IA passa pela
+> Cloud Function `generateAi`, que guarda a chave no servidor, exige login e
+> controla a cota do plano free. Configure a chave como *secret* das Functions
+> (passo 4 acima), não como variável do build do front-end.
 
 ---
 
 ## Variáveis de Ambiente
 
-| Variável | Obrigatória | Descrição |
-|---|---|---|
-| `GEMINI_API_KEY` | Sim | Chave da API do Google Gemini — [obter em aistudio.google.com](https://aistudio.google.com/apikey) |
-| `PIXABAY_API_KEY` | Não | Imagens nos slides — [obter em pixabay.com/api/docs](https://pixabay.com/api/docs/) |
+| Variável | Onde | Obrigatória | Descrição |
+|---|---|---|---|
+| `GEMINI_API_KEY` | **Secret das Cloud Functions** | Sim | Chave da API do Google Gemini — [obter em aistudio.google.com](https://aistudio.google.com/apikey). Configure com `firebase functions:secrets:set GEMINI_API_KEY`. |
+| `PIXABAY_API_KEY` | Build do front-end (`.env.local`) | Não | Imagens nos slides — [obter em pixabay.com/api/docs](https://pixabay.com/api/docs/) |
 
 ---
 
@@ -154,6 +162,7 @@ O arquivo `firebase-applet-config.json` na raiz contém a configuração do proj
 2. Ative **Authentication** (Google), **Firestore**, **Storage** e **Cloud Messaging**
 3. Substitua o conteúdo de `firebase-applet-config.json` com os dados do seu projeto
 4. Publique as regras: `firebase deploy --only firestore:rules,storage:rules`
+5. Defina o secret e publique as functions: `firebase functions:secrets:set GEMINI_API_KEY` e `firebase deploy --only functions`
 
 ---
 

@@ -27,7 +27,8 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      // A GEMINI_API_KEY foi removida do bundle: as chamadas de IA passam pela
+      // Cloud Function `generateAi`, que guarda a chave no servidor.
       'process.env.PIXABAY_API_KEY': JSON.stringify(env.PIXABAY_API_KEY),
     },
     build: {

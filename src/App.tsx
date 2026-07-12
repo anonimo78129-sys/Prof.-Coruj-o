@@ -15,10 +15,10 @@ import {
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
   Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
 } from 'lucide-react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { auth, db, storage, logOut, getFcmToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
+import { auth, db, storage, logOut, getFcmToken, generateAiCallable, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -30,12 +30,9 @@ import {
 } from './utils';
 import { INFORMATICA_LESSONS, JOGOS_LESSONS } from './seed-lessons';
 
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-  console.error("CRITICAL: GEMINI_API_KEY está ausente no ambiente!");
-}
-const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
-
+// A chave do Gemini NÃO existe mais no cliente: toda geração passa pela Cloud
+// Function `generateAi` (ver src/firebase.ts), que guarda a chave no servidor,
+// exige autenticação e controla a cota do plano free de forma inviolável.
 const AI_MODEL = 'gemini-2.5-flash';
 
 const LOADING_MESSAGES = {
@@ -101,44 +98,8 @@ function renderChatText(text: string): React.ReactNode {
 }
 
 
-const withRetry = async <T,>(fn: () => Promise<T>, maxRetries = 4, baseDelayMs = 2000): Promise<T> => {
-  let attempt = 0;
-  let rateLimit429Attempts = 0;
-  while (attempt < maxRetries) {
-    try {
-      return await fn();
-    } catch (error: any) {
-      attempt++;
-      let msg = '';
-      if (typeof error === 'string') msg = error;
-      else if (error instanceof Error) msg = error.message;
-      else if (error?.error?.message) msg = error.error.message;
-      else if (error?.message) msg = Object.prototype.toString.call(error.message) === '[object String]' ? error.message : JSON.stringify(error.message);
-      else { try { msg = JSON.stringify(error); } catch (e) {} }
-
-      const status = error?.status || error?.error?.code || (typeof error?.error === 'object' ? error?.error?.status : null);
-      const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
-      const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-
-      if (is429) {
-        rateLimit429Attempts++;
-        if (rateLimit429Attempts <= 1) {
-          // Wait 30s for per-minute quota window to reset, then try once more
-          await new Promise(resolve => setTimeout(resolve, 30000 + Math.random() * 5000));
-          continue;
-        }
-        throw error; // Second 429: quota is exhausted, give up
-      } else if (is503 && attempt < maxRetries) {
-        const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + (Math.random() * 1000);
-        console.warn(`API overloaded (503). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt} of ${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        throw error;
-      }
-    }
-  }
-  throw new Error("Servidor da IA indisponível após várias tentativas. Tente novamente em alguns minutos.");
-};
+// Retentativas de 503/429 agora acontecem no backend (Cloud Function
+// `generateAi`), para que a cota só seja debitada uma vez, em caso de sucesso.
 
 const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'): Promise<T> => {
   return new Promise<T>((resolve, reject) => {
@@ -152,21 +113,28 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label = 'operação'):
   });
 };
 
-let _pendingInputTokens = 0;
-let _pendingOutputTokens = 0;
+type AiGenParams = { model?: string; contents: any; config?: any };
 
-const generateContentWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0]) => {
-  if (!apiKey) {
-    throw new Error('Chave da IA não configurada. Contate o suporte.');
-  }
-  if (!params.model) params.model = AI_MODEL;
-  const result = await withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
-  const usage = (result as any).usageMetadata;
-  if (usage) {
-    _pendingInputTokens += usage.promptTokenCount || 0;
-    _pendingOutputTokens += usage.candidatesTokenCount || 0;
-  }
-  return result;
+// Encaminha a geração para a Cloud Function autenticada. O backend cuida das
+// retentativas (503/429), contabiliza tokens/estatísticas e, quando
+// `billable` é true, debita e valida a cota do plano free — nada disso pode
+// ser burlado no cliente. Retorna só os campos que os chamadores consomem.
+const generateContentWithRetry = async (
+  params: AiGenParams,
+  billable = false,
+): Promise<{ text: string; functionCalls?: any }> => {
+  const result = await withTimeout(
+    generateAiCallable({
+      model: params.model || AI_MODEL,
+      contents: params.contents,
+      config: params.config,
+      billable,
+    }),
+    90000,
+    'geração de conteúdo',
+  );
+  const data = (result?.data || {}) as { text?: string; functionCalls?: any };
+  return { text: data.text || '', functionCalls: data.functionCalls || undefined };
 };
 
 function useFirestoreSync<T extends { id: string }>(
@@ -13813,26 +13781,9 @@ function AppInner() {
     return (profile?.generationsUsed ?? 0) >= FREE_GENERATION_LIMIT;
   }, [user, profile]);
 
-  const recordGeneration = async () => {
-    if (!user) return;
-    // Pro/admin não gastam cota: o contador de gerações fica parado pra eles
-    // (o limite já os isenta), mas os tokens continuam registrados — são a
-    // métrica de custo real no painel admin.
-    const isPrivileged = profile?.isPro || profile?.role === 'admin';
-    const inputT = _pendingInputTokens; const outputT = _pendingOutputTokens;
-    _pendingInputTokens = 0; _pendingOutputTokens = 0;
-    try {
-      const userUpdate: any = { inputTokens: increment(inputT), outputTokens: increment(outputT) };
-      if (!isPrivileged) userUpdate.generationsUsed = increment(1);
-      await setDoc(doc(db, 'users', user.uid), userUpdate, { merge: true });
-      const monthKey = new Date().toISOString().slice(0, 7).replace('-', '_');
-      const statsPayload = { totalGenerations: increment(1), totalInputTokens: increment(inputT), totalOutputTokens: increment(outputT) };
-      await Promise.all([
-        setDoc(doc(db, 'config', 'stats'), statsPayload, { merge: true }),
-        setDoc(doc(db, 'config', `stats_${monthKey}`), statsPayload, { merge: true }),
-      ]);
-    } catch { /* best-effort */ }
-  };
+  // A contabilização de cota, tokens e estatísticas agora acontece no backend
+  // (Cloud Function `generateAi`), atomicamente e à prova de adulteração — as
+  // gerações "billable" passam `billable: true` ao generateContentWithRetry.
 
   if (!isAuthLoaded) {
     return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FE]"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -14367,7 +14318,7 @@ ${avaliacaoBlock}
 
       // Plano de aula exige raciocínio pedagógico real (sequência didática,
       // BNCC, adequação de nível) — vale a pena um orçamento extra de "pensar antes de responder".
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } }, true);
       const planDraft = response.text || '';
 
       // ── Validação local determinística das habilidades BNCC ──────────────
@@ -14390,7 +14341,6 @@ ${avaliacaoBlock}
 
       setPlannerPlan(planResult);
       updateTask(taskId, { status: 'completed', result: planResult });
-      recordGeneration();
     } catch (error) {
       updateTask(taskId, { status: 'error', error: formatApiError(error, 'Não consegui montar o plano dessa vez. Tente novamente.') });
     }
@@ -14411,7 +14361,7 @@ ${avaliacaoBlock}
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount, selectedClass?.level);
         // Coreografia de layouts + planejamento do arco do deck se beneficiam de
         // um orçamento extra de raciocínio antes de responder.
-        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } }, true);
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
         const firstBrace = text.indexOf('{');
@@ -14448,7 +14398,6 @@ ${avaliacaoBlock}
         const sanitized = sanitizeSlideData(parsed);
         setPlannerPresentationData(sanitized);
         updateTask(taskId, { status: 'completed', result: sanitized });
-        recordGeneration();
       } else {
         const resClassLevel = selectedClass?.level || '';
         const resIsEarlyChildhood = resClassLevel.toLowerCase().includes('infantil');
@@ -14578,12 +14527,11 @@ _______________________________________________________________________________
 
 REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBIDO introduções, tabelas Markdown (| coluna |) ou texto fora da estrutura.`;
           
-        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt }, true);
         const result = response.text || '';
         if (type === 'exam') setPlannerExam(result);
         else setPlannerActivity(result);
         updateTask(taskId, { status: 'completed', result });
-        recordGeneration();
       }
     } catch (error) {
       updateTask(taskId, { status: 'error', error: formatApiError(error, 'Esse material não saiu como esperado. Tente novamente.') });

@@ -6,6 +6,7 @@
   },
   "main": "index.js",
   "dependencies": {
+    "@google/genai": "^1.50.1",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.1.0"
   },

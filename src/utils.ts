@@ -49,6 +49,9 @@ export const formatApiError = (error: any, defaultMsg: string): string => {
   if (msg.startsWith('[IA_FORMATO]')) {
     return 'A IA respondeu num formato inesperado. Toque em gerar de novo que normalmente resolve.';
   }
+  if (msg.includes('FREE_LIMIT_REACHED')) {
+    return 'Você usou todas as gerações gratuitas. Ative o Pro para continuar gerando sem limites.';
+  }
   if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
     return 'Muita gente usando a IA agora. Já estou tentando de novo. Se continuar, aguarde 1 minuto.';
   }

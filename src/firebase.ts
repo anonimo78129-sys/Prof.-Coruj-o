@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -14,6 +15,14 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, { ignoreUndefinedProperties: true }, firebaseConfig.firestoreDatabaseId);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Proxy de IA: a chave do Gemini fica no backend. O cliente só invoca a Cloud
+// Function autenticada (região us-central1, mesma do restante das functions).
+export const functions = getFunctions(app, 'us-central1');
+export const generateAiCallable = httpsCallable<
+  { model?: string; contents: unknown; config?: unknown; billable?: boolean },
+  { text: string; functionCalls?: unknown }
+>(functions, 'generateAi');
 
 export const signIn = () => signInWithPopup(auth, googleProvider);
 export const logOut = () => signOut(auth);

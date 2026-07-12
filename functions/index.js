@@ -11,10 +11,13 @@
  */
 
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
+const { GoogleGenAI } = require('@google/genai');
 
 initializeApp();
 
@@ -161,5 +164,132 @@ exports.sendClassReminders = onSchedule(
     );
 
     logger.info(`Lembretes enviados: ${totalSent}`);
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proxy de geração de IA (Gemini)
+//
+// A chave do Gemini vive SÓ no servidor (secret GEMINI_API_KEY). O cliente nunca
+// a vê — todas as gerações passam por aqui, exigindo usuário autenticado.
+//
+// A cota do plano free é a fonte da verdade em `usage/{uid}` — coleção que as
+// regras do Firestore tornam ilegível-para-escrita ao cliente, então não pode
+// ser zerada por delete+recreate do próprio documento (era o bypass do achado #3).
+// Espelhamos o contador em `users/{uid}` apenas para exibição/painel admin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
+const FREE_GENERATION_LIMIT = 10;
+const ADMIN_EMAILS = ['lyelsonmf520@gmail.com'];
+const AI_MODEL = 'gemini-2.5-flash';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Retenta o Gemini no servidor (503 sobrecarga / 429 cota-por-minuto), de modo
+// que o cliente faça uma única chamada e a cota só seja debitada em caso de
+// sucesso — sem risco de debitar duas vezes por retentativas de rede.
+async function callGeminiWithRetry(ai, params, maxRetries = 4) {
+  let attempt = 0;
+  let rl429 = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (error) {
+      attempt++;
+      const msg = (error && (error.message || String(error))) || '';
+      const status = (error && (error.status || (error.error && error.error.code))) || null;
+      const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
+      const is429 = status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+      if (is429 && rl429 < 1) { rl429++; await sleep(30000); continue; }
+      if (is503 && attempt < maxRetries) { await sleep(2000 * Math.pow(2, attempt - 1) + Math.random() * 1000); continue; }
+      throw error;
+    }
+  }
+  throw new Error('UNAVAILABLE: servidor da IA indisponível após várias tentativas.');
+}
+
+exports.generateAi = onCall(
+  { secrets: [GEMINI_API_KEY], timeoutSeconds: 120, memory: '512MiB', region: 'us-central1' },
+  async (request) => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Faça login para usar a IA.');
+
+    const data = request.data || {};
+    const { model, contents, config, billable } = data;
+    if (!contents) throw new HttpsError('invalid-argument', 'Requisição de IA inválida.');
+
+    const email = ((request.auth.token && request.auth.token.email) || '').toLowerCase();
+    const userRef = db.doc(`users/${uid}`);
+    const usageRef = db.doc(`usage/${uid}`);
+    const [userSnap, usageSnap] = await Promise.all([userRef.get(), usageRef.get()]);
+    const user = userSnap.exists ? (userSnap.data() || {}) : {};
+    const privileged = user.isPro === true || user.role === 'admin' || ADMIN_EMAILS.includes(email);
+
+    // Fonte da verdade da cota: usage/{uid}. Na primeira vez, migra do valor
+    // que existir em users/{uid} para não presentear resets aos usuários atuais.
+    const used = usageSnap.exists
+      ? (usageSnap.data().generationsUsed || 0)
+      : (user.generationsUsed || 0);
+
+    if (billable && !privileged && used >= FREE_GENERATION_LIMIT) {
+      throw new HttpsError('resource-exhausted', 'FREE_LIMIT_REACHED');
+    }
+
+    let result;
+    try {
+      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value() });
+      result = await callGeminiWithRetry(ai, { model: model || AI_MODEL, contents, config });
+    } catch (error) {
+      const msg = (error && (error.message || String(error))) || 'Erro na IA';
+      // Preserva os tokens de status (503/UNAVAILABLE/429) para o cliente mapear.
+      throw new HttpsError('unavailable', msg);
+    }
+
+    const usage = result.usageMetadata || {};
+    const inTok = usage.promptTokenCount || 0;
+    const outTok = usage.candidatesTokenCount || 0;
+    const countThis = !!billable && !privileged;
+
+    // Contabilização atômica (best-effort — nunca falha a resposta ao usuário).
+    try {
+      const writes = [];
+
+      // usage/{uid}: contador à prova de adulteração.
+      if (countThis) {
+        writes.push(
+          usageSnap.exists
+            ? usageRef.set({ generationsUsed: FieldValue.increment(1) }, { merge: true })
+            : usageRef.set({ generationsUsed: (user.generationsUsed || 0) + 1 }, { merge: true })
+        );
+      }
+
+      // users/{uid}: espelho para exibição + tokens (métrica de custo do admin).
+      const userUpdate = {
+        inputTokens: FieldValue.increment(inTok),
+        outputTokens: FieldValue.increment(outTok),
+      };
+      if (countThis) userUpdate.generationsUsed = used + 1;
+      writes.push(userRef.set(userUpdate, { merge: true }));
+
+      // Estatísticas globais (o cliente não conseguia escrever aqui — achado #7).
+      const monthKey = new Date().toISOString().slice(0, 7).replace('-', '_');
+      const statsPayload = {
+        totalGenerations: FieldValue.increment(1),
+        totalInputTokens: FieldValue.increment(inTok),
+        totalOutputTokens: FieldValue.increment(outTok),
+      };
+      writes.push(db.doc('config/stats').set(statsPayload, { merge: true }));
+      writes.push(db.doc(`config/stats_${monthKey}`).set(statsPayload, { merge: true }));
+
+      await Promise.all(writes);
+    } catch (e) {
+      logger.warn('Falha ao contabilizar geração (resposta segue normalmente):', e);
+    }
+
+    let functionCalls = null;
+    try { functionCalls = result.functionCalls || null; } catch (e) { functionCalls = null; }
+
+    return { text: result.text || '', functionCalls };
   }
 );
