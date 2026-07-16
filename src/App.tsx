@@ -7749,6 +7749,14 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
+      {/* MUNDO PERDIDO — destaque: só a arte. Sem ação por enquanto. */}
+      <button
+        aria-label="Mundo Perdido — Escape Room"
+        className="w-full relative overflow-hidden rounded-[2rem] border-4 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
+      >
+        <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
+      </button>
+
       {/* Atividades menores */}
       <div className="grid grid-cols-2 gap-3 mb-8">
         {smallActivities.map(m => {
