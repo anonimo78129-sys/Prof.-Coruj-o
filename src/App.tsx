@@ -13,7 +13,7 @@ import {
   Wand2, Grid3x3, Puzzle, Dice5, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
   Volume2, Shuffle, Swords, Crown, Zap, Gift, Pause, RotateCcw, Dices, Timer as TimerIcon, Star, Minus, Hand, Ticket, Siren,
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
-  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
+  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff, Share2
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -24,6 +24,8 @@ import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, inc
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 import EscapeGame from './escape/EscapeGame';
+import { QRCodeSVG } from 'qrcode.react';
+import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
 import {
   escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
@@ -9467,6 +9469,11 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string; crit?: boolean } | null>(null);
   const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string; heal?: boolean }[]>([]);
   const [awarded, setAwarded] = useState(false);
+  // Batalha recebida por link/QR (#batalha=...) — perguntas prontas, sem IA
+  const [shared, setShared] = useState<SharedBattle | null>(null);
+  // Painel de compartilhamento (link/QR da batalha atual); null = fechado
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Tremor de tela + flash branco no impacto crítico: manipulação direta de
   // classe CSS (via ref) em vez de estado, pra reiniciar a animação mesmo em
@@ -9735,27 +9742,79 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
     after(2600, () => { drawQuestion(); setPhase('question'); beginQuestionTimers(0); });
   };
 
-  const generate = async () => {
-    if (!topic.trim()) { setError('Informe o tema da batalha.'); return; }
-    if (hasRealTeams && pick.length !== 2) { setError('Escolha exatamente 2 equipes para a batalha.'); return; }
-    setError(''); setPhase('loading');
-    try {
-      const prompt = `Gere ${count} perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade ${difficulty}.
+  // Batalha recebida por link/QR: decodifica as perguntas do hash ao montar.
+  // O hash é limpo em seguida para o link não "grudar" na sessão do professor.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith('#batalha=')) return;
+    const b = decodeBattle(hash.slice('#batalha='.length));
+    window.location.hash = '';
+    if (!b) return;
+    setShared(b);
+    setTopic(b.topic);
+    questionsRef.current = b.questions;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Gera as perguntas via IA (compartilhado entre "Começar batalha" e
+  // "Gerar e compartilhar"). Lança em caso de falha.
+  const fetchQuestions = async (): Promise<GamiBattleQ[]> => {
+    const prompt = `Gere ${count} perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade ${difficulty}.
 Cada pergunta: enunciado curto (máximo 110 caracteres), 4 alternativas curtas (máximo 38 caracteres cada), apenas UMA correta.
 Varie os tipos: definição, complete a frase, verdadeiro ou falso disfarçado, qual é, quem foi.
 Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]}
 onde "correct" é o índice (0 a 3) da alternativa correta.`;
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
-      const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-      const parsed = JSON.parse(raw);
-      const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
-      if (!valid.length) throw new Error('sem perguntas');
-      questionsRef.current = valid;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(raw);
+    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
+    if (!valid.length) throw new Error('sem perguntas');
+    return valid;
+  };
+
+  const generate = async () => {
+    if (!topic.trim()) { setError('Informe o tema da batalha.'); return; }
+    if (hasRealTeams && pick.length !== 2) { setError('Escolha exatamente 2 equipes para a batalha.'); return; }
+    setError('');
+    // Perguntas já vieram prontas pelo link compartilhado: começa direto.
+    if (shared && questionsRef.current.length) { startBattle(); return; }
+    setPhase('loading');
+    try {
+      questionsRef.current = await fetchQuestions();
       startBattle();
     } catch {
       setError('Não consegui gerar as perguntas. Tente novamente.');
       setPhase('setup');
     }
+  };
+
+  // Gera as perguntas e abre o painel de link/QR — mesmo mecanismo do jogo
+  // Escape: a batalha inteira viaja no link, quem abre já entra pronta.
+  const generateAndShare = async () => {
+    if (!topic.trim()) { setError('Informe o tema da batalha.'); return; }
+    setError('');
+    if (!(shared && questionsRef.current.length)) {
+      setPhase('loading');
+      try {
+        questionsRef.current = await fetchQuestions();
+      } catch {
+        setError('Não consegui gerar as perguntas. Tente novamente.');
+        setPhase('setup');
+        return;
+      }
+      setPhase('setup');
+    }
+    setShareCopied(false);
+    setShareLink(battleShareUrl({ topic: topic.trim(), questions: questionsRef.current }));
+  };
+
+  const copyShareLink = async () => {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch { /* clipboard indisponível — o link fica visível para copiar manualmente */ }
   };
 
   // Atalho só para admin: pula a chamada de IA com perguntas fixas, pra
@@ -9946,19 +10005,59 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     </div>
   );
 
+  // ── Painel de compartilhamento (link/QR) — mesmo mecanismo do jogo Escape:
+  // a batalha inteira viaja codificada no link, sem backend. Renderizado por
+  // cima de qualquer fase (setup ou fim da batalha).
+  const sharePanelEl = shareLink !== null && (
+    <div className="fixed inset-0 z-[140] bg-black/70 backdrop-blur-sm flex items-center justify-center p-5" onClick={e => { if (e.target === e.currentTarget) setShareLink(null); }}>
+      <div className="bg-white rounded-3xl p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto no-scrollbar text-center shadow-2xl">
+        <p className="font-black text-gray-800 text-base">⚔️ Batalha pronta para compartilhar!</p>
+        <p className="text-sm text-gray-500 mt-1 leading-snug">{topic.trim()} · {questionsRef.current.length} pergunta{questionsRef.current.length === 1 ? '' : 's'}</p>
+
+        {/* QR — escaneia e a batalha abre pronta, com as mesmas perguntas */}
+        <div className="inline-block bg-white p-3 rounded-2xl border-2 border-gray-200 mt-4">
+          <QRCodeSVG value={shareLink} size={192} level="M" marginSize={1} />
+        </div>
+        <p className="text-xs text-gray-500 mt-2 leading-snug">Peça para <b>escanear o QR</b> com a câmera — ou envie o link. A batalha abre pronta, com as mesmas perguntas, sem gastar gerações de IA.</p>
+
+        {/* Link — alternativa ao QR (WhatsApp, Classroom, e-mail...) */}
+        <textarea
+          readOnly
+          value={shareLink}
+          onFocus={e => e.target.select()}
+          className="w-full mt-3 px-3 py-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-xl resize-none h-14 focus:outline-none"
+        />
+        <button onClick={copyShareLink} className="w-full mt-2 bg-gradient-to-r from-rose-500 to-red-600 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+          <Copy size={15} /> {shareCopied ? 'Link copiado! ✓' : 'Copiar link'}
+        </button>
+        {shareLink.length > 1900 && (
+          <p className="text-[11px] text-amber-600 font-medium mt-2 leading-snug">⚠️ Muitas perguntas deixaram o QR denso. Se algum celular tiver dificuldade de ler, use o link.</p>
+        )}
+        <button onClick={() => setShareLink(null)} className="w-full mt-2 bg-gray-100 text-gray-600 font-bold py-2.5 rounded-xl text-sm">Fechar</button>
+      </div>
+    </div>
+  );
+
   if (phase === 'setup' || phase === 'loading') return (
     <GamiToolShell title="Batalha de Revisão" subtitle="Arena do conhecimento" icon={Swords} theme="crimson" onClose={onClose}>
+      {sharePanelEl}
       {phase === 'setup' && (
         <div className="space-y-4">
+          {shared && questionsRef.current.length > 0 && (
+            <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-2xl p-4 backdrop-blur flex items-start gap-2">
+              <p className="text-sm text-emerald-200 leading-relaxed flex-1"><b>⚡ Batalha recebida por link:</b> {questionsRef.current.length} perguntas prontas sobre <b>{shared.topic || 'o tema compartilhado'}</b>. É só escolher as equipes e começar — sem gastar IA.</p>
+              <button onClick={() => { setShared(null); questionsRef.current = []; setTopic(''); }} className="text-emerald-300/70 text-[11px] font-bold underline shrink-0">descartar</button>
+            </div>
+          )}
           <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur">
             <p className="text-sm text-white/75 leading-relaxed"><b className="text-white">Batalha em turnos:</b> a IA gera perguntas e cada equipe responde na sua vez. <b className="text-emerald-300">Acertou = ataque de {HIT}.</b> <b className="text-red-300">Errou = contra-ataque de {WRONG_HIT}.</b> <b className="text-amber-300">Resposta em até 3s = CRÍTICO (+{CRIT_BONUS})</b>. <b className="text-emerald-300">{HEAL_STREAK} acertos seguidos curam {HEAL_AMOUNT} HP</b>. Abaixo de metade do HP entra em <b className="text-amber-300">Fúria (+{FURY_BONUS})</b>. Vence quem zerar o HP do rival!</p>
           </div>
           {error && <p className="text-sm text-red-300 font-medium bg-red-500/15 border border-red-400/25 rounded-xl p-3">{error}</p>}
-          <div>
+          {!shared && <div>
             <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Tema da revisão</label>
             <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Frações, Era Vargas, Sistema Solar…" className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400/50 bg-white/[0.08] text-white placeholder-white/30" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+          </div>}
+          {!shared && <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Banco de perguntas</label>
               <div className="flex gap-1.5">
@@ -9975,7 +10074,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 <option value="difícil">Difícil</option>
               </select>
             </div>
-          </div>
+          </div>}
           <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur">
             <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">{hasRealTeams ? 'Escolha as 2 equipes da batalha' : 'Equipes da batalha'}</p>
             <div className="flex flex-wrap gap-2">
@@ -9998,6 +10097,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           <button onClick={generate} className="w-full bg-gradient-to-r from-rose-500 to-red-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-lg shadow-rose-950/60">
             <Swords size={20} /> Começar batalha
           </button>
+          <button onClick={generateAndShare} className="w-full bg-white/[0.08] border border-white/15 text-white/80 font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
+            <Share2 size={16} /> {shared ? 'Compartilhar esta batalha' : 'Gerar e compartilhar por link/QR'}
+          </button>
           {isAdmin && (
             <button onClick={startDevTest} className="w-full bg-white/[0.08] border border-dashed border-white/25 text-white/70 font-bold py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2">
               🧪 Teste rápido (dev) — pula a IA, perguntas fixas
@@ -10018,6 +10120,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   // caixas creme — paleta própria, deliberadamente distinta do modo palco.
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
+      {sharePanelEl}
       {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras.
           gami-crit-shake/gami-crit-flash são disparadas via classList (não estado),
           pra reiniciar mesmo em críticos consecutivos sem esperar re-render. */}
@@ -10295,9 +10398,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     <p className="text-[11px] text-[#8a7a5a] font-bold mt-3">Vincule alunos a esta equipe na aba Equipes para premiar com XP.</p>
                   )}
                   {awarded && <p className="text-emerald-700 text-sm font-bold mt-3">XP entregue! ✓</p>}
-                  <div className="flex justify-center gap-6 mt-4">
+                  <div className="flex justify-center gap-5 mt-4">
                     <button onClick={startBattle} className="font-pixel text-[#8a5a1a] text-[9px] flex items-center gap-1.5"><Swords size={13} />Revanche</button>
                     <button onClick={() => setPhase('setup')} className="font-pixel text-[#7a2a2a] text-[9px] flex items-center gap-1.5"><RotateCcw size={13} />Nova batalha</button>
+                    <button onClick={() => { setShareCopied(false); setShareLink(battleShareUrl({ topic: topic.trim(), questions: questionsRef.current })); }} className="font-pixel text-[#1a5c8a] text-[9px] flex items-center gap-1.5"><Share2 size={13} />Compartilhar</button>
                   </div>
                 </div>
               </div>
@@ -13417,10 +13521,16 @@ function AppInner() {
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
 
-  // Link/QR de quiz compartilhado pelo professor (#jogo=...): abre direto o
-  // jogo Escape (Mundo Perdido), que decodifica o quiz do próprio hash.
+  // Links/QR compartilhados pelo professor:
+  //  #jogo=...    → jogo Escape (Mundo Perdido), que decodifica o quiz do hash
+  //  #batalha=... → Batalha de Revisão (QuaqueMagia), que decodifica as
+  //                 perguntas do hash ao montar
   useEffect(() => {
-    const openSharedGame = () => { if (window.location.hash.startsWith('#jogo=')) setScreen('escape'); };
+    const openSharedGame = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#jogo=')) setScreen('escape');
+      else if (hash.startsWith('#batalha=')) { setGamiInitialTool('batalha'); setScreen('gamificacao'); }
+    };
     openSharedGame();
     window.addEventListener('hashchange', openSharedGame);
     return () => window.removeEventListener('hashchange', openSharedGame);
