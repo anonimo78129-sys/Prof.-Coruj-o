@@ -38,6 +38,91 @@ const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
 
 const AI_MODEL = 'gemini-2.5-flash';
 
+// ── Privacidade / LGPD ──────────────────────────────────────────────────────
+// Versão do aviso de privacidade aceito no cadastro (registrada no doc do
+// usuário). Incremente ao publicar uma nova versão da política.
+const PRIVACY_VERSION = '2026-07-12';
+// Canal do titular / Encarregado (LGPD art. 41). AJUSTE para o e-mail oficial.
+const PRIVACY_CONTACT_EMAIL = 'lyelsonmf520@gmail.com';
+
+// Overlay com a Política de Privacidade e Termos de Uso.
+// ⚠️ RASCUNHO-BASE: revise com um advogado quando possível. Foi escrito para
+// dar transparência mínima exigida pela LGPD, mas não substitui aconselhamento
+// jurídico. Reutilizado na tela de login e no perfil.
+function PrivacyPolicyOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={onClose}>
+      <div
+        className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-2xl max-h-[88vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="text-lg font-black text-gray-900">Privacidade e Termos</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 font-bold text-sm px-3 py-1 rounded-lg hover:bg-gray-100">Fechar</button>
+        </div>
+        <div className="overflow-y-auto px-5 py-4 text-sm text-gray-700 leading-relaxed space-y-4">
+          <p className="text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-xl p-3">
+            Resumo em linguagem simples abaixo. Última atualização: {PRIVACY_VERSION}. Em caso de dúvida sobre seus dados, fale com a gente: <span className="font-semibold">{PRIVACY_CONTACT_EMAIL}</span>.
+          </p>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">1. Quem trata seus dados</h3>
+            <p>O Prof. Corujão é uma ferramenta de apoio pedagógico. Em relação aos seus dados de cadastro (professor), atuamos como controlador. Em relação aos dados de alunos que você insere, <strong>você (professor/escola) é o controlador</strong> e o Prof. Corujão atua como operador, tratando esses dados apenas para lhe prestar o serviço.</p>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">2. Dados que coletamos</h3>
+            <p><strong>Do professor:</strong> nome, e-mail, senha (guardada de forma segura pelo Firebase Authentication), foto de perfil (opcional), número de celular (verificação por SMS), escola e disciplina (opcionais), fuso horário e dados de uso do app.</p>
+            <p className="mt-1"><strong>De alunos, inseridos por você:</strong> nomes, presença/faltas, notas, observações pedagógicas e, se você optar por incluir, informações sobre necessidades específicas (ex.: TDAH, TEA, dislexia). Peça que você insira <strong>somente o necessário</strong>.</p>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">3. Para que usamos</h3>
+            <p>Para autenticar seu acesso, gerar materiais pedagógicos com inteligência artificial, organizar suas turmas, diário, calendário e pareceres, e enviar lembretes de aula. Não vendemos seus dados nem os de seus alunos.</p>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">4. Inteligência artificial e compartilhamento</h3>
+            <p>Os textos e arquivos que você envia para gerar materiais são processados pela IA do <strong>Google (Gemini)</strong>. Usamos ainda o <strong>Google Firebase</strong> (login, banco de dados, armazenamento e notificações) e o <strong>Pixabay</strong> (busca de imagens). Esses provedores podem processar dados em servidores fora do Brasil (transferência internacional). Evite inserir dados sensíveis de alunos em campos enviados à IA quando não for imprescindível.</p>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">5. Dados de crianças e adolescentes</h3>
+            <p>Ao inserir dados de alunos menores de idade, você declara ter respaldo legal para isso (por exemplo, autorização da instituição de ensino e/ou consentimento dos pais/responsáveis, conforme o art. 14 da LGPD) e ser responsável por usar esses dados no melhor interesse do aluno. Nós apenas processamos esses dados sob sua orientação.</p>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">6. Seus direitos (LGPD art. 18)</h3>
+            <p>Você pode acessar, corrigir, exportar e excluir seus dados. Dentro do app: o botão <strong>“Baixar meus dados”</strong> (portabilidade) e <strong>“Excluir conta”</strong> (eliminação) ficam no seu Perfil. Para outras solicitações, escreva para {PRIVACY_CONTACT_EMAIL}.</p>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">7. Retenção e segurança</h3>
+            <p>Mantemos seus dados enquanto sua conta existir. Ao excluir a conta, apagamos seus dados de cadastro, turmas, materiais, diário, foto e feedbacks. Adotamos medidas de segurança como acesso autenticado, regras de acesso por usuário e chaves de IA mantidas apenas no servidor.</p>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-900 mb-1">8. Termos de uso</h3>
+            <p>O app é oferecido “como está”, para fins pedagógicos. O conteúdo gerado por IA pode conter erros — revise antes de usar. Você é responsável pelos dados que insere e pelo uso que faz do serviço.</p>
+          </div>
+
+          <p className="text-xs text-gray-400 pt-2 border-t border-gray-100">Este texto é um modelo inicial e pode ser atualizado. Recomenda-se revisão por profissional jurídico.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Aviso curto de transparência ao coletar/processar dados de alunos (LGPD).
+function LgpdNotice({ text }: { text: string }) {
+  return (
+    <p className="text-[11px] leading-snug text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+      <span aria-hidden>🔒</span>
+      <span>{text}</span>
+    </p>
+  );
+}
+
 const LOADING_MESSAGES = {
   planner: [
     "Dando uma olhada no tema...",
@@ -4090,7 +4175,45 @@ const ProfileScreen = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [showPrivacyProfile, setShowPrivacyProfile] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Portabilidade (LGPD art. 18, V): baixa um JSON com todos os dados do usuário
+  // guardados no app (perfil + subcoleções). Best-effort por subcoleção.
+  const exportMyData = async () => {
+    if (!user || isExporting) return;
+    setIsExporting(true);
+    try {
+      const uid = user.uid;
+      const bundle: Record<string, any> = {
+        exportadoEm: new Date().toISOString(),
+        aviso: 'Dados pessoais exportados conforme a LGPD (art. 18, V). Inclui dados de alunos sob sua responsabilidade — trate com cuidado.',
+        perfil: { ...profile, email: user.email || profile.email || '' },
+      };
+      const subcols = ['schedules', 'classes', 'events', 'resources', 'gamification', 'diario', 'notifications'];
+      for (const col of subcols) {
+        try {
+          const snap = await getDocs(collection(db, `users/${uid}/${col}`));
+          bundle[col] = snap.docs.map(d => d.data());
+        } catch { bundle[col] = []; }
+      }
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prof-corujao-meus-dados-${toISODate(new Date())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Seus dados foram baixados.');
+    } catch (e) {
+      toast.error('Não consegui exportar agora. Tente novamente.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
   const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   const openAddClass = () => {
@@ -4577,11 +4700,14 @@ const ProfileScreen = ({
                       <div>
                         <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Perfil da Turma</label>
                         <textarea
-                          placeholder="Ex: Turma participativa, 2 alunos com TDAH, prefere aulas práticas."
+                          placeholder="Ex: Turma participativa, prefere aulas práticas."
                           value={classForm.profile}
                           onChange={e => setClassForm(f => ({ ...f, profile: e.target.value }))}
                           className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 resize-none h-16 text-sm"
                         />
+                        <div className="mt-1.5">
+                          <LgpdNotice text="Evite dados sensíveis ou que identifiquem alunos individualmente aqui — este texto é enviado à IA (Google) para gerar os materiais." />
+                        </div>
                       </div>
                       {/* Cor */}
                       <div>
@@ -4657,8 +4783,43 @@ const ProfileScreen = ({
             <ChevronRight size={20} className="text-gray-400" />
           </button>
 
+          {/* Meus dados (LGPD) — portabilidade e transparência */}
+          <button
+            onClick={exportMyData}
+            disabled={isExporting}
+            className="w-full flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-60"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm">
+                <Download size={20} />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-gray-900">Baixar meus dados</h3>
+                <p className="text-xs text-gray-500">{isExporting ? 'Preparando arquivo...' : 'Exportar seus dados (LGPD)'}</p>
+              </div>
+            </div>
+            <ChevronRight size={20} className="text-gray-400" />
+          </button>
+
+          <button
+            onClick={() => setShowPrivacyProfile(true)}
+            className="w-full flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-600 shadow-sm">
+                <Shield size={20} />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-gray-900">Privacidade e Termos</h3>
+                <p className="text-xs text-gray-500">Como tratamos seus dados</p>
+              </div>
+            </div>
+            <ChevronRight size={20} className="text-gray-400" />
+          </button>
+
         </div>
       </div>
+      {showPrivacyProfile && <PrivacyPolicyOverlay onClose={() => setShowPrivacyProfile(false)} />}
 
       {/* Zona de Perigo — colapsável */}
       <div className="mb-8 mt-4">
@@ -7586,6 +7747,14 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         className="w-full relative overflow-hidden rounded-[2rem] border-4 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
         <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" className="w-full h-auto block select-none" draggable={false} />
+      </button>
+
+      {/* MUNDO PERDIDO — destaque: só a arte. Sem ação por enquanto. */}
+      <button
+        aria-label="Mundo Perdido — Escape Room"
+        className="w-full relative overflow-hidden rounded-[2rem] border-4 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
+      >
+        <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
       {/* Atividades menores */}
@@ -10687,6 +10856,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
                     {activeTool === 'parecer' && (
                       <>
+                        <LgpdNotice text="Você é responsável pelos dados do aluno inseridos aqui. O texto é processado por IA (Google) para gerar o parecer; use apenas o necessário e conforme a LGPD." />
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Nome do aluno *</label>
                           <input value={studentName} onChange={e => setStudentName(e.target.value)} maxLength={80} placeholder="Ex: Maria Clara" className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm" />
@@ -11028,6 +11198,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
               <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
               <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo, um nome por linha. Funciona nas duas telas.</p>
             </div>
+            <LgpdNotice text="Os nomes e a frequência dos alunos ficam guardados só na sua conta. Você é responsável por esses dados (LGPD) — insira apenas o necessário." />
             <textarea
               value={diarioBulkNames}
               onChange={e => setDiarioBulkNames(e.target.value)}
@@ -13201,6 +13372,8 @@ function AppInner() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
   const [authError, setAuthError] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
   const [phoneStep, setPhoneStep] = useState<'idle' | 'enter' | 'code'>('idle');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -13727,6 +13900,10 @@ function AppInner() {
       if (isLoginMode) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
+        if (!acceptedTerms) {
+          setAuthError('Para criar a conta, você precisa ler e aceitar a Política de Privacidade e os Termos de Uso.');
+          return;
+        }
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         if (userCredential.user) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
@@ -13737,6 +13914,8 @@ function AppInner() {
             onboarded: false,
             createdAt: new Date().toISOString(),
             phoneVerified: false,
+            // Registro do consentimento (LGPD art. 8º, §1º): prova de aceite.
+            consent: { accepted: true, version: PRIVACY_VERSION, at: new Date().toISOString() },
           });
           // Trigger phone verification step
           setPhoneStep('enter');
@@ -13922,10 +14101,28 @@ function AppInner() {
                   </div>
                 )}
 
+                {!isResetMode && !isLoginMode && (
+                  <label className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                    />
+                    <span>
+                      Li e concordo com a{' '}
+                      <button type="button" onClick={() => setShowPrivacy(true)} className="text-indigo-600 font-semibold underline">
+                        Política de Privacidade e Termos de Uso
+                      </button>
+                      , inclusive quanto ao tratamento de dados de alunos sob minha responsabilidade (LGPD).
+                    </span>
+                  </label>
+                )}
+
                 <button
                   type="submit"
-                  disabled={isAuthProcessing}
-                  className={`w-full text-white font-bold py-3 px-6 rounded-xl transition-all ${isAuthProcessing ? 'bg-gray-400 cursor-not-allowed shadow-md' : 'bg-gradient-to-br from-indigo-600 to-indigo-800 shadow-lg shadow-indigo-600/30 active:scale-[0.98]'}`}
+                  disabled={isAuthProcessing || (!isResetMode && !isLoginMode && !acceptedTerms)}
+                  className={`w-full text-white font-bold py-3 px-6 rounded-xl transition-all ${isAuthProcessing || (!isResetMode && !isLoginMode && !acceptedTerms) ? 'bg-gray-400 cursor-not-allowed shadow-md' : 'bg-gradient-to-br from-indigo-600 to-indigo-800 shadow-lg shadow-indigo-600/30 active:scale-[0.98]'}`}
                 >
                   {isAuthProcessing ? 'Processando...' : (isResetMode ? 'Enviar link' : (isLoginMode ? 'Entrar' : 'Cadastrar'))}
                 </button>
@@ -13947,7 +14144,16 @@ function AppInner() {
               </motion.div>
             </AnimatePresence>
           </motion.form>
+
+          <button
+            type="button"
+            onClick={() => setShowPrivacy(true)}
+            className="text-xs text-black/60 hover:text-black font-medium underline drop-shadow-sm"
+          >
+            Política de Privacidade e Termos
+          </button>
         </div>
+        {showPrivacy && <PrivacyPolicyOverlay onClose={() => setShowPrivacy(false)} />}
       </div>
     );
   }
@@ -14993,6 +15199,18 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
                 snap.docs.forEach(d => batch.delete(d.ref));
                 if (snap.docs.length > 0) await batch.commit();
               }
+              // Direito de eliminação (LGPD art. 18, VI): também remove a foto no
+              // Storage e os feedbacks enviados por este usuário. Best-effort —
+              // uma falha aqui não deve impedir a exclusão da conta em si.
+              try { await deleteObject(storageRef(storage, `users/${uid}/photo.jpg`)); } catch { /* sem foto */ }
+              try {
+                const fbSnap = await getDocs(query(collection(db, 'feedback'), where('uid', '==', uid)));
+                if (!fbSnap.empty) {
+                  const fbBatch = writeBatch(db);
+                  fbSnap.docs.forEach(d => fbBatch.delete(d.ref));
+                  await fbBatch.commit();
+                }
+              } catch { /* sem feedbacks ou sem permissão */ }
               await deleteDoc(doc(db, 'users', uid));
               await deleteUser(user);
             } catch (e: any) {

@@ -1,20 +1,31 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Profile photos: owner can read/write their own photo; others can read (for display)
+    // Foto de perfil: leitura restrita ao próprio dono (minimização — LGPD
+    // art. 6º, III). A foto não é exibida a outros usuários; admins mantêm
+    // acesso para suporte. Escrita apenas do dono, até 2 MB e só imagem.
     match /users/{userId}/photo.jpg {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+        && (
+          request.auth.uid == userId
+          || request.auth.token.admin == true
+          || (request.auth.token.email == "lyelsonmf520@gmail.com" && request.auth.token.email_verified == true)
+        );
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.size < 2 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
-    // Library files: any authenticated user can read; only the email admin can write/delete
+    // Library files: any authenticated user can read; only admins can write/delete.
+    // Admin via custom claim (`admin: true`) é o caminho preferido; o e-mail de
+    // bootstrap segue como fallback legado.
     match /library/{allPaths=**} {
       allow read: if request.auth != null;
       allow write, delete: if request.auth != null
-        && request.auth.token.email == "lyelsonmf520@gmail.com"
-        && request.auth.token.email_verified == true;
+        && (
+          request.auth.token.admin == true
+          || (request.auth.token.email == "lyelsonmf520@gmail.com" && request.auth.token.email_verified == true)
+        );
     }
   }
 }
