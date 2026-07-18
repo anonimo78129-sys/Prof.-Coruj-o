@@ -1,0 +1,829 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+
+/* ── CSS do jogo Escape (Mundo Perdido) — extraído do app Prof ──
+   Sem @import tailwindcss (o index.css principal já importa),
+   sem estilos globais de body (o jogo roda como overlay dentro do Corujão). */
+
+@font-face { font-family: '16BitDreams';      src: url('/escape-assets/fonts/16BitDreams.ttf'); }
+@font-face { font-family: 'AccessDenied';     src: url('/escape-assets/fonts/AccessDenied.ttf'); }
+@font-face { font-family: 'DetectivesDames';  src: url('/escape-assets/fonts/DetectivesDames.ttf'); }
+@font-face { font-family: 'EatenByGrues';     src: url('/escape-assets/fonts/EatenByGrues.ttf'); }
+@font-face { font-family: 'LankyGit';         src: url('/escape-assets/fonts/LankyGit.ttf'); }
+@font-face { font-family: 'LordFlimbington';  src: url('/escape-assets/fonts/LordFlimbington.ttf'); }
+@font-face { font-family: 'MythosMaximus';    src: url('/escape-assets/fonts/MythosMaximus.ttf'); }
+@font-face { font-family: 'ThatsDelaware';    src: url('/escape-assets/fonts/ThatsDelaware.ttf'); }
+@font-face { font-family: 'YoreInPeril';      src: url('/escape-assets/fonts/YoreInPeril.ttf'); }
+@font-face { font-family: 'ItttiestBittiest'; src: url('/escape-assets/fonts/ItttiestBittiest.ttf'); }
+@font-face { font-family: 'IttyBitty';        src: url('/escape-assets/fonts/IttyBitty.ttf'); }
+@font-face { font-family: 'Alagard';          src: url('/escape-assets/fonts/Alagard.ttf'); }
+@font-face { font-family: 'Romulus';          src: url('/escape-assets/fonts/Romulus.ttf'); }
+
+@layer utilities {
+  .font-pixel { font-family: 'Press Start 2P', monospace; }
+  .font-vt { font-family: 'VT323', monospace; }
+
+  /* ── Classic pixel button (dark border, square) ── */
+  .btn-pixel {
+    font-family: 'Press Start 2P', monospace;
+    border: 3px solid #1a1a1a;
+    box-shadow: 4px 4px 0px #1a1a1a;
+    border-radius: 0;
+    transition: transform 80ms, box-shadow 80ms;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-pixel:active {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 #1a1a1a;
+  }
+
+  /* ── Chunky pixel game button (beveled, stacked menu) ── */
+  .btn-game {
+    font-family: 'Press Start 2P', monospace;
+    background: linear-gradient(to bottom, #2ca149 0% 12.5%, #84d03c 12.5% 87.5%, #c4de3c 87.5% 100%);
+    border: 4px solid #0d2a0d;
+    box-shadow: inset 4px 0 0 #2ca149, inset -4px 0 0 #c4de3c, 0 6px 0 #0d2a0d, 0 8px 0 rgba(0,0,0,0.35);
+    color: #ffffff;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.55);
+    border-radius: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 70ms, box-shadow 70ms;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-game:active {
+    transform: translateY(6px);
+    box-shadow: inset 4px 0 0 #2ca149, inset -4px 0 0 #c4de3c, 0 0 0 #0d2a0d;
+  }
+
+  /* ── Gold RPG button (pixel art 3-stripe) ── */
+  .btn-rpg {
+    font-family: 'Press Start 2P', monospace;
+    background: linear-gradient(to bottom, #b06010 0% 12.5%, #f0a010 12.5% 87.5%, #f0c840 87.5% 100%);
+    border: 4px solid #0d2a0d;
+    box-shadow: inset 4px 0 0 #b06010, inset -4px 0 0 #f0c840, 0 6px 0 #0d2a0d, 0 8px 0 rgba(0,0,0,0.35);
+    color: #ffffff;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.55);
+    border-radius: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 80ms, box-shadow 80ms;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-rpg:active {
+    transform: translateY(6px);
+    box-shadow: inset 4px 0 0 #b06010, inset -4px 0 0 #f0c840, 0 0 0 #0d2a0d;
+  }
+
+  /* ── Parchment panel (menus, dialogs) ── */
+  .panel-parchment {
+    background: linear-gradient(160deg, #f7ead5 0%, #e8d4a8 100%);
+    border: 3px solid #7a4f2d;
+    box-shadow: 5px 5px 0 #3a2010;
+  }
+
+  /* ── Dark RPG dialog (NPC conversations) ── */
+  .dialog-rpg {
+    border: 3px solid #e8d4a8;
+    outline: 3px solid #1a1a1a;
+    background: rgba(8, 4, 20, 0.92);
+  }
+
+  /* ── Simple pixel panel (dark) ── */
+  .panel-pixel {
+    border: 3px solid #1a1a1a;
+    box-shadow: 5px 5px 0px #1a1a1a;
+    border-radius: 0;
+  }
+
+  /* ── RPG-style wood header bar ── */
+  .bar-wood {
+    background: linear-gradient(to bottom, #8b5e2c 0%, #6b4018 100%);
+    border-bottom: 3px solid #3a2010;
+    box-shadow: 0 3px 0 #1a0c04;
+  }
+
+  /* ── Glows ── */
+  .glow-teal   { filter: drop-shadow(0 0 8px #00d4aa) drop-shadow(0 0 16px #00d4aa); }
+  .glow-gold   { filter: drop-shadow(0 0 8px #ffd700) drop-shadow(0 0 16px #ffd700); }
+  .glow-purple { filter: drop-shadow(0 0 8px #cc44ff) drop-shadow(0 0 16px #cc44ff); }
+  .glow-white  { filter: drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 20px #ffffff); }
+  .glow-amber  { filter: drop-shadow(0 0 8px #ffc800) drop-shadow(0 0 16px #ffc800); }
+
+  /* ── Scrollbar hide ── */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* ═══════════════════════════════════
+     ANIMATIONS
+  ═══════════════════════════════════ */
+
+  /* Scene transitions */
+  @keyframes scene-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .scene-fade-in { animation: scene-fade-in 400ms ease-out forwards; }
+
+  /* ── Story game ── */
+  @keyframes fade-hold {
+    0%   { opacity: 0; }
+    20%  { opacity: 1; }
+    80%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes scene-transition {
+    0%   { opacity: 0; }
+    30%  { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  /* Transição de cena em blocos pixel (estilo GBA): cada bloco cresce,
+     segura cobrindo a tela durante a troca de cenário, e encolhe. */
+  @keyframes block-in-out {
+    0%   { transform: scale(0); }
+    28%  { transform: scale(1.04); }
+    68%  { transform: scale(1.04); }
+    100% { transform: scale(0); }
+  }
+  /* Folhas caindo — atravessam a tela derivando em X e girando */
+  @keyframes leaf-fall {
+    0%   { transform: translate(0, -6vh) rotate(0deg); opacity: 0; }
+    8%   { opacity: 0.9; }
+    88%  { opacity: 0.9; }
+    100% { transform: translate(var(--lx, 40px), 104vh) rotate(var(--lr, 300deg)); opacity: 0; }
+  }
+  /* Ken Burns sutil nas ilustrações de lore (zoom lento) */
+  @keyframes lore-kenburns {
+    0%   { transform: scale(1); }
+    100% { transform: scale(1.07) translateY(-1.2%); }
+  }
+  /* Lore FX — anel de ondulação na água (pântano) */
+  @keyframes lore-ripple {
+    0%   { transform: translate(-50%,-50%) scale(0.25); opacity: 0.75; }
+    100% { transform: translate(-50%,-50%) scale(1.7);  opacity: 0; }
+  }
+  /* Lore FX — faixa de névoa deslizando lentamente */
+  @keyframes mist-drift {
+    0%, 100% { transform: translateX(-10%); }
+    50%      { transform: translateX(8%); }
+  }
+  @keyframes battle-shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-3px); }
+    40%       { transform: translateX(3px); }
+    60%       { transform: translateX(-2px); }
+    80%       { transform: translateX(2px); }
+  }
+  @keyframes enemy-breathe {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%       { transform: translateY(-6px) scale(1.04); }
+  }
+  @keyframes enemy-hit-recoil {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(-40px); }
+    60%  { transform: translateX(12px); }
+    80%  { transform: translateX(-6px); }
+    100% { transform: translateX(0); }
+  }
+  @keyframes impact-ring {
+    0%   { transform: scale(0.3); opacity: 0.95; }
+    100% { transform: scale(2.6); opacity: 0; }
+  }
+  @keyframes projectile-spin {
+    0%   { transform: rotate(0deg)   scale(1); }
+    100% { transform: rotate(360deg) scale(1.15); }
+  }
+  @keyframes enemy-vibrate {
+    0%, 100% { transform: translateX(0); }
+    15%       { transform: translateX(-2px); }
+    30%       { transform: translateX(2px); }
+    45%       { transform: translateX(-2px); }
+    60%       { transform: translateX(2px); }
+    75%       { transform: translateX(-1px); }
+    90%       { transform: translateX(1px); }
+  }
+  @keyframes enemy-glow-pulse {
+    0%, 100% { filter: drop-shadow(0 0 6px #00e5ff) drop-shadow(0 0 2px #00bcd4); }
+    50%       { filter: drop-shadow(0 0 18px #00e5ff) drop-shadow(0 0 8px #00bcd4); }
+  }
+  @keyframes enemy-flash-blue {
+    0%   { opacity: 0.55; }
+    100% { opacity: 0; }
+  }
+  @keyframes ring-expand {
+    0%   { transform: scale(1);   opacity: 0.7; }
+    100% { transform: scale(1.9); opacity: 0; }
+  }
+  @keyframes battle-stripes {
+    0%   { background-position: 0 0; }
+    100% { background-position: 56px 0; }
+  }
+  @keyframes battle-enemy-in {
+    0%   { transform: translateX(140px); opacity: 0; }
+    100% { transform: translateX(0);     opacity: 1; }
+  }
+  @keyframes battle-player-in {
+    0%   { transform: translateX(-140px); opacity: 0; }
+    100% { transform: translateX(0);      opacity: 1; }
+  }
+  @keyframes battle-bg-fade {
+    0%, 49.9% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes battle-float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-6px); }
+  }
+  @keyframes butterfly-move-x {
+    from { transform: translateX(0); }
+    to   { transform: translateX(calc(100vw + 120px)); }
+  }
+  @keyframes butterfly-move-x-rev {
+    from { transform: translateX(calc(100vw + 120px)); }
+    to   { transform: translateX(0); }
+  }
+  @keyframes butterfly-bob-a {
+    0%   { transform: translateY(-22px) rotate(-4deg); }
+    30%  { transform: translateY(18px)  rotate(3deg); }
+    60%  { transform: translateY(-14px) rotate(-5deg); }
+    80%  { transform: translateY(24px)  rotate(2deg); }
+    100% { transform: translateY(-22px) rotate(-4deg); }
+  }
+  @keyframes butterfly-bob-b {
+    0%   { transform: translateY(10px)  rotate(3deg); }
+    40%  { transform: translateY(-28px) rotate(-5deg); }
+    70%  { transform: translateY(16px)  rotate(4deg); }
+    100% { transform: translateY(10px)  rotate(3deg); }
+  }
+  @keyframes butterfly-bob-c {
+    0%   { transform: translateY(-8px)  rotate(-2deg); }
+    25%  { transform: translateY(26px)  rotate(5deg); }
+    55%  { transform: translateY(-20px) rotate(-4deg); }
+    80%  { transform: translateY(12px)  rotate(3deg); }
+    100% { transform: translateY(-8px)  rotate(-2deg); }
+  }
+  @keyframes butterfly-bob-d {
+    0%   { transform: translateY(20px)  rotate(4deg); }
+    35%  { transform: translateY(-18px) rotate(-3deg); }
+    65%  { transform: translateY(22px)  rotate(5deg); }
+    100% { transform: translateY(20px)  rotate(4deg); }
+  }
+  @keyframes butterfly-frame {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes butterfly-frame2 {
+    0%, 49% { opacity: 0; }
+    50%, 100% { opacity: 1; }
+  }
+  @keyframes sunlight-pulse {
+    0%, 100% { opacity: 0.4; }
+    50%       { opacity: 0.75; }
+  }
+  @keyframes foliage-sway {
+    0%, 100% { transform: rotate(0deg); }
+    25%       { transform: rotate(1deg); }
+    75%       { transform: rotate(-1deg); }
+  }
+  @keyframes vine-sway {
+    0%, 100% { transform: skewX(0deg); }
+    30%       { transform: skewX(1.5deg); }
+    70%       { transform: skewX(-1.5deg); }
+  }
+  @keyframes battle-faint {
+    0%   { transform: translateY(0) scale(1);      opacity: 1; }
+    100% { transform: translateY(40px) scale(0.3); opacity: 0; }
+  }
+  @keyframes dmg-float {
+    0%   { transform: translateX(-50%) translateY(0)    scale(0.6); opacity: 0; }
+    20%  { transform: translateX(-50%) translateY(-6px) scale(1.2); opacity: 1; }
+    35%  { transform: translateX(-50%) translateY(-10px) scale(1);  opacity: 1; }
+    100% { transform: translateX(-50%) translateY(-44px) scale(1);  opacity: 0; }
+  }
+  @keyframes enemy-rage-pulse {
+    0%, 100% { filter: drop-shadow(0 0 6px rgba(255,60,40,0.7))  saturate(1.3) hue-rotate(-10deg); }
+    50%       { filter: drop-shadow(0 0 16px rgba(255,40,20,0.95)) saturate(1.6) hue-rotate(-16deg); }
+  }
+
+  @keyframes logs-rise {
+    0%   { transform: translateY(60px); opacity: 0; }
+    100% { transform: translateY(0px);  opacity: 1; }
+  }
+
+  @keyframes right-light-pulse {
+    0%, 100% { opacity: 0.7; }
+    50%       { opacity: 1; }
+  }
+  @keyframes hint-bob {
+    0%, 100% { transform: translate(-50%, 0); }
+    50%      { transform: translate(-50%, -6px); }
+  }
+  @keyframes mote-float {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    20%  { opacity: 0.9; }
+    80%  { opacity: 0.7; }
+    100% { transform: translate(var(--mx, 20px), -70px); opacity: 0; }
+  }
+  @keyframes gate-open {
+    0%   { transform: scaleY(1);    opacity: 1; }
+    60%  { transform: scaleY(1.04); opacity: 0.8; }
+    100% { transform: scaleY(0.1) translateY(40px); opacity: 0; }
+  }
+
+  @keyframes slide-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  .slide-up { animation: slide-up 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+  /* Sparkle */
+  @keyframes sparkle {
+    0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+    50%       { opacity: 1; transform: scale(1.2) rotate(180deg); }
+  }
+  .sparkle { animation: sparkle 1.2s ease-in-out infinite; }
+
+  /* Iris orb pulse */
+  @keyframes iris-glow {
+    0%, 100% { box-shadow: 0 0 12px 4px #00d4aa, 0 0 24px 8px rgba(0,212,170,0.3); }
+    50%       { box-shadow: 0 0 20px 8px #00d4aa, 0 0 40px 16px rgba(0,212,170,0.5); }
+  }
+  .iris-glow { animation: iris-glow 2s ease-in-out infinite; }
+
+  /* Portal spin */
+  @keyframes portal-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  .portal-spin { animation: portal-spin 8s linear infinite; }
+
+  /* Fragment float */
+  @keyframes fragment-float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-8px); }
+  }
+  .fragment-float { animation: fragment-float 2.5s ease-in-out infinite; }
+
+  /* Firefly glow pulse */
+  @keyframes firefly-pulse {
+    0%, 100% { opacity: 0.25; transform: scale(0.85); }
+    40%       { opacity: 1;    transform: scale(1.3); }
+    60%       { opacity: 0.9;  transform: scale(1.1); }
+  }
+  .firefly-pulse { animation: firefly-pulse 1.4s ease-in-out infinite; }
+
+  /* Firefly erratic drift — usa --dx / --dy definidos inline */
+  @keyframes firefly-drift {
+    0%   { translate: 0 0; }
+    25%  { translate: calc(var(--dx) * 0.5) calc(var(--dy) * -0.7); }
+    50%  { translate: var(--dx) 0; }
+    75%  { translate: calc(var(--dx) * 0.3) var(--dy); }
+    100% { translate: 0 0; }
+  }
+
+  /* Crystal glow */
+  @keyframes crystal-glow {
+    0%, 100% { filter: drop-shadow(0 0 4px #9333ea); }
+    50%       { filter: drop-shadow(0 0 12px #cc44ff) drop-shadow(0 0 20px #9333ea); }
+  }
+  .crystal-active { animation: crystal-glow 2s ease-in-out infinite; }
+
+  /* Heartbeat */
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.15); }
+  }
+  .heartbeat { animation: heartbeat 0.8s ease-in-out; }
+
+  .logo-zoom {}
+
+  /* Arbustos balançando ao vento — assimétrico para parecer natural */
+  @keyframes bushes-wind {
+    0%   { transform: skewX(0deg)    translateX(0px); }
+    18%  { transform: skewX(-0.9deg) translateX(-3px); }
+    45%  { transform: skewX(1.1deg)  translateX(4px); }
+    65%  { transform: skewX(0.5deg)  translateX(2px); }
+    82%  { transform: skewX(-0.6deg) translateX(-2px); }
+    100% { transform: skewX(0deg)    translateX(0px); }
+  }
+
+  /* ── Logo flutuação suave ── */
+  @keyframes logo-float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-10px); }
+  }
+
+  /* ── Fundo respiração ── */
+  @keyframes bg-breathe {
+    0%, 100% { transform: scale(1.00); }
+    50%       { transform: scale(1.06); }
+  }
+
+  /* ── Logo shimmer ── */
+/* ── Screen shimmer ── */
+  /* sweep dura 40% do ciclo, pausa o resto */
+  @keyframes screen-shimmer {
+    0%     { transform: translateX(-100%) skewX(-18deg); }
+    36.4%  { transform: translateX(200%)  skewX(-18deg); }
+    100%   { transform: translateX(200%)  skewX(-18deg); }
+  }
+  .screen-shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      rgba(255,255,255,0.12) 50%,
+      transparent 65%
+    );
+    animation: screen-shimmer 11s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* ── Partículas flutuantes — brisa ── */
+  @keyframes particle-breeze {
+    0%   { transform: translate(0, 0);                             opacity: 0; }
+    12%  { opacity: 1; }
+    30%  { transform: translate(calc(var(--wind) * 0.28), -12px); }
+    55%  { transform: translate(calc(var(--wind) * 0.60),   8px); }
+    78%  { transform: translate(calc(var(--wind) * 0.85), -6px);  opacity: 0.8; }
+    100% { transform: translate(var(--wind), 4px);                 opacity: 0; }
+  }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--color);
+    box-shadow: 0 0 5px var(--color), 0 0 10px var(--color);
+    animation: particle-breeze var(--duration) ease-in-out var(--delay) infinite;
+    pointer-events: none;
+  }
+
+  /* ── Landing screen animations ── */
+  @keyframes water-shimmer {
+    0%, 100% { background-position-x: 0px; opacity: 0.80; }
+    50%       { background-position-x: 40px; opacity: 0.95; }
+  }
+  @keyframes bg-drift {
+    from { background-position-x: 0px; }
+    to   { background-position-x: -480px; }
+  }
+
+  /* ── Hero patrol (home screen) ── */
+  @keyframes hero-patrol {
+    0%    { transform: translateX(-48px) scaleX(1); }
+    44%   { transform: translateX(48px) scaleX(1); }
+    50%   { transform: translateX(48px) scaleX(-1); }
+    94%   { transform: translateX(-48px) scaleX(-1); }
+    100%  { transform: translateX(-48px) scaleX(1); }
+  }
+  .hero-patrol { animation: hero-patrol 5s ease-in-out infinite; }
+
+  /* ── Cloud drift ── */
+  @keyframes cloud-drift {
+    0%, 100% { transform: translateX(0px); }
+    50%       { transform: translateX(14px); }
+  }
+  .cloud-1 { animation: cloud-drift 9s  ease-in-out infinite; }
+  .cloud-2 { animation: cloud-drift 13s ease-in-out infinite reverse; }
+  .cloud-3 { animation: cloud-drift 7s  ease-in-out infinite 2s; }
+
+  @keyframes apple-fall {
+    0%   { transform: translateY(0) rotate(-8deg);     opacity: 1; }
+    80%  { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(18deg); opacity: 0; }
+  }
+
+  @keyframes apple-pop {
+    0%   { transform: scale(1);   opacity: 1; }
+    50%  { transform: scale(1.5); opacity: 1; }
+    100% { transform: scale(0);   opacity: 0; }
+  }
+
+  /* Maçã sai de trás da árvore (--ox/--oy = deslocamento relativo à pos. final) */
+  @keyframes apple-emerge {
+    from {
+      transform: translate(var(--ox, 15vw), var(--oy, 12vh)) scale(0.12);
+      opacity: 0;
+    }
+    65% {
+      transform: translate(0, 0) scale(1.18);
+      opacity: 1;
+    }
+    82% {
+      transform: translate(0, 0) scale(0.92);
+      opacity: 1;
+    }
+    to {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Flutuação suave (aplicada no filho, para não conflitar com apple-emerge) */
+  @keyframes apple-float {
+    0%, 100% { transform: translateY(0px)   rotate(-3deg); }
+    50%       { transform: translateY(-11px) rotate(4deg); }
+  }
+
+  /* Halo pulsante atrás da maçã, convida ao toque */
+  @keyframes apple-glow {
+    0%, 100% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.35; }
+    50%       { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7; }
+  }
+
+  /* Pip do progresso enche com um leve pop ao coletar */
+  @keyframes pip-fill {
+    0%   { transform: scale(0.2); }
+    60%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+
+  /* ── Tree sway (subtle) ── */
+  @keyframes tree-sway {
+    0%, 100% { transform: skewX(0deg); }
+    50%       { transform: skewX(1.5deg); }
+  }
+  .tree-sway { animation: tree-sway 4s ease-in-out infinite; transform-origin: bottom center; }
+
+  /* ── Mato de primeiro plano: skewX a partir do chão ── */
+  @keyframes foliage-wind {
+    0%   { transform: skewX(0deg); }
+    18%  { transform: skewX(-1.4deg); }
+    42%  { transform: skewX(1.0deg); }
+    68%  { transform: skewX(1.6deg); }
+    84%  { transform: skewX(-0.5deg); }
+    100% { transform: skewX(0deg); }
+  }
+
+  /* ── Flora props: rotação orgânica assimétrica (cogumelos/flores) ── */
+  @keyframes tree-sway {
+    0%, 100% { transform: rotate(0deg); }
+    20%  { transform: rotate(-1.2deg); }
+    50%  { transform: rotate(0.8deg); }
+    80%  { transform: rotate(-0.6deg); }
+  }
+
+  @keyframes trunk-pulse {
+    0%, 100% { box-shadow: 0 0 18px rgba(0,220,120,0.45), 0 0 40px rgba(0,200,100,0.25); }
+    50%       { box-shadow: 0 0 32px rgba(0,240,140,0.85), 0 0 70px rgba(0,220,110,0.5); }
+  }
+
+  @keyframes trunk-particle {
+    0%   { transform: translate(0, 0) scale(1); opacity: 0; }
+    8%   { opacity: 1; }
+    85%  { opacity: 0.7; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.4); opacity: 0; }
+  }
+  @keyframes computer-glow-pulse {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(0,255,80,0.2)); }
+    50%       { filter: drop-shadow(0 0 10px rgba(0,255,80,0.55)) drop-shadow(0 0 20px rgba(0,200,60,0.2)); }
+  }
+  @keyframes neon-glow-pulse {
+    0%, 100% { box-shadow: 0 0 4px #40e0d0, 0 0 10px rgba(64,224,208,0.5); }
+    50%       { box-shadow: 0 0 10px #40e0d0, 0 0 24px rgba(64,224,208,0.9), 0 0 40px rgba(32,200,200,0.4); }
+  }
+
+  @keyframes light-pulse {
+    0%, 100% { opacity: 0.5; }
+    50%       { opacity: 1; }
+  }
+
+  @keyframes light-pulse-dark {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
+  }
+
+  @keyframes fade-in-dark {
+    0%   { opacity: 0; }
+    100% { opacity: 0.92; }
+  }
+
+  /* Ato 6 — nó da floresta: anel de ripple ao disparar */
+  @keyframes node-ripple {
+    0%   { transform: scale(1);   opacity: 0.9; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
+  /* respiração luminosa (núcleo da Consciência / brasa) */
+  @keyframes breathe-glow {
+    0%, 100% { transform: translate(-50%,-50%) scale(1);    filter: brightness(1); }
+    50%      { transform: translate(-50%,-50%) scale(1.12); filter: brightness(1.35); }
+  }
+  @keyframes pop-in {
+    0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 0; }
+    60%  { transform: translate(-50%,-50%) scale(1.15); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+  }
+
+  /* Ato 7 — explosão de florada */
+  @keyframes burst {
+    0%   { transform: translate(-50%,-50%); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--bx,0px)), calc(-50% + var(--by,0px))) scale(0.3); opacity: 0; }
+  }
+  @keyframes flash-bloom {
+    0%   { opacity: 0; }
+    25%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes sky-brighten {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  /* Ato 7 — fim sombrio: cinzas caindo */
+  @keyframes ash-fall {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    10%  { opacity: 0.7; }
+    100% { transform: translate(var(--ax,0px), 112vh); opacity: 0; }
+  }
+  /* feixes de luz vertical (corredor / final) */
+  @keyframes beam-pulse {
+    0%, 100% { opacity: 0.12; }
+    50%      { opacity: 0.34; }
+  }
+
+  @keyframes boulder-shake {
+    0%,100% { transform: translateX(0) rotate(0deg); }
+    10%  { transform: translateX(-7px) rotate(-1.8deg); }
+    22%  { transform: translateX(6px) rotate(1.4deg); }
+    34%  { transform: translateX(-8px) rotate(-2.2deg); }
+    46%  { transform: translateX(7px) rotate(1.8deg); }
+    58%  { transform: translateX(-5px) rotate(-1.4deg); }
+    70%  { transform: translateX(8px) rotate(2deg); }
+    82%  { transform: translateX(-6px) rotate(-1.6deg); }
+    92%  { transform: translateX(5px) rotate(1.2deg); }
+  }
+
+  @keyframes flora-sway {
+    0%   { transform: rotate(0deg); }
+    18%  { transform: rotate(-2.4deg); }
+    45%  { transform: rotate(1.8deg); }
+    68%  { transform: rotate(-1.0deg); }
+    85%  { transform: rotate(2.6deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  /* jacaré único: passa da direita p/ esquerda, pausa fora da cena,
+     vira e passa da esquerda p/ direita, pausa, repete (mais devagar) */
+  @keyframes croc-pass {
+    /* passagem 1: direita → esquerda */
+    0%    { transform: translateX(120vw) scaleX(1); }
+    33%   { transform: translateX(-130vw) scaleX(1); }
+    /* pausa fora da cena (esquerda) */
+    50%   { transform: translateX(-130vw) scaleX(-1); }
+    /* passagem 2: esquerda → direita */
+    83%   { transform: translateX(120vw) scaleX(-1); }
+    /* pausa fora da cena (direita) */
+    100%  { transform: translateX(120vw) scaleX(-1); }
+  }
+
+  @keyframes frog-frame {
+    0%, 49%  { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes frog-frame2 {
+    0%, 49%  { opacity: 0; }
+    50%, 100% { opacity: 1; }
+  }
+
+  @keyframes croc-bob {
+    0%, 100% { margin-bottom: 0px; }
+    50%       { margin-bottom: 8px; }
+  }
+
+  @keyframes plant-sway {
+    0%   { transform: rotate(0deg); }
+    25%  { transform: rotate(2.5deg); }
+    75%  { transform: rotate(-2.5deg); }
+    100% { transform: rotate(0deg); }
+  }
+  @keyframes plant-sway-strong {
+    0%   { transform: rotate(0deg); }
+    25%  { transform: rotate(4.5deg); }
+    75%  { transform: rotate(-4.5deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  /* ── Map node ── */
+  @keyframes map-node-pulse {
+    0%, 100% { box-shadow: 5px 5px 0 #3a2010; }
+    50%       { box-shadow: 5px 5px 0 #3a2010, 0 0 18px rgba(240,196,85,0.7); }
+  }
+  .node-pulse { animation: map-node-pulse 1.4s ease-in-out infinite; }
+
+  /* ── Side-scrolling world ── */
+  /* Portal: 10 frames horizontais de 64×64 — sheet nativo 640×64 */
+  @keyframes portal-sheet-anim { to { background-position-x: -640px; } }
+  .portal-anim {
+    width: 64px; height: 64px;
+    background-image: url('/escape-assets/world/portal-sheet.png');
+    background-repeat: no-repeat;
+    background-size: 640px 64px;
+    background-position: 0 0;
+    animation: portal-sheet-anim 0.9s steps(10) infinite;
+    image-rendering: pixelated;
+    transform: scale(1.8);
+    transform-origin: bottom center;
+  }
+  /* Campfire: grade 5 colunas × 8 linhas de 32×32 — sheet nativo 160×256 */
+  @keyframes campfire-x { to { background-position-x: -160px; } }
+  @keyframes campfire-y { to { background-position-y: -256px; } }
+  .campfire-anim {
+    width: 32px; height: 32px;
+    background-image: url('/escape-assets/world/campfire-sheet.png');
+    background-repeat: no-repeat;
+    background-size: 160px 256px;
+    background-position: 0 0;
+    animation: campfire-x 0.2s steps(5) infinite,
+               campfire-y 1.6s steps(8) infinite;
+    image-rendering: pixelated;
+    transform: scale(1.8);
+    transform-origin: bottom center;
+  }
+
+  /* ── Battle system ── */
+  @keyframes screen-shake {
+    0%, 100% { transform: translate(0, 0); }
+    20%       { transform: translate(-6px, 3px); }
+    40%       { transform: translate(6px, -3px); }
+    60%       { transform: translate(-5px, -2px); }
+    80%       { transform: translate(5px, 2px); }
+  }
+  .screen-shake { animation: screen-shake 360ms ease-in-out; }
+
+  @keyframes enemy-enter {
+    0%   { transform: translateY(-60px) scale(0.6); opacity: 0; }
+    70%  { transform: translateY(8px) scale(1.05); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+
+  @keyframes battle-idle {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-7px); }
+  }
+  .battle-idle { animation: battle-idle 2.2s ease-in-out infinite; }
+
+  @keyframes enemy-hurt {
+    0%, 100% { transform: translateX(0); }
+    25%       { transform: translateX(-10px) rotate(-3deg); }
+    50%       { transform: translateX(10px) rotate(3deg); }
+    75%       { transform: translateX(-6px); }
+  }
+  .enemy-hurt { animation: enemy-hurt 340ms ease-in-out; }
+
+  @keyframes enemy-attack {
+    0%   { transform: translateY(0) scale(1); }
+    40%  { transform: translateY(46px) scale(1.12); }
+    100% { transform: translateY(0) scale(1); }
+  }
+  .enemy-attack { animation: enemy-attack 500ms ease-in-out; }
+
+  @keyframes hero-hurt {
+    0%, 100% { transform: translateX(0); filter: none; }
+    25%, 75%  { transform: translateX(-7px); filter: brightness(2) sepia(1) hue-rotate(-40deg); }
+    50%        { transform: translateX(7px); }
+  }
+  .hero-hurt { animation: hero-hurt 340ms ease-in-out; }
+
+  @keyframes float-dmg {
+    0%   { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+    20%  { transform: translate(-50%, -16px) scale(1.15); opacity: 1; }
+    100% { transform: translate(-50%, -58px) scale(1); opacity: 0; }
+  }
+  .float-dmg { animation: float-dmg 1.1s ease-out forwards; left: 50%; }
+
+  @keyframes slash-fx {
+    0%   { transform: scale(0.3) rotate(-30deg); opacity: 0; }
+    40%  { transform: scale(1.3) rotate(20deg); opacity: 1; }
+    100% { transform: scale(1.6) rotate(40deg); opacity: 0; }
+  }
+  .slash-fx { animation: slash-fx 500ms ease-out forwards; }
+
+  @keyframes banner-pop {
+    0%   { transform: scale(0.4); opacity: 0; }
+    50%  { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .banner-pop { animation: banner-pop 360ms cubic-bezier(.2,1.4,.4,1) forwards; }
+
+  /* ── Victory confetti fall ── */
+  @keyframes fall {
+    from { transform: translateY(0) rotate(0deg); opacity: 1; }
+    to   { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* ── Input RPG style ── */
+  .input-rpg {
+    background: #f7ead5;
+    border: 3px solid #7a4f2d;
+    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.15);
+    color: #2a1400;
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    border-radius: 2px;
+    outline: none;
+  }
+  .input-rpg::placeholder { color: #a88060; }
+  .input-rpg:focus { border-color: #c88f20; box-shadow: inset 2px 2px 0 rgba(0,0,0,0.15), 0 0 0 2px rgba(200,143,32,0.4); }
+}

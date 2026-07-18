@@ -1,0 +1,4 @@
+SunnyLand pixel art assets by Ansimuz (https://ansimuz.itch.io/sunny-land-pixel-game-art)
+License: CC0 (public domain).
+Frames sliced from the SunnyLand texture atlas: player (raposa), door (portão),
+tree, bush, rock, shrooms, sign, house, frog, gem.

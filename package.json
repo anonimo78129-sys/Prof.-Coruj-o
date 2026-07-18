@@ -27,6 +27,7 @@
     "motion": "^12.38.0",
     "path-browserify": "^1.0.1",
     "pptxgenjs": "^4.0.1",
+    "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",

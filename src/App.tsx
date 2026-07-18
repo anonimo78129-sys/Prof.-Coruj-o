@@ -23,6 +23,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
+import EscapeGame from './escape/EscapeGame';
 import {
   escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
@@ -544,7 +545,7 @@ const fetchPixabayImage = async (query: string | undefined, width: number, heigh
 };
 
 // --- Types ---
-type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin' | 'gamificacao' | 'ferramentas' | 'acervo';
+type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin' | 'gamificacao' | 'ferramentas' | 'acervo' | 'escape';
 type PlannerMode = 'plan' | 'activities' | 'slides' | 'exam';
 
 interface PresentationTheme {
@@ -7749,9 +7750,10 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
-      {/* MUNDO PERDIDO — destaque: só a arte. Sem ação por enquanto. */}
+      {/* MUNDO PERDIDO — abre o jogo Escape (aventura narrativa) */}
       <button
         aria-label="Mundo Perdido — Escape Room"
+        onClick={() => setScreen('escape')}
         className="w-full relative overflow-hidden rounded-[2rem] border-4 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
         <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
@@ -13414,6 +13416,15 @@ function AppInner() {
 
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
+
+  // Link/QR de quiz compartilhado pelo professor (#jogo=...): abre direto o
+  // jogo Escape (Mundo Perdido), que decodifica o quiz do próprio hash.
+  useEffect(() => {
+    const openSharedGame = () => { if (window.location.hash.startsWith('#jogo=')) setScreen('escape'); };
+    openSharedGame();
+    window.addEventListener('hashchange', openSharedGame);
+    return () => window.removeEventListener('hashchange', openSharedGame);
+  }, []);
   const [ferramentasTool, setFerramentasTool] = useState<string | null>(null);
   const [gamiInitialTool, setGamiInitialTool] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
@@ -15228,6 +15239,10 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" />}
         </AnimatePresence>
+
+        {/* Mundo Perdido — jogo Escape em overlay de tela cheia (fora do
+            AnimatePresence: cobre a UI inteira, inclusive a navegação) */}
+        {screen === 'escape' && <EscapeGame onExitApp={() => setScreen('estudio')} />}
 
         <GlobalTaskIndicator 
           tasks={activeTasks} 

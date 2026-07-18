@@ -1,0 +1,31 @@
+Música de fundo do jogo
+
+explore.mp3
+  Título: "Mystery Vintage Recordings"
+  Artista: EchoWaveMutawe
+  Fonte: Pixabay Music (https://pixabay.com/music/)
+  ID da faixa: 559054
+  Licença: Licença de Conteúdo Pixabay — livre para uso pessoal e
+    comercial, atribuição não obrigatória (mas bem-vinda).
+    https://pixabay.com/service/license-summary/
+  Fornecida pela equipe do Projeto Amazônia (download direto do Pixabay).
+
+home-theme.mp3
+  Título: "That Game Arcade (Medium)"
+  Artista: moodmode
+  Fonte: Pixabay Music (https://pixabay.com/music/)
+  ID da faixa: 236110
+  Licença: Licença de Conteúdo Pixabay — livre para uso pessoal e
+    comercial, atribuição não obrigatória (mas bem-vinda).
+    https://pixabay.com/service/license-summary/
+  Fornecida pela equipe do Projeto Amazônia (download direto do Pixabay).
+
+battle.mp3
+  Título: "Enemy 2"
+  Artista: Retro-BGM-Chan
+  Fonte: Pixabay Music (https://pixabay.com/music/)
+  ID da faixa: 534611
+  Licença: Licença de Conteúdo Pixabay — livre para uso pessoal e
+    comercial, atribuição não obrigatória (mas bem-vinda).
+    https://pixabay.com/service/license-summary/
+  Fornecida pela equipe do Projeto Amazônia (download direto do Pixabay).

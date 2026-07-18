@@ -1,0 +1,27 @@
+Efeitos sonoros do jogo — todos CC0 (Creative Commons Zero / domínio público)
+
+Autor de todos os arquivos: Kenney Vleugels (https://kenney.nl)
+Licença: CC0 1.0 Universal — http://creativecommons.org/publicdomain/zero/1.0/
+  "You may use these assets in personal and commercial projects.
+   Credit (Kenney or www.kenney.nl) would be nice but is not mandatory."
+
+Baixados (e convertidos de .ogg para .mp3 com ffmpeg) a partir do espelho
+público CC0 abaixo, que reúne os packs oficiais da Kenney com o License.txt
+de cada pack incluso:
+  https://github.com/MissLav/CC0-Public-Domain-Sounds
+
+Arquivo          Pack de origem          Arquivo original
+---------------  ----------------------  --------------------------------
+tap.mp3          Interface Sounds        Audio/click_001.ogg
+select.mp3       Interface Sounds        Audio/select_001.ogg
+correct.mp3       Interface Sounds        Audio/confirmation_002.ogg
+wrong.mp3        Interface Sounds        Audio/error_001.ogg
+gate.mp3         RPG Audio               Audio/doorOpen_1.ogg
+walk.mp3         Impact Sounds           Audio/footstep_grass_000.ogg
+attack.mp3       Digital Audio           Audio/laser1.ogg
+hurt.mp3         Impact Sounds           Audio/impactPunch_medium_000.ogg
+victory.mp3      Music Jingles           Audio/8-Bit jingles/jingles_NES00.ogg
+
+Cada pack (RPG Audio, Interface Sounds, Impact Sounds, Digital Audio,
+Music Jingles) tem seu próprio License.txt confirmando CC0, verificado
+individualmente antes do uso aqui.
