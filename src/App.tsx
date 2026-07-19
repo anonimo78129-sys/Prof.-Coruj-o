@@ -7736,19 +7736,20 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
   const smallActivities: GameMode[] = ['sequencia', 'escape', 'story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
   // Estilo dos cards de atividade só nesta tela: os tons pasteis de modeMeta.bg
-  // (pensados pro fundo cinza-claro) somem contra o azul escuro da aba Jogos.
-  // Aqui usamos vidro fosco colorido — mesmo princípio dos painéis do Kit ao
-  // Vivo (bg branco translúcido) — com ícone/título mais claros pra contraste.
+  // (pensados pro fundo cinza-claro) somem contra o azul escuro da aba Jogos,
+  // e o vidro fosco translúcido testado antes ficou apagado demais. Aqui os
+  // cards são blocos de cor sólida e vivos, sem transparência, com ícone e
+  // texto em branco — o contraste vem do salto de cor, não da opacidade.
   const smallActivityTint: Record<GameMode, { bg: string; icon: string; title: string }> = {
-    story: { bg: 'bg-fuchsia-500/15 border-fuchsia-300/30', icon: 'text-fuchsia-300', title: 'text-fuchsia-100' },
-    quiz: { bg: 'bg-amber-500/15 border-amber-300/30', icon: 'text-amber-300', title: 'text-amber-100' },
-    wordsearch: { bg: 'bg-emerald-500/15 border-emerald-300/30', icon: 'text-emerald-300', title: 'text-emerald-100' },
-    crossword: { bg: 'bg-sky-500/15 border-sky-300/30', icon: 'text-sky-300', title: 'text-sky-100' },
-    bingo: { bg: 'bg-pink-500/15 border-pink-300/30', icon: 'text-pink-300', title: 'text-pink-100' },
-    escape: { bg: 'bg-rose-500/15 border-rose-300/30', icon: 'text-rose-300', title: 'text-rose-100' },
-    memory: { bg: 'bg-teal-500/15 border-teal-300/30', icon: 'text-teal-300', title: 'text-teal-100' },
-    sequencia: { bg: 'bg-violet-500/15 border-violet-300/30', icon: 'text-violet-300', title: 'text-violet-100' },
-    flashcard: { bg: 'bg-orange-500/15 border-orange-300/30', icon: 'text-orange-300', title: 'text-orange-100' },
+    story: { bg: 'bg-fuchsia-600', icon: 'text-white', title: 'text-white' },
+    quiz: { bg: 'bg-amber-500', icon: 'text-white', title: 'text-white' },
+    wordsearch: { bg: 'bg-emerald-600', icon: 'text-white', title: 'text-white' },
+    crossword: { bg: 'bg-sky-600', icon: 'text-white', title: 'text-white' },
+    bingo: { bg: 'bg-pink-600', icon: 'text-white', title: 'text-white' },
+    escape: { bg: 'bg-rose-600', icon: 'text-white', title: 'text-white' },
+    memory: { bg: 'bg-teal-600', icon: 'text-white', title: 'text-white' },
+    sequencia: { bg: 'bg-violet-600', icon: 'text-white', title: 'text-white' },
+    flashcard: { bg: 'bg-orange-600', icon: 'text-white', title: 'text-white' },
   };
 
   return (
@@ -7788,11 +7789,11 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
             <button
               key={m}
               onClick={() => setActiveMode(m)}
-              className={`relative rounded-3xl p-4 text-left backdrop-blur border-2 ${tint.bg} active:scale-[0.97] transition-transform`}
+              className={`relative rounded-3xl p-4 text-left shadow-lg ${tint.bg} active:scale-[0.97] transition-transform`}
             >
               <Icon size={28} className={`${tint.icon} mb-2`} />
               <h3 className={`font-bold text-sm ${tint.title}`}>{meta.title}</h3>
-              <p className="text-[11px] text-indigo-100/70 mt-0.5 leading-tight">{meta.desc}</p>
+              <p className="text-[11px] text-white/80 mt-0.5 leading-tight">{meta.desc}</p>
             </button>
           );
         })}
