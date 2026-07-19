@@ -3834,6 +3834,8 @@ const ChatScreen = ({
       7. ACERVO/BIBLIOTECA: apagar um material gerado (delete_saved_resource — DESTRUTIVO).
       8. CALENDÁRIO: adicionar evento personalizado — reunião, prazo, data comemorativa (add_custom_event); remover evento personalizado (remove_custom_event — DESTRUTIVO). Para aulas de turma, use schedule_class/schedule_lesson_series, não estas.
       9. KIT DO PROFESSOR: abrir uma ferramenta pronta pro professor preencher — Parecer, Adaptação Inclusiva, Rubrica, Nivelador de Texto, Comunicação com Famílias, Material de Vídeo, Material do PDF (open_professor_tool). Você não gera o conteúdo dessas ferramentas sozinho, só abre a tela certa.
+      10. Trocar o avatar visual da Turma Gamificada entre Coruja e Emblema (change_avatar_skin).
+      11. Marcar um evento personalizado do Calendário como concluído (mark_event_done).
 
       Como funciona cada tela (pra explicar ao professor quando perguntado):
       - TURMA GAMIFICADA > ALUNOS: cadastro dos alunos da turma; cada um ganha XP, moedas (corujinhas 🪙) e medalhas automáticas.
@@ -4117,6 +4119,27 @@ const ChatScreen = ({
                   },
                   required: ['tool']
                 }
+              },
+              {
+                name: 'change_avatar_skin',
+                description: 'Trocar o tema visual dos avatares da Turma Gamificada (aba Ajustes) entre Coruja e Emblema.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    className: { type: Type.STRING },
+                    skin: { type: Type.STRING, enum: ['coruja', 'emblema'] }
+                  },
+                  required: ['className', 'skin']
+                }
+              },
+              {
+                name: 'mark_event_done',
+                description: 'Marcar um evento personalizado do Calendário como concluído.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { title: { type: Type.STRING }, date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD, se souber — ajuda a desambiguar.' } },
+                  required: ['title']
+                }
               }
             ]
           }]
@@ -4280,6 +4303,21 @@ const ChatScreen = ({
             setFerramentasTool(args.tool);
             setScreen('ferramentas');
             responseText += `Abrindo ${toolMeta?.title ?? 'a ferramenta'} no Kit do Professor. `;
+          } else if (call.name === 'change_avatar_skin') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const skin = args.skin === 'emblema' ? 'emblema' : 'coruja';
+            updateGamiClass(targetClass.id, cls => ({ ...cls, skin }));
+            responseText += `Avatar de ${targetClass.name} trocado para ${skin === 'emblema' ? 'Emblema' : 'Coruja'}. `;
+          } else if (call.name === 'mark_event_done') {
+            const title = String(args.title || '').toLowerCase();
+            const dateFilter = args.date ? String(args.date) : null;
+            const event = customEventsRef.current.find(e => e.title.toLowerCase().includes(title) && (!dateFilter || e.date.startsWith(dateFilter)));
+            if (!event) { responseText += `Não encontrei nenhum evento com "${args.title}" no calendário. `; continue; }
+            const newList = customEventsRef.current.map(e => e.id === event.id ? { ...e, status: 'done' as const } : e);
+            customEventsRef.current = newList;
+            setCustomEvents(newList);
+            responseText += `Evento "${event.title}" marcado como concluído. `;
           } else if (call.name === 'schedule_class') {
             addClassItems([{
               id: Math.random().toString(36).slice(2, 11),
