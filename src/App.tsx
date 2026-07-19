@@ -7743,7 +7743,8 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {/* BATALHA DE REVISÃO — destaque: só a arte, clicável (atalho pra batalha do Kit) */}
+      {/* QUAQUEMAGIA (Batalha de Revisão) — mora aqui: este card é a única
+          entrada do jogo (foi removido do grid do Kit ao Vivo) */}
       <button
         onClick={() => openBattle?.()}
         aria-label="Abrir Batalha de Revisão"
@@ -11651,7 +11652,8 @@ const GamificacaoScreen = ({
     { id: 'semaforo', icon: Siren, grad: 'from-emerald-400 via-amber-400 to-red-500', label: 'Semáforo' },
     { id: 'dado', icon: Dices, grad: 'from-slate-500 to-slate-700', label: 'Dado' },
     { id: 'placar', icon: Trophy, grad: 'from-amber-500 to-orange-600', label: 'Placar' },
-    { id: 'batalha', icon: Swords, grad: 'from-rose-500 to-red-600', label: 'Batalha' },
+    // A Batalha de Revisão (QuaqueMagia) saiu do Kit ao Vivo: agora mora só
+    // no card da aba Jogos (openBattle → initialLiveTool 'batalha').
   ];
 
   if (schedules.length === 0) {
@@ -12364,7 +12366,9 @@ const GamificacaoScreen = ({
             students={currentCls.students}
             subject={selectedSchedule?.subject ?? selectedSchedule?.name ?? 'Geral'}
             level={selectedSchedule?.level ?? 'Fundamental'}
-            onClose={() => setLiveTool(null)}
+            // A batalha só abre pelo card da aba Jogos (ou link #batalha=),
+            // então fechar volta pra lá — não pro Kit ao Vivo.
+            onClose={() => { setLiveTool(null); setScreen('estudio'); }}
             onAwardTeam={(teamIdx, _names, points) => {
               const team = currentCls.teams[teamIdx];
               if (!team) return;
