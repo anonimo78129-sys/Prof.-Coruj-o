@@ -4165,8 +4165,16 @@ const ChatScreen = ({
             const points = Number(args.points) || 0;
             if (!points) { responseText += `Preciso saber quantos pontos dar. `; continue; }
             const cls = readGamiClass(targetClass.id);
+            // Se o motivo bate com um comportamento configurado, herda o
+            // rótulo e o emoji dele — mas o valor de pontos é SEMPRE o que o
+            // professor pediu (points), pra não premiar um número diferente
+            // do que a mensagem de confirmação diz.
             const matched = cls.behaviors.find(b => b.label.toLowerCase() === String(args.reason || '').toLowerCase());
-            const behavior = matched ?? { label: args.reason || (points > 0 ? 'Pontos do assistente' : 'Penalidade do assistente'), points, emoji: points > 0 ? '⭐' : '⚠️' };
+            const behavior = {
+              label: matched?.label ?? (args.reason || (points > 0 ? 'Pontos do assistente' : 'Penalidade do assistente')),
+              points,
+              emoji: matched?.emoji ?? (points > 0 ? '⭐' : '⚠️'),
+            };
             const studentIds = args.studentName
               ? cls.students.filter(s => s.name.toLowerCase().includes(String(args.studentName).toLowerCase())).map(s => s.id)
               : cls.students.map(s => s.id);
@@ -4275,7 +4283,12 @@ const ChatScreen = ({
             const date = String(args.date || '').trim();
             if (!title || !date) { responseText += `Preciso do título e da data do evento. `; continue; }
             const eventType = ['prep', 'admin', 'commemorative'].includes(args.type) ? args.type : 'admin';
-            const newEvent = { id: Date.now().toString(36) + Math.random().toString(36).substring(2), title, date, type: eventType as 'prep' | 'admin' | 'commemorative', status: 'pending' as const };
+            // Mesmo formato que a tela de Calendário grava (fmt = "YYYY-MM-DD 00:00"):
+            // as telas leem via split(' ')[0], mas manter o sufixo deixa os
+            // eventos do assistente idênticos aos criados pela UI e evita um
+            // parse de Date interpretar "YYYY-MM-DD" como UTC (dia anterior no BR).
+            const storedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date} 00:00` : date;
+            const newEvent = { id: Date.now().toString(36) + Math.random().toString(36).substring(2), title, date: storedDate, type: eventType as 'prep' | 'admin' | 'commemorative', status: 'pending' as const };
             const newList = [...customEventsRef.current, newEvent];
             customEventsRef.current = newList;
             setCustomEvents(newList);
