@@ -14922,9 +14922,10 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
   };
 
   return (
-    // Teste visual: a aba Jogos usa o azul do app (indigo-600, o mesmo da
-    // navegação) como fundo; as demais telas seguem no cinza-claro padrão.
-    <div className={`min-h-screen ${screen === 'estudio' ? 'bg-indigo-600' : 'bg-[#F8F9FE]'} font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900`}>
+    // A aba Jogos usa o azul escuro do app (indigo-800, o tom mais escuro do
+    // degradê indigo-600→800) como fundo sólido; as demais telas seguem no
+    // cinza-claro padrão.
+    <div className={`min-h-screen ${screen === 'estudio' ? 'bg-indigo-800' : 'bg-[#F8F9FE]'} font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900`}>
       <ToastContainer />
 
       <AnimatePresence>
