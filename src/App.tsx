@@ -7735,6 +7735,22 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
   const smallActivities: GameMode[] = ['sequencia', 'escape', 'story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
+  // Estilo dos cards de atividade só nesta tela: os tons pasteis de modeMeta.bg
+  // (pensados pro fundo cinza-claro) somem contra o azul escuro da aba Jogos.
+  // Aqui usamos vidro fosco colorido — mesmo princípio dos painéis do Kit ao
+  // Vivo (bg branco translúcido) — com ícone/título mais claros pra contraste.
+  const smallActivityTint: Record<GameMode, { bg: string; icon: string; title: string }> = {
+    story: { bg: 'bg-fuchsia-500/15 border-fuchsia-300/30', icon: 'text-fuchsia-300', title: 'text-fuchsia-100' },
+    quiz: { bg: 'bg-amber-500/15 border-amber-300/30', icon: 'text-amber-300', title: 'text-amber-100' },
+    wordsearch: { bg: 'bg-emerald-500/15 border-emerald-300/30', icon: 'text-emerald-300', title: 'text-emerald-100' },
+    crossword: { bg: 'bg-sky-500/15 border-sky-300/30', icon: 'text-sky-300', title: 'text-sky-100' },
+    bingo: { bg: 'bg-pink-500/15 border-pink-300/30', icon: 'text-pink-300', title: 'text-pink-100' },
+    escape: { bg: 'bg-rose-500/15 border-rose-300/30', icon: 'text-rose-300', title: 'text-rose-100' },
+    memory: { bg: 'bg-teal-500/15 border-teal-300/30', icon: 'text-teal-300', title: 'text-teal-100' },
+    sequencia: { bg: 'bg-violet-500/15 border-violet-300/30', icon: 'text-violet-300', title: 'text-violet-100' },
+    flashcard: { bg: 'bg-orange-500/15 border-orange-300/30', icon: 'text-orange-300', title: 'text-orange-100' },
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
       <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" light />
@@ -7766,16 +7782,17 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
       <div className="grid grid-cols-2 gap-3 mb-8">
         {smallActivities.map(m => {
           const meta = modeMeta[m];
+          const tint = smallActivityTint[m];
           const Icon = meta.icon;
           return (
             <button
               key={m}
               onClick={() => setActiveMode(m)}
-              className={`relative rounded-3xl p-4 text-left shadow-sm border-2 ${meta.bg} active:scale-[0.97] transition-transform`}
+              className={`relative rounded-3xl p-4 text-left backdrop-blur border-2 ${tint.bg} active:scale-[0.97] transition-transform`}
             >
-              <Icon size={28} className={`${meta.color} mb-2`} />
-              <h3 className={`font-bold text-sm ${meta.color}`}>{meta.title}</h3>
-              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{meta.desc}</p>
+              <Icon size={28} className={`${tint.icon} mb-2`} />
+              <h3 className={`font-bold text-sm ${tint.title}`}>{meta.title}</h3>
+              <p className="text-[11px] text-indigo-100/70 mt-0.5 leading-tight">{meta.desc}</p>
             </button>
           );
         })}
