@@ -3616,12 +3616,13 @@ const ChatScreen = ({
   setPlannerTopic,
   setPlannerSelectedClassId,
   setPlannerMode,
-  getScheduleBuffer
+  getScheduleBuffer,
+  user,
 }: {
-  profile: UserProfile, 
+  profile: UserProfile,
   setProfile: (p: UserProfile) => void,
-  estudioContext: string, 
-  messages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], 
+  estudioContext: string,
+  messages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[],
   setMessages: (m: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[]) => void,
   classes: ClassItem[],
   schedules: ClassSchedule[],
@@ -3636,9 +3637,37 @@ const ChatScreen = ({
   setPlannerTopic: (t: string) => void,
   setPlannerSelectedClassId: (id: string) => void,
   setPlannerMode: (m: PlannerMode) => void,
-  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[]
+  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
+  user: any,
 }) => {
   const [input, setInput] = useState('');
+  // Gamificação: assinatura própria da mesma coleção Firestore que a
+  // GamificacaoScreen usa (mesmo padrão já existente no app — DiarioScreen
+  // também tem a sua). O assistente lê/escreve turmas gamificadas pra
+  // executar pedidos do professor no chat (dar ponto, criar equipe...).
+  const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
+  // Ref sempre sincronizada com o array mais recente: uma resposta do
+  // assistente pode disparar VÁRIAS ações de gamificação em sequência (ex.:
+  // cadastrar aluno + colocar na equipe) na mesma execução síncrona, antes
+  // de o React re-renderizar — sem a ref, a segunda chamada leria o array
+  // "gamiClasses" ainda desatualizado (sem o que a primeira acabou de
+  // adicionar) e sobrescreveria a mudança dela.
+  const gamiClassesRef = useRef(gamiClasses);
+  gamiClassesRef.current = gamiClasses;
+  const readGamiClass = (classId: string) => gamiClassesRef.current.find(c => c.id === classId) ?? gamiDefaultClass(classId);
+  const updateGamiClass = (classId: string, updater: (prev: ClassGamification) => ClassGamification) => {
+    const list = gamiClassesRef.current;
+    const existing = list.find(c => c.id === classId);
+    const prev = existing ?? gamiDefaultClass(classId);
+    const next = updater(prev);
+    const newList = existing ? list.map(c => c.id === classId ? next : c) : [...list, next];
+    gamiClassesRef.current = newList;
+    setGamiClasses(newList);
+  };
+  // Ação destrutiva pendente de confirmação explícita do professor (nunca
+  // persistida — se o app fechar antes de confirmar, a ação simplesmente
+  // não acontece, que é o comportamento seguro por padrão).
+  const [pendingConfirm, setPendingConfirm] = useState<{ detail: string; run: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFile, setSelectedFile] = useState<{ file: File, url: string, base64: string } | null>(null);
@@ -3702,7 +3731,11 @@ const ChatScreen = ({
   const sendMessage = async (messageText?: string) => {
     const textToSend = messageText || input;
     if (!textToSend.trim() && !selectedFile) return;
-    
+
+    // Mandar outra mensagem abandona uma confirmação pendente sem executar
+    // nada — só o botão "Sim, continuar" executa a ação destrutiva.
+    if (pendingConfirm) setPendingConfirm(null);
+
     const currentFile = selectedFile;
     setSelectedFile(null);
 
@@ -3765,10 +3798,17 @@ const ChatScreen = ({
       - Conteúdo do Estúdio: ${estudioContext ? `${estudioContext.substring(0, 300)}...` : 'Vazio'}
 
       Suas Capacidades no App (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
-      1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca'.
+      1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca', 'gamificacao', 'ferramentas', 'acervo'.
       2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais ficam disponíveis no histórico ao concluir.
       3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
+      5. TURMA GAMIFICADA: dar/tirar pontos de um aluno ou da turma toda (award_points), cadastrar aluno (add_student_to_class), remover aluno (remove_student_from_class — DESTRUTIVO), criar equipe (create_team), colocar aluno numa equipe (assign_student_to_team), resgatar recompensa da Loja pra um aluno (redeem_reward), criar recompensa nova na Loja (add_custom_reward), encerrar a temporada (end_season — DESTRUTIVO).
+
+      Como funciona a Turma Gamificada (pra explicar ao professor quando perguntado):
+      - ALUNOS: cadastro dos alunos da turma; cada um ganha XP, moedas (corujinhas 🪙) e medalhas automáticas.
+      - EQUIPES: agrupam alunos, competem por XP semanal.
+      - LOJA: os alunos trocam as moedas ganhas por recompensas configuradas pelo professor (ex: "Primeiro da fila" por 10 corujinhas). Resgatar desconta as moedas do aluno.
+      - AJUSTES: onde o professor configura os comportamentos que valem ponto (ex: "Participou da aula" = +1 XP), as recompensas da Loja, o avatar visual da turma (Coruja ou Emblema) e o botão de Encerrar Temporada (zera XP/moedas/sequência do bimestre e salva o ranking no Hall da Fama — o XP total e o nível de cada aluno são vitalícios e não zeram).
 
       Sua Expertise Pedagógica (responda diretamente no chat, sem funções):
       - GESTÃO DE SALA: estratégias práticas para indisciplina, turmas agitadas, conflitos entre alunos, engajamento.
@@ -3785,6 +3825,7 @@ const ChatScreen = ({
       4. Quando usar uma função de geração, informe que o material ficará disponível no histórico ao concluir.
       5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo.
       6. Se o professor desabafar sobre dificuldades em sala, acolha brevemente e ofereça 2-3 estratégias práticas imediatas.
+      7. AÇÕES DESTRUTIVAS (remove_student_from_class, end_season): o app SEMPRE pede confirmação explícita ao professor antes de executar, então pode chamar a função normalmente quando o pedido for claro — a confirmação acontece automaticamente antes de qualquer dado ser apagado ou zerado. Nunca invente que já executou uma dessas ações.
 
       Histórico:
       ${sortedHistory.slice(-20).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
@@ -3908,6 +3949,83 @@ const ChatScreen = ({
                     schoolName: { type: Type.STRING }
                   }
                 }
+              },
+              {
+                name: 'award_points',
+                description: 'Dar (ou tirar, com número negativo) pontos de XP na Turma Gamificada, pra um aluno específico ou pra turma toda.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    className: { type: Type.STRING },
+                    studentName: { type: Type.STRING, description: 'Nome do aluno. Omitir para dar pontos a todos os alunos da turma.' },
+                    points: { type: Type.NUMBER, description: 'Positivo para premiar, negativo para penalizar.' },
+                    reason: { type: Type.STRING, description: 'Motivo curto (ex: "Participou da aula"). Se bater com um comportamento já configurado na turma, usa o emoji dele.' }
+                  },
+                  required: ['className', 'points', 'reason']
+                }
+              },
+              {
+                name: 'add_student_to_class',
+                description: 'Cadastrar um novo aluno na Turma Gamificada (aba Alunos).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING } },
+                  required: ['className', 'studentName']
+                }
+              },
+              {
+                name: 'remove_student_from_class',
+                description: 'DESTRUTIVO: remover um aluno da Turma Gamificada, apagando seu histórico de pontos, moedas e medalhas. Sempre pede confirmação ao professor antes de executar — nunca some sem avisar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING } },
+                  required: ['className', 'studentName']
+                }
+              },
+              {
+                name: 'create_team',
+                description: 'Criar uma equipe na Turma Gamificada (aba Equipes). Se o nome bater com uma equipe padrão (Corujas, Fênix, Dragões, Tubarões, Águias, Lobos), usa o emoji e a cor padrão dela.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, teamName: { type: Type.STRING } },
+                  required: ['className', 'teamName']
+                }
+              },
+              {
+                name: 'assign_student_to_team',
+                description: 'Colocar um aluno numa equipe já existente da Turma Gamificada.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING }, teamName: { type: Type.STRING } },
+                  required: ['className', 'studentName', 'teamName']
+                }
+              },
+              {
+                name: 'redeem_reward',
+                description: 'Resgatar uma recompensa da Loja pra um aluno, descontando o custo em moedas (corujinhas). Só funciona se o aluno tiver moedas suficientes.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING }, rewardLabel: { type: Type.STRING } },
+                  required: ['className', 'studentName', 'rewardLabel']
+                }
+              },
+              {
+                name: 'add_custom_reward',
+                description: 'Adicionar uma recompensa personalizada à Loja da Turma Gamificada (aba Ajustes).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, label: { type: Type.STRING }, cost: { type: Type.NUMBER, description: 'Custo em moedas (corujinhas).' } },
+                  required: ['className', 'label', 'cost']
+                }
+              },
+              {
+                name: 'end_season',
+                description: 'DESTRUTIVO: encerrar a temporada da Turma Gamificada (aba Ajustes). Zera XP da temporada, moedas e sequência de todos os alunos (o XP total e o nível não zeram) e salva o ranking no Hall da Fama. Sempre pede confirmação ao professor antes de executar — nunca encerra sem avisar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING } },
+                  required: ['className']
+                }
               }
             ]
           }]
@@ -3916,10 +4034,103 @@ const ChatScreen = ({
       
       if (response.functionCalls && response.functionCalls.length > 0) {
         let responseText = "";
+        // Ação destrutiva encontrada nesta rodada — fica pendente de
+        // confirmação explícita do professor em vez de executar direto.
+        // Só uma por vez: se o modelo pedir mais de uma ação destrutiva na
+        // mesma resposta (raro), só a primeira vira confirmação; o resto é
+        // ignorado silenciosamente (o professor pode pedir de novo depois).
+        let confirmToSet: { detail: string; run: () => void } | null = null;
+        const resolveGamiClass = (className: string) => schedules.find(s => s.name.toLowerCase().includes((className || '').toLowerCase()));
+
         for (const call of response.functionCalls) {
           const args = call.args as any;
-          
-          if (call.name === 'schedule_class') {
+
+          if (call.name === 'award_points') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const points = Number(args.points) || 0;
+            if (!points) { responseText += `Preciso saber quantos pontos dar. `; continue; }
+            const cls = readGamiClass(targetClass.id);
+            const matched = cls.behaviors.find(b => b.label.toLowerCase() === String(args.reason || '').toLowerCase());
+            const behavior = matched ?? { label: args.reason || (points > 0 ? 'Pontos do assistente' : 'Penalidade do assistente'), points, emoji: points > 0 ? '⭐' : '⚠️' };
+            const studentIds = args.studentName
+              ? cls.students.filter(s => s.name.toLowerCase().includes(String(args.studentName).toLowerCase())).map(s => s.id)
+              : cls.students.map(s => s.id);
+            if (studentIds.length === 0) { responseText += `Não encontrei ${args.studentName ? `o aluno "${args.studentName}"` : 'alunos'} em ${targetClass.name}. `; continue; }
+            updateGamiClass(targetClass.id, c => gamiApplyAward(c, studentIds, behavior, gamiWeekKey()));
+            responseText += `${points > 0 ? '+' : ''}${points} XP para ${args.studentName ? args.studentName : `toda a turma ${targetClass.name}`}. `;
+          } else if (call.name === 'add_student_to_class') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            if (!String(args.studentName || '').trim()) { responseText += `Preciso do nome do aluno. `; continue; }
+            updateGamiClass(targetClass.id, cls => gamiApplyAddStudent(cls, String(args.studentName).trim()));
+            responseText += `${args.studentName} cadastrado(a) na gamificação de ${targetClass.name}. `;
+          } else if (call.name === 'remove_student_from_class') {
+            const targetClass = resolveGamiClass(args.className);
+            const student = targetClass ? readGamiClass(targetClass.id).students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase())) : null;
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; }
+            else if (!confirmToSet) {
+              const classId = targetClass.id, className = targetClass.name, studentId = student.id, studentName = student.name;
+              confirmToSet = {
+                detail: `Remover ${studentName} da gamificação de ${className} apaga todo o histórico de pontos, moedas e medalhas dele(a). Não dá pra desfazer.`,
+                run: () => { updateGamiClass(classId, c => ({ ...c, students: c.students.filter(s => s.id !== studentId) })); toast.success(`${studentName} removido(a).`); },
+              };
+              responseText += `Antes de remover ${studentName}, preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'create_team') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const teamName = String(args.teamName || '').trim();
+            if (!teamName) { responseText += `Preciso do nome da equipe. `; continue; }
+            const preset = GAMI_TEAM_PRESETS.find(p => p.name.toLowerCase() === teamName.toLowerCase());
+            const team = preset ? { ...preset, id: gamiRid() } : { id: gamiRid(), name: teamName, emoji: '🏆', color: '#6366f1' };
+            updateGamiClass(targetClass.id, cls => ({ ...cls, teams: [...cls.teams, team] }));
+            responseText += `Equipe "${team.name}" criada em ${targetClass.name}. `;
+          } else if (call.name === 'assign_student_to_team') {
+            const targetClass = resolveGamiClass(args.className);
+            const cls = targetClass ? readGamiClass(targetClass.id) : null;
+            const student = cls?.students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase()));
+            const team = cls?.teams.find(t => t.name.toLowerCase().includes(String(args.teamName || '').toLowerCase()));
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; }
+            else if (!team) { responseText += `Não encontrei a equipe "${args.teamName}" em ${targetClass.name}. `; }
+            else {
+              updateGamiClass(targetClass.id, c => ({ ...c, students: c.students.map(s => s.id === student.id ? { ...s, teamId: team.id } : s) }));
+              responseText += `${student.name} agora está na equipe ${team.name}. `;
+            }
+          } else if (call.name === 'redeem_reward') {
+            const targetClass = resolveGamiClass(args.className);
+            const cls = targetClass ? readGamiClass(targetClass.id) : null;
+            const student = cls?.students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase()));
+            const reward = cls?.rewards.find(r => r.label.toLowerCase().includes(String(args.rewardLabel || '').toLowerCase()));
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; }
+            else if (!reward) { responseText += `Não encontrei a recompensa "${args.rewardLabel}" na loja de ${targetClass.name}. `; }
+            else if (student.coins < reward.cost) { responseText += `${student.name} só tem ${student.coins} corujinhas — "${reward.label}" custa ${reward.cost}. `; }
+            else {
+              updateGamiClass(targetClass.id, c => gamiApplyPurchase(c, student.id, reward).cls);
+              responseText += `"${reward.label}" resgatada para ${student.name}. `;
+            }
+          } else if (call.name === 'add_custom_reward') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const label = String(args.label || '').trim();
+            if (!label || !args.cost) { responseText += `Preciso do nome e do custo em corujinhas da recompensa. `; continue; }
+            updateGamiClass(targetClass.id, cls => ({ ...cls, rewards: [...cls.rewards, { id: gamiRid(), label, cost: Number(args.cost), emoji: '🎁' }] }));
+            responseText += `Recompensa "${label}" adicionada à loja de ${targetClass.name} por ${args.cost} corujinhas. `;
+          } else if (call.name === 'end_season') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!confirmToSet) {
+              const classId = targetClass.id, className = targetClass.name;
+              confirmToSet = {
+                detail: `Encerrar a temporada de ${className} zera o XP da temporada, as moedas e a sequência de todos os alunos (o XP total e o nível ficam preservados) e salva o ranking atual no Hall da Fama. Não dá pra desfazer.`,
+                run: () => { updateGamiClass(classId, c => gamiApplyEndSeason(c)); toast.success('Nova temporada iniciada!', <Trophy size={16} />); },
+              };
+              responseText += `Antes de encerrar a temporada de ${className}, preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'schedule_class') {
             addClassItems([{
               id: Math.random().toString(36).slice(2, 11),
               title: args.title,
@@ -3979,6 +4190,7 @@ const ChatScreen = ({
             responseText += `Perfil atualizado com sucesso. `;
           }
         }
+        if (confirmToSet) setPendingConfirm(confirmToSet);
         setMessages([...newMessages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: responseText || "Tudo certo! Realizei as ações solicitadas.", date: Date.now() }]);
       } else {
         setMessages([...newMessages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: response.text || "Em que posso ajudar?", date: Date.now() }]);
@@ -4164,6 +4376,37 @@ const ChatScreen = ({
         </AnimatePresence>
       </div>
 
+      {/* Ação destrutiva pendente: só executa com um toque explícito do
+          professor. Some sem executar se ele mandar outra mensagem ou sair
+          do chat — nada acontece por padrão. */}
+      {pendingConfirm && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-2 flex items-start gap-2 shrink-0"
+        >
+          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-amber-800 leading-relaxed">{pendingConfirm.detail}</p>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => {
+                  pendingConfirm.run();
+                  setMessages([...messages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: 'Feito.', date: Date.now() }]);
+                  setPendingConfirm(null);
+                }}
+                className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-transform"
+              >Sim, continuar</button>
+              <button
+                onClick={() => {
+                  setMessages([...messages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: 'Ok, não fiz nada.', date: Date.now() }]);
+                  setPendingConfirm(null);
+                }}
+                className="bg-white text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 active:scale-95 transition-transform"
+              >Cancelar</button>
+            </div>
+          </div>
+        </motion.div>
+      )}
       <motion.div
         animate={{ boxShadow: input.length > 0 ? '0 0 0 2px #6366f1' : '0 1px 3px 0 rgb(0 0 0 / 0.05)' }}
         transition={{ duration: 0.2 }}
@@ -8786,6 +9029,73 @@ const gamiYesterdayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// ── Lógica pura de gamificação (sem estado de componente) ──────────────────
+// Extraída da GamificacaoScreen pra ser reaproveitada também pelo assistente
+// de IA do chat: as duas telas chamam as MESMAS funções, então uma correção
+// de regra (XP, streak, missão...) vale pros dois caminhos automaticamente.
+const checkBadges = (students: GamiStudent[]): GamiStudent[] =>
+  students.map(s => {
+    const badges = [...s.badges];
+    GAMI_BADGES.forEach(b => { if (!badges.includes(b.id) && b.check(s)) badges.push(b.id); });
+    return { ...s, badges };
+  });
+
+function gamiApplyAward(cls: ClassGamification, studentIds: string[], behavior: { label: string; points: number; emoji: string }, wk: string): ClassGamification {
+  const today = gamiTodayKey();
+  const points = behavior.points;
+  const coins = points > 0 ? Math.max(1, Math.floor(points / 5)) : 0;
+  const isNewWeek = cls.weekKey !== wk;
+  const students = cls.students.map(raw => {
+    // Virada de semana: zera o XP semanal de todos antes de acumular
+    const s = isNewWeek ? { ...raw, weekXp: 0 } : raw;
+    if (!studentIds.includes(s.id)) return s;
+    const newXp = Math.max(0, s.xp + points);
+    const newTotal = s.totalXp + (points > 0 ? points : 0);
+    const newWeekXp = (s.weekXp ?? 0) + (points > 0 ? points : 0);
+    const newCoins = Math.max(0, s.coins + coins);
+    const streak = points > 0
+      ? (s.lastPointDay === today ? s.streak : s.lastPointDay === gamiYesterdayKey() ? s.streak + 1 : 1)
+      : s.streak;
+    return { ...s, xp: newXp, totalXp: newTotal, weekXp: newWeekXp, coins: newCoins, streak, lastPointDay: points > 0 ? today : s.lastPointDay };
+  });
+  const checked = checkBadges(students);
+  // Missão de semana anterior expira na virada — sem isso ela ficava "morta"
+  // no estado: parava de contar e nunca era limpa.
+  let mission = cls.mission && cls.mission.weekKey === wk ? cls.mission : null;
+  if (mission && points > 0) mission = { ...mission, progress: mission.progress + points * studentIds.length };
+  const logEntry: GamiLogEntry = { id: gamiRid(), studentIds, label: behavior.label, emoji: behavior.emoji, points, coins, kind: 'award', date: Date.now() };
+  return { ...cls, students: checked, weekKey: wk, log: [logEntry, ...cls.log].slice(0, 200), mission };
+}
+
+function gamiApplyPurchase(cls: ClassGamification, studentId: string, reward: GamiReward): { cls: ClassGamification; ok: boolean } {
+  const s = cls.students.find(x => x.id === studentId);
+  if (!s || s.coins < reward.cost) return { cls, ok: false };
+  const students = cls.students.map(x => x.id === studentId ? { ...x, coins: x.coins - reward.cost } : x);
+  const logEntry: GamiLogEntry = { id: gamiRid(), studentIds: [studentId], label: reward.label, emoji: reward.emoji, points: 0, coins: -reward.cost, kind: 'purchase', date: Date.now() };
+  return { cls: { ...cls, students, log: [logEntry, ...cls.log].slice(0, 200) }, ok: true };
+}
+
+// DESTRUTIVO: zera XP da temporada, moedas e sequência de todos os alunos
+// (totalXp — nível, medalhas — é vitalício e sobrevive). Sempre passa por
+// confirmação explícita antes de ser chamada a partir do chat.
+function gamiApplyEndSeason(cls: ClassGamification): ClassGamification {
+  const top = [...cls.students].sort((a, b) => b.totalXp - a.totalXp).slice(0, 5);
+  const entry: GamiHallEntry = { season: cls.season, date: Date.now(), top: top.map(s => ({ name: s.name, xp: s.totalXp })) };
+  return {
+    ...cls,
+    season: cls.season + 1,
+    hallOfFame: [...(cls.hallOfFame ?? []), entry],
+    students: cls.students.map(s => ({ ...s, xp: 0, weekXp: 0, coins: 0, streak: 0, lastPointDay: undefined, participatedDay: undefined })),
+    log: [],
+    mission: null,
+    weekKey: gamiWeekKey(),
+  };
+}
+
+function gamiApplyAddStudent(cls: ClassGamification, name: string): ClassGamification {
+  return { ...cls, students: [...cls.students, { id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }] };
+}
+
 // AudioContext único e reutilizado: criar um por toque estoura o limite do
 // navegador (~6 no Chrome) em premiações rápidas e silencia o som.
 let chimeCtx: AudioContext | null = null;
@@ -11683,47 +11993,12 @@ const GamificacaoScreen = ({
     }
   };
 
-  const checkBadges = (students: GamiStudent[], _cls: ClassGamification): GamiStudent[] => {
-    return students.map(s => {
-      const badges = [...s.badges];
-      GAMI_BADGES.forEach(b => {
-        if (!badges.includes(b.id) && b.check(s)) badges.push(b.id);
-      });
-      return { ...s, badges };
-    });
-  };
-
+  // checkBadges/gamiApplyAward/gamiApplyPurchase/gamiApplyEndSeason/gamiApplyAddStudent
+  // são funções puras de nível de módulo (perto de GAMI_TEAM_PRESETS) — o
+  // assistente de IA do chat chama as MESMAS funções, então uma correção de
+  // regra vale pros dois caminhos automaticamente.
   const awardPoints = (studentIds: string[], behavior: GamiBehavior) => {
-    const points = behavior.points;
-    const coins = points > 0 ? Math.max(1, Math.floor(points / 5)) : 0;
-    const today = gamiTodayKey();
-
-    updateCls(cls => {
-      const isNewWeek = cls.weekKey !== wk;
-      const students = cls.students.map(raw => {
-        // Virada de semana: zera o XP semanal de todos antes de acumular
-        const s = isNewWeek ? { ...raw, weekXp: 0 } : raw;
-        if (!studentIds.includes(s.id)) return s;
-        const newXp = Math.max(0, s.xp + points);
-        const newTotal = s.totalXp + (points > 0 ? points : 0);
-        const newWeekXp = (s.weekXp ?? 0) + (points > 0 ? points : 0);
-        const newCoins = Math.max(0, s.coins + coins);
-        const streak = points > 0
-          ? (s.lastPointDay === today ? s.streak : s.lastPointDay === gamiYesterdayKey() ? s.streak + 1 : 1)
-          : s.streak;
-        return { ...s, xp: newXp, totalXp: newTotal, weekXp: newWeekXp, coins: newCoins, streak, lastPointDay: points > 0 ? today : s.lastPointDay };
-      });
-      const checked = checkBadges(students, { ...cls, weekKey: wk, students });
-      // Missão de semana anterior expira na virada — sem isso ela ficava "morta"
-      // no estado: parava de contar e nunca era limpa.
-      let mission = cls.mission && cls.mission.weekKey === wk ? cls.mission : null;
-      if (mission && points > 0) {
-        mission = { ...mission, progress: mission.progress + points * studentIds.length };
-      }
-      const logEntry: GamiLogEntry = { id: gamiRid(), studentIds, label: behavior.label, emoji: behavior.emoji, points, coins, kind: 'award', date: Date.now() };
-      return { ...cls, students: checked, weekKey: wk, log: [logEntry, ...cls.log].slice(0, 200), mission };
-    });
-
+    updateCls(cls => gamiApplyAward(cls, studentIds, behavior, wk));
     if (currentCls?.soundOn !== false) playChime();
     setAwardingStudentId(null);
   };
@@ -11731,11 +12006,9 @@ const GamificacaoScreen = ({
   const purchaseReward = (studentId: string, reward: GamiReward) => {
     let ok = true;
     updateCls(cls => {
-      const s = cls.students.find(x => x.id === studentId);
-      if (!s || s.coins < reward.cost) { ok = false; return cls; }
-      const students = cls.students.map(x => x.id === studentId ? { ...x, coins: x.coins - reward.cost } : x);
-      const logEntry: GamiLogEntry = { id: gamiRid(), studentIds: [studentId], label: reward.label, emoji: reward.emoji, points: 0, coins: -reward.cost, kind: 'purchase', date: Date.now() };
-      return { ...cls, students, log: [logEntry, ...cls.log].slice(0, 200) };
+      const result = gamiApplyPurchase(cls, studentId, reward);
+      ok = result.ok;
+      return result.cls;
     });
     if (!ok) { toast.error('Corujinhas insuficientes!'); return; }
     toast.success(`${reward.label} resgatada!`, <EmojiIcon emoji={reward.emoji} size={16} />);
@@ -11745,7 +12018,7 @@ const GamificacaoScreen = ({
   const addStudent = () => {
     const name = newStudentName.trim();
     if (!name) return;
-    updateCls(cls => ({ ...cls, students: [...cls.students, { id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }] }));
+    updateCls(cls => gamiApplyAddStudent(cls, name));
     setNewStudentName('');
   };
 
@@ -11755,18 +12028,7 @@ const GamificacaoScreen = ({
 
   const endSeason = () => {
     if (!currentCls) return;
-    const top = [...currentCls.students].sort((a, b) => b.totalXp - a.totalXp).slice(0, 5);
-    const entry: GamiHallEntry = { season: currentCls.season, date: Date.now(), top: top.map(s => ({ name: s.name, xp: s.totalXp })) };
-    updateCls(cls => ({
-      ...cls,
-      season: cls.season + 1,
-      hallOfFame: [...(cls.hallOfFame ?? []), entry],
-      // totalXp é vitalício (nível/skins/badges) e sobrevive à virada de temporada.
-      students: cls.students.map(s => ({ ...s, xp: 0, weekXp: 0, coins: 0, streak: 0, lastPointDay: undefined, participatedDay: undefined })),
-      log: [],
-      mission: null,
-      weekKey: gamiWeekKey(),
-    }));
+    updateCls(cls => gamiApplyEndSeason(cls));
     setShowSeasonEnd(false);
     toast.success('Nova temporada iniciada!', <Trophy size={16} />);
   };
@@ -15394,6 +15656,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerSelectedClassId={setPlannerSelectedClassId}
             setPlannerMode={setPlannerMode}
             getScheduleBuffer={getScheduleBuffer}
+            user={user}
           />}
           {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} schedules={schedules} profile={profile} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} onImport={() => setImportRequest({ mode: 'calendar' })} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail"
