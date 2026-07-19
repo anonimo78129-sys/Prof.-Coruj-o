@@ -11520,7 +11520,11 @@ const GamificacaoScreen = ({
   const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(schedules[0]?.id ?? null);
   const [tab, setTab] = useState<'alunos' | 'equipes' | 'loja' | 'ajustes'>('alunos');
-  const [liveTool, setLiveTool] = useState<string | null>(null);
+  // Lido direto do estado inicial (não de um useEffect): assim, quem chega por
+  // atalho (card Batalha/QuaqueMagia da aba Jogos) já pinta a ferramenta na
+  // primeira renderização, sem o flash da aba Turma por trás antes do efeito
+  // rodar.
+  const [liveTool, setLiveTool] = useState<string | null>(() => initialLiveTool ?? null);
   const [kitExpanded, setKitExpanded] = useState(false);
   const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
   const [shopStudentId, setShopStudentId] = useState<string | null>(null);
@@ -11542,12 +11546,13 @@ const GamificacaoScreen = ({
     }
   }, [schedules, selectedClassId]);
 
-  // Abre direto uma ferramenta ao vivo (ex.: atalho "Batalha" vindo da aba Jogos).
+  // O valor inicial de liveTool já veio de initialLiveTool (acima); aqui só
+  // limpa o sinal no App, senão reabriria a ferramenta sozinha da próxima vez
+  // que esta tela montar por outro caminho (ex.: pela navegação inferior).
   useEffect(() => {
-    if (!initialLiveTool) return;
-    setLiveTool(initialLiveTool);
-    clearInitialLiveTool?.();
-  }, [initialLiveTool, clearInitialLiveTool]);
+    if (initialLiveTool) clearInitialLiveTool?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedSchedule = schedules.find(s => s.id === selectedClassId);
   const wk = gamiWeekKey();
