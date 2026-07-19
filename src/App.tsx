@@ -3606,9 +3606,12 @@ const ChatScreen = ({
   classes,
   schedules,
   savedResources,
+  setSavedResources,
   addClassItems,
   customEvents,
+  setCustomEvents,
   setScreen,
+  setFerramentasTool,
   notifications,
   setNotifications,
   generatePlan,
@@ -3627,9 +3630,12 @@ const ChatScreen = ({
   classes: ClassItem[],
   schedules: ClassSchedule[],
   savedResources: SavedResource[],
+  setSavedResources: (r: SavedResource[]) => void,
   addClassItems: (items: ClassItem[]) => void,
   customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
+  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   setScreen: (s: Screen) => void,
+  setFerramentasTool: (t: string | null) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   generatePlan: (topic?: string, classId?: string) => Promise<void>,
@@ -3664,6 +3670,27 @@ const ChatScreen = ({
     gamiClassesRef.current = newList;
     setGamiClasses(newList);
   };
+  // Diário: mesma lógica de assinatura própria + ref usada pra gamificação,
+  // pra marcar chamada (P/F/A) a pedido do professor no chat.
+  const [diarioEntries, setDiarioEntries] = useFirestoreSync<DiarioEntry>('diario', user, []);
+  const diarioEntriesRef = useRef(diarioEntries);
+  diarioEntriesRef.current = diarioEntries;
+  const updateDiarioEntry = (id: string, classId: string, date: string, updater: (prev: DiarioEntry) => DiarioEntry) => {
+    const list = diarioEntriesRef.current;
+    const existing = list.find(e => e.id === id);
+    const prev = existing ?? { id, classId, date, att: {} };
+    const next = updater(prev);
+    const newList = existing ? list.map(e => e.id === id ? next : e) : [...list, next];
+    diarioEntriesRef.current = newList;
+    setDiarioEntries(newList);
+  };
+  // customEvents e savedResources são estado do App (não desta tela) — refs
+  // locais aqui só pra manter múltiplas ações do assistente na mesma
+  // resposta consistentes entre si, mesmo padrão da gamificação/diário.
+  const customEventsRef = useRef(customEvents);
+  customEventsRef.current = customEvents;
+  const savedResourcesRef = useRef(savedResources);
+  savedResourcesRef.current = savedResources;
   // Ação destrutiva pendente de confirmação explícita do professor (nunca
   // persistida — se o app fechar antes de confirmar, a ação simplesmente
   // não acontece, que é o comportamento seguro por padrão).
@@ -3803,12 +3830,20 @@ const ChatScreen = ({
       3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
       5. TURMA GAMIFICADA: dar/tirar pontos de um aluno ou da turma toda (award_points), cadastrar aluno (add_student_to_class), remover aluno (remove_student_from_class — DESTRUTIVO), criar equipe (create_team), colocar aluno numa equipe (assign_student_to_team), resgatar recompensa da Loja pra um aluno (redeem_reward), criar recompensa nova na Loja (add_custom_reward), encerrar a temporada (end_season — DESTRUTIVO).
+      6. DIÁRIO DE BORDO: marcar chamada de um aluno — presente/falta/atraso (mark_attendance).
+      7. ACERVO/BIBLIOTECA: apagar um material gerado (delete_saved_resource — DESTRUTIVO).
+      8. CALENDÁRIO: adicionar evento personalizado — reunião, prazo, data comemorativa (add_custom_event); remover evento personalizado (remove_custom_event — DESTRUTIVO). Para aulas de turma, use schedule_class/schedule_lesson_series, não estas.
+      9. KIT DO PROFESSOR: abrir uma ferramenta pronta pro professor preencher — Parecer, Adaptação Inclusiva, Rubrica, Nivelador de Texto, Comunicação com Famílias, Material de Vídeo, Material do PDF (open_professor_tool). Você não gera o conteúdo dessas ferramentas sozinho, só abre a tela certa.
 
-      Como funciona a Turma Gamificada (pra explicar ao professor quando perguntado):
-      - ALUNOS: cadastro dos alunos da turma; cada um ganha XP, moedas (corujinhas 🪙) e medalhas automáticas.
-      - EQUIPES: agrupam alunos, competem por XP semanal.
-      - LOJA: os alunos trocam as moedas ganhas por recompensas configuradas pelo professor (ex: "Primeiro da fila" por 10 corujinhas). Resgatar desconta as moedas do aluno.
-      - AJUSTES: onde o professor configura os comportamentos que valem ponto (ex: "Participou da aula" = +1 XP), as recompensas da Loja, o avatar visual da turma (Coruja ou Emblema) e o botão de Encerrar Temporada (zera XP/moedas/sequência do bimestre e salva o ranking no Hall da Fama — o XP total e o nível de cada aluno são vitalícios e não zeram).
+      Como funciona cada tela (pra explicar ao professor quando perguntado):
+      - TURMA GAMIFICADA > ALUNOS: cadastro dos alunos da turma; cada um ganha XP, moedas (corujinhas 🪙) e medalhas automáticas.
+      - TURMA GAMIFICADA > EQUIPES: agrupam alunos, competem por XP semanal.
+      - TURMA GAMIFICADA > LOJA: os alunos trocam as moedas ganhas por recompensas configuradas pelo professor (ex: "Primeiro da fila" por 10 corujinhas). Resgatar desconta as moedas do aluno.
+      - TURMA GAMIFICADA > AJUSTES: onde o professor configura os comportamentos que valem ponto (ex: "Participou da aula" = +1 XP), as recompensas da Loja, o avatar visual da turma (Coruja ou Emblema) e o botão de Encerrar Temporada (zera XP/moedas/sequência do bimestre e salva o ranking no Hall da Fama — o XP total e o nível de cada aluno são vitalícios e não zeram).
+      - DIÁRIO DE BORDO: chamada (P/F/A) e notas por aula, por turma e data.
+      - ACERVO: histórico de tudo que foi gerado (planos, slides, atividades, provas), com busca e reimpressão.
+      - CALENDÁRIO: aulas agendadas + eventos personalizados (reuniões, prazos, datas comemorativas, feriados).
+      - KIT DO PROFESSOR: ferramentas avulsas que pedem informação do professor antes de gerar (não são preenchidas automaticamente pelo assistente).
 
       Sua Expertise Pedagógica (responda diretamente no chat, sem funções):
       - GESTÃO DE SALA: estratégias práticas para indisciplina, turmas agitadas, conflitos entre alunos, engajamento.
@@ -3825,7 +3860,7 @@ const ChatScreen = ({
       4. Quando usar uma função de geração, informe que o material ficará disponível no histórico ao concluir.
       5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo.
       6. Se o professor desabafar sobre dificuldades em sala, acolha brevemente e ofereça 2-3 estratégias práticas imediatas.
-      7. AÇÕES DESTRUTIVAS (remove_student_from_class, end_season): o app SEMPRE pede confirmação explícita ao professor antes de executar, então pode chamar a função normalmente quando o pedido for claro — a confirmação acontece automaticamente antes de qualquer dado ser apagado ou zerado. Nunca invente que já executou uma dessas ações.
+      7. AÇÕES DESTRUTIVAS (remove_student_from_class, end_season, delete_saved_resource, remove_custom_event): o app SEMPRE pede confirmação explícita ao professor antes de executar, então pode chamar a função normalmente quando o pedido for claro — a confirmação acontece automaticamente antes de qualquer dado ser apagado ou zerado. Nunca invente que já executou uma dessas ações.
 
       Histórico:
       ${sortedHistory.slice(-20).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
@@ -4026,6 +4061,62 @@ const ChatScreen = ({
                   properties: { className: { type: Type.STRING } },
                   required: ['className']
                 }
+              },
+              {
+                name: 'mark_attendance',
+                description: 'Marcar a chamada (presença/falta/atraso) de um aluno no Diário de Bordo de uma aula.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    className: { type: Type.STRING },
+                    studentName: { type: Type.STRING },
+                    status: { type: Type.STRING, enum: ['P', 'F', 'A'], description: 'P = presente, F = falta, A = atraso' },
+                    date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD. Omitir para usar hoje.' }
+                  },
+                  required: ['className', 'studentName', 'status']
+                }
+              },
+              {
+                name: 'delete_saved_resource',
+                description: 'DESTRUTIVO: apagar permanentemente um material gerado (plano, slides, atividade ou prova) do Acervo/Biblioteca. Sempre pede confirmação ao professor antes de executar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { title: { type: Type.STRING, description: 'Título (ou parte dele) do material a apagar.' } },
+                  required: ['title']
+                }
+              },
+              {
+                name: 'add_custom_event',
+                description: 'Adicionar um evento personalizado ao Calendário (reunião, prazo, lembrete administrativo etc — não é uma aula de turma, use schedule_class para isso).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD.' },
+                    type: { type: Type.STRING, enum: ['prep', 'admin', 'commemorative'], description: 'prep = preparação de aula, admin = administrativo/reunião, commemorative = data comemorativa' }
+                  },
+                  required: ['title', 'date', 'type']
+                }
+              },
+              {
+                name: 'remove_custom_event',
+                description: 'DESTRUTIVO: remover permanentemente um evento personalizado do Calendário. Sempre pede confirmação ao professor antes de executar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { title: { type: Type.STRING }, date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD, se souber — ajuda a desambiguar.' } },
+                  required: ['title']
+                }
+              },
+              {
+                name: 'open_professor_tool',
+                description: 'Abrir uma ferramenta do Kit do Professor pronta pro professor preencher e gerar (o assistente não gera sozinho — o professor completa os campos).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    tool: { type: Type.STRING, enum: ['parecer', 'inclusao', 'rubrica', 'nivelador', 'familia', 'video', 'pdf'], description: 'parecer = Parecer Descritivo, inclusao = Adaptação Inclusiva, rubrica = Rubrica de Avaliação, nivelador = Nivelador de Texto, familia = Comunicação com Famílias, video = Material de Vídeo (YouTube), pdf = Material do meu PDF' }
+                  },
+                  required: ['tool']
+                }
               }
             ]
           }]
@@ -4130,6 +4221,65 @@ const ChatScreen = ({
               };
               responseText += `Antes de encerrar a temporada de ${className}, preciso da sua confirmação — veja abaixo. `;
             }
+          } else if (call.name === 'mark_attendance') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const student = readGamiClass(targetClass.id).students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase()));
+            if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; continue; }
+            const status = ['P', 'F', 'A'].includes(args.status) ? args.status : 'P';
+            const date = String(args.date || gamiTodayKey());
+            const entryId = `${targetClass.id}_${date}`;
+            updateDiarioEntry(entryId, targetClass.id, date, entry => ({ ...entry, att: { ...entry.att, [student.id]: status } }));
+            responseText += `${student.name} marcado(a) como ${status === 'P' ? 'presente' : status === 'F' ? 'falta' : 'atraso'} em ${date}. `;
+          } else if (call.name === 'delete_saved_resource') {
+            const resource = savedResourcesRef.current.find(r => r.title.toLowerCase().includes(String(args.title || '').toLowerCase()));
+            if (!resource) { responseText += `Não encontrei nenhum material com "${args.title}" no Acervo. `; }
+            else if (!confirmToSet) {
+              const resourceId = resource.id, resourceTitle = resource.title;
+              confirmToSet = {
+                detail: `Apagar "${resourceTitle}" do Acervo é permanente — não dá pra desfazer.`,
+                run: () => {
+                  const newList = savedResourcesRef.current.filter(r => r.id !== resourceId);
+                  savedResourcesRef.current = newList;
+                  setSavedResources(newList);
+                  toast.success(`"${resourceTitle}" apagado.`);
+                },
+              };
+              responseText += `Antes de apagar "${resourceTitle}", preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'add_custom_event') {
+            const title = String(args.title || '').trim();
+            const date = String(args.date || '').trim();
+            if (!title || !date) { responseText += `Preciso do título e da data do evento. `; continue; }
+            const eventType = ['prep', 'admin', 'commemorative'].includes(args.type) ? args.type : 'admin';
+            const newEvent = { id: Date.now().toString(36) + Math.random().toString(36).substring(2), title, date, type: eventType as 'prep' | 'admin' | 'commemorative', status: 'pending' as const };
+            const newList = [...customEventsRef.current, newEvent];
+            customEventsRef.current = newList;
+            setCustomEvents(newList);
+            responseText += `Evento "${title}" adicionado ao calendário em ${date}. `;
+          } else if (call.name === 'remove_custom_event') {
+            const title = String(args.title || '').toLowerCase();
+            const dateFilter = args.date ? String(args.date) : null;
+            const event = customEventsRef.current.find(e => e.title.toLowerCase().includes(title) && (!dateFilter || e.date.startsWith(dateFilter)));
+            if (!event) { responseText += `Não encontrei nenhum evento com "${args.title}" no calendário. `; }
+            else if (!confirmToSet) {
+              const eventId = event.id, eventTitle = event.title, eventDate = event.date.split(' ')[0];
+              confirmToSet = {
+                detail: `Remover o evento "${eventTitle}" (${eventDate}) do calendário é permanente — não dá pra desfazer.`,
+                run: () => {
+                  const newList = customEventsRef.current.filter(e => e.id !== eventId);
+                  customEventsRef.current = newList;
+                  setCustomEvents(newList);
+                  toast.success(`Evento "${eventTitle}" removido.`);
+                },
+              };
+              responseText += `Antes de remover "${eventTitle}", preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'open_professor_tool') {
+            const toolMeta = FERRAMENTAS_META.find(t => t.id === args.tool);
+            setFerramentasTool(args.tool);
+            setScreen('ferramentas');
+            responseText += `Abrindo ${toolMeta?.title ?? 'a ferramenta'} no Kit do Professor. `;
           } else if (call.name === 'schedule_class') {
             addClassItems([{
               id: Math.random().toString(36).slice(2, 11),
@@ -15643,11 +15793,14 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             estudioContext={estudioContext} 
             messages={inboxMessages} 
             setMessages={setInboxMessages} 
-            classes={classes} 
-            schedules={schedules} 
-            savedResources={savedResources} 
-            addClassItems={addClassItems} 
+            classes={classes}
+            schedules={schedules}
+            savedResources={savedResources}
+            setSavedResources={setSavedResources}
+            addClassItems={addClassItems}
             customEvents={customEvents}
+            setCustomEvents={setCustomEvents}
+            setFerramentasTool={setFerramentasTool}
             notifications={allNotifications}
             setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
