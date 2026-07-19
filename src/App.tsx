@@ -720,7 +720,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
   );
 };
 
-const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, bannerPlaceholder, setScreen, rightAction }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; bannerPlaceholder?: string; setScreen?: (s: Screen) => void; rightAction?: React.ReactNode }) => {
+const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, bannerPlaceholder, setScreen, rightAction, light }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; bannerPlaceholder?: string; setScreen?: (s: Screen) => void; rightAction?: React.ReactNode; light?: boolean }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(
     'Notification' in window ? Notification.permission : 'denied'
@@ -755,8 +755,8 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
 
     <div className={`flex justify-between items-start ${typeof bannerImage === 'string' || bannerPlaceholder ? 'pt-28' : 'pt-2'}`}>
       <div className="px-2">
-        <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
-        <h1 className="text-2xl font-black text-gray-900">{title}</h1>
+        <p className={`${light ? 'text-indigo-200' : 'text-gray-600'} text-sm font-bold uppercase tracking-wider mb-1`}>{subtitle}</p>
+        <h1 className={`text-2xl font-black ${light ? 'text-white' : 'text-gray-900'}`}>{title}</h1>
       </div>
       <div className="flex gap-3 relative">
         {children}
@@ -7737,10 +7737,10 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
+      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" light />
 
       <div className="px-1 mb-6">
-        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
+        <p className="text-sm text-indigo-100 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
       {/* QUAQUEMAGIA (Batalha de Revisão) — mora aqui: este card é a única
@@ -14922,7 +14922,9 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+    // Teste visual: a aba Jogos usa o azul do app (indigo-600, o mesmo da
+    // navegação) como fundo; as demais telas seguem no cinza-claro padrão.
+    <div className={`min-h-screen ${screen === 'estudio' ? 'bg-indigo-600' : 'bg-[#F8F9FE]'} font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900`}>
       <ToastContainer />
 
       <AnimatePresence>
