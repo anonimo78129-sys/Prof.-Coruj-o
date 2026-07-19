@@ -1,8 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
 
 /* ── CSS do jogo Escape (Mundo Perdido) — extraído do app Prof ──
-   Sem @import tailwindcss (o index.css principal já importa),
-   sem estilos globais de body (o jogo roda como overlay dentro do Corujão). */
+   Sem @import tailwindcss (o index.css principal já importa), sem estilos
+   globais de body (o jogo roda como overlay dentro do Corujão) e SEM
+   @layer: este arquivo entra no bundle ANTES do CSS do Tailwind (ordem de
+   import do main.tsx), e declarar `@layer utilities` aqui primeiro
+   reordenava as camadas — o preflight (base) passava a vencer as classes
+   utilitárias e quebrava o layout do app inteiro. Regras sem camada
+   têm precedência sobre qualquer camada, então o jogo continua estilizado.
+   As fontes Press Start 2P / VT323 vêm do <link> no index.html. */
 
 @font-face { font-family: '16BitDreams';      src: url('/escape-assets/fonts/16BitDreams.ttf'); }
 @font-face { font-family: 'AccessDenied';     src: url('/escape-assets/fonts/AccessDenied.ttf'); }
@@ -18,7 +23,6 @@
 @font-face { font-family: 'Alagard';          src: url('/escape-assets/fonts/Alagard.ttf'); }
 @font-face { font-family: 'Romulus';          src: url('/escape-assets/fonts/Romulus.ttf'); }
 
-@layer utilities {
   .font-pixel { font-family: 'Press Start 2P', monospace; }
   .font-vt { font-family: 'VT323', monospace; }
 
@@ -826,4 +830,3 @@
   }
   .input-rpg::placeholder { color: #a88060; }
   .input-rpg:focus { border-color: #c88f20; box-shadow: inset 2px 2px 0 rgba(0,0,0,0.15), 0 0 0 2px rgba(200,143,32,0.4); }
-}
