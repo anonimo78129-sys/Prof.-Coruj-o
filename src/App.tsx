@@ -11292,180 +11292,260 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     setHost('A plateia votou!');
   };
 
+  // ── Palco do "programa" — fundo de estúdio com holofotes e cores vivas.
+  // É uma função (não um componente) de propósito: inlina o JSX, então os
+  // inputs do setup não remontam/perdem foco a cada tecla.
+  const HEX = 'polygon(4% 0, 96% 0, 100% 50%, 96% 100%, 4% 100%, 0 50%)';
+  const stage = (children: React.ReactNode) => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[130] flex flex-col overflow-hidden"
+      style={{ background: 'linear-gradient(180deg,#2a1a86 0%,#180d55 42%,#0a0430 78%,#05010f 100%)' }}>
+      {/* holofotes e brilhos de estúdio */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-1/4 left-1/2 -translate-x-1/2 w-[150%] h-[75%]" style={{ background: 'radial-gradient(ellipse at 50% 0,rgba(255,214,80,0.30),transparent 60%)' }} />
+        <div className="absolute -top-10 -left-10 w-44 h-44 rounded-full blur-[80px]" style={{ background: 'rgba(236,72,153,0.40)' }} />
+        <div className="absolute top-8 -right-10 w-44 h-44 rounded-full blur-[80px]" style={{ background: 'rgba(34,211,238,0.34)' }} />
+        <div className="absolute bottom-0 left-1/3 w-56 h-56 rounded-full blur-[90px]" style={{ background: 'rgba(124,58,237,0.40)' }} />
+        {/* feixes de luz diagonais */}
+        <div className="absolute -top-20 left-1/4 w-40 h-[120%] rotate-[18deg] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(255,214,80,0.35),transparent 70%)' }} />
+        <div className="absolute -top-20 right-1/4 w-40 h-[120%] -rotate-[18deg] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(34,211,238,0.30),transparent 70%)' }} />
+      </div>
+      <button onClick={onClose} className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
+      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-4 pt-5 pb-8">{children}</div>
+    </motion.div>
+  );
+
+  // Título estilo letreiro do programa
+  const showLogo = (
+    <div className="text-center mb-1">
+      <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>RUMO AO MILHÃO</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1">o show do saber</p>
+    </div>
+  );
+
+  // Corujão apresentador — avatar num holofote + balão de fala. Placeholder
+  // com ícone; troque por <img> quando tiver a arte do apresentador.
+  const presenter = (
+    <div className="flex items-end gap-2 mb-3">
+      <div className="relative shrink-0">
+        <div className="absolute inset-0 -m-1 rounded-full blur-md" style={{ background: 'radial-gradient(circle,rgba(255,214,80,0.7),transparent 70%)' }} />
+        <div className="relative w-14 h-14 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-lg">
+          <Bird size={30} className="text-amber-200" />
+        </div>
+      </div>
+      <div className="relative flex-1 bg-white/95 rounded-2xl rounded-bl-sm px-3.5 py-2.5 shadow-xl">
+        <span className="absolute -top-2 left-3 inline-flex items-center gap-1 bg-red-600 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
+        <p className="text-[13px] text-gray-800 font-semibold leading-snug min-h-[2.4em] mt-1">{host}</p>
+      </div>
+    </div>
+  );
+
   // ── SETUP / LOADING ──
-  if (phase === 'setup' || phase === 'loading') return (
-    <GamiToolShell title="Rumo ao Milhão" subtitle="Escada do conhecimento" icon={Coins} theme="amber" onClose={onClose}>
+  if (phase === 'setup' || phase === 'loading') return stage(
+    <div className="max-w-md mx-auto">
+      {showLogo}
       {phase === 'setup' && (
-        <div className="space-y-4">
-          <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur">
-            <p className="text-sm text-white/75 leading-relaxed">Cada equipe escala sua própria escada de prêmios, respondendo perguntas cada vez mais difíceis. <b className="text-amber-300">Acertou? Pode parar e garantir o prêmio, ou arriscar a próxima.</b> Errou acima de uma <b className="text-emerald-300">parada segura</b>, cai pra ela. Cada time tem 3 ajudas: <b className="text-white">Cartas (50:50)</b>, <b className="text-white">Pular</b> e <b className="text-white">Plateia</b>. Vence quem juntar o maior prêmio!</p>
+        <div className="space-y-3.5 mt-4">
+          <div className="bg-white/10 border border-white/15 rounded-2xl p-4 backdrop-blur">
+            <p className="text-sm text-white/85 leading-relaxed">Cada equipe escala a própria <b className="text-amber-300">escada do milhão</b>. Acertou? <b className="text-amber-300">Pode parar e garantir</b>, ou arriscar a próxima. Errou acima de uma <b className="text-emerald-300">parada segura</b>, cai pra ela. Cada time tem 3 ajudas: <b className="text-white">50:50</b>, <b className="text-white">Pular</b> e <b className="text-white">Plateia</b>. Vence quem juntar o maior prêmio!</p>
           </div>
-          {error && <p className="text-sm text-red-300 font-medium bg-red-500/15 border border-red-400/25 rounded-xl p-3">{error}</p>}
+          {error && <p className="text-sm text-red-200 font-medium bg-red-500/25 border border-red-400/40 rounded-xl p-3">{error}</p>}
           <div>
-            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Tema do jogo</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Frações, Brasil Colônia…" className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400/50 bg-white/[0.08] text-white placeholder-white/30" />
+            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Tema do jogo</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Frações, Brasil Colônia…" className="w-full border border-white/15 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 bg-white/10 text-white placeholder-white/40" />
           </div>
           <div>
-            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Dificuldade base</label>
-            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/10 rounded-xl px-3 py-2.5 text-sm bg-white/[0.08] text-white [&>option]:text-gray-900">
+            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Dificuldade base</label>
+            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/15 rounded-xl px-3 py-2.5 text-sm bg-white/10 text-white [&>option]:text-gray-900">
               <option value="fácil">Fácil</option>
               <option value="média">Média</option>
               <option value="difícil">Difícil</option>
             </select>
           </div>
-          <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur">
-            <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">{hasRealTeams ? 'Escolha as equipes (2 a 6)' : 'Equipes do jogo'}</p>
+          <div className="bg-white/10 rounded-2xl p-4 border border-white/15 backdrop-blur">
+            <p className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-2">{hasRealTeams ? 'Escolha as equipes (2 a 6)' : 'Equipes do jogo'}</p>
             <div className="flex flex-wrap gap-2">
               {hasRealTeams ? teams.slice(0, 8).map((t, i) => {
                 const on = pick.includes(i);
                 return (
                   <button key={t.id} onClick={() => setPick(p => on ? p.filter(x => x !== i) : (p.length >= 6 ? p : [...p, i]))}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all inline-flex items-center gap-1 ${on ? 'text-white border-white/40 shadow-lg scale-105' : 'text-white/50 border-white/10 bg-white/[0.06]'}`}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all inline-flex items-center gap-1 ${on ? 'text-white border-white/50 shadow-lg scale-105' : 'text-white/60 border-white/15 bg-white/[0.06]'}`}
                     style={on ? { backgroundColor: t.color } : undefined}>
                     <EmojiIcon emoji={t.emoji} size={12} /> {t.name}
                   </button>
                 );
-              }) : contestants.map((c, i) => (
-                <span key={i} className="text-white text-xs font-bold px-3 py-1.5 rounded-full inline-flex items-center gap-1" style={{ backgroundColor: c.color }}><EmojiIcon emoji={c.emoji} size={12} /> {c.name}</span>
+              }) : contestants.map((ct, i) => (
+                <span key={i} className="text-white text-xs font-bold px-3 py-1.5 rounded-full inline-flex items-center gap-1" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={12} /> {ct.name}</span>
               ))}
             </div>
-            {!hasRealTeams && <p className="text-[11px] text-white/35 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
+            {!hasRealTeams && <p className="text-[11px] text-white/45 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
           </div>
-          <button onClick={start} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-950/60">
-            <Coins size={20} /> Começar o jogo
+          <button onClick={start} className="w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+            <Coins size={20} /> Começar o show
           </button>
         </div>
       )}
       {phase === 'loading' && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <Loader2 size={40} className="animate-spin text-amber-400" />
-          <p className="text-sm font-bold text-white/60">Montando a escada de perguntas…</p>
+        <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <Loader2 size={40} className="animate-spin text-amber-300" />
+          <p className="text-sm font-bold text-white/70">No ar em instantes… montando as perguntas.</p>
         </div>
       )}
-    </GamiToolShell>
+    </div>
   );
 
-  // ── END — ranking ──
+  // ── END — grande final ──
   if (phase === 'end') {
-    const ranking = contestants.map((c, i) => ({ c, prize: results[i] ?? 0 })).sort((a, b) => b.prize - a.prize);
-    return (
-      <GamiToolShell title="Rumo ao Milhão" subtitle="Resultado final" icon={Trophy} theme="amber" onClose={onClose}>
+    const ranking = contestants.map((ct, i) => ({ ct, prize: results[i] ?? 0 })).sort((a, b) => b.prize - a.prize);
+    const champ = ranking[0];
+    return stage(
+      <div className="max-w-md mx-auto">
         <ConfettiBurst />
-        <div className="space-y-3">
+        {showLogo}
+        {champ && champ.prize > 0 && (
+          <div className="text-center mt-4 mb-5">
+            <div className="relative inline-flex flex-col items-center">
+              <Crown size={30} className="text-amber-300 mb-1" style={{ filter: 'drop-shadow(0 0 10px rgba(255,210,77,0.8))' }} />
+              <div className="w-20 h-20 rounded-full border-4 border-amber-300 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-[0_0_40px_-4px_rgba(255,210,77,0.8)]">
+                <EmojiIcon emoji={champ.ct.emoji} size={40} />
+              </div>
+            </div>
+            <p className="font-black text-white text-lg mt-3">{champ.ct.name} é campeão!</p>
+            <p className="font-black text-3xl mt-1" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.6)' }}>{fmtPrize(champ.prize)}</p>
+          </div>
+        )}
+        <div className="space-y-2">
           {ranking.map((r, pos) => (
-            <div key={r.c.name + pos} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border-2 ${pos === 0 ? 'bg-amber-400/20 border-amber-400/60' : 'bg-white/[0.06] border-white/10'}`}>
-              <span className="font-black text-lg w-6 text-center text-white/80">{pos === 0 ? <Crown size={20} className="text-amber-300 inline" /> : `${pos + 1}º`}</span>
-              <EmojiIcon emoji={r.c.emoji} size={22} />
-              <span className="flex-1 font-black text-white">{r.c.name}</span>
-              <span className="font-black text-amber-300 tabular-nums">{fmtPrize(r.prize)}</span>
+            <div key={r.ct.name + pos} className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border-2 ${pos === 0 ? 'bg-amber-400/20 border-amber-400/70' : 'bg-white/[0.07] border-white/12'}`}>
+              <span className="font-black text-sm w-6 text-center text-white/80">{pos === 0 ? <Crown size={18} className="text-amber-300 inline" /> : `${pos + 1}º`}</span>
+              <EmojiIcon emoji={r.ct.emoji} size={20} />
+              <span className="flex-1 font-black text-white text-sm">{r.ct.name}</span>
+              <span className="font-black text-amber-300 tabular-nums text-sm">{fmtPrize(r.prize)}</span>
             </div>
           ))}
-          {winnerIdx >= 0 && contestants[winnerIdx]?.teamIdx >= 0 && !awarded && (
-            <button onClick={awardWinner} className="w-full mt-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
-              <Zap size={16} /> Dar +3 XP ao time campeão
-            </button>
-          )}
-          {awarded && <p className="text-emerald-300 text-sm font-bold text-center mt-2 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
-          <div className="flex gap-3 mt-2">
-            <button onClick={() => { setPhase('setup'); setResults([]); }} className="flex-1 bg-white/[0.08] border border-white/15 text-white font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-1.5"><RotateCcw size={15} /> Jogar de novo</button>
-            <button onClick={onClose} className="flex-1 bg-white/[0.08] border border-white/15 text-white/70 font-bold py-3 rounded-2xl text-sm">Sair</button>
-          </div>
         </div>
-      </GamiToolShell>
+        {winnerIdx >= 0 && contestants[winnerIdx]?.teamIdx >= 0 && !awarded && (
+          <button onClick={awardWinner} className="w-full mt-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+            <Zap size={16} /> Dar +3 XP ao time campeão
+          </button>
+        )}
+        {awarded && <p className="text-emerald-300 text-sm font-bold text-center mt-3 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
+        <div className="flex gap-3 mt-3">
+          <button onClick={() => { setPhase('setup'); setResults([]); }} className="flex-1 text-amber-950 font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}><RotateCcw size={15} /> Jogar de novo</button>
+          <button onClick={onClose} className="flex-1 bg-white/10 border border-white/20 text-white/80 font-bold py-3 rounded-2xl text-sm">Sair</button>
+        </div>
+      </div>
     );
   }
 
-  // ── PLAY ──
+  // ── PLAY — palco do show ──
   const c = contestants[teamIdx];
   const reveal = step === 'revealed' || step === 'decision' || step === 'runEnd';
-  return (
-    <GamiToolShell title="Rumo ao Milhão" subtitle={`${c?.name ?? ''}`} icon={Coins} theme="amber" onClose={onClose}>
-      <div className="space-y-3">
-        {/* Escada de prêmios (do topo para baixo) */}
-        <div className="bg-white/[0.05] border border-white/10 rounded-2xl p-2 backdrop-blur">
-          <div className="flex flex-col-reverse gap-0.5">
-            {MILHAO_LADDER.map((rung, i) => {
-              const isCur = i === levelIdx;
+  return stage(
+    <div className="max-w-md mx-auto">
+      {/* time no ar */}
+      <div className="flex items-center justify-center gap-2 mb-2">
+        <span className="inline-flex items-center gap-1.5 text-white font-black text-sm px-3 py-1 rounded-full shadow-lg" style={{ backgroundColor: c?.color ?? '#6366f1' }}>
+          <EmojiIcon emoji={c?.emoji ?? '🦉'} size={14} /> {c?.name ?? ''}
+        </span>
+      </div>
+
+      {presenter}
+
+      <div className="flex gap-3">
+        {/* prêmio atual */}
+        <div className="flex-1 bg-white/10 border border-amber-300/30 rounded-2xl px-4 py-3 backdrop-blur flex flex-col justify-center">
+          <p className="text-[10px] font-bold text-cyan-200/70 uppercase tracking-widest">Pergunta {levelIdx + 1} de {MILHAO_LADDER.length} · valendo</p>
+          <p className="font-black text-2xl leading-none mt-1" style={{ color: '#ffd24d', textShadow: '0 0 14px rgba(255,210,77,0.5)' }}>{fmtPrize(MILHAO_LADDER[levelIdx].prize)}</p>
+        </div>
+        {/* escada compacta */}
+        <div className="w-16 shrink-0 bg-black/25 border border-white/10 rounded-2xl p-1.5 flex flex-col-reverse gap-0.5">
+          {MILHAO_LADDER.map((rung, i) => {
+            const isCur = i === levelIdx;
+            return (
+              <div key={i} className={`flex items-center justify-center gap-0.5 rounded-md text-[9px] font-black py-0.5 transition-all ${isCur ? 'bg-amber-300 text-amber-950 scale-110 shadow-[0_0_12px_rgba(255,210,77,0.8)]' : i < levelIdx ? 'text-emerald-300' : 'text-white/35'}`}>
+                {rung.safe && <Star size={8} className={isCur ? 'text-amber-900' : 'text-emerald-300'} />}{i + 1}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {q && (
+        <>
+          {/* enunciado */}
+          <div className="mt-3 rounded-2xl px-4 py-4 border border-cyan-300/25" style={{ background: 'linear-gradient(180deg,rgba(12,20,60,0.85),rgba(8,12,40,0.85))', boxShadow: '0 0 24px -8px rgba(34,211,238,0.4)' }}>
+            <p className="text-[15px] text-white font-semibold leading-snug text-center">{q.q}</p>
+          </div>
+
+          {/* alternativas — formato hexagonal de programa */}
+          <div className="grid grid-cols-1 gap-2.5 mt-3">
+            {q.options.map((opt, i) => {
+              const isHidden = hidden.includes(i);
+              const isSel = selected === i;
+              const isCorrect = reveal && i === q.correct;
+              const isWrongSel = reveal && isSel && i !== q.correct;
+              const border = isCorrect ? 'linear-gradient(90deg,#34d399,#059669)' : isWrongSel ? 'linear-gradient(90deg,#f87171,#dc2626)' : isSel ? 'linear-gradient(90deg,#fff0a8,#f59e0b)' : 'linear-gradient(90deg,#fcd34d,#b45309)';
+              const fill = isCorrect ? 'rgba(6,78,59,0.95)' : isWrongSel ? 'rgba(80,10,10,0.95)' : isSel ? 'rgba(90,60,5,0.95)' : 'rgba(10,20,55,0.95)';
               return (
-                <div key={i} className={`flex items-center justify-between px-3 py-1 rounded-lg text-xs font-bold ${isCur ? 'bg-amber-400 text-amber-950' : i < levelIdx ? 'text-emerald-300' : 'text-white/40'}`}>
-                  <span className="inline-flex items-center gap-1">{rung.safe && <Star size={11} className={isCur ? 'text-amber-900' : 'text-emerald-300'} />}{i + 1}</span>
-                  <span className="tabular-nums">{fmtPrize(rung.prize)}</span>
-                </div>
+                <button key={i} disabled={isHidden || step !== 'answering'} onClick={() => setSelected(i)}
+                  className={`relative block w-full active:scale-[0.99] transition-transform ${isHidden ? 'opacity-15 pointer-events-none' : ''}`}>
+                  <div style={{ clipPath: HEX, background: border }} className="p-[2px]">
+                    <div style={{ clipPath: HEX, background: fill }} className="flex items-center gap-3 pl-3 pr-5 py-3">
+                      <span className="font-black text-lg shrink-0 w-6 text-center" style={{ color: isCorrect ? '#6ee7b7' : isWrongSel ? '#fca5a5' : '#fcd34d' }}>{['A', 'B', 'C', 'D'][i]}</span>
+                      <span className="flex-1 text-sm text-white font-semibold text-left leading-tight">{isHidden ? '' : opt}</span>
+                      {audience && !isHidden && (
+                        <span className="flex items-center gap-1 shrink-0">
+                          <span className="w-12 h-2 bg-white/15 rounded-full overflow-hidden"><span className="block h-full bg-cyan-300" style={{ width: `${audience[i]}%` }} /></span>
+                          <span className="text-[10px] font-bold text-cyan-100/80 tabular-nums w-7 text-right">{audience[i]}%</span>
+                        </span>
+                      )}
+                      {isCorrect && <Check size={16} className="text-emerald-300 shrink-0" strokeWidth={3} />}
+                      {isWrongSel && <X size={16} className="text-red-300 shrink-0" strokeWidth={3} />}
+                    </div>
+                  </div>
+                </button>
               );
             })}
           </div>
-        </div>
 
-        {/* Corujão apresentador */}
-        <div className="bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-3 flex items-start gap-2 backdrop-blur">
-          <Bird size={18} className="text-amber-300 shrink-0 mt-0.5" />
-          <p className="text-sm text-white/90 leading-snug min-h-[2.2em]">{host}</p>
-        </div>
-
-        {q && (
-          <>
-            <div className="bg-white/[0.08] border border-white/10 rounded-2xl px-4 py-4">
-              <p className="text-[11px] font-bold text-amber-300/80 uppercase tracking-wider mb-1">Valendo {fmtPrize(MILHAO_LADDER[levelIdx].prize)}</p>
-              <p className="text-base text-white font-medium leading-snug">{q.q}</p>
+          {/* ajudas — moedas do apresentador */}
+          {step === 'answering' && (
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {([{ on: lifelines.cartas, fn: useCartas, Icon: Scissors, label: '50:50' },
+                 { on: lifelines.pular, fn: usePular, Icon: SkipForward, label: 'Pular' },
+                 { on: lifelines.plateia, fn: usePlateia, Icon: Users, label: 'Plateia' }] as const).map((a, i) => (
+                <button key={i} onClick={a.fn} disabled={!a.on}
+                  className={`flex flex-col items-center gap-0.5 py-2.5 rounded-2xl border text-[11px] font-black transition-all ${a.on ? 'bg-white/10 border-amber-300/40 text-amber-100 active:scale-95' : 'bg-white/[0.03] border-white/8 text-white/25 line-through'}`}>
+                  <a.Icon size={16} /> {a.label}
+                </button>
+              ))}
             </div>
-            <div className="grid grid-cols-1 gap-2">
-              {q.options.map((opt, i) => {
-                const isHidden = hidden.includes(i);
-                const isSel = selected === i;
-                const isCorrect = reveal && i === q.correct;
-                const isWrongSel = reveal && isSel && i !== q.correct;
-                return (
-                  <button key={i} disabled={isHidden || step !== 'answering'}
-                    onClick={() => setSelected(i)}
-                    className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left border-2 transition-all ${isHidden ? 'opacity-20 pointer-events-none' : ''} ${isCorrect ? 'bg-emerald-500/25 border-emerald-400' : isWrongSel ? 'bg-red-500/25 border-red-400' : isSel ? 'bg-amber-400/20 border-amber-400' : 'bg-white/[0.06] border-white/10'}`}>
-                    <span className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center font-black text-sm ${isCorrect ? 'bg-emerald-400 text-emerald-950' : isWrongSel ? 'bg-red-400 text-red-950' : 'bg-white/10 text-white/70'}`}>{['A', 'B', 'C', 'D'][i]}</span>
-                    <span className="flex-1 text-sm text-white font-medium">{isHidden ? '' : opt}</span>
-                    {audience && !isHidden && (
-                      <span className="flex items-center gap-1 shrink-0">
-                        <span className="w-14 h-2 bg-white/10 rounded-full overflow-hidden"><span className="block h-full bg-amber-300" style={{ width: `${audience[i]}%` }} /></span>
-                        <span className="text-[10px] font-bold text-white/60 tabular-nums w-8 text-right">{audience[i]}%</span>
-                      </span>
-                    )}
-                    {isCorrect && <Check size={16} className="text-emerald-300 shrink-0" strokeWidth={3} />}
-                    {isWrongSel && <X size={16} className="text-red-300 shrink-0" strokeWidth={3} />}
-                  </button>
-                );
-              })}
+          )}
+
+          {/* ações */}
+          {step === 'answering' && (
+            <button onClick={confirmAnswer} disabled={selected === null} className="w-full mt-3 text-amber-950 font-black py-3.5 rounded-2xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_0_30px_-6px_rgba(255,210,77,0.8)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+              Resposta final
+            </button>
+          )}
+          {step === 'revealed' && (
+            <button onClick={afterReveal} className="w-full mt-3 bg-white/12 border border-white/25 text-white font-bold py-3 rounded-2xl">Continuar</button>
+          )}
+          {step === 'decision' && (
+            <div className="flex gap-2 mt-3">
+              <button onClick={stopHere} className="flex-1 bg-gradient-to-br from-emerald-500 to-green-600 text-white font-black py-3 rounded-2xl text-sm shadow-lg">Parar<br /><span className="text-[11px] font-normal opacity-85">garante {fmtPrize(MILHAO_LADDER[levelIdx].prize)}</span></button>
+              <button onClick={continueClimb} className="flex-1 text-amber-950 font-black py-3 rounded-2xl text-sm shadow-lg" style={{ background: 'linear-gradient(135deg,#ffdf6b,#f59e0b)' }}>Arriscar<br /><span className="text-[11px] font-normal opacity-80">vale {fmtPrize(MILHAO_LADDER[levelIdx + 1].prize)}</span></button>
             </div>
-
-            {/* Ajudas */}
-            {step === 'answering' && (
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={useCartas} disabled={!lifelines.cartas} className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[11px] font-bold transition-all ${lifelines.cartas ? 'bg-white/[0.08] border-white/15 text-white' : 'bg-white/[0.03] border-white/5 text-white/25 line-through'}`}><Scissors size={15} /> 50:50</button>
-                <button onClick={usePular} disabled={!lifelines.pular} className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[11px] font-bold transition-all ${lifelines.pular ? 'bg-white/[0.08] border-white/15 text-white' : 'bg-white/[0.03] border-white/5 text-white/25 line-through'}`}><SkipForward size={15} /> Pular</button>
-                <button onClick={usePlateia} disabled={!lifelines.plateia} className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[11px] font-bold transition-all ${lifelines.plateia ? 'bg-white/[0.08] border-white/15 text-white' : 'bg-white/[0.03] border-white/5 text-white/25 line-through'}`}><Users size={15} /> Plateia</button>
-              </div>
-            )}
-
-            {/* Ações por passo */}
-            {step === 'answering' && (
-              <button onClick={confirmAnswer} disabled={selected === null} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-3.5 rounded-2xl text-base disabled:opacity-40 shadow-lg shadow-amber-950/50">
-                Resposta final
-              </button>
-            )}
-            {step === 'revealed' && (
-              <button onClick={afterReveal} className="w-full bg-white/[0.1] border border-white/20 text-white font-bold py-3 rounded-2xl">Continuar</button>
-            )}
-            {step === 'decision' && (
-              <div className="flex gap-2">
-                <button onClick={stopHere} className="flex-1 bg-emerald-600 text-white font-bold py-3 rounded-2xl text-sm">Parar<br /><span className="text-[11px] font-normal opacity-80">garante {fmtPrize(MILHAO_LADDER[levelIdx].prize)}</span></button>
-                <button onClick={continueClimb} className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold py-3 rounded-2xl text-sm">Arriscar<br /><span className="text-[11px] font-normal opacity-80">vale {fmtPrize(MILHAO_LADDER[levelIdx + 1].prize)}</span></button>
-              </div>
-            )}
-            {step === 'runEnd' && (
-              <button onClick={nextTeam} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-3.5 rounded-2xl">
-                {teamIdx + 1 < contestants.length ? `Vez de ${contestants[teamIdx + 1].name}` : 'Ver ranking final'}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    </GamiToolShell>
+          )}
+          {step === 'runEnd' && (
+            <button onClick={nextTeam} className="w-full mt-3 text-amber-950 font-black py-3.5 rounded-2xl shadow-[0_0_30px_-6px_rgba(255,210,77,0.8)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+              {teamIdx + 1 < contestants.length ? `Vez de ${contestants[teamIdx + 1].name}` : 'Ver grande final'}
+            </button>
+          )}
+        </>
+      )}
+    </div>
   );
 };
 
