@@ -17,6 +17,7 @@ import {
   Egg, Feather, Bird, Medal, Gem, Sprout, Flame, Rocket, Dumbbell, VolumeX, BookX, AlertTriangle, Footprints,
   Armchair, Music2, Fish, HeartCrack, PawPrint, Percent, Smartphone, TestTube, Landmark, Check,
   Lightbulb, Sparkle, Compass, FlaskConical, Pickaxe, Goal, Gamepad2, Skull, Palette, MessagesSquare, Circle, Heart,
+  Scissors, SkipForward, HelpCircle,
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -7990,6 +7991,7 @@ const EstudioScreen = ({
   studioReopenTaskId,
   setStudioReopenTaskId,
   openBattle,
+  openMilhao,
 }: {
   profile: UserProfile,
   setScreen: (s: Screen) => void,
@@ -8003,6 +8005,7 @@ const EstudioScreen = ({
   studioReopenTaskId: string | null,
   setStudioReopenTaskId: (id: string | null) => void,
   openBattle?: () => void,
+  openMilhao?: () => void,
 }) => {
   const [activeMode, setActiveMode] = useState<GameMode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -8324,6 +8327,23 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
         <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
+      </button>
+
+      {/* RUMO AO MILHÃO — quiz de escada de prêmios (turma vs turma).
+          Placeholder dourado até a arte ficar pronta: troque este bloco por
+          uma <img src="/assets/battle/rumo-ao-milhao.jpg" .../> quando tiver a
+          ilustração, igual aos cards acima. */}
+      <button
+        aria-label="Rumo ao Milhão"
+        onClick={() => openMilhao?.()}
+        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform aspect-[1100/532] bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-700"
+      >
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+          <Coins size={40} className="text-white drop-shadow mb-1" />
+          <p className="font-black text-white text-2xl leading-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.4)]">RUMO AO MILHÃO</p>
+          <p className="text-amber-950/80 text-xs font-bold mt-1">Quem chega mais alto na escada do saber?</p>
+          <span className="mt-2 text-[9px] font-bold uppercase tracking-widest text-amber-950/50 bg-white/30 rounded-full px-2 py-0.5">arte em breve</span>
+        </div>
       </button>
 
       {/* Atividades menores */}
@@ -11082,6 +11102,373 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   );
 };
 
+// ─── Rumo ao Milhão — quiz de escada de prêmios (turma vs turma) ──────────────
+type MilhaoQ = { q: string; options: string[]; correct: number };
+// 9 degraus; "safe" = parada segura (errar acima dela não zera: cai pra ela).
+const MILHAO_LADDER: { prize: number; safe?: boolean }[] = [
+  { prize: 1000 }, { prize: 2000 }, { prize: 5000, safe: true },
+  { prize: 10000 }, { prize: 25000 }, { prize: 50000, safe: true },
+  { prize: 100000 }, { prize: 500000 }, { prize: 1000000 },
+];
+const fmtPrize = (v: number) => v >= 1000000
+  ? `R$ ${(v / 1000000).toLocaleString('pt-BR')} ${v === 1000000 ? 'milhão' : 'milhões'}`
+  : `R$ ${v.toLocaleString('pt-BR')}`;
+
+const GamiMilhao = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
+  teams: GamiTeam[];
+  students: GamiStudent[];
+  subject: string;
+  level: string;
+  onClose: () => void;
+  onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
+  isAdmin?: boolean;
+}) => {
+  const hasRealTeams = teams.length >= 2;
+  const [pick, setPick] = useState<number[]>(hasRealTeams ? [0, 1] : []);
+  // Cada "contestant" é uma equipe que vai escalar a própria escada.
+  const contestants = useMemo(() => hasRealTeams
+    ? pick.map(i => ({ teamIdx: i, name: teams[i]?.name ?? '?', emoji: teams[i]?.emoji ?? '🦉', color: teams[i]?.color ?? '#6366f1' }))
+    : [{ teamIdx: -1, name: 'Time Azul', emoji: '🔵', color: '#3b82f6' }, { teamIdx: -1, name: 'Time Vermelho', emoji: '🔴', color: '#ef4444' }],
+  [hasRealTeams, pick, teams]);
+
+  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
+  const [topic, setTopic] = useState('');
+  const [difficulty, setDifficulty] = useState('média');
+  const [error, setError] = useState('');
+
+  const poolRef = useRef<MilhaoQ[]>([]);
+  const usedRef = useRef<Set<number>>(new Set());
+
+  // Estado da rodada do time atual
+  const [teamIdx, setTeamIdx] = useState(0);          // índice em `contestants`
+  const [levelIdx, setLevelIdx] = useState(0);        // degrau atual (0..8)
+  const [q, setQ] = useState<MilhaoQ | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [step, setStep] = useState<'answering' | 'revealed' | 'decision' | 'runEnd'>('answering');
+  const [hidden, setHidden] = useState<number[]>([]);      // 50:50
+  const [audience, setAudience] = useState<number[] | null>(null); // plateia
+  const [lifelines, setLifelines] = useState({ cartas: true, pular: true, plateia: true });
+  const [results, setResults] = useState<number[]>([]);   // prêmio guardado por contestant
+  const [host, setHost] = useState('');
+  const [awarded, setAwarded] = useState(false);
+
+  const fetchPool = async (): Promise<MilhaoQ[]> => {
+    const prompt = `Gere 18 perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade base ${difficulty}.
+ORDENE da MAIS FÁCIL para a MAIS DIFÍCIL: as primeiras bem simples, as últimas desafiadoras.
+Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(raw);
+    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
+    if (valid.length < 4) throw new Error('poucas perguntas');
+    return valid;
+  };
+
+  // Sorteia uma pergunta do "andar" de dificuldade certo (fácil/média/difícil),
+  // preferindo as ainda não usadas para dois times pegarem perguntas diferentes.
+  const drawQuestion = (lvl: number): MilhaoQ => {
+    const pool = poolRef.current;
+    const third = Math.max(1, Math.floor(pool.length / 3));
+    const tier = lvl < 3 ? 0 : lvl < 6 ? 1 : 2;
+    const start = tier * third, endEx = tier === 2 ? pool.length : start + third;
+    let candidates: number[] = [];
+    for (let i = start; i < endEx; i++) if (!usedRef.current.has(i)) candidates.push(i);
+    if (candidates.length === 0) for (let i = start; i < endEx; i++) candidates.push(i);
+    if (candidates.length === 0) candidates = pool.map((_, i) => i);
+    const idx = candidates[Math.floor(Math.random() * candidates.length)];
+    usedRef.current.add(idx);
+    return pool[idx];
+  };
+
+  const lastSafePrize = (lvl: number) => {
+    let banked = 0;
+    for (let i = 0; i < lvl; i++) if (MILHAO_LADDER[i].safe) banked = MILHAO_LADDER[i].prize;
+    return banked;
+  };
+
+  const startRunForTeam = (ti: number) => {
+    setTeamIdx(ti); setLevelIdx(0);
+    setLifelines({ cartas: true, pular: true, plateia: true });
+    setHidden([]); setAudience(null); setSelected(null); setStep('answering');
+    setQ(drawQuestion(0));
+    setHost(`${contestants[ti].name}, valendo ${fmtPrize(MILHAO_LADDER[0].prize)}! Boa sorte.`);
+  };
+
+  const start = async () => {
+    if (!topic.trim()) { setError('Informe o tema do jogo.'); return; }
+    if (hasRealTeams && pick.length < 2) { setError('Escolha pelo menos 2 equipes.'); return; }
+    setError(''); setPhase('loading');
+    try {
+      poolRef.current = await fetchPool();
+      usedRef.current = new Set();
+      setResults(contestants.map(() => 0));
+      setAwarded(false);
+      setPhase('play');
+      startRunForTeam(0);
+    } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
+  };
+
+  const confirmAnswer = () => {
+    if (selected === null || step !== 'answering' || !q) return;
+    setStep('revealed');
+    if (selected === q.correct) setHost(`Resposta certa! ${contestants[teamIdx].name} chega em ${fmtPrize(MILHAO_LADDER[levelIdx].prize)}.`);
+    else setHost(`Que pena! A resposta era "${q.options[q.correct]}".`);
+  };
+
+  const bankAndEndRun = (prize: number, won = false) => {
+    setResults(prev => prev.map((p, i) => i === teamIdx ? prize : p));
+    setStep('runEnd');
+    setHost(won ? `INCRÍVEL! ${contestants[teamIdx].name} chegou ao MILHÃO!`
+      : prize > 0 ? `${contestants[teamIdx].name} garante ${fmtPrize(prize)}.`
+      : `${contestants[teamIdx].name} não levou prêmio desta vez.`);
+  };
+
+  const afterReveal = () => {
+    if (!q) return;
+    if (selected !== q.correct) { bankAndEndRun(lastSafePrize(levelIdx)); return; }
+    if (levelIdx >= MILHAO_LADDER.length - 1) { bankAndEndRun(MILHAO_LADDER[levelIdx].prize, true); return; }
+    setStep('decision');
+    setHost(`Você tem ${fmtPrize(MILHAO_LADDER[levelIdx].prize)} garantidos. Parar ou arriscar a próxima?`);
+  };
+
+  const continueClimb = () => {
+    const next = levelIdx + 1;
+    setLevelIdx(next); setSelected(null); setHidden([]); setAudience(null); setStep('answering');
+    setQ(drawQuestion(next));
+    setHost(`Valendo ${fmtPrize(MILHAO_LADDER[next].prize)}!`);
+  };
+
+  const stopHere = () => bankAndEndRun(MILHAO_LADDER[levelIdx].prize);
+
+  const winnerIdx = useMemo(() => {
+    if (!results.length) return -1;
+    let best = 0;
+    results.forEach((p, i) => { if (p > results[best]) best = i; });
+    return results[best] > 0 ? best : -1;
+  }, [results]);
+
+  const awardWinner = () => {
+    if (awarded || winnerIdx < 0) return;
+    const c = contestants[winnerIdx];
+    if (c && c.teamIdx >= 0) {
+      const ids = students.filter(s => s.teamId === teams[c.teamIdx]?.id).map(s => s.id);
+      if (ids.length) onAwardTeam(c.teamIdx, ids, 3);
+    }
+    setAwarded(true);
+  };
+
+  const nextTeam = () => {
+    const next = teamIdx + 1;
+    if (next < contestants.length) startRunForTeam(next);
+    else setPhase('end');
+  };
+
+  const useCartas = () => {
+    if (!lifelines.cartas || !q || step !== 'answering') return;
+    const wrong = [0, 1, 2, 3].filter(i => i !== q.correct).sort(() => Math.random() - 0.5).slice(0, 2);
+    setHidden(wrong); setLifelines(l => ({ ...l, cartas: false }));
+    setHost('Cartas! Duas alternativas erradas foram eliminadas.');
+  };
+  const usePular = () => {
+    if (!lifelines.pular || step !== 'answering') return;
+    setSelected(null); setHidden([]); setAudience(null);
+    setQ(drawQuestion(levelIdx)); setLifelines(l => ({ ...l, pular: false }));
+    setHost('Pulou! Pergunta nova, mesmo valor.');
+  };
+  const usePlateia = () => {
+    if (!lifelines.plateia || !q || step !== 'answering') return;
+    const visible = [0, 1, 2, 3].filter(i => !hidden.includes(i));
+    const dist = [0, 0, 0, 0];
+    const correctShare = 45 + Math.floor(Math.random() * 26); // 45..70 %
+    dist[q.correct] = correctShare;
+    let rem = 100 - correctShare;
+    const others = visible.filter(i => i !== q.correct);
+    others.forEach((i, idx) => {
+      if (idx === others.length - 1) { dist[i] = rem; rem = 0; }
+      else { const s = Math.floor(Math.random() * (rem + 1)); dist[i] = s; rem -= s; }
+    });
+    setAudience(dist); setLifelines(l => ({ ...l, plateia: false }));
+    setHost('A plateia votou!');
+  };
+
+  // ── SETUP / LOADING ──
+  if (phase === 'setup' || phase === 'loading') return (
+    <GamiToolShell title="Rumo ao Milhão" subtitle="Escada do conhecimento" icon={Coins} theme="amber" onClose={onClose}>
+      {phase === 'setup' && (
+        <div className="space-y-4">
+          <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur">
+            <p className="text-sm text-white/75 leading-relaxed">Cada equipe escala sua própria escada de prêmios, respondendo perguntas cada vez mais difíceis. <b className="text-amber-300">Acertou? Pode parar e garantir o prêmio, ou arriscar a próxima.</b> Errou acima de uma <b className="text-emerald-300">parada segura</b>, cai pra ela. Cada time tem 3 ajudas: <b className="text-white">Cartas (50:50)</b>, <b className="text-white">Pular</b> e <b className="text-white">Plateia</b>. Vence quem juntar o maior prêmio!</p>
+          </div>
+          {error && <p className="text-sm text-red-300 font-medium bg-red-500/15 border border-red-400/25 rounded-xl p-3">{error}</p>}
+          <div>
+            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Tema do jogo</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Frações, Brasil Colônia…" className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400/50 bg-white/[0.08] text-white placeholder-white/30" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Dificuldade base</label>
+            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/10 rounded-xl px-3 py-2.5 text-sm bg-white/[0.08] text-white [&>option]:text-gray-900">
+              <option value="fácil">Fácil</option>
+              <option value="média">Média</option>
+              <option value="difícil">Difícil</option>
+            </select>
+          </div>
+          <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">{hasRealTeams ? 'Escolha as equipes (2 a 6)' : 'Equipes do jogo'}</p>
+            <div className="flex flex-wrap gap-2">
+              {hasRealTeams ? teams.slice(0, 8).map((t, i) => {
+                const on = pick.includes(i);
+                return (
+                  <button key={t.id} onClick={() => setPick(p => on ? p.filter(x => x !== i) : (p.length >= 6 ? p : [...p, i]))}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all inline-flex items-center gap-1 ${on ? 'text-white border-white/40 shadow-lg scale-105' : 'text-white/50 border-white/10 bg-white/[0.06]'}`}
+                    style={on ? { backgroundColor: t.color } : undefined}>
+                    <EmojiIcon emoji={t.emoji} size={12} /> {t.name}
+                  </button>
+                );
+              }) : contestants.map((c, i) => (
+                <span key={i} className="text-white text-xs font-bold px-3 py-1.5 rounded-full inline-flex items-center gap-1" style={{ backgroundColor: c.color }}><EmojiIcon emoji={c.emoji} size={12} /> {c.name}</span>
+              ))}
+            </div>
+            {!hasRealTeams && <p className="text-[11px] text-white/35 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
+          </div>
+          <button onClick={start} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-950/60">
+            <Coins size={20} /> Começar o jogo
+          </button>
+        </div>
+      )}
+      {phase === 'loading' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+          <Loader2 size={40} className="animate-spin text-amber-400" />
+          <p className="text-sm font-bold text-white/60">Montando a escada de perguntas…</p>
+        </div>
+      )}
+    </GamiToolShell>
+  );
+
+  // ── END — ranking ──
+  if (phase === 'end') {
+    const ranking = contestants.map((c, i) => ({ c, prize: results[i] ?? 0 })).sort((a, b) => b.prize - a.prize);
+    return (
+      <GamiToolShell title="Rumo ao Milhão" subtitle="Resultado final" icon={Trophy} theme="amber" onClose={onClose}>
+        <ConfettiBurst />
+        <div className="space-y-3">
+          {ranking.map((r, pos) => (
+            <div key={r.c.name + pos} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border-2 ${pos === 0 ? 'bg-amber-400/20 border-amber-400/60' : 'bg-white/[0.06] border-white/10'}`}>
+              <span className="font-black text-lg w-6 text-center text-white/80">{pos === 0 ? <Crown size={20} className="text-amber-300 inline" /> : `${pos + 1}º`}</span>
+              <EmojiIcon emoji={r.c.emoji} size={22} />
+              <span className="flex-1 font-black text-white">{r.c.name}</span>
+              <span className="font-black text-amber-300 tabular-nums">{fmtPrize(r.prize)}</span>
+            </div>
+          ))}
+          {winnerIdx >= 0 && contestants[winnerIdx]?.teamIdx >= 0 && !awarded && (
+            <button onClick={awardWinner} className="w-full mt-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+              <Zap size={16} /> Dar +3 XP ao time campeão
+            </button>
+          )}
+          {awarded && <p className="text-emerald-300 text-sm font-bold text-center mt-2 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
+          <div className="flex gap-3 mt-2">
+            <button onClick={() => { setPhase('setup'); setResults([]); }} className="flex-1 bg-white/[0.08] border border-white/15 text-white font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-1.5"><RotateCcw size={15} /> Jogar de novo</button>
+            <button onClick={onClose} className="flex-1 bg-white/[0.08] border border-white/15 text-white/70 font-bold py-3 rounded-2xl text-sm">Sair</button>
+          </div>
+        </div>
+      </GamiToolShell>
+    );
+  }
+
+  // ── PLAY ──
+  const c = contestants[teamIdx];
+  const reveal = step === 'revealed' || step === 'decision' || step === 'runEnd';
+  return (
+    <GamiToolShell title="Rumo ao Milhão" subtitle={`${c?.name ?? ''}`} icon={Coins} theme="amber" onClose={onClose}>
+      <div className="space-y-3">
+        {/* Escada de prêmios (do topo para baixo) */}
+        <div className="bg-white/[0.05] border border-white/10 rounded-2xl p-2 backdrop-blur">
+          <div className="flex flex-col-reverse gap-0.5">
+            {MILHAO_LADDER.map((rung, i) => {
+              const isCur = i === levelIdx;
+              return (
+                <div key={i} className={`flex items-center justify-between px-3 py-1 rounded-lg text-xs font-bold ${isCur ? 'bg-amber-400 text-amber-950' : i < levelIdx ? 'text-emerald-300' : 'text-white/40'}`}>
+                  <span className="inline-flex items-center gap-1">{rung.safe && <Star size={11} className={isCur ? 'text-amber-900' : 'text-emerald-300'} />}{i + 1}</span>
+                  <span className="tabular-nums">{fmtPrize(rung.prize)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Corujão apresentador */}
+        <div className="bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-3 flex items-start gap-2 backdrop-blur">
+          <Bird size={18} className="text-amber-300 shrink-0 mt-0.5" />
+          <p className="text-sm text-white/90 leading-snug min-h-[2.2em]">{host}</p>
+        </div>
+
+        {q && (
+          <>
+            <div className="bg-white/[0.08] border border-white/10 rounded-2xl px-4 py-4">
+              <p className="text-[11px] font-bold text-amber-300/80 uppercase tracking-wider mb-1">Valendo {fmtPrize(MILHAO_LADDER[levelIdx].prize)}</p>
+              <p className="text-base text-white font-medium leading-snug">{q.q}</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {q.options.map((opt, i) => {
+                const isHidden = hidden.includes(i);
+                const isSel = selected === i;
+                const isCorrect = reveal && i === q.correct;
+                const isWrongSel = reveal && isSel && i !== q.correct;
+                return (
+                  <button key={i} disabled={isHidden || step !== 'answering'}
+                    onClick={() => setSelected(i)}
+                    className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left border-2 transition-all ${isHidden ? 'opacity-20 pointer-events-none' : ''} ${isCorrect ? 'bg-emerald-500/25 border-emerald-400' : isWrongSel ? 'bg-red-500/25 border-red-400' : isSel ? 'bg-amber-400/20 border-amber-400' : 'bg-white/[0.06] border-white/10'}`}>
+                    <span className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center font-black text-sm ${isCorrect ? 'bg-emerald-400 text-emerald-950' : isWrongSel ? 'bg-red-400 text-red-950' : 'bg-white/10 text-white/70'}`}>{['A', 'B', 'C', 'D'][i]}</span>
+                    <span className="flex-1 text-sm text-white font-medium">{isHidden ? '' : opt}</span>
+                    {audience && !isHidden && (
+                      <span className="flex items-center gap-1 shrink-0">
+                        <span className="w-14 h-2 bg-white/10 rounded-full overflow-hidden"><span className="block h-full bg-amber-300" style={{ width: `${audience[i]}%` }} /></span>
+                        <span className="text-[10px] font-bold text-white/60 tabular-nums w-8 text-right">{audience[i]}%</span>
+                      </span>
+                    )}
+                    {isCorrect && <Check size={16} className="text-emerald-300 shrink-0" strokeWidth={3} />}
+                    {isWrongSel && <X size={16} className="text-red-300 shrink-0" strokeWidth={3} />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Ajudas */}
+            {step === 'answering' && (
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={useCartas} disabled={!lifelines.cartas} className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[11px] font-bold transition-all ${lifelines.cartas ? 'bg-white/[0.08] border-white/15 text-white' : 'bg-white/[0.03] border-white/5 text-white/25 line-through'}`}><Scissors size={15} /> 50:50</button>
+                <button onClick={usePular} disabled={!lifelines.pular} className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[11px] font-bold transition-all ${lifelines.pular ? 'bg-white/[0.08] border-white/15 text-white' : 'bg-white/[0.03] border-white/5 text-white/25 line-through'}`}><SkipForward size={15} /> Pular</button>
+                <button onClick={usePlateia} disabled={!lifelines.plateia} className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[11px] font-bold transition-all ${lifelines.plateia ? 'bg-white/[0.08] border-white/15 text-white' : 'bg-white/[0.03] border-white/5 text-white/25 line-through'}`}><Users size={15} /> Plateia</button>
+              </div>
+            )}
+
+            {/* Ações por passo */}
+            {step === 'answering' && (
+              <button onClick={confirmAnswer} disabled={selected === null} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-3.5 rounded-2xl text-base disabled:opacity-40 shadow-lg shadow-amber-950/50">
+                Resposta final
+              </button>
+            )}
+            {step === 'revealed' && (
+              <button onClick={afterReveal} className="w-full bg-white/[0.1] border border-white/20 text-white font-bold py-3 rounded-2xl">Continuar</button>
+            )}
+            {step === 'decision' && (
+              <div className="flex gap-2">
+                <button onClick={stopHere} className="flex-1 bg-emerald-600 text-white font-bold py-3 rounded-2xl text-sm">Parar<br /><span className="text-[11px] font-normal opacity-80">garante {fmtPrize(MILHAO_LADDER[levelIdx].prize)}</span></button>
+                <button onClick={continueClimb} className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold py-3 rounded-2xl text-sm">Arriscar<br /><span className="text-[11px] font-normal opacity-80">vale {fmtPrize(MILHAO_LADDER[levelIdx + 1].prize)}</span></button>
+              </div>
+            )}
+            {step === 'runEnd' && (
+              <button onClick={nextTeam} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black py-3.5 rounded-2xl">
+                {teamIdx + 1 < contestants.length ? `Vez de ${contestants[teamIdx + 1].name}` : 'Ver ranking final'}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </GamiToolShell>
+  );
+};
+
 // ─── Kit do Professor (ferramentas de IA + diário de classe) ──────────────────
 type FerramentaId = 'parecer' | 'inclusao' | 'rubrica' | 'nivelador' | 'familia' | 'video' | 'pdf';
 
@@ -12965,6 +13352,24 @@ const GamificacaoScreen = ({
               const ids = currentCls.students.filter(s => s.teamId === team.id).map(s => s.id);
               if (ids.length === 0) return;
               awardPoints(ids, { id: 'batalha', label: 'Batalha de Revisão', points, emoji: '⚔️' });
+            }}
+          />
+        )}
+        {liveTool === 'milhao' && (
+          <GamiMilhao
+            isAdmin={isAdminAccount(profile, user)}
+            teams={currentCls.teams}
+            students={currentCls.students}
+            subject={selectedSchedule?.subject ?? selectedSchedule?.name ?? 'Geral'}
+            level={selectedSchedule?.level ?? 'Fundamental'}
+            // Como a Batalha: só abre pelo card da aba Jogos, então fechar volta pra lá.
+            onClose={() => { setLiveTool(null); setScreen('estudio'); }}
+            onAwardTeam={(teamIdx, _names, points) => {
+              const team = currentCls.teams[teamIdx];
+              if (!team) return;
+              const ids = currentCls.students.filter(s => s.teamId === team.id).map(s => s.id);
+              if (ids.length === 0) return;
+              awardPoints(ids, { id: 'milhao', label: 'Rumo ao Milhão', points, emoji: '🪙' });
             }}
           />
         )}
@@ -15943,7 +16348,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               }
             }
           }} onImportSyllabus={(cls) => setImportRequest({ mode: 'syllabus', targetClass: cls })} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} openBattle={() => { setGamiInitialTool('batalha'); setScreen('gamificacao'); }} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} openBattle={() => { setGamiInitialTool('batalha'); setScreen('gamificacao'); }} openMilhao={() => { setGamiInitialTool('milhao'); setScreen('gamificacao'); }} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} initialLiveTool={gamiInitialTool} clearInitialLiveTool={() => setGamiInitialTool(null)} />}
           {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
