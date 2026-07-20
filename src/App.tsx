@@ -11154,6 +11154,16 @@ const MILHAO_CSS = `
 const MilhaoShine = () => (
   <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)', animation: 'milhao-shine 3s ease-in-out infinite' }} />
 );
+// Ilustração do cenário (cortina/palco) — cobre o placeholder em CSS quando existir.
+// Coloque em public/assets/battle/milhao-cortina.jpg (recomendado 1200×1600 ou similar, retrato).
+const MilhaoBgArt = () => (
+  <img src="/assets/battle/milhao-cortina.jpg" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
+// Ilustração do personagem (Corujão) no palco — PNG com fundo transparente recomendado.
+// Coloque em public/assets/battle/milhao-personagem.png. Cobre o círculo placeholder por cima.
+const MilhaoCharacterArt = () => (
+  <img src="/assets/battle/milhao-personagem.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 h-40 w-auto object-contain" style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
 // Times genéricos para quem ainda não criou equipes na aba Equipes.
 const MILHAO_FALLBACK = [
   { name: 'Time Azul', emoji: '🔵', color: '#3b82f6' },
@@ -11371,6 +11381,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         <div className="absolute top-10 right-1/4 w-28 h-[130%] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.55),transparent 65%)', transformOrigin: 'top center', animation: 'milhao-sway-r 6s ease-in-out infinite' }} />
         <div className="absolute bottom-0 left-1/3 w-56 h-56 rounded-full blur-[90px]" style={{ background: 'rgba(124,58,237,0.35)' }} />
       </div>
+      <MilhaoBgArt />
       <button onClick={onClose} className="absolute top-12 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
       <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-4 pt-16 pb-8">{children}</div>
     </motion.div>
@@ -11519,12 +11530,16 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         {[[16, 34], [82, 28], [30, 58], [70, 52]].map(([x, y], i) => (
           <span key={i} className="absolute w-1 h-1 rounded-full bg-white/80" style={{ left: `${x}%`, top: `${y}%`, boxShadow: '0 0 6px 2px rgba(255,255,255,0.55)', animation: `milhao-twinkle 2.4s ease-in-out ${i * 0.5}s infinite` }} />
         ))}
-        {/* apresentador (placeholder — vira a sua arte quando a imagem existir) */}
-        <div className="absolute left-1/2 bottom-10 -translate-x-1/2 flex flex-col items-center">
+        {/* cortina/cenário em arte real — cobre todo o placeholder de CSS acima quando existir */}
+        <MilhaoBgArt />
+        {/* apresentador — placeholder em CSS (fica atrás) coberto pela arte real do personagem quando existir */}
+        <div className="absolute inset-x-0 bottom-10 z-[1] flex flex-col items-center">
           <div className="w-28 h-16 rounded-[50%]" style={{ background: 'radial-gradient(ellipse,rgba(255,220,120,0.35),transparent 70%)' }} />
-          <div className="w-16 h-16 -mt-14 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-xl" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}><Bird size={34} className="text-amber-200" /></div>
+          <div className="relative w-full flex justify-center -mt-14" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
+            <div className="w-16 h-16 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-xl"><Bird size={34} className="text-amber-200" /></div>
+            <MilhaoCharacterArt />
+          </div>
         </div>
-        <img src="/assets/battle/milhao-palco.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />
 
         {/* ── OVERLAYS ── */}
         <button onClick={onClose} className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/55 text-white/90 border border-white/25 rounded-lg px-2.5 py-1.5 text-[11px] font-black active:scale-95 transition-transform"><X size={13} /> <span className="font-pixel text-[9px]">SAIR</span></button>
