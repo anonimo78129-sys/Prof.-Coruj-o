@@ -11114,6 +11114,24 @@ const fmtPrize = (v: number) => v >= 1000000
   ? `R$ ${(v / 1000000).toLocaleString('pt-BR')} ${v === 1000000 ? 'milhão' : 'milhões'}`
   : `R$ ${v.toLocaleString('pt-BR')}`;
 
+// Animações do show (lâmpadas, feixes, brilhos, entrada das alternativas).
+const MILHAO_CSS = `
+@keyframes milhao-twinkle{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes milhao-sway{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(-7deg)}}
+@keyframes milhao-sway-r{0%,100%{transform:rotate(14deg)}50%{transform:rotate(7deg)}}
+@keyframes milhao-shine{0%{transform:translateX(-140%) skewX(-18deg)}55%,100%{transform:translateX(340%) skewX(-18deg)}}
+@keyframes milhao-pop{0%{opacity:0;transform:translateY(10px) scale(.96)}100%{opacity:1;transform:none}}
+@keyframes milhao-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes milhao-glow{0%,100%{box-shadow:0 0 10px rgba(255,210,77,.9)}50%{box-shadow:0 0 20px 5px rgba(255,210,77,.95)}}
+@keyframes milhao-glow-green{0%,100%{box-shadow:0 4px 0 rgba(0,0,0,.35),0 0 4px rgba(52,211,153,.4)}50%{box-shadow:0 4px 0 rgba(0,0,0,.35),0 0 18px 4px rgba(52,211,153,.85)}}
+@keyframes milhao-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){.milhao-anim *{animation:none!important}}
+`;
+// Brilho que "varre" botões/placas douradas. Pai precisa de relative + overflow-hidden.
+const MilhaoShine = () => (
+  <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)', animation: 'milhao-shine 3s ease-in-out infinite' }} />
+);
+
 const GamiMilhao = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
   teams: GamiTeam[];
   students: GamiStudent[];
@@ -11297,28 +11315,38 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   // inputs do setup não remontam/perdem foco a cada tecla.
   const stage = (children: React.ReactNode) => (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[130] flex flex-col overflow-hidden"
-      style={{ background: 'linear-gradient(180deg,#2a1a86 0%,#180d55 42%,#0a0430 78%,#05010f 100%)' }}>
-      {/* holofotes e brilhos de estúdio */}
+      className="milhao-anim fixed inset-0 z-[130] flex flex-col overflow-hidden"
+      style={{ background: 'linear-gradient(180deg,#33102e 0%,#1e0a22 55%,#0d0410 100%)' }}>
+      <style>{MILHAO_CSS}</style>
+      {/* cenário: cortinas, sanca com lâmpadas e feixes de luz */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-1/4 left-1/2 -translate-x-1/2 w-[150%] h-[75%]" style={{ background: 'radial-gradient(ellipse at 50% 0,rgba(255,214,80,0.30),transparent 60%)' }} />
-        <div className="absolute -top-10 -left-10 w-44 h-44 rounded-full blur-[80px]" style={{ background: 'rgba(236,72,153,0.40)' }} />
-        <div className="absolute top-8 -right-10 w-44 h-44 rounded-full blur-[80px]" style={{ background: 'rgba(34,211,238,0.34)' }} />
-        <div className="absolute bottom-0 left-1/3 w-56 h-56 rounded-full blur-[90px]" style={{ background: 'rgba(124,58,237,0.40)' }} />
-        {/* feixes de luz diagonais */}
-        <div className="absolute -top-20 left-1/4 w-40 h-[120%] rotate-[18deg] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(255,214,80,0.35),transparent 70%)' }} />
-        <div className="absolute -top-20 right-1/4 w-40 h-[120%] -rotate-[18deg] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(34,211,238,0.30),transparent 70%)' }} />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 8%,rgba(255,214,80,0.18),transparent 55%)' }} />
+        <div className="absolute inset-y-0 left-0 w-1/5" style={{ background: 'linear-gradient(90deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 left-0 w-1/5" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/5" style={{ background: 'linear-gradient(270deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/5" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)' }} />
+        <div className="absolute top-0 inset-x-0 h-8" style={{ background: 'linear-gradient(180deg,#a51a2a,#6e0d18)' }} />
+        <div className="absolute top-8 inset-x-0 h-[3px]" style={{ background: 'linear-gradient(90deg,#8a5a00,#ffd24d 30%,#ffd24d 70%,#8a5a00)' }} />
+        <div className="absolute top-10 inset-x-6 flex justify-between">
+          {Array.from({ length: 11 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)', animation: `milhao-twinkle 1.8s ease-in-out ${(i % 3) * 0.6}s infinite` }} />)}
+        </div>
+        <div className="absolute top-10 left-1/4 w-28 h-[130%] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.55),transparent 65%)', transformOrigin: 'top center', animation: 'milhao-sway 6s ease-in-out infinite' }} />
+        <div className="absolute top-10 right-1/4 w-28 h-[130%] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.55),transparent 65%)', transformOrigin: 'top center', animation: 'milhao-sway-r 6s ease-in-out infinite' }} />
+        <div className="absolute bottom-0 left-1/3 w-56 h-56 rounded-full blur-[90px]" style={{ background: 'rgba(124,58,237,0.35)' }} />
       </div>
-      <button onClick={onClose} className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
-      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-4 pt-5 pb-8">{children}</div>
+      <button onClick={onClose} className="absolute top-12 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
+      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-4 pt-16 pb-8">{children}</div>
     </motion.div>
   );
 
   // Título estilo letreiro do programa
   const showLogo = (
     <div className="text-center mb-1">
-      <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>RUMO AO MILHÃO</p>
-      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1">o show do saber</p>
+      <div className="relative inline-block overflow-hidden rounded-2xl border-2 border-amber-300/50 px-6 py-2" style={{ background: 'linear-gradient(180deg,rgba(85,42,0,0.55),rgba(30,12,0,0.72))', boxShadow: '0 0 30px -6px rgba(255,210,77,0.5), inset 0 1px 0 rgba(255,255,255,0.12)' }}>
+        <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>RUMO AO MILHÃO</p>
+        <MilhaoShine />
+      </div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1.5">o show do saber</p>
     </div>
   );
 
@@ -11362,8 +11390,9 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
             </div>
             {!hasRealTeams && <p className="text-[11px] text-white/45 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
           </div>
-          <button onClick={start} className="w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+          <button onClick={start} className="relative overflow-hidden w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
             <Coins size={20} /> Começar o show
+            <MilhaoShine />
           </button>
         </div>
       )}
@@ -11386,7 +11415,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         {showLogo}
         {champ && champ.prize > 0 && (
           <div className="text-center mt-4 mb-5">
-            <div className="relative inline-flex flex-col items-center">
+            <div className="relative inline-flex flex-col items-center" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
               <Crown size={30} className="text-amber-300 mb-1" style={{ filter: 'drop-shadow(0 0 10px rgba(255,210,77,0.8))' }} />
               <div className="w-20 h-20 rounded-full border-4 border-amber-300 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-[0_0_40px_-4px_rgba(255,210,77,0.8)]">
                 <EmojiIcon emoji={champ.ct.emoji} size={40} />
@@ -11425,24 +11454,38 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   const reveal = step === 'revealed' || step === 'decision' || step === 'runEnd';
   const PALETTE = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="milhao-anim fixed inset-0 z-[130] flex flex-col font-vt">
+      <style>{MILHAO_CSS}</style>
       {/* ── PALCO (arte no topo) ── */}
       <div className="relative flex-1 overflow-hidden">
         {/* Placeholder do palco em CSS (fica atrás). Some quando a arte real
             /assets/battle/milhao-palco.jpg existir e carregar por cima. */}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#3a1030 0%,#2a0d3a 45%,#160718 100%)' }} />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 12%,rgba(255,214,80,0.16),transparent 55%)' }} />
+        {/* piso de madeira do palco */}
+        <div className="absolute bottom-0 inset-x-0 h-14" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 2px, transparent 2px 34px), linear-gradient(180deg,#6b3416,#3a1a0a)' }} />
+        <div className="absolute bottom-0 inset-x-0 h-14 opacity-40" style={{ background: 'radial-gradient(ellipse at 50% 0,rgba(255,214,80,0.5),transparent 65%)' }} />
+        {/* cortinas com dobras de tecido */}
         <div className="absolute inset-y-0 left-0 w-1/4" style={{ background: 'linear-gradient(90deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 left-0 w-1/4" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)' }} />
         <div className="absolute inset-y-0 right-0 w-1/4" style={{ background: 'linear-gradient(270deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/4" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)' }} />
+        {/* sanca com trilho dourado e letreiro de lâmpadas */}
         <div className="absolute top-0 inset-x-0 h-8" style={{ background: 'linear-gradient(180deg,#a51a2a,#6e0d18)' }} />
-        <div className="absolute top-9 left-1/3 w-24 h-[130%] -rotate-12 blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.6),transparent 60%)' }} />
-        <div className="absolute top-9 right-1/3 w-24 h-[130%] rotate-12 blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.6),transparent 60%)' }} />
-        <div className="absolute top-9 inset-x-8 flex justify-between">
-          {Array.from({ length: 9 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)' }} />)}
+        <div className="absolute top-8 inset-x-0 h-[3px]" style={{ background: 'linear-gradient(90deg,#8a5a00,#ffd24d 30%,#ffd24d 70%,#8a5a00)' }} />
+        <div className="absolute top-9 left-1/3 w-24 h-[130%] blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.6),transparent 60%)', transformOrigin: 'top center', animation: 'milhao-sway 6s ease-in-out infinite' }} />
+        <div className="absolute top-9 right-1/3 w-24 h-[130%] blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.6),transparent 60%)', transformOrigin: 'top center', animation: 'milhao-sway-r 6s ease-in-out infinite' }} />
+        <div className="absolute top-10 inset-x-8 flex justify-between">
+          {Array.from({ length: 9 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)', animation: `milhao-twinkle 1.8s ease-in-out ${(i % 3) * 0.6}s infinite` }} />)}
         </div>
+        {/* brilhos espalhados pelo cenário */}
+        {[[16, 34], [82, 28], [30, 58], [70, 52]].map(([x, y], i) => (
+          <span key={i} className="absolute w-1 h-1 rounded-full bg-white/80" style={{ left: `${x}%`, top: `${y}%`, boxShadow: '0 0 6px 2px rgba(255,255,255,0.55)', animation: `milhao-twinkle 2.4s ease-in-out ${i * 0.5}s infinite` }} />
+        ))}
         {/* apresentador (placeholder — vira a sua arte quando a imagem existir) */}
-        <div className="absolute left-1/2 bottom-4 -translate-x-1/2 flex flex-col items-center">
+        <div className="absolute left-1/2 bottom-10 -translate-x-1/2 flex flex-col items-center">
           <div className="w-28 h-16 rounded-[50%]" style={{ background: 'radial-gradient(ellipse,rgba(255,220,120,0.35),transparent 70%)' }} />
-          <div className="w-16 h-16 -mt-14 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-xl"><Bird size={34} className="text-amber-200" /></div>
+          <div className="w-16 h-16 -mt-14 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-xl" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}><Bird size={34} className="text-amber-200" /></div>
         </div>
         <img src="/assets/battle/milhao-palco.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />
 
@@ -11451,24 +11494,28 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         <span className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
         {/* prêmio + time */}
         <div className="absolute top-12 left-1/2 -translate-x-1/2 z-10 text-center">
-          <span className="inline-flex items-center gap-1.5 text-white font-black text-xs px-3 py-1 rounded-full shadow-lg mb-1" style={{ backgroundColor: c?.color ?? '#6366f1' }}><EmojiIcon emoji={c?.emoji ?? '🦉'} size={13} /> {c?.name ?? ''}</span>
-          <p className="font-pixel text-[8px] text-amber-100/80 uppercase tracking-widest">Valendo</p>
-          <p className="font-black text-2xl leading-none" style={{ color: '#ffd24d', textShadow: '0 0 16px rgba(255,210,77,0.7), 0 2px 0 rgba(90,40,0,0.6)' }}>{fmtPrize(MILHAO_LADDER[levelIdx].prize)}</p>
+          <span className="inline-flex items-center gap-1.5 text-white font-black text-xs px-3 py-1 rounded-full shadow-lg mb-1 border border-white/30" style={{ backgroundColor: c?.color ?? '#6366f1' }}><EmojiIcon emoji={c?.emoji ?? '🦉'} size={13} /> {c?.name ?? ''}</span>
+          <div className="relative overflow-hidden rounded-xl border border-amber-300/60 px-4 pt-1 pb-1.5" style={{ background: 'linear-gradient(180deg,rgba(70,35,0,0.72),rgba(25,10,0,0.85))', boxShadow: '0 0 18px -2px rgba(255,210,77,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
+            <p className="font-pixel text-[8px] text-amber-100/80 uppercase tracking-widest">Valendo</p>
+            <p className="font-black text-2xl leading-none" style={{ color: '#ffd24d', textShadow: '0 0 16px rgba(255,210,77,0.7), 0 2px 0 rgba(90,40,0,0.6)' }}>{fmtPrize(MILHAO_LADDER[levelIdx].prize)}</p>
+            <MilhaoShine />
+          </div>
         </div>
         {/* escada de prêmios (lateral direita) */}
-        <div className="absolute top-1/2 -translate-y-1/2 right-2 z-10 w-14 bg-black/40 border border-white/15 rounded-xl p-1 flex flex-col-reverse gap-0.5 backdrop-blur">
+        <div className="absolute top-1/2 -translate-y-1/2 right-2 z-10 w-14 border border-amber-300/25 rounded-xl p-1 flex flex-col-reverse gap-0.5 backdrop-blur" style={{ background: 'linear-gradient(180deg,rgba(20,8,30,0.72),rgba(0,0,0,0.6))' }}>
           {MILHAO_LADDER.map((rung, i) => {
             const isCur = i === levelIdx;
             return (
-              <div key={i} className={`flex items-center justify-center gap-0.5 rounded-md text-[9px] font-black py-0.5 transition-all ${isCur ? 'bg-amber-300 text-amber-950 scale-110 shadow-[0_0_10px_rgba(255,210,77,0.9)]' : i < levelIdx ? 'text-emerald-300' : 'text-white/40'}`}>
+              <div key={i} className={`flex items-center justify-center gap-0.5 rounded-md text-[9px] font-black py-0.5 transition-all ${isCur ? 'bg-amber-300 text-amber-950 scale-110' : i < levelIdx ? 'text-emerald-300' : 'text-white/40'}`} style={isCur ? { animation: 'milhao-glow 1.6s ease-in-out infinite' } : undefined}>
                 {rung.safe && <Star size={8} className={isCur ? 'text-amber-900' : 'text-emerald-300'} />}{i + 1}
               </div>
             );
           })}
         </div>
         {/* balão de fala do apresentador */}
-        <div className="absolute bottom-3 left-3 right-20 z-10">
-          <div className="bg-white/95 rounded-2xl rounded-bl-sm px-3 py-2 shadow-xl">
+        <div className="absolute bottom-3 left-3 right-20 z-10 flex items-end gap-1.5">
+          <div className="w-9 h-9 shrink-0 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-lg"><Bird size={18} className="text-amber-200" /></div>
+          <div key={host} className="bg-white/95 rounded-2xl rounded-bl-sm px-3 py-2 shadow-xl" style={{ animation: 'milhao-pop 0.3s ease-out' }}>
             <p className="font-vt text-[15px] text-gray-800 leading-tight">{host}</p>
           </div>
         </div>
@@ -11478,7 +11525,10 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
       <div className="bg-[#3d4a7d] border-t-4 border-[#2c3763] px-3 pt-3 pb-6 shrink-0">
         {q && (
           <>
-            <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3 min-h-[64px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
+            <div key={`${teamIdx}-${levelIdx}-${q.q}`} className="relative bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3 min-h-[64px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_0_rgba(0,0,0,0.25)]" style={{ animation: 'milhao-pop 0.35s ease-out' }}>
+              {(['top-1.5 left-2', 'top-1.5 right-2', 'bottom-1.5 left-2', 'bottom-1.5 right-2'] as const).map(pos => (
+                <span key={pos} className={`absolute ${pos} w-1.5 h-1.5 rounded-full bg-[#c9b28a] border border-[#8a7a5a]`} />
+              ))}
               <p className="font-vt text-xl text-[#3a3020] leading-snug">
                 {q.q}
                 <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Pergunta {levelIdx + 1} de {MILHAO_LADDER.length} · vez de <EmojiIcon emoji={c?.emoji ?? '🦉'} size={10} /> {c?.name ?? ''}</span>
@@ -11493,10 +11543,13 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                 const isCorrect = reveal && i === q.correct;
                 const isWrongSel = reveal && isSel && i !== q.correct;
                 const dimmed = reveal && !isCorrect && !isWrongSel;
+                const anim = isWrongSel ? 'milhao-shake 0.45s ease-in-out'
+                  : isCorrect ? 'milhao-glow-green 1.4s ease-in-out infinite'
+                  : `milhao-pop 0.35s ease-out ${i * 0.07}s backwards`;
                 return (
-                  <button key={i} disabled={isHidden || step !== 'answering'} onClick={() => setSelected(i)}
-                    className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] active:translate-y-0.5 active:shadow-none ${isHidden ? 'opacity-0 pointer-events-none' : ''} ${dimmed ? 'opacity-35 saturate-0' : ''} ${isSel && !reveal ? 'ring-2 ring-white scale-[1.02]' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
-                    style={{ backgroundColor: isWrongSel ? '#7f1d1d' : PALETTE[i] }}>
+                  <button key={`${q.q}-${i}`} disabled={isHidden || step !== 'answering'} onClick={() => setSelected(i)}
+                    className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all border-2 border-black/25 shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_4px_0_rgba(0,0,0,0.35)] active:translate-y-0.5 active:shadow-none ${isHidden ? 'opacity-0 pointer-events-none' : ''} ${dimmed ? 'opacity-35 saturate-0' : ''} ${isSel && !reveal ? 'ring-2 ring-white scale-[1.02]' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                    style={{ backgroundColor: isWrongSel ? '#7f1d1d' : PALETTE[i], animation: anim }}>
                     <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
                     <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
                     {audience && (
@@ -11529,8 +11582,9 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
             {/* ações por passo */}
             <div className="max-w-lg w-full mx-auto">
               {step === 'answering' && (
-                <button onClick={confirmAnswer} disabled={selected === null} className="w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                <button onClick={confirmAnswer} disabled={selected === null} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
                   <span className="font-pixel text-[10px]">RESPOSTA FINAL</span>
+                  {selected !== null && <MilhaoShine />}
                 </button>
               )}
               {step === 'revealed' && (
@@ -11543,8 +11597,9 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                 </div>
               )}
               {step === 'runEnd' && (
-                <button onClick={nextTeam} className="w-full text-amber-950 font-black py-3 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none font-pixel text-[10px]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                <button onClick={nextTeam} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none font-pixel text-[10px]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
                   {teamIdx + 1 < contestants.length ? `VEZ DE ${(contestants[teamIdx + 1].name || '').toUpperCase()}` : 'GRANDE FINAL'}
+                  <MilhaoShine />
                 </button>
               )}
             </div>
