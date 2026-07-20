@@ -11295,7 +11295,6 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   // ── Palco do "programa" — fundo de estúdio com holofotes e cores vivas.
   // É uma função (não um componente) de propósito: inlina o JSX, então os
   // inputs do setup não remontam/perdem foco a cada tecla.
-  const HEX = 'polygon(4% 0, 96% 0, 100% 50%, 96% 100%, 4% 100%, 0 50%)';
   const stage = (children: React.ReactNode) => (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[130] flex flex-col overflow-hidden"
@@ -11320,23 +11319,6 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     <div className="text-center mb-1">
       <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>RUMO AO MILHÃO</p>
       <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1">o show do saber</p>
-    </div>
-  );
-
-  // Corujão apresentador — avatar num holofote + balão de fala. Placeholder
-  // com ícone; troque por <img> quando tiver a arte do apresentador.
-  const presenter = (
-    <div className="flex items-end gap-2 mb-3">
-      <div className="relative shrink-0">
-        <div className="absolute inset-0 -m-1 rounded-full blur-md" style={{ background: 'radial-gradient(circle,rgba(255,214,80,0.7),transparent 70%)' }} />
-        <div className="relative w-14 h-14 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-lg">
-          <Bird size={30} className="text-amber-200" />
-        </div>
-      </div>
-      <div className="relative flex-1 bg-white/95 rounded-2xl rounded-bl-sm px-3.5 py-2.5 shadow-xl">
-        <span className="absolute -top-2 left-3 inline-flex items-center gap-1 bg-red-600 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
-        <p className="text-[13px] text-gray-800 font-semibold leading-snug min-h-[2.4em] mt-1">{host}</p>
-      </div>
     </div>
   );
 
@@ -11441,111 +11423,135 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   // ── PLAY — palco do show ──
   const c = contestants[teamIdx];
   const reveal = step === 'revealed' || step === 'decision' || step === 'runEnd';
-  return stage(
-    <div className="max-w-md mx-auto">
-      {/* time no ar */}
-      <div className="flex items-center justify-center gap-2 mb-2">
-        <span className="inline-flex items-center gap-1.5 text-white font-black text-sm px-3 py-1 rounded-full shadow-lg" style={{ backgroundColor: c?.color ?? '#6366f1' }}>
-          <EmojiIcon emoji={c?.emoji ?? '🦉'} size={14} /> {c?.name ?? ''}
-        </span>
-      </div>
-
-      {presenter}
-
-      <div className="flex gap-3">
-        {/* prêmio atual */}
-        <div className="flex-1 bg-white/10 border border-amber-300/30 rounded-2xl px-4 py-3 backdrop-blur flex flex-col justify-center">
-          <p className="text-[10px] font-bold text-cyan-200/70 uppercase tracking-widest">Pergunta {levelIdx + 1} de {MILHAO_LADDER.length} · valendo</p>
-          <p className="font-black text-2xl leading-none mt-1" style={{ color: '#ffd24d', textShadow: '0 0 14px rgba(255,210,77,0.5)' }}>{fmtPrize(MILHAO_LADDER[levelIdx].prize)}</p>
+  const PALETTE = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
+      {/* ── PALCO (arte no topo) ── */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* Placeholder do palco em CSS (fica atrás). Some quando a arte real
+            /assets/battle/milhao-palco.jpg existir e carregar por cima. */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#3a1030 0%,#2a0d3a 45%,#160718 100%)' }} />
+        <div className="absolute inset-y-0 left-0 w-1/4" style={{ background: 'linear-gradient(90deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/4" style={{ background: 'linear-gradient(270deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute top-0 inset-x-0 h-8" style={{ background: 'linear-gradient(180deg,#a51a2a,#6e0d18)' }} />
+        <div className="absolute top-9 left-1/3 w-24 h-[130%] -rotate-12 blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.6),transparent 60%)' }} />
+        <div className="absolute top-9 right-1/3 w-24 h-[130%] rotate-12 blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.6),transparent 60%)' }} />
+        <div className="absolute top-9 inset-x-8 flex justify-between">
+          {Array.from({ length: 9 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)' }} />)}
         </div>
-        {/* escada compacta */}
-        <div className="w-16 shrink-0 bg-black/25 border border-white/10 rounded-2xl p-1.5 flex flex-col-reverse gap-0.5">
+        {/* apresentador (placeholder — vira a sua arte quando a imagem existir) */}
+        <div className="absolute left-1/2 bottom-4 -translate-x-1/2 flex flex-col items-center">
+          <div className="w-28 h-16 rounded-[50%]" style={{ background: 'radial-gradient(ellipse,rgba(255,220,120,0.35),transparent 70%)' }} />
+          <div className="w-16 h-16 -mt-14 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-xl"><Bird size={34} className="text-amber-200" /></div>
+        </div>
+        <img src="/assets/battle/milhao-palco.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />
+
+        {/* ── OVERLAYS ── */}
+        <button onClick={onClose} className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/55 text-white/90 border border-white/25 rounded-lg px-2.5 py-1.5 text-[11px] font-black active:scale-95 transition-transform"><X size={13} /> <span className="font-pixel text-[9px]">SAIR</span></button>
+        <span className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
+        {/* prêmio + time */}
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-10 text-center">
+          <span className="inline-flex items-center gap-1.5 text-white font-black text-xs px-3 py-1 rounded-full shadow-lg mb-1" style={{ backgroundColor: c?.color ?? '#6366f1' }}><EmojiIcon emoji={c?.emoji ?? '🦉'} size={13} /> {c?.name ?? ''}</span>
+          <p className="font-pixel text-[8px] text-amber-100/80 uppercase tracking-widest">Valendo</p>
+          <p className="font-black text-2xl leading-none" style={{ color: '#ffd24d', textShadow: '0 0 16px rgba(255,210,77,0.7), 0 2px 0 rgba(90,40,0,0.6)' }}>{fmtPrize(MILHAO_LADDER[levelIdx].prize)}</p>
+        </div>
+        {/* escada de prêmios (lateral direita) */}
+        <div className="absolute top-1/2 -translate-y-1/2 right-2 z-10 w-14 bg-black/40 border border-white/15 rounded-xl p-1 flex flex-col-reverse gap-0.5 backdrop-blur">
           {MILHAO_LADDER.map((rung, i) => {
             const isCur = i === levelIdx;
             return (
-              <div key={i} className={`flex items-center justify-center gap-0.5 rounded-md text-[9px] font-black py-0.5 transition-all ${isCur ? 'bg-amber-300 text-amber-950 scale-110 shadow-[0_0_12px_rgba(255,210,77,0.8)]' : i < levelIdx ? 'text-emerald-300' : 'text-white/35'}`}>
+              <div key={i} className={`flex items-center justify-center gap-0.5 rounded-md text-[9px] font-black py-0.5 transition-all ${isCur ? 'bg-amber-300 text-amber-950 scale-110 shadow-[0_0_10px_rgba(255,210,77,0.9)]' : i < levelIdx ? 'text-emerald-300' : 'text-white/40'}`}>
                 {rung.safe && <Star size={8} className={isCur ? 'text-amber-900' : 'text-emerald-300'} />}{i + 1}
               </div>
             );
           })}
         </div>
+        {/* balão de fala do apresentador */}
+        <div className="absolute bottom-3 left-3 right-20 z-10">
+          <div className="bg-white/95 rounded-2xl rounded-bl-sm px-3 py-2 shadow-xl">
+            <p className="font-vt text-[15px] text-gray-800 leading-tight">{host}</p>
+          </div>
+        </div>
       </div>
 
-      {q && (
-        <>
-          {/* enunciado */}
-          <div className="mt-3 rounded-2xl px-4 py-4 border border-cyan-300/25" style={{ background: 'linear-gradient(180deg,rgba(12,20,60,0.85),rgba(8,12,40,0.85))', boxShadow: '0 0 24px -8px rgba(34,211,238,0.4)' }}>
-            <p className="text-[15px] text-white font-semibold leading-snug text-center">{q.q}</p>
-          </div>
-
-          {/* alternativas — formato hexagonal de programa */}
-          <div className="grid grid-cols-1 gap-2.5 mt-3">
-            {q.options.map((opt, i) => {
-              const isHidden = hidden.includes(i);
-              const isSel = selected === i;
-              const isCorrect = reveal && i === q.correct;
-              const isWrongSel = reveal && isSel && i !== q.correct;
-              const border = isCorrect ? 'linear-gradient(90deg,#34d399,#059669)' : isWrongSel ? 'linear-gradient(90deg,#f87171,#dc2626)' : isSel ? 'linear-gradient(90deg,#fff0a8,#f59e0b)' : 'linear-gradient(90deg,#fcd34d,#b45309)';
-              const fill = isCorrect ? 'rgba(6,78,59,0.95)' : isWrongSel ? 'rgba(80,10,10,0.95)' : isSel ? 'rgba(90,60,5,0.95)' : 'rgba(10,20,55,0.95)';
-              return (
-                <button key={i} disabled={isHidden || step !== 'answering'} onClick={() => setSelected(i)}
-                  className={`relative block w-full active:scale-[0.99] transition-transform ${isHidden ? 'opacity-15 pointer-events-none' : ''}`}>
-                  <div style={{ clipPath: HEX, background: border }} className="p-[2px]">
-                    <div style={{ clipPath: HEX, background: fill }} className="flex items-center gap-3 pl-3 pr-5 py-3">
-                      <span className="font-black text-lg shrink-0 w-6 text-center" style={{ color: isCorrect ? '#6ee7b7' : isWrongSel ? '#fca5a5' : '#fcd34d' }}>{['A', 'B', 'C', 'D'][i]}</span>
-                      <span className="flex-1 text-sm text-white font-semibold text-left leading-tight">{isHidden ? '' : opt}</span>
-                      {audience && !isHidden && (
-                        <span className="flex items-center gap-1 shrink-0">
-                          <span className="w-12 h-2 bg-white/15 rounded-full overflow-hidden"><span className="block h-full bg-cyan-300" style={{ width: `${audience[i]}%` }} /></span>
-                          <span className="text-[10px] font-bold text-cyan-100/80 tabular-nums w-7 text-right">{audience[i]}%</span>
-                        </span>
-                      )}
-                      {isCorrect && <Check size={16} className="text-emerald-300 shrink-0" strokeWidth={3} />}
-                      {isWrongSel && <X size={16} className="text-red-300 shrink-0" strokeWidth={3} />}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* ajudas — moedas do apresentador */}
-          {step === 'answering' && (
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              {([{ on: lifelines.cartas, fn: useCartas, Icon: Scissors, label: '50:50' },
-                 { on: lifelines.pular, fn: usePular, Icon: SkipForward, label: 'Pular' },
-                 { on: lifelines.plateia, fn: usePlateia, Icon: Users, label: 'Plateia' }] as const).map((a, i) => (
-                <button key={i} onClick={a.fn} disabled={!a.on}
-                  className={`flex flex-col items-center gap-0.5 py-2.5 rounded-2xl border text-[11px] font-black transition-all ${a.on ? 'bg-white/10 border-amber-300/40 text-amber-100 active:scale-95' : 'bg-white/[0.03] border-white/8 text-white/25 line-through'}`}>
-                  <a.Icon size={16} /> {a.label}
-                </button>
-              ))}
+      {/* ── PAINEL DE PERGUNTAS (embaixo) ── */}
+      <div className="bg-[#3d4a7d] border-t-4 border-[#2c3763] px-3 pt-3 pb-6 shrink-0">
+        {q && (
+          <>
+            <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3 min-h-[64px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
+              <p className="font-vt text-xl text-[#3a3020] leading-snug">
+                {q.q}
+                <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Pergunta {levelIdx + 1} de {MILHAO_LADDER.length} · vez de <EmojiIcon emoji={c?.emoji ?? '🦉'} size={10} /> {c?.name ?? ''}</span>
+              </p>
             </div>
-          )}
 
-          {/* ações */}
-          {step === 'answering' && (
-            <button onClick={confirmAnswer} disabled={selected === null} className="w-full mt-3 text-amber-950 font-black py-3.5 rounded-2xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_0_30px_-6px_rgba(255,210,77,0.8)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-              Resposta final
-            </button>
-          )}
-          {step === 'revealed' && (
-            <button onClick={afterReveal} className="w-full mt-3 bg-white/12 border border-white/25 text-white font-bold py-3 rounded-2xl">Continuar</button>
-          )}
-          {step === 'decision' && (
-            <div className="flex gap-2 mt-3">
-              <button onClick={stopHere} className="flex-1 bg-gradient-to-br from-emerald-500 to-green-600 text-white font-black py-3 rounded-2xl text-sm shadow-lg">Parar<br /><span className="text-[11px] font-normal opacity-85">garante {fmtPrize(MILHAO_LADDER[levelIdx].prize)}</span></button>
-              <button onClick={continueClimb} className="flex-1 text-amber-950 font-black py-3 rounded-2xl text-sm shadow-lg" style={{ background: 'linear-gradient(135deg,#ffdf6b,#f59e0b)' }}>Arriscar<br /><span className="text-[11px] font-normal opacity-80">vale {fmtPrize(MILHAO_LADDER[levelIdx + 1].prize)}</span></button>
+            {/* alternativas — estilo da Batalha (2×2 coloridas) */}
+            <div className="grid grid-cols-2 gap-2.5 max-w-lg w-full mx-auto my-4">
+              {q.options.map((opt, i) => {
+                const isHidden = hidden.includes(i);
+                const isSel = selected === i;
+                const isCorrect = reveal && i === q.correct;
+                const isWrongSel = reveal && isSel && i !== q.correct;
+                const dimmed = reveal && !isCorrect && !isWrongSel;
+                return (
+                  <button key={i} disabled={isHidden || step !== 'answering'} onClick={() => setSelected(i)}
+                    className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all border-2 border-black/25 shadow-[0_4px_0_rgba(0,0,0,0.35)] active:translate-y-0.5 active:shadow-none ${isHidden ? 'opacity-0 pointer-events-none' : ''} ${dimmed ? 'opacity-35 saturate-0' : ''} ${isSel && !reveal ? 'ring-2 ring-white scale-[1.02]' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                    style={{ backgroundColor: isWrongSel ? '#7f1d1d' : PALETTE[i] }}>
+                    <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
+                    <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
+                    {audience && (
+                      <span className="shrink-0 flex flex-col items-end">
+                        <span className="font-pixel text-[9px] text-white/90 tabular-nums">{audience[i]}%</span>
+                        <span className="w-8 h-1.5 bg-black/25 rounded-full overflow-hidden mt-0.5"><span className="block h-full bg-white/80" style={{ width: `${audience[i]}%` }} /></span>
+                      </span>
+                    )}
+                    {isCorrect && <Check size={16} className="shrink-0 text-white" strokeWidth={3} />}
+                    {isWrongSel && <X size={16} className="shrink-0 text-white" strokeWidth={3} />}
+                  </button>
+                );
+              })}
             </div>
-          )}
-          {step === 'runEnd' && (
-            <button onClick={nextTeam} className="w-full mt-3 text-amber-950 font-black py-3.5 rounded-2xl shadow-[0_0_30px_-6px_rgba(255,210,77,0.8)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-              {teamIdx + 1 < contestants.length ? `Vez de ${contestants[teamIdx + 1].name}` : 'Ver grande final'}
-            </button>
-          )}
-        </>
-      )}
-    </div>
+
+            {/* ajudas */}
+            {step === 'answering' && (
+              <div className="grid grid-cols-3 gap-2 max-w-lg w-full mx-auto mb-3">
+                {([{ on: lifelines.cartas, fn: useCartas, Icon: Scissors, label: '50:50' },
+                   { on: lifelines.pular, fn: usePular, Icon: SkipForward, label: 'Pular' },
+                   { on: lifelines.plateia, fn: usePlateia, Icon: Users, label: 'Plateia' }] as const).map((a, i) => (
+                  <button key={i} onClick={a.fn} disabled={!a.on}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 font-pixel text-[8px] transition-all ${a.on ? 'bg-[#2c3763] border-black/30 text-amber-200 active:scale-95' : 'bg-[#2c3763]/50 border-black/20 text-white/25 line-through'}`}>
+                    <a.Icon size={15} /> {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* ações por passo */}
+            <div className="max-w-lg w-full mx-auto">
+              {step === 'answering' && (
+                <button onClick={confirmAnswer} disabled={selected === null} className="w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                  <span className="font-pixel text-[10px]">RESPOSTA FINAL</span>
+                </button>
+              )}
+              {step === 'revealed' && (
+                <button onClick={afterReveal} className="w-full bg-[#2c3763] border-2 border-black/30 text-white font-black py-3 rounded-xl font-pixel text-[10px] active:translate-y-0.5">CONTINUAR</button>
+              )}
+              {step === 'decision' && (
+                <div className="flex gap-2">
+                  <button onClick={stopHere} className="flex-1 bg-gradient-to-br from-emerald-500 to-green-600 text-white font-black py-2.5 rounded-xl text-sm shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none"><span className="font-pixel text-[9px]">PARAR</span><br /><span className="font-vt text-sm opacity-90">garante {fmtPrize(MILHAO_LADDER[levelIdx].prize)}</span></button>
+                  <button onClick={continueClimb} className="flex-1 text-amber-950 font-black py-2.5 rounded-xl text-sm shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(135deg,#ffdf6b,#f59e0b)' }}><span className="font-pixel text-[9px]">ARRISCAR</span><br /><span className="font-vt text-sm opacity-85">vale {fmtPrize(MILHAO_LADDER[levelIdx + 1].prize)}</span></button>
+                </div>
+              )}
+              {step === 'runEnd' && (
+                <button onClick={nextTeam} className="w-full text-amber-950 font-black py-3 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none font-pixel text-[10px]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                  {teamIdx + 1 < contestants.length ? `VEZ DE ${(contestants[teamIdx + 1].name || '').toUpperCase()}` : 'GRANDE FINAL'}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </motion.div>
   );
 };
 
