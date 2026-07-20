@@ -11114,6 +11114,29 @@ const fmtPrize = (v: number) => v >= 1000000
   ? `R$ ${(v / 1000000).toLocaleString('pt-BR')} ${v === 1000000 ? 'milhão' : 'milhões'}`
   : `R$ ${v.toLocaleString('pt-BR')}`;
 
+// Banco fixo pra testar o jogo sem chamar a IA (rápido, sem gastar cota).
+// 18 perguntas, ordenadas fácil → difícil (mesmo formato do que a IA gera).
+const MILHAO_SAMPLE_QUESTIONS: MilhaoQ[] = [
+  { q: 'Quantos dias tem uma semana?', options: ['5', '6', '7', '8'], correct: 2 },
+  { q: 'De que cor é o céu num dia sem nuvens?', options: ['Verde', 'Azul', 'Cinza', 'Roxo'], correct: 1 },
+  { q: 'Quantas patas tem um cachorro?', options: ['2', '3', '4', '6'], correct: 2 },
+  { q: 'Qual é a capital do Brasil?', options: ['Rio de Janeiro', 'Brasília', 'São Paulo', 'Salvador'], correct: 1 },
+  { q: 'Quanto é 7 x 8?', options: ['54', '56', '58', '64'], correct: 1 },
+  { q: 'Quem escreveu "Dom Casmurro"?', options: ['José de Alencar', 'Machado de Assis', 'Clarice Lispector', 'Monteiro Lobato'], correct: 1 },
+  { q: 'Qual planeta é conhecido como Planeta Vermelho?', options: ['Vênus', 'Júpiter', 'Marte', 'Saturno'], correct: 2 },
+  { q: 'Qual é o maior oceano do mundo?', options: ['Atlântico', 'Índico', 'Ártico', 'Pacífico'], correct: 3 },
+  { q: 'Em que ano o Brasil foi "descoberto"?', options: ['1500', '1822', '1889', '1600'], correct: 0 },
+  { q: 'Qual é o osso mais longo do corpo humano?', options: ['Úmero', 'Fêmur', 'Tíbia', 'Rádio'], correct: 1 },
+  { q: 'Quantos lados tem um hexágono?', options: ['5', '6', '7', '8'], correct: 1 },
+  { q: 'Qual gás as plantas liberam na fotossíntese?', options: ['Gás carbônico', 'Nitrogênio', 'Oxigênio', 'Hidrogênio'], correct: 2 },
+  { q: 'Quem pintou a Mona Lisa?', options: ['Michelangelo', 'Van Gogh', 'Da Vinci', 'Picasso'], correct: 2 },
+  { q: 'Qual é o menor país do mundo?', options: ['Mônaco', 'San Marino', 'Vaticano', 'Liechtenstein'], correct: 2 },
+  { q: 'Quanto é a raiz quadrada de 144?', options: ['10', '11', '12', '14'], correct: 2 },
+  { q: 'Em que continente fica o deserto do Saara?', options: ['Ásia', 'África', 'Oceania', 'América'], correct: 1 },
+  { q: 'Qual elemento químico tem símbolo "Au"?', options: ['Prata', 'Alumínio', 'Ouro', 'Argônio'], correct: 2 },
+  { q: 'Quem foi o primeiro presidente do Brasil?', options: ['Getúlio Vargas', 'Deodoro da Fonseca', 'Pedro Álvares Cabral', 'Juscelino Kubitschek'], correct: 1 },
+];
+
 // Animações do show (lâmpadas, feixes, brilhos, entrada das alternativas).
 const MILHAO_CSS = `
 @keyframes milhao-twinkle{0%,100%{opacity:1}50%{opacity:.35}}
@@ -11213,12 +11236,12 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     return banked;
   };
 
-  const start = async () => {
-    if (!topic.trim()) { setError('Informe o tema do jogo.'); return; }
+  const start = async (testMode = false) => {
+    if (!testMode && !topic.trim()) { setError('Informe o tema do jogo.'); return; }
     if (pick.length < 2) { setError('Escolha pelo menos 2 equipes.'); return; }
     setError(''); setPhase('loading');
     try {
-      poolRef.current = await fetchPool();
+      poolRef.current = testMode ? MILHAO_SAMPLE_QUESTIONS : await fetchPool();
       usedRef.current = new Set();
       setTstates(contestants.map(() => ({ status: 'playing', prize: 0 })));
       setAnswers(contestants.map(() => null));
@@ -11402,9 +11425,12 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
             </div>
             {!hasRealTeams && <p className="text-[11px] text-white/45 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
           </div>
-          <button onClick={start} className="relative overflow-hidden w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+          <button onClick={() => start()} className="relative overflow-hidden w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
             <Coins size={20} /> Começar o show
             <MilhaoShine />
+          </button>
+          <button onClick={() => start(true)} className="w-full text-amber-200 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 bg-white/[0.06] border border-dashed border-amber-300/40 active:scale-95 transition-transform">
+            <FlaskConical size={13} /> Testar com perguntas de exemplo (sem IA)
           </button>
         </div>
       )}
