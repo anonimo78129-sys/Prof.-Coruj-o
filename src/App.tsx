@@ -11202,8 +11202,18 @@ const QUIZ_CSS = `
 @keyframes qz-beam{0%,100%{opacity:.3;transform:translateX(-8px)}50%{opacity:.6;transform:translateX(8px)}}
 @keyframes qz-spin{to{transform:rotate(360deg)}}
 @keyframes qz-rise{0%{opacity:0;transform:translateY(20px) scale(.9)}100%{opacity:1;transform:none}}
+/* cortina: começa fechada (cobre metade cada), abre com um leve overshoot e
+   para na faixa de 25% */
+@keyframes qz-curtain-open{0%{width:50%}18%{width:50%}78%{width:22%}100%{width:25%}}
+/* balanço leve e contínuo das cortinas (origem no topo da lateral externa) */
+@keyframes qz-sway-l{0%,100%{transform:rotate(0deg)}50%{transform:rotate(.7deg)}}
+@keyframes qz-sway-r{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-.7deg)}}
 .qz-anim-pop{animation:qz-pop .35s ease-out both}
-@media (prefers-reduced-motion:reduce){.qz-stage *{animation:none!important}}
+.qz-curtain-l{animation:qz-curtain-open 1.5s cubic-bezier(.25,.9,.25,1) both}
+.qz-curtain-r{animation:qz-curtain-open 1.5s cubic-bezier(.25,.9,.25,1) both}
+.qz-curtain-l img{transform-origin:top left;animation:qz-sway-l 5s ease-in-out .3s infinite}
+.qz-curtain-r img{transform-origin:top right;animation:qz-sway-r 5.4s ease-in-out .3s infinite}
+@media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l,.qz-curtain-r,.qz-curtain-l img,.qz-curtain-r img{animation:none!important;width:25%}}
 `;
 
 // Paleta puxada das ilustrações: madeira azul (fundo), azul-ardósia (cortinas)
@@ -11383,21 +11393,23 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
           {/* ÁREA ROLÁVEL: banner (ilustração) + pergunta + alternativas */}
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             {/* BANNER 1200x760 — palco completo: fundo azul + professora ao
-                centro, cortinas (esquerda/direita) emoldurando as laterais em
-                altura cheia POR CIMA dela, e o balcão na frente do palco. */}
+                centro, o balcão na frente e as cortinas POR CIMA de tudo,
+                emoldurando as laterais. As cortinas começam FECHADAS (cobrem
+                metade cada), abrem balançando ao iniciar e param numa faixa de
+                25% de cada lado, ficando levemente balançando. */}
             <div className="w-full shrink-0 relative overflow-hidden" style={{ aspectRatio: '1200 / 760', background: '#7ba6d4' }}>
               <LeilaoFundo />
               <LeilaoPersonagem />
-              {/* cortina esquerda (faixa lateral de altura cheia) */}
-              <div aria-hidden className="absolute inset-y-0 left-0 w-[40%] overflow-hidden pointer-events-none">
+              {/* balcão na frente do palco (a cortina fica por cima dele) */}
+              <img src="/assets/battle/balcao.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              {/* cortina esquerda (abre balançando, para em 25%, por cima do balcão) */}
+              <div aria-hidden className="qz-curtain-l absolute inset-y-0 left-0 overflow-hidden pointer-events-none" style={{ width: '25%' }}>
                 <img src="/assets/battle/cortina-esq.png" alt="" className="absolute left-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
-              {/* cortina direita (faixa lateral de altura cheia) */}
-              <div aria-hidden className="absolute inset-y-0 right-0 w-[40%] overflow-hidden pointer-events-none">
+              {/* cortina direita (abre balançando, para em 25%, por cima do balcão) */}
+              <div aria-hidden className="qz-curtain-r absolute inset-y-0 right-0 overflow-hidden pointer-events-none" style={{ width: '25%' }}>
                 <img src="/assets/battle/cortina-dir.png" alt="" className="absolute right-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
-              {/* balcão na frente do palco (cobre a base das cortinas e da professora) */}
-              <img src="/assets/battle/balcao.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               {/* luz de palco suave por cima */}
               <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
             </div>
