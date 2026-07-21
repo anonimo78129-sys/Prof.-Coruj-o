@@ -650,7 +650,7 @@ const fetchPixabayImage = async (query: string | undefined, width: number, heigh
 };
 
 // --- Types ---
-type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin' | 'gamificacao' | 'ferramentas' | 'acervo' | 'escape';
+type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin' | 'gamificacao' | 'ferramentas' | 'acervo' | 'escape' | 'quizrelampago';
 type PlannerMode = 'plan' | 'activities' | 'slides' | 'exam';
 
 interface PresentationTheme {
@@ -8327,16 +8327,17 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
-      {/* QUIZ RELÂMPAGO — card reservado, sem ação de clique ainda; banner
-          real entra em /assets/battle/quiz-relampago.jpg quando estiver
-          pronto (mesmo aspecto 1100x532 dos outros cards) */}
-      <div
-        aria-label="Quiz Relâmpago — em breve"
-        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-dashed border-white/50 mb-4 flex items-center justify-center bg-white/10"
+      {/* QUIZ RELÂMPAGO — banner real entra em
+          /assets/battle/quiz-relampago.jpg quando estiver pronto (mesmo
+          aspecto 1100x532 dos outros cards); até lá, placeholder */}
+      <button
+        onClick={() => setScreen('quizrelampago')}
+        aria-label="Quiz Relâmpago"
+        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-dashed border-white/50 mb-4 flex items-center justify-center bg-white/10 active:scale-[0.98] transition-transform"
         style={{ aspectRatio: '1100 / 532' }}
       >
-        <span className="text-white/70 font-bold text-sm tracking-wide">Quiz Relâmpago — banner em breve</span>
-      </div>
+        <span className="text-white/70 font-bold text-sm tracking-wide">⚡ Quiz Relâmpago — banner em breve</span>
+      </button>
 
       {/* Atividades menores */}
       <div className="grid grid-cols-2 gap-3 mb-8">
@@ -11177,6 +11178,171 @@ const MILHAO_FALLBACK = [
   { name: 'Time Verde', emoji: '🟢', color: '#22c55e' },
   { name: 'Time Amarelo', emoji: '🟡', color: '#eab308' },
 ];
+
+// QUIZ RELÂMPAGO — quiz rápido de turma inteira (sem equipes): 10 perguntas
+// geradas por IA sobre o tema, uma pergunta por vez, tela cheia estilo show
+// (tábuas de madeira, caixa creme da pergunta, botões A/B/C/D coloridos).
+const QUIZ_RELAMPAGO_TOTAL = 10;
+const QuizRelampago = ({ onExitApp }: { onExitApp: () => void }) => {
+  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
+  const [topic, setTopic] = useState('');
+  const [error, setError] = useState('');
+  const [questions, setQuestions] = useState<MilhaoQ[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [score, setScore] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [paused, setPaused] = useState(false);
+
+  const fetchQuestions = async (): Promise<MilhaoQ[]> => {
+    const prompt = `Gere ${QUIZ_RELAMPAGO_TOTAL} perguntas de múltipla escolha sobre "${topic}", adequadas para uma turma de sala de aula.
+Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(raw);
+    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
+    if (valid.length < 4) throw new Error('poucas perguntas');
+    return valid.slice(0, QUIZ_RELAMPAGO_TOTAL);
+  };
+
+  const start = async (testMode = false) => {
+    if (!testMode && !topic.trim()) { setError('Informe o tema do quiz.'); return; }
+    setError(''); setPhase('loading');
+    try {
+      const qs = testMode ? MILHAO_SAMPLE_QUESTIONS.slice(0, QUIZ_RELAMPAGO_TOTAL) : await fetchQuestions();
+      setQuestions(qs); setIdx(0); setScore(0); setSelected(null); setPaused(false);
+      setPhase('play');
+    } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
+  };
+
+  const answer = (i: number) => {
+    if (selected !== null || paused) return;
+    setSelected(i);
+    if (i === questions[idx].correct) setScore(s => s + 1);
+    setTimeout(() => {
+      setIdx(cur => {
+        const next = cur + 1;
+        if (next >= questions.length) setPhase('end'); else setSelected(null);
+        return next;
+      });
+    }, 1200);
+  };
+
+  const woodBg = 'repeating-linear-gradient(90deg, #7a4a24 0 26px, #6b3f1f 26px 28px), linear-gradient(180deg, #8a5a30, #6b3f1f)';
+  const letterColors = ['#dc4b4b', '#e0ab2e', '#3fae6c', '#3d7fd6'];
+  const q = questions[idx];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col select-none">
+      {phase === 'setup' && (
+        <div className="flex-1 flex flex-col px-6 py-8" style={{ background: 'linear-gradient(180deg,#5a3a1e,#3a2413)' }}>
+          <button onClick={onExitApp} aria-label="Fechar" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white mb-6">
+            <X size={18} />
+          </button>
+          <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 max-w-sm mx-auto w-full">
+            <p className="text-5xl">⚡</p>
+            <h1 className="text-2xl font-black text-yellow-300">Quiz Relâmpago</h1>
+            <p className="text-white/80 text-sm">{QUIZ_RELAMPAGO_TOTAL} perguntas rápidas pra turma toda responder junto. Diga o tema da aula.</p>
+            <input
+              value={topic}
+              onChange={e => setTopic(e.target.value)}
+              placeholder="Ex.: Sistema Solar"
+              className="w-full rounded-full px-4 py-3 text-sm font-semibold text-[#3a2413] bg-[#f5ecd7] outline-none"
+            />
+            {error && <p className="text-rose-300 text-xs font-semibold">{error}</p>}
+            <button onClick={() => start(false)} className="w-full rounded-full py-3 font-bold text-[#3a2413] bg-yellow-400 active:scale-[0.98] transition-transform">
+              Começar o quiz
+            </button>
+            <button onClick={() => start(true)} className="w-full rounded-full py-3 font-bold text-white/90 bg-white/10 border border-white/30 active:scale-[0.98] transition-transform">
+              Testar com perguntas de exemplo (sem IA)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === 'loading' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4" style={{ background: 'linear-gradient(180deg,#5a3a1e,#3a2413)' }}>
+          <Loader2 size={36} className="text-yellow-300 animate-spin" />
+          <p className="text-white/90 text-sm font-semibold">Gerando perguntas...</p>
+        </div>
+      )}
+
+      {phase === 'play' && q && (
+        <>
+          {/* header: fechar, progresso, pausar */}
+          <div className="shrink-0 flex items-center gap-3 px-4 py-3" style={{ background: 'linear-gradient(180deg,#6b4423,#4a2f18)' }}>
+            <button onClick={onExitApp} aria-label="Fechar" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0">
+              <X size={18} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold text-amber-200 tracking-wide">PERGUNTA <span className="text-yellow-300">{idx + 1}</span> / {questions.length}</p>
+              <div className="h-1.5 rounded-full bg-black/30 mt-1 overflow-hidden">
+                <div className="h-full bg-yellow-400 rounded-full transition-all" style={{ width: `${((idx + (selected !== null ? 1 : 0)) / questions.length) * 100}%` }} />
+              </div>
+            </div>
+            <button onClick={() => setPaused(p => !p)} aria-label={paused ? 'Retomar' : 'Pausar'} className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0">
+              {paused ? <Play size={16} /> : <Pause size={16} />}
+            </button>
+          </div>
+
+          {/* espaço do banner — reservado, sem ilustração ainda */}
+          <div className="flex-1 min-h-[120px] bg-white" />
+
+          {/* caixa da pergunta + alternativas */}
+          <div className="shrink-0 px-4 pt-6 pb-6" style={{ background: woodBg }}>
+            <div className="bg-[#f5ecd7] rounded-2xl p-4 shadow-xl">
+              <p className="font-bold text-[#3a2413] text-base leading-snug mb-3">{q.q}</p>
+              <div className="space-y-2">
+                {q.options.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-[#efe3c8] rounded-full px-3 py-2">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: letterColors[i] }}>
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="text-sm font-semibold text-[#3a2413]">{opt}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-center text-white/70 text-[11px] font-bold tracking-wide mt-4 mb-3">
+              {paused ? 'JOGO PAUSADO' : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
+            </p>
+
+            <div className="grid grid-cols-4 gap-2">
+              {q.options.map((_, i) => {
+                const showState = selected !== null;
+                const isCorrect = i === q.correct;
+                const dim = showState && !isCorrect && selected !== i;
+                return (
+                  <button
+                    key={i}
+                    disabled={showState || paused}
+                    onClick={() => answer(i)}
+                    className="aspect-square rounded-2xl flex items-center justify-center text-white font-black text-2xl border-2 border-white/80 shadow-lg active:scale-95 transition-transform"
+                    style={{ background: letterColors[i], opacity: dim ? 0.4 : 1, outline: showState && isCorrect ? '3px solid #fff' : 'none' }}
+                  >
+                    {String.fromCharCode(65 + i)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {phase === 'end' && (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-3" style={{ background: 'linear-gradient(180deg,#5a3a1e,#3a2413)' }}>
+          <p className="text-6xl">🏆</p>
+          <h2 className="text-2xl font-black text-yellow-300">Quiz concluído!</h2>
+          <p className="text-white/90">Vocês acertaram <b>{score}</b> de <b>{questions.length}</b> perguntas.</p>
+          <button onClick={onExitApp} className="mt-3 px-6 py-3 rounded-full bg-yellow-400 text-[#3a2413] font-bold active:scale-[0.98] transition-transform">
+            Voltar aos Jogos
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const LeilaoDoSaber = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
   teams: GamiTeam[];
@@ -17063,6 +17229,9 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         {/* Mundo Perdido — jogo Escape em overlay de tela cheia (fora do
             AnimatePresence: cobre a UI inteira, inclusive a navegação) */}
         {screen === 'escape' && <EscapeGame onExitApp={() => setScreen('estudio')} />}
+
+        {/* Quiz Relâmpago — quiz rápido em overlay de tela cheia */}
+        {screen === 'quizrelampago' && <QuizRelampago onExitApp={() => setScreen('estudio')} />}
 
         <GlobalTaskIndicator 
           tasks={activeTasks} 
