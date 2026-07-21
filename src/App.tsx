@@ -11214,8 +11214,10 @@ const QUIZ_CSS = `
 // cima pra dar legibilidade ao texto.
 const QuizStage = ({ children }: { children: React.ReactNode }) => (
   <div className="qz-stage relative flex-1 flex flex-col overflow-hidden" style={{ background: '#345b86' }}>
-    {/* apenas a ilustração enviada (tábuas azuis, versão vertical) */}
+    {/* a ilustração enviada (tábuas azuis, versão vertical) */}
     <img src="/assets/battle/fundo-vertical.jpg" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+    {/* escurecimento suave pra deixar a ilustração um pouco mais escura */}
+    <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(18,30,52,0.32)' }} />
     {children}
   </div>
 );
