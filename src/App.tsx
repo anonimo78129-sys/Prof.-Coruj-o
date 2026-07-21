@@ -11289,8 +11289,9 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               as alternativas vierem mais longas que o normal, a caixa cresce
               e essa área rola — os botões A/B/C/D nunca ficam cortados. */}
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-            {/* espaço do banner — reservado, sem ilustração ainda */}
-            <div className="min-h-[120px] bg-white shrink-0" />
+            {/* espaço do banner — reservado, sem ilustração ainda.
+                Proporção 1200x760 pra encaixar certinho quando a arte chegar. */}
+            <div className="w-full bg-white shrink-0" style={{ aspectRatio: '1200 / 760' }} />
 
             {/* caixa da pergunta + alternativas */}
             <div className="shrink-0 px-4 pt-6 pb-6" style={{ background: woodBg }}>
