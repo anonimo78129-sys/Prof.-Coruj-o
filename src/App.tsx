@@ -13,7 +13,11 @@ import {
   Wand2, Grid3x3, Puzzle, Dice5, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
   Volume2, Shuffle, Swords, Crown, Zap, Gift, Pause, RotateCcw, Dices, Timer as TimerIcon, Star, Minus, Hand, Ticket, Siren,
   Coins, BarChart3, Scale, Megaphone, PartyPopper, CalendarDays, Mail,
-  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff
+  Copy, Youtube, Accessibility, ListChecks, Printer, HeartHandshake, GraduationCap, NotebookPen, Eye, EyeOff, Share2,
+  Egg, Feather, Bird, Medal, Gem, Sprout, Flame, Rocket, Dumbbell, VolumeX, BookX, AlertTriangle, Footprints,
+  Armchair, Music2, Fish, HeartCrack, PawPrint, Percent, Smartphone, TestTube, Landmark, Check,
+  Lightbulb, Sparkle, Compass, FlaskConical, Pickaxe, Goal, Gamepad2, Skull, Palette, MessagesSquare, Circle, Heart,
+  Scissors, SkipForward, HelpCircle,
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -23,6 +27,9 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
+import EscapeGame from './escape/EscapeGame';
+import { QRCodeSVG } from 'qrcode.react';
+import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
 import {
   escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
@@ -37,6 +44,104 @@ if (!apiKey) {
 const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
 
 const AI_MODEL = 'gemini-2.5-flash';
+
+// ── Emoji → ícone ────────────────────────────────────────────────────────────
+// Boa parte da UI (avatares, medalhas, comportamentos, recompensas, equipes)
+// guarda um campo `emoji: string` livre — inclusive já salvo no Firestore de
+// turmas reais. Em vez de trocar o formato dos dados (o que quebraria turmas
+// já criadas), este mapa só troca a RENDERIZAÇÃO: emoji conhecido vira ícone
+// lucide; emoji sem mapeamento (conteúdo gerado pela IA, valor antigo, etc.)
+// continua caindo no próprio emoji como texto — nada quebra silenciosamente.
+type EmojiIconEntry = { Icon: React.ComponentType<{ size?: number; className?: string }>; className?: string };
+const EMOJI_ICON_MAP: Record<string, EmojiIconEntry> = {
+  // Avatares — trilha Coruja
+  '🥚': { Icon: Egg, className: 'text-amber-700' },
+  '🐣': { Icon: Feather, className: 'text-amber-500' },
+  '🦉': { Icon: Bird, className: 'text-indigo-500' },
+  '🌟': { Icon: Star, className: 'text-amber-400' },
+  '🎓': { Icon: GraduationCap, className: 'text-indigo-600' },
+  '👑': { Icon: Crown, className: 'text-amber-500' },
+  // Avatares — trilha Emblema
+  '🛡️': { Icon: Shield, className: 'text-slate-500' },
+  '🥉': { Icon: Medal, className: 'text-orange-600' },
+  '🥈': { Icon: Medal, className: 'text-gray-400' },
+  '🥇': { Icon: Medal, className: 'text-amber-500' },
+  '💎': { Icon: Gem, className: 'text-cyan-500' },
+  // Medalhas automáticas
+  '🌱': { Icon: Sprout, className: 'text-emerald-600' },
+  '🔥': { Icon: Flame, className: 'text-orange-500' },
+  '⚡': { Icon: Zap, className: 'text-amber-500' },
+  '💯': { Icon: Percent, className: 'text-rose-500' },
+  '🚀': { Icon: Rocket, className: 'text-indigo-500' },
+  // Comportamentos (pontuação)
+  '🙋': { Icon: Hand, className: 'text-sky-500' },
+  '🤝': { Icon: HeartHandshake, className: 'text-emerald-500' },
+  '📘': { Icon: BookOpen, className: 'text-blue-500' },
+  '💪': { Icon: Dumbbell, className: 'text-orange-500' },
+  '💜': { Icon: Heart, className: 'text-violet-500' },
+  '🔇': { Icon: VolumeX, className: 'text-red-400' },
+  '📕': { Icon: BookX, className: 'text-red-400' },
+  '⭐': { Icon: Star, className: 'text-amber-400' },
+  '⚠️': { Icon: AlertTriangle, className: 'text-amber-600' },
+  // Recompensas
+  '🚶': { Icon: Footprints, className: 'text-sky-500' },
+  '🪑': { Icon: Armchair, className: 'text-amber-700' },
+  '🎵': { Icon: Music2, className: 'text-fuchsia-500' },
+  '💌': { Icon: Mail, className: 'text-rose-500' },
+  '📅': { Icon: CalendarDays, className: 'text-indigo-500' },
+  '🎁': { Icon: Gift, className: 'text-amber-500' },
+  // Equipes (🦉 Corujas reaproveita a entrada de avatar acima)
+  '🐉': { Icon: Sparkles, className: 'text-emerald-600' },
+  '🦈': { Icon: Fish, className: 'text-sky-600' },
+  '🦅': { Icon: Bird, className: 'text-amber-600' },
+  '🐺': { Icon: PawPrint, className: 'text-violet-500' },
+  // Batalha (QuaqueMagia)
+  '🏆': { Icon: Trophy, className: 'text-amber-500' },
+  '💔': { Icon: HeartCrack, className: 'text-red-400' },
+  '🔵': { Icon: Circle, className: 'text-blue-500 fill-blue-500' },
+  '🔴': { Icon: Circle, className: 'text-red-500 fill-red-500' },
+  '🧪': { Icon: TestTube, className: 'text-violet-400' },
+  '⚔️': { Icon: Swords, className: 'text-rose-500' },
+  // Ambientação do Escape Room / universo pop da história
+  '⚗️': { Icon: FlaskConical, className: 'text-sky-600' },
+  '🔍': { Icon: Search, className: 'text-slate-600' },
+  '🧙': { Icon: Wand2, className: 'text-violet-500' },
+  '⛏️': { Icon: Pickaxe, className: 'text-emerald-700' },
+  '⚽': { Icon: Goal, className: 'text-emerald-600' },
+  '🦸': { Icon: Sparkles, className: 'text-sky-500' },
+  '🍥': { Icon: Circle, className: 'text-rose-400' },
+  '🎮': { Icon: Gamepad2, className: 'text-indigo-500' },
+  '🏴‍☠️': { Icon: Skull, className: 'text-slate-700' },
+  // Atividade extra do Storytelling
+  '✍️': { Icon: Pencil, className: 'text-fuchsia-600' },
+  '🔄': { Icon: Shuffle, className: 'text-fuchsia-600' },
+  '🎨': { Icon: Palette, className: 'text-fuchsia-600' },
+  '🗣️': { Icon: MessagesSquare, className: 'text-fuchsia-600' },
+  // Avulsos (empty states, toasts, avisos)
+  '🔒': { Icon: Lock, className: '' },
+  '🔔': { Icon: Bell, className: '' },
+  '📱': { Icon: Smartphone, className: '' },
+  '✕': { Icon: X, className: '' },
+  '✗': { Icon: X, className: '' },
+  '✓': { Icon: Check, className: '' },
+  '💡': { Icon: Lightbulb, className: 'text-indigo-500' },
+  '🎉': { Icon: PartyPopper, className: 'text-emerald-500' },
+  '✦': { Icon: Sparkle, className: '' },
+  '🏛️': { Icon: Landmark, className: '' },
+  '🧭': { Icon: Compass, className: 'text-violet-500' },
+};
+function EmojiIcon({ emoji, size = 16, className = '' }: { emoji: string; size?: number; className?: string }) {
+  const entry = EMOJI_ICON_MAP[emoji];
+  if (!entry) return <span className={className}>{emoji}</span>;
+  const { Icon, className: base = '' } = entry;
+  return <Icon size={size} className={`${base} ${className}`.trim()} />;
+}
+// Medalha de pódio (1º/2º/3º); do 4º em diante, cai pra "Nº°" em texto.
+const RANK_EMOJI = ['🥇', '🥈', '🥉'] as const;
+function RankBadge({ rank, size = 14 }: { rank: number; size?: number }) {
+  if (rank < 3) return <EmojiIcon emoji={RANK_EMOJI[rank]} size={size} />;
+  return <span className="text-gray-500 font-bold">{rank + 1}°</span>;
+}
 
 // ── Privacidade / LGPD ──────────────────────────────────────────────────────
 // Versão do aviso de privacidade aceito no cadastro (registrada no doc do
@@ -117,7 +222,7 @@ function PrivacyPolicyOverlay({ onClose }: { onClose: () => void }) {
 function LgpdNotice({ text }: { text: string }) {
   return (
     <p className="text-[11px] leading-snug text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
-      <span aria-hidden>🔒</span>
+      <Lock aria-hidden size={13} className="shrink-0 mt-0.5" />
       <span>{text}</span>
     </p>
   );
@@ -404,20 +509,20 @@ class ErrorBoundary extends React.Component<
 
 // --- Toast System ---
 type ToastType = 'error' | 'success' | 'info';
-interface Toast { id: string; message: string; type: ToastType; }
+interface Toast { id: string; message: string; type: ToastType; icon?: React.ReactNode; }
 
 let _toastSetter: React.Dispatch<React.SetStateAction<Toast[]>> | null = null;
 
 const toast = {
-  show(message: string, type: ToastType = 'info') {
+  show(message: string, type: ToastType = 'info', icon?: React.ReactNode) {
     if (!_toastSetter) { console.warn('[toast]', message); return; }
     const id = Math.random().toString(36).slice(2);
-    _toastSetter(prev => [...prev.slice(-3), { id, message, type }]);
+    _toastSetter(prev => [...prev.slice(-3), { id, message, type, icon }]);
     setTimeout(() => _toastSetter!(prev => prev.filter(t => t.id !== id)), 4500);
   },
-  error(msg: string) { this.show(msg, 'error'); },
-  success(msg: string) { this.show(msg, 'success'); },
-  info(msg: string) { this.show(msg, 'info'); },
+  error(msg: string, icon?: React.ReactNode) { this.show(msg, 'error', icon); },
+  success(msg: string, icon?: React.ReactNode) { this.show(msg, 'success', icon); },
+  info(msg: string, icon?: React.ReactNode) { this.show(msg, 'info', icon); },
 };
 
 const ToastContainer = () => {
@@ -437,8 +542,9 @@ const ToastContainer = () => {
               t.type === 'error' ? 'bg-red-500' : t.type === 'success' ? 'bg-emerald-500' : 'bg-gray-800'
             }`}
           >
+            {t.icon && <span className="shrink-0 mt-0.5">{t.icon}</span>}
             <span className="flex-1">{t.message}</span>
-            <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="opacity-70 hover:opacity-100 shrink-0 mt-0.5">✕</button>
+            <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="opacity-70 hover:opacity-100 shrink-0 mt-0.5"><X size={14} /></button>
           </motion.div>
         ))}
       </AnimatePresence>
@@ -544,7 +650,7 @@ const fetchPixabayImage = async (query: string | undefined, width: number, heigh
 };
 
 // --- Types ---
-type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin' | 'gamificacao' | 'ferramentas' | 'acervo';
+type Screen = 'home' | 'planner' | 'chat' | 'calendar' | 'dayDetail' | 'profile' | 'estudio' | 'biblioteca' | 'admin' | 'gamificacao' | 'ferramentas' | 'acervo' | 'escape';
 type PlannerMode = 'plan' | 'activities' | 'slides' | 'exam';
 
 interface PresentationTheme {
@@ -717,7 +823,7 @@ const BottomNav = ({ activeScreen, setScreen, isAdmin }: { activeScreen: Screen,
   );
 };
 
-const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, bannerPlaceholder, setScreen, rightAction }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; bannerPlaceholder?: string; setScreen?: (s: Screen) => void; rightAction?: React.ReactNode }) => {
+const Header = ({ title, subtitle, profile, notifications = [], setNotifications, children, bannerImage, bannerPlaceholder, setScreen, rightAction, light }: { title: string; subtitle: string; profile: UserProfile; notifications?: any[]; setNotifications?: (n: any[]) => void; children?: React.ReactNode; bannerImage?: string | null; bannerPlaceholder?: string; setScreen?: (s: Screen) => void; rightAction?: React.ReactNode; light?: boolean }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(
     'Notification' in window ? Notification.permission : 'denied'
@@ -752,8 +858,8 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
 
     <div className={`flex justify-between items-start ${typeof bannerImage === 'string' || bannerPlaceholder ? 'pt-28' : 'pt-2'}`}>
       <div className="px-2">
-        <p className="text-gray-600 text-sm font-bold uppercase tracking-wider mb-1">{subtitle}</p>
-        <h1 className="text-2xl font-black text-gray-900">{title}</h1>
+        <p className={`${light ? 'text-indigo-200' : 'text-gray-600'} text-sm font-bold uppercase tracking-wider mb-1`}>{subtitle}</p>
+        <h1 className={`text-2xl font-black ${light ? 'text-white' : 'text-gray-900'}`}>{title}</h1>
       </div>
       <div className="flex gap-3 relative">
         {children}
@@ -1915,7 +2021,7 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
                     className="text-xs bg-emerald-600 text-white px-2 py-1.5 rounded-lg font-bold disabled:opacity-60 flex items-center gap-1">
                     {regenLoading ? <Loader2 size={11} className="animate-spin" /> : null}OK
                   </button>
-                  <button onClick={() => setRegenState(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-1.5 rounded-lg font-bold">✕</button>
+                  <button onClick={() => setRegenState(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-1.5 rounded-lg font-bold"><X size={12} /></button>
                 </>
               ) : (
                 <button onClick={() => setRegenState({ idx, prompt: '' })} className="text-xs bg-emerald-600 text-white px-2 py-1.5 rounded-lg font-bold">Regerar</button>
@@ -3501,9 +3607,12 @@ const ChatScreen = ({
   classes,
   schedules,
   savedResources,
+  setSavedResources,
   addClassItems,
   customEvents,
+  setCustomEvents,
   setScreen,
+  setFerramentasTool,
   notifications,
   setNotifications,
   generatePlan,
@@ -3511,19 +3620,23 @@ const ChatScreen = ({
   setPlannerTopic,
   setPlannerSelectedClassId,
   setPlannerMode,
-  getScheduleBuffer
+  getScheduleBuffer,
+  user,
 }: {
-  profile: UserProfile, 
+  profile: UserProfile,
   setProfile: (p: UserProfile) => void,
-  estudioContext: string, 
-  messages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[], 
+  estudioContext: string,
+  messages: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[],
   setMessages: (m: {id: string, role: 'user' | 'model', text: string, date: number, attachment?: { mimeType: string, url: string, data: string, name: string }}[]) => void,
   classes: ClassItem[],
   schedules: ClassSchedule[],
   savedResources: SavedResource[],
+  setSavedResources: (r: SavedResource[]) => void,
   addClassItems: (items: ClassItem[]) => void,
   customEvents: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[],
+  setCustomEvents: (c: {id: string, title: string, date: string, type: 'prep' | 'admin' | 'holiday' | 'commemorative', status?: 'pending' | 'done'}[]) => void,
   setScreen: (s: Screen) => void,
+  setFerramentasTool: (t: string | null) => void,
   notifications?: any[],
   setNotifications?: (n: any[]) => void,
   generatePlan: (topic?: string, classId?: string) => Promise<void>,
@@ -3531,9 +3644,58 @@ const ChatScreen = ({
   setPlannerTopic: (t: string) => void,
   setPlannerSelectedClassId: (id: string) => void,
   setPlannerMode: (m: PlannerMode) => void,
-  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[]
+  getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
+  user: any,
 }) => {
   const [input, setInput] = useState('');
+  // Gamificação: assinatura própria da mesma coleção Firestore que a
+  // GamificacaoScreen usa (mesmo padrão já existente no app — DiarioScreen
+  // também tem a sua). O assistente lê/escreve turmas gamificadas pra
+  // executar pedidos do professor no chat (dar ponto, criar equipe...).
+  const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
+  // Ref sempre sincronizada com o array mais recente: uma resposta do
+  // assistente pode disparar VÁRIAS ações de gamificação em sequência (ex.:
+  // cadastrar aluno + colocar na equipe) na mesma execução síncrona, antes
+  // de o React re-renderizar — sem a ref, a segunda chamada leria o array
+  // "gamiClasses" ainda desatualizado (sem o que a primeira acabou de
+  // adicionar) e sobrescreveria a mudança dela.
+  const gamiClassesRef = useRef(gamiClasses);
+  gamiClassesRef.current = gamiClasses;
+  const readGamiClass = (classId: string) => gamiClassesRef.current.find(c => c.id === classId) ?? gamiDefaultClass(classId);
+  const updateGamiClass = (classId: string, updater: (prev: ClassGamification) => ClassGamification) => {
+    const list = gamiClassesRef.current;
+    const existing = list.find(c => c.id === classId);
+    const prev = existing ?? gamiDefaultClass(classId);
+    const next = updater(prev);
+    const newList = existing ? list.map(c => c.id === classId ? next : c) : [...list, next];
+    gamiClassesRef.current = newList;
+    setGamiClasses(newList);
+  };
+  // Diário: mesma lógica de assinatura própria + ref usada pra gamificação,
+  // pra marcar chamada (P/F/A) a pedido do professor no chat.
+  const [diarioEntries, setDiarioEntries] = useFirestoreSync<DiarioEntry>('diario', user, []);
+  const diarioEntriesRef = useRef(diarioEntries);
+  diarioEntriesRef.current = diarioEntries;
+  const updateDiarioEntry = (id: string, classId: string, date: string, updater: (prev: DiarioEntry) => DiarioEntry) => {
+    const list = diarioEntriesRef.current;
+    const existing = list.find(e => e.id === id);
+    const prev = existing ?? { id, classId, date, att: {} };
+    const next = updater(prev);
+    const newList = existing ? list.map(e => e.id === id ? next : e) : [...list, next];
+    diarioEntriesRef.current = newList;
+    setDiarioEntries(newList);
+  };
+  // customEvents e savedResources são estado do App (não desta tela) — refs
+  // locais aqui só pra manter múltiplas ações do assistente na mesma
+  // resposta consistentes entre si, mesmo padrão da gamificação/diário.
+  const customEventsRef = useRef(customEvents);
+  customEventsRef.current = customEvents;
+  const savedResourcesRef = useRef(savedResources);
+  savedResourcesRef.current = savedResources;
+  // Ação destrutiva pendente de confirmação explícita do professor (nunca
+  // persistida — se o app fechar antes de confirmar, a ação simplesmente
+  // não acontece, que é o comportamento seguro por padrão).
+  const [pendingConfirm, setPendingConfirm] = useState<{ detail: string; run: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFile, setSelectedFile] = useState<{ file: File, url: string, base64: string } | null>(null);
@@ -3597,7 +3759,11 @@ const ChatScreen = ({
   const sendMessage = async (messageText?: string) => {
     const textToSend = messageText || input;
     if (!textToSend.trim() && !selectedFile) return;
-    
+
+    // Mandar outra mensagem abandona uma confirmação pendente sem executar
+    // nada — só o botão "Sim, continuar" executa a ação destrutiva.
+    if (pendingConfirm) setPendingConfirm(null);
+
     const currentFile = selectedFile;
     setSelectedFile(null);
 
@@ -3660,10 +3826,27 @@ const ChatScreen = ({
       - Conteúdo do Estúdio: ${estudioContext ? `${estudioContext.substring(0, 300)}...` : 'Vazio'}
 
       Suas Capacidades no App (USE AS FUNÇÕES SEMPRE QUE POSSÍVEL):
-      1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca'.
+      1. NAVEGAÇÃO: Mudar para as telas 'home', 'planner', 'chat', 'calendar', 'profile', 'estudio', 'biblioteca', 'gamificacao', 'ferramentas', 'acervo'.
       2. MATERIAL DIDÁTICO: Gerar Planos de Aula, Slides, Atividades ou Provas. Os materiais ficam disponíveis no histórico ao concluir.
       3. AGENDAMENTO: Marcar uma aula individual (schedule_class) ou uma série de aulas (schedule_lesson_series).
       4. PERFIL: Atualizar nome, disciplina ou escola.
+      5. TURMA GAMIFICADA: dar/tirar pontos de um aluno ou da turma toda (award_points), cadastrar aluno (add_student_to_class), remover aluno (remove_student_from_class — DESTRUTIVO), criar equipe (create_team), colocar aluno numa equipe (assign_student_to_team), resgatar recompensa da Loja pra um aluno (redeem_reward), criar recompensa nova na Loja (add_custom_reward), encerrar a temporada (end_season — DESTRUTIVO).
+      6. DIÁRIO DE BORDO: marcar chamada de um aluno — presente/falta/atraso (mark_attendance).
+      7. ACERVO/BIBLIOTECA: apagar um material gerado (delete_saved_resource — DESTRUTIVO).
+      8. CALENDÁRIO: adicionar evento personalizado — reunião, prazo, data comemorativa (add_custom_event); remover evento personalizado (remove_custom_event — DESTRUTIVO). Para aulas de turma, use schedule_class/schedule_lesson_series, não estas.
+      9. KIT DO PROFESSOR: abrir uma ferramenta pronta pro professor preencher — Parecer, Adaptação Inclusiva, Rubrica, Nivelador de Texto, Comunicação com Famílias, Material de Vídeo, Material do PDF (open_professor_tool). Você não gera o conteúdo dessas ferramentas sozinho, só abre a tela certa.
+      10. Trocar o avatar visual da Turma Gamificada entre Coruja e Emblema (change_avatar_skin).
+      11. Marcar um evento personalizado do Calendário como concluído (mark_event_done).
+
+      Como funciona cada tela (pra explicar ao professor quando perguntado):
+      - TURMA GAMIFICADA > ALUNOS: cadastro dos alunos da turma; cada um ganha XP, moedas (corujinhas 🪙) e medalhas automáticas.
+      - TURMA GAMIFICADA > EQUIPES: agrupam alunos, competem por XP semanal.
+      - TURMA GAMIFICADA > LOJA: os alunos trocam as moedas ganhas por recompensas configuradas pelo professor (ex: "Primeiro da fila" por 10 corujinhas). Resgatar desconta as moedas do aluno.
+      - TURMA GAMIFICADA > AJUSTES: onde o professor configura os comportamentos que valem ponto (ex: "Participou da aula" = +1 XP), as recompensas da Loja, o avatar visual da turma (Coruja ou Emblema) e o botão de Encerrar Temporada (zera XP/moedas/sequência do bimestre e salva o ranking no Hall da Fama — o XP total e o nível de cada aluno são vitalícios e não zeram).
+      - DIÁRIO DE BORDO: chamada (P/F/A) e notas por aula, por turma e data.
+      - ACERVO: histórico de tudo que foi gerado (planos, slides, atividades, provas), com busca e reimpressão.
+      - CALENDÁRIO: aulas agendadas + eventos personalizados (reuniões, prazos, datas comemorativas, feriados).
+      - KIT DO PROFESSOR: ferramentas avulsas que pedem informação do professor antes de gerar (não são preenchidas automaticamente pelo assistente).
 
       Sua Expertise Pedagógica (responda diretamente no chat, sem funções):
       - GESTÃO DE SALA: estratégias práticas para indisciplina, turmas agitadas, conflitos entre alunos, engajamento.
@@ -3680,6 +3863,7 @@ const ChatScreen = ({
       4. Quando usar uma função de geração, informe que o material ficará disponível no histórico ao concluir.
       5. Se o professor disser apenas "Oi", faça um resumo do dia baseado nas aulas e sugira algo.
       6. Se o professor desabafar sobre dificuldades em sala, acolha brevemente e ofereça 2-3 estratégias práticas imediatas.
+      7. AÇÕES DESTRUTIVAS (remove_student_from_class, end_season, delete_saved_resource, remove_custom_event): o app SEMPRE pede confirmação explícita ao professor antes de executar, então pode chamar a função normalmente quando o pedido for claro — a confirmação acontece automaticamente antes de qualquer dado ser apagado ou zerado. Nunca invente que já executou uma dessas ações.
 
       Histórico:
       ${sortedHistory.slice(-20).map(m => `[${new Date(m.date).toLocaleTimeString()}] ${m.role === 'user' ? 'Professor' : 'Assistente'}: ${m.text}`).join('\n')}
@@ -3803,6 +3987,160 @@ const ChatScreen = ({
                     schoolName: { type: Type.STRING }
                   }
                 }
+              },
+              {
+                name: 'award_points',
+                description: 'Dar (ou tirar, com número negativo) pontos de XP na Turma Gamificada, pra um aluno específico ou pra turma toda.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    className: { type: Type.STRING },
+                    studentName: { type: Type.STRING, description: 'Nome do aluno. Omitir para dar pontos a todos os alunos da turma.' },
+                    points: { type: Type.NUMBER, description: 'Positivo para premiar, negativo para penalizar.' },
+                    reason: { type: Type.STRING, description: 'Motivo curto (ex: "Participou da aula"). Se bater com um comportamento já configurado na turma, usa o emoji dele.' }
+                  },
+                  required: ['className', 'points', 'reason']
+                }
+              },
+              {
+                name: 'add_student_to_class',
+                description: 'Cadastrar um novo aluno na Turma Gamificada (aba Alunos).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING } },
+                  required: ['className', 'studentName']
+                }
+              },
+              {
+                name: 'remove_student_from_class',
+                description: 'DESTRUTIVO: remover um aluno da Turma Gamificada, apagando seu histórico de pontos, moedas e medalhas. Sempre pede confirmação ao professor antes de executar — nunca some sem avisar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING } },
+                  required: ['className', 'studentName']
+                }
+              },
+              {
+                name: 'create_team',
+                description: 'Criar uma equipe na Turma Gamificada (aba Equipes). Se o nome bater com uma equipe padrão (Corujas, Fênix, Dragões, Tubarões, Águias, Lobos), usa o emoji e a cor padrão dela.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, teamName: { type: Type.STRING } },
+                  required: ['className', 'teamName']
+                }
+              },
+              {
+                name: 'assign_student_to_team',
+                description: 'Colocar um aluno numa equipe já existente da Turma Gamificada.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING }, teamName: { type: Type.STRING } },
+                  required: ['className', 'studentName', 'teamName']
+                }
+              },
+              {
+                name: 'redeem_reward',
+                description: 'Resgatar uma recompensa da Loja pra um aluno, descontando o custo em moedas (corujinhas). Só funciona se o aluno tiver moedas suficientes.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, studentName: { type: Type.STRING }, rewardLabel: { type: Type.STRING } },
+                  required: ['className', 'studentName', 'rewardLabel']
+                }
+              },
+              {
+                name: 'add_custom_reward',
+                description: 'Adicionar uma recompensa personalizada à Loja da Turma Gamificada (aba Ajustes).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING }, label: { type: Type.STRING }, cost: { type: Type.NUMBER, description: 'Custo em moedas (corujinhas).' } },
+                  required: ['className', 'label', 'cost']
+                }
+              },
+              {
+                name: 'end_season',
+                description: 'DESTRUTIVO: encerrar a temporada da Turma Gamificada (aba Ajustes). Zera XP da temporada, moedas e sequência de todos os alunos (o XP total e o nível não zeram) e salva o ranking no Hall da Fama. Sempre pede confirmação ao professor antes de executar — nunca encerra sem avisar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { className: { type: Type.STRING } },
+                  required: ['className']
+                }
+              },
+              {
+                name: 'mark_attendance',
+                description: 'Marcar a chamada (presença/falta/atraso) de um aluno no Diário de Bordo de uma aula.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    className: { type: Type.STRING },
+                    studentName: { type: Type.STRING },
+                    status: { type: Type.STRING, enum: ['P', 'F', 'A'], description: 'P = presente, F = falta, A = atraso' },
+                    date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD. Omitir para usar hoje.' }
+                  },
+                  required: ['className', 'studentName', 'status']
+                }
+              },
+              {
+                name: 'delete_saved_resource',
+                description: 'DESTRUTIVO: apagar permanentemente um material gerado (plano, slides, atividade ou prova) do Acervo/Biblioteca. Sempre pede confirmação ao professor antes de executar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { title: { type: Type.STRING, description: 'Título (ou parte dele) do material a apagar.' } },
+                  required: ['title']
+                }
+              },
+              {
+                name: 'add_custom_event',
+                description: 'Adicionar um evento personalizado ao Calendário (reunião, prazo, lembrete administrativo etc — não é uma aula de turma, use schedule_class para isso).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD.' },
+                    type: { type: Type.STRING, enum: ['prep', 'admin', 'commemorative'], description: 'prep = preparação de aula, admin = administrativo/reunião, commemorative = data comemorativa' }
+                  },
+                  required: ['title', 'date', 'type']
+                }
+              },
+              {
+                name: 'remove_custom_event',
+                description: 'DESTRUTIVO: remover permanentemente um evento personalizado do Calendário. Sempre pede confirmação ao professor antes de executar.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { title: { type: Type.STRING }, date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD, se souber — ajuda a desambiguar.' } },
+                  required: ['title']
+                }
+              },
+              {
+                name: 'open_professor_tool',
+                description: 'Abrir uma ferramenta do Kit do Professor pronta pro professor preencher e gerar (o assistente não gera sozinho — o professor completa os campos).',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    tool: { type: Type.STRING, enum: ['parecer', 'inclusao', 'rubrica', 'nivelador', 'familia', 'video', 'pdf'], description: 'parecer = Parecer Descritivo, inclusao = Adaptação Inclusiva, rubrica = Rubrica de Avaliação, nivelador = Nivelador de Texto, familia = Comunicação com Famílias, video = Material de Vídeo (YouTube), pdf = Material do meu PDF' }
+                  },
+                  required: ['tool']
+                }
+              },
+              {
+                name: 'change_avatar_skin',
+                description: 'Trocar o tema visual dos avatares da Turma Gamificada (aba Ajustes) entre Coruja e Emblema.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    className: { type: Type.STRING },
+                    skin: { type: Type.STRING, enum: ['coruja', 'emblema'] }
+                  },
+                  required: ['className', 'skin']
+                }
+              },
+              {
+                name: 'mark_event_done',
+                description: 'Marcar um evento personalizado do Calendário como concluído.',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: { title: { type: Type.STRING }, date: { type: Type.STRING, description: 'Data no formato AAAA-MM-DD, se souber — ajuda a desambiguar.' } },
+                  required: ['title']
+                }
               }
             ]
           }]
@@ -3811,10 +4149,190 @@ const ChatScreen = ({
       
       if (response.functionCalls && response.functionCalls.length > 0) {
         let responseText = "";
+        // Ação destrutiva encontrada nesta rodada — fica pendente de
+        // confirmação explícita do professor em vez de executar direto.
+        // Só uma por vez: se o modelo pedir mais de uma ação destrutiva na
+        // mesma resposta (raro), só a primeira vira confirmação; o resto é
+        // ignorado silenciosamente (o professor pode pedir de novo depois).
+        let confirmToSet: { detail: string; run: () => void } | null = null;
+        const resolveGamiClass = (className: string) => schedules.find(s => s.name.toLowerCase().includes((className || '').toLowerCase()));
+
         for (const call of response.functionCalls) {
           const args = call.args as any;
-          
-          if (call.name === 'schedule_class') {
+
+          if (call.name === 'award_points') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const points = Number(args.points) || 0;
+            if (!points) { responseText += `Preciso saber quantos pontos dar. `; continue; }
+            const cls = readGamiClass(targetClass.id);
+            // Se o motivo bate com um comportamento configurado, herda o
+            // rótulo e o emoji dele — mas o valor de pontos é SEMPRE o que o
+            // professor pediu (points), pra não premiar um número diferente
+            // do que a mensagem de confirmação diz.
+            const matched = cls.behaviors.find(b => b.label.toLowerCase() === String(args.reason || '').toLowerCase());
+            const behavior = {
+              label: matched?.label ?? (args.reason || (points > 0 ? 'Pontos do assistente' : 'Penalidade do assistente')),
+              points,
+              emoji: matched?.emoji ?? (points > 0 ? '⭐' : '⚠️'),
+            };
+            const studentIds = args.studentName
+              ? cls.students.filter(s => s.name.toLowerCase().includes(String(args.studentName).toLowerCase())).map(s => s.id)
+              : cls.students.map(s => s.id);
+            if (studentIds.length === 0) { responseText += `Não encontrei ${args.studentName ? `o aluno "${args.studentName}"` : 'alunos'} em ${targetClass.name}. `; continue; }
+            updateGamiClass(targetClass.id, c => gamiApplyAward(c, studentIds, behavior, gamiWeekKey()));
+            responseText += `${points > 0 ? '+' : ''}${points} XP para ${args.studentName ? args.studentName : `toda a turma ${targetClass.name}`}. `;
+          } else if (call.name === 'add_student_to_class') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            if (!String(args.studentName || '').trim()) { responseText += `Preciso do nome do aluno. `; continue; }
+            updateGamiClass(targetClass.id, cls => gamiApplyAddStudent(cls, String(args.studentName).trim()));
+            responseText += `${args.studentName} cadastrado(a) na gamificação de ${targetClass.name}. `;
+          } else if (call.name === 'remove_student_from_class') {
+            const targetClass = resolveGamiClass(args.className);
+            const student = targetClass ? readGamiClass(targetClass.id).students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase())) : null;
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; }
+            else if (!confirmToSet) {
+              const classId = targetClass.id, className = targetClass.name, studentId = student.id, studentName = student.name;
+              confirmToSet = {
+                detail: `Remover ${studentName} da gamificação de ${className} apaga todo o histórico de pontos, moedas e medalhas dele(a). Não dá pra desfazer.`,
+                run: () => { updateGamiClass(classId, c => ({ ...c, students: c.students.filter(s => s.id !== studentId) })); toast.success(`${studentName} removido(a).`); },
+              };
+              responseText += `Antes de remover ${studentName}, preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'create_team') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const teamName = String(args.teamName || '').trim();
+            if (!teamName) { responseText += `Preciso do nome da equipe. `; continue; }
+            const preset = GAMI_TEAM_PRESETS.find(p => p.name.toLowerCase() === teamName.toLowerCase());
+            const team = preset ? { ...preset, id: gamiRid() } : { id: gamiRid(), name: teamName, emoji: '🏆', color: '#6366f1' };
+            updateGamiClass(targetClass.id, cls => ({ ...cls, teams: [...cls.teams, team] }));
+            responseText += `Equipe "${team.name}" criada em ${targetClass.name}. `;
+          } else if (call.name === 'assign_student_to_team') {
+            const targetClass = resolveGamiClass(args.className);
+            const cls = targetClass ? readGamiClass(targetClass.id) : null;
+            const student = cls?.students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase()));
+            const team = cls?.teams.find(t => t.name.toLowerCase().includes(String(args.teamName || '').toLowerCase()));
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; }
+            else if (!team) { responseText += `Não encontrei a equipe "${args.teamName}" em ${targetClass.name}. `; }
+            else {
+              updateGamiClass(targetClass.id, c => ({ ...c, students: c.students.map(s => s.id === student.id ? { ...s, teamId: team.id } : s) }));
+              responseText += `${student.name} agora está na equipe ${team.name}. `;
+            }
+          } else if (call.name === 'redeem_reward') {
+            const targetClass = resolveGamiClass(args.className);
+            const cls = targetClass ? readGamiClass(targetClass.id) : null;
+            const student = cls?.students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase()));
+            const reward = cls?.rewards.find(r => r.label.toLowerCase().includes(String(args.rewardLabel || '').toLowerCase()));
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; }
+            else if (!reward) { responseText += `Não encontrei a recompensa "${args.rewardLabel}" na loja de ${targetClass.name}. `; }
+            else if (student.coins < reward.cost) { responseText += `${student.name} só tem ${student.coins} corujinhas — "${reward.label}" custa ${reward.cost}. `; }
+            else {
+              updateGamiClass(targetClass.id, c => gamiApplyPurchase(c, student.id, reward).cls);
+              responseText += `"${reward.label}" resgatada para ${student.name}. `;
+            }
+          } else if (call.name === 'add_custom_reward') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const label = String(args.label || '').trim();
+            if (!label || !args.cost) { responseText += `Preciso do nome e do custo em corujinhas da recompensa. `; continue; }
+            updateGamiClass(targetClass.id, cls => ({ ...cls, rewards: [...cls.rewards, { id: gamiRid(), label, cost: Number(args.cost), emoji: '🎁' }] }));
+            responseText += `Recompensa "${label}" adicionada à loja de ${targetClass.name} por ${args.cost} corujinhas. `;
+          } else if (call.name === 'end_season') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; }
+            else if (!confirmToSet) {
+              const classId = targetClass.id, className = targetClass.name;
+              confirmToSet = {
+                detail: `Encerrar a temporada de ${className} zera o XP da temporada, as moedas e a sequência de todos os alunos (o XP total e o nível ficam preservados) e salva o ranking atual no Hall da Fama. Não dá pra desfazer.`,
+                run: () => { updateGamiClass(classId, c => gamiApplyEndSeason(c)); toast.success('Nova temporada iniciada!', <Trophy size={16} />); },
+              };
+              responseText += `Antes de encerrar a temporada de ${className}, preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'mark_attendance') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const student = readGamiClass(targetClass.id).students.find(s => s.name.toLowerCase().includes(String(args.studentName || '').toLowerCase()));
+            if (!student) { responseText += `Não encontrei o aluno "${args.studentName}" em ${targetClass.name}. `; continue; }
+            const status = ['P', 'F', 'A'].includes(args.status) ? args.status : 'P';
+            const date = String(args.date || gamiTodayKey());
+            const entryId = `${targetClass.id}_${date}`;
+            updateDiarioEntry(entryId, targetClass.id, date, entry => ({ ...entry, att: { ...entry.att, [student.id]: status } }));
+            responseText += `${student.name} marcado(a) como ${status === 'P' ? 'presente' : status === 'F' ? 'falta' : 'atraso'} em ${date}. `;
+          } else if (call.name === 'delete_saved_resource') {
+            const resource = savedResourcesRef.current.find(r => r.title.toLowerCase().includes(String(args.title || '').toLowerCase()));
+            if (!resource) { responseText += `Não encontrei nenhum material com "${args.title}" no Acervo. `; }
+            else if (!confirmToSet) {
+              const resourceId = resource.id, resourceTitle = resource.title;
+              confirmToSet = {
+                detail: `Apagar "${resourceTitle}" do Acervo é permanente — não dá pra desfazer.`,
+                run: () => {
+                  const newList = savedResourcesRef.current.filter(r => r.id !== resourceId);
+                  savedResourcesRef.current = newList;
+                  setSavedResources(newList);
+                  toast.success(`"${resourceTitle}" apagado.`);
+                },
+              };
+              responseText += `Antes de apagar "${resourceTitle}", preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'add_custom_event') {
+            const title = String(args.title || '').trim();
+            const date = String(args.date || '').trim();
+            if (!title || !date) { responseText += `Preciso do título e da data do evento. `; continue; }
+            const eventType = ['prep', 'admin', 'commemorative'].includes(args.type) ? args.type : 'admin';
+            // Mesmo formato que a tela de Calendário grava (fmt = "YYYY-MM-DD 00:00"):
+            // as telas leem via split(' ')[0], mas manter o sufixo deixa os
+            // eventos do assistente idênticos aos criados pela UI e evita um
+            // parse de Date interpretar "YYYY-MM-DD" como UTC (dia anterior no BR).
+            const storedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date} 00:00` : date;
+            const newEvent = { id: Date.now().toString(36) + Math.random().toString(36).substring(2), title, date: storedDate, type: eventType as 'prep' | 'admin' | 'commemorative', status: 'pending' as const };
+            const newList = [...customEventsRef.current, newEvent];
+            customEventsRef.current = newList;
+            setCustomEvents(newList);
+            responseText += `Evento "${title}" adicionado ao calendário em ${date}. `;
+          } else if (call.name === 'remove_custom_event') {
+            const title = String(args.title || '').toLowerCase();
+            const dateFilter = args.date ? String(args.date) : null;
+            const event = customEventsRef.current.find(e => e.title.toLowerCase().includes(title) && (!dateFilter || e.date.startsWith(dateFilter)));
+            if (!event) { responseText += `Não encontrei nenhum evento com "${args.title}" no calendário. `; }
+            else if (!confirmToSet) {
+              const eventId = event.id, eventTitle = event.title, eventDate = event.date.split(' ')[0];
+              confirmToSet = {
+                detail: `Remover o evento "${eventTitle}" (${eventDate}) do calendário é permanente — não dá pra desfazer.`,
+                run: () => {
+                  const newList = customEventsRef.current.filter(e => e.id !== eventId);
+                  customEventsRef.current = newList;
+                  setCustomEvents(newList);
+                  toast.success(`Evento "${eventTitle}" removido.`);
+                },
+              };
+              responseText += `Antes de remover "${eventTitle}", preciso da sua confirmação — veja abaixo. `;
+            }
+          } else if (call.name === 'open_professor_tool') {
+            const toolMeta = FERRAMENTAS_META.find(t => t.id === args.tool);
+            setFerramentasTool(args.tool);
+            setScreen('ferramentas');
+            responseText += `Abrindo ${toolMeta?.title ?? 'a ferramenta'} no Kit do Professor. `;
+          } else if (call.name === 'change_avatar_skin') {
+            const targetClass = resolveGamiClass(args.className);
+            if (!targetClass) { responseText += `Não encontrei a turma "${args.className}". `; continue; }
+            const skin = args.skin === 'emblema' ? 'emblema' : 'coruja';
+            updateGamiClass(targetClass.id, cls => ({ ...cls, skin }));
+            responseText += `Avatar de ${targetClass.name} trocado para ${skin === 'emblema' ? 'Emblema' : 'Coruja'}. `;
+          } else if (call.name === 'mark_event_done') {
+            const title = String(args.title || '').toLowerCase();
+            const dateFilter = args.date ? String(args.date) : null;
+            const event = customEventsRef.current.find(e => e.title.toLowerCase().includes(title) && (!dateFilter || e.date.startsWith(dateFilter)));
+            if (!event) { responseText += `Não encontrei nenhum evento com "${args.title}" no calendário. `; continue; }
+            const newList = customEventsRef.current.map(e => e.id === event.id ? { ...e, status: 'done' as const } : e);
+            customEventsRef.current = newList;
+            setCustomEvents(newList);
+            responseText += `Evento "${event.title}" marcado como concluído. `;
+          } else if (call.name === 'schedule_class') {
             addClassItems([{
               id: Math.random().toString(36).slice(2, 11),
               title: args.title,
@@ -3874,6 +4392,7 @@ const ChatScreen = ({
             responseText += `Perfil atualizado com sucesso. `;
           }
         }
+        if (confirmToSet) setPendingConfirm(confirmToSet);
         setMessages([...newMessages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: responseText || "Tudo certo! Realizei as ações solicitadas.", date: Date.now() }]);
       } else {
         setMessages([...newMessages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: response.text || "Em que posso ajudar?", date: Date.now() }]);
@@ -4021,7 +4540,8 @@ const ChatScreen = ({
                       )}
                     </div>
                   )}
-                  <div className="text-base leading-relaxed">
+                  <div className={`text-base leading-relaxed ${isError ? 'flex items-start gap-1.5' : ''}`}>
+                    {isError && <AlertCircle size={16} className="shrink-0 mt-0.5" />}
                     {renderChatText(cleanText)}
                   </div>
                   <div className={`text-[10px] mt-2 text-right ${msg.role === 'user' && !isError ? 'text-indigo-200' : isError ? 'text-red-300' : 'text-gray-400'}`}>
@@ -4058,6 +4578,37 @@ const ChatScreen = ({
         </AnimatePresence>
       </div>
 
+      {/* Ação destrutiva pendente: só executa com um toque explícito do
+          professor. Some sem executar se ele mandar outra mensagem ou sair
+          do chat — nada acontece por padrão. */}
+      {pendingConfirm && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-2 flex items-start gap-2 shrink-0"
+        >
+          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-amber-800 leading-relaxed">{pendingConfirm.detail}</p>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => {
+                  pendingConfirm.run();
+                  setMessages([...messages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: 'Feito.', date: Date.now() }]);
+                  setPendingConfirm(null);
+                }}
+                className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-transform"
+              >Sim, continuar</button>
+              <button
+                onClick={() => {
+                  setMessages([...messages, { id: Math.random().toString(36).slice(2, 11), role: 'model', text: 'Ok, não fiz nada.', date: Date.now() }]);
+                  setPendingConfirm(null);
+                }}
+                className="bg-white text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 active:scale-95 transition-transform"
+              >Cancelar</button>
+            </div>
+          </div>
+        </motion.div>
+      )}
       <motion.div
         animate={{ boxShadow: input.length > 0 ? '0 0 0 2px #6366f1' : '0 1px 3px 0 rgb(0 0 0 / 0.05)' }}
         transition={{ duration: 0.2 }}
@@ -5235,7 +5786,7 @@ const HolidaySuggestion = ({ holidayName }: { holidayName: string }) => {
 
   if (loading) return <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 text-sm">Pensando em uma dica pedagógica...</div>;
   if (error) return <div className="p-4 bg-red-50 rounded-2xl text-red-600 text-sm">{error}</div>;
-  return <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-900 border border-indigo-100 text-sm"><strong>💡 Dica do Gemini:</strong> {suggestion}</div>;
+  return <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-900 border border-indigo-100 text-sm"><strong className="inline-flex items-center gap-1"><Lightbulb size={14} /> Dica do Gemini:</strong> {suggestion}</div>;
 };
 
 const DayDetailScreen = ({
@@ -7732,27 +8283,46 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
 
   const smallActivities: GameMode[] = ['sequencia', 'escape', 'story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
 
+  // Estilo dos cards de atividade só nesta tela: os tons pasteis de modeMeta.bg
+  // (pensados pro fundo cinza-claro) somem contra o azul escuro da aba Jogos,
+  // e o vidro fosco translúcido testado antes ficou apagado demais. Aqui os
+  // cards são blocos de cor sólida e vivos, sem transparência, com ícone e
+  // texto em branco — o contraste vem do salto de cor, não da opacidade.
+  const smallActivityTint: Record<GameMode, { bg: string; icon: string; title: string }> = {
+    story: { bg: 'bg-fuchsia-600', icon: 'text-white', title: 'text-white' },
+    quiz: { bg: 'bg-amber-500', icon: 'text-white', title: 'text-white' },
+    wordsearch: { bg: 'bg-emerald-600', icon: 'text-white', title: 'text-white' },
+    crossword: { bg: 'bg-sky-600', icon: 'text-white', title: 'text-white' },
+    bingo: { bg: 'bg-pink-600', icon: 'text-white', title: 'text-white' },
+    escape: { bg: 'bg-rose-600', icon: 'text-white', title: 'text-white' },
+    memory: { bg: 'bg-teal-600', icon: 'text-white', title: 'text-white' },
+    sequencia: { bg: 'bg-violet-600', icon: 'text-white', title: 'text-white' },
+    flashcard: { bg: 'bg-orange-600', icon: 'text-white', title: 'text-white' },
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" />
+      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" light />
 
       <div className="px-1 mb-6">
-        <p className="text-sm text-gray-500 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
+        <p className="text-sm text-indigo-100 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
       </div>
 
-      {/* BATALHA DE REVISÃO — destaque: só a arte, clicável (atalho pra batalha do Kit) */}
+      {/* QUAQUEMAGIA (Batalha de Revisão) — mora aqui: este card é a única
+          entrada do jogo (foi removido do grid do Kit ao Vivo) */}
       <button
         onClick={() => openBattle?.()}
         aria-label="Abrir Batalha de Revisão"
-        className="w-full relative overflow-hidden rounded-[2rem] border-4 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
+        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
         <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
-      {/* MUNDO PERDIDO — destaque: só a arte. Sem ação por enquanto. */}
+      {/* MUNDO PERDIDO — abre o jogo Escape (aventura narrativa) */}
       <button
         aria-label="Mundo Perdido — Escape Room"
-        className="w-full relative overflow-hidden rounded-[2rem] border-4 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
+        onClick={() => setScreen('escape')}
+        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
         <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
       </button>
@@ -7761,16 +8331,17 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
       <div className="grid grid-cols-2 gap-3 mb-8">
         {smallActivities.map(m => {
           const meta = modeMeta[m];
+          const tint = smallActivityTint[m];
           const Icon = meta.icon;
           return (
             <button
               key={m}
               onClick={() => setActiveMode(m)}
-              className={`relative rounded-3xl p-4 text-left shadow-sm border-2 ${meta.bg} active:scale-[0.97] transition-transform`}
+              className={`relative rounded-3xl p-4 text-left shadow-lg ${tint.bg} active:scale-[0.97] transition-transform`}
             >
-              <Icon size={28} className={`${meta.color} mb-2`} />
-              <h3 className={`font-bold text-sm ${meta.color}`}>{meta.title}</h3>
-              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{meta.desc}</p>
+              <Icon size={28} className={`${tint.icon} mb-2`} />
+              <h3 className={`font-bold text-sm ${tint.title}`}>{meta.title}</h3>
+              <p className="text-[11px] text-white/80 mt-0.5 leading-tight">{meta.desc}</p>
             </button>
           );
         })}
@@ -7836,15 +8407,16 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                         <input value={popTheme} onChange={e => setPopTheme(e.target.value)} placeholder="Ex: Harry Potter, Minecraft, futebol, Naruto..." className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-fuchsia-400" />
                         <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-1">
                           {['🧙 Harry Potter', '⛏️ Minecraft', '⚽ Futebol', '🦸 Super-heróis', '🍥 Naruto', '🎮 Videogame', '🚀 Star Wars', '🏴‍☠️ Piratas'].map(t => {
+                            const emoji = t.slice(0, t.indexOf(' '));
                             const value = t.slice(t.indexOf(' ') + 1);
                             return (
                               <button
                                 key={t}
                                 type="button"
                                 onClick={() => setPopTheme(value)}
-                                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 ${popTheme === value ? 'bg-fuchsia-600 text-white border-fuchsia-600' : 'bg-white text-gray-500 border-gray-200'}`}
+                                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 inline-flex items-center gap-1 ${popTheme === value ? 'bg-fuchsia-600 text-white border-fuchsia-600' : 'bg-white text-gray-500 border-gray-200'}`}
                               >
-                                {t}
+                                <EmojiIcon emoji={emoji} size={12} /> {value}
                               </button>
                             );
                           })}
@@ -7870,19 +8442,19 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Atividade da história</label>
                         <div className="grid grid-cols-2 gap-2 mt-1">
                           {([
-                            { v: 'surpresa', label: '🦉 Corujão decide', sub: 'A IA escolhe a melhor' },
-                            { v: 'reescrever', label: '✍️ Capítulo do aluno', sub: 'Turma escreve a sequência' },
-                            { v: 'inverter', label: '🔄 E se...?', sub: 'Cenário invertido p/ discutir' },
-                            { v: 'ilustrar', label: '🎨 Cena ilustrada', sub: 'Desenho com legenda conceitual' },
-                            { v: 'debate', label: '🗣️ Debate guiado', sub: 'Questão polêmica da história' },
-                          ] as { v: typeof storyActivity; label: string; sub: string }[]).map(a => (
+                            { v: 'surpresa', emoji: '🦉', label: 'Corujão decide', sub: 'A IA escolhe a melhor' },
+                            { v: 'reescrever', emoji: '✍️', label: 'Capítulo do aluno', sub: 'Turma escreve a sequência' },
+                            { v: 'inverter', emoji: '🔄', label: 'E se...?', sub: 'Cenário invertido p/ discutir' },
+                            { v: 'ilustrar', emoji: '🎨', label: 'Cena ilustrada', sub: 'Desenho com legenda conceitual' },
+                            { v: 'debate', emoji: '🗣️', label: 'Debate guiado', sub: 'Questão polêmica da história' },
+                          ] as { v: typeof storyActivity; emoji: string; label: string; sub: string }[]).map(a => (
                             <button
                               key={a.v}
                               type="button"
                               onClick={() => setStoryActivity(a.v)}
                               className={`p-3 rounded-2xl border-2 text-left transition-colors ${storyActivity === a.v ? 'border-fuchsia-500 bg-fuchsia-50' : 'border-gray-200 bg-white'} ${a.v === 'surpresa' ? 'col-span-2' : ''}`}
                             >
-                              <p className={`text-sm font-bold ${storyActivity === a.v ? 'text-fuchsia-700' : 'text-gray-700'}`}>{a.label}</p>
+                              <p className={`text-sm font-bold inline-flex items-center gap-1 ${storyActivity === a.v ? 'text-fuchsia-700' : 'text-gray-700'}`}><EmojiIcon emoji={a.emoji} size={14} /> {a.label}</p>
                               <p className="text-[10px] text-gray-500 mt-0.5">{a.sub}</p>
                             </button>
                           ))}
@@ -7986,18 +8558,18 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ambientação</label>
                         <div className="grid grid-cols-2 gap-2 mt-1">
                           {([
-                            { v: 'medieval', label: '⚔️ Medieval', sub: 'Pergaminhos e castelos' },
-                            { v: 'lab', label: '⚗️ Científico', sub: 'Laboratório secreto' },
-                            { v: 'detective', label: '🔍 Detetive', sub: 'Dossiê criminal' },
-                            { v: 'space', label: '🚀 Espacial', sub: 'Missão galáctica' },
-                          ] as { v: EscapeTheme; label: string; sub: string }[]).map(t => (
+                            { v: 'medieval', emoji: '⚔️', label: 'Medieval', sub: 'Pergaminhos e castelos' },
+                            { v: 'lab', emoji: '⚗️', label: 'Científico', sub: 'Laboratório secreto' },
+                            { v: 'detective', emoji: '🔍', label: 'Detetive', sub: 'Dossiê criminal' },
+                            { v: 'space', emoji: '🚀', label: 'Espacial', sub: 'Missão galáctica' },
+                          ] as { v: EscapeTheme; emoji: string; label: string; sub: string }[]).map(t => (
                             <button
                               key={t.v}
                               type="button"
                               onClick={() => setEscapeTheme(t.v)}
                               className={`p-3 rounded-2xl border-2 text-left transition-colors ${escapeTheme === t.v ? 'border-rose-500 bg-rose-50' : 'border-gray-200 bg-white'}`}
                             >
-                              <p className={`text-sm font-bold ${escapeTheme === t.v ? 'text-rose-700' : 'text-gray-700'}`}>{t.label}</p>
+                              <p className={`text-sm font-bold inline-flex items-center gap-1 ${escapeTheme === t.v ? 'text-rose-700' : 'text-gray-700'}`}><EmojiIcon emoji={t.emoji} size={14} /> {t.label}</p>
                               <p className="text-[10px] text-gray-500 mt-0.5">{t.sub}</p>
                             </button>
                           ))}
@@ -8659,6 +9231,73 @@ const gamiYesterdayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// ── Lógica pura de gamificação (sem estado de componente) ──────────────────
+// Extraída da GamificacaoScreen pra ser reaproveitada também pelo assistente
+// de IA do chat: as duas telas chamam as MESMAS funções, então uma correção
+// de regra (XP, streak, missão...) vale pros dois caminhos automaticamente.
+const checkBadges = (students: GamiStudent[]): GamiStudent[] =>
+  students.map(s => {
+    const badges = [...s.badges];
+    GAMI_BADGES.forEach(b => { if (!badges.includes(b.id) && b.check(s)) badges.push(b.id); });
+    return { ...s, badges };
+  });
+
+function gamiApplyAward(cls: ClassGamification, studentIds: string[], behavior: { label: string; points: number; emoji: string }, wk: string): ClassGamification {
+  const today = gamiTodayKey();
+  const points = behavior.points;
+  const coins = points > 0 ? Math.max(1, Math.floor(points / 5)) : 0;
+  const isNewWeek = cls.weekKey !== wk;
+  const students = cls.students.map(raw => {
+    // Virada de semana: zera o XP semanal de todos antes de acumular
+    const s = isNewWeek ? { ...raw, weekXp: 0 } : raw;
+    if (!studentIds.includes(s.id)) return s;
+    const newXp = Math.max(0, s.xp + points);
+    const newTotal = s.totalXp + (points > 0 ? points : 0);
+    const newWeekXp = (s.weekXp ?? 0) + (points > 0 ? points : 0);
+    const newCoins = Math.max(0, s.coins + coins);
+    const streak = points > 0
+      ? (s.lastPointDay === today ? s.streak : s.lastPointDay === gamiYesterdayKey() ? s.streak + 1 : 1)
+      : s.streak;
+    return { ...s, xp: newXp, totalXp: newTotal, weekXp: newWeekXp, coins: newCoins, streak, lastPointDay: points > 0 ? today : s.lastPointDay };
+  });
+  const checked = checkBadges(students);
+  // Missão de semana anterior expira na virada — sem isso ela ficava "morta"
+  // no estado: parava de contar e nunca era limpa.
+  let mission = cls.mission && cls.mission.weekKey === wk ? cls.mission : null;
+  if (mission && points > 0) mission = { ...mission, progress: mission.progress + points * studentIds.length };
+  const logEntry: GamiLogEntry = { id: gamiRid(), studentIds, label: behavior.label, emoji: behavior.emoji, points, coins, kind: 'award', date: Date.now() };
+  return { ...cls, students: checked, weekKey: wk, log: [logEntry, ...cls.log].slice(0, 200), mission };
+}
+
+function gamiApplyPurchase(cls: ClassGamification, studentId: string, reward: GamiReward): { cls: ClassGamification; ok: boolean } {
+  const s = cls.students.find(x => x.id === studentId);
+  if (!s || s.coins < reward.cost) return { cls, ok: false };
+  const students = cls.students.map(x => x.id === studentId ? { ...x, coins: x.coins - reward.cost } : x);
+  const logEntry: GamiLogEntry = { id: gamiRid(), studentIds: [studentId], label: reward.label, emoji: reward.emoji, points: 0, coins: -reward.cost, kind: 'purchase', date: Date.now() };
+  return { cls: { ...cls, students, log: [logEntry, ...cls.log].slice(0, 200) }, ok: true };
+}
+
+// DESTRUTIVO: zera XP da temporada, moedas e sequência de todos os alunos
+// (totalXp — nível, medalhas — é vitalício e sobrevive). Sempre passa por
+// confirmação explícita antes de ser chamada a partir do chat.
+function gamiApplyEndSeason(cls: ClassGamification): ClassGamification {
+  const top = [...cls.students].sort((a, b) => b.totalXp - a.totalXp).slice(0, 5);
+  const entry: GamiHallEntry = { season: cls.season, date: Date.now(), top: top.map(s => ({ name: s.name, xp: s.totalXp })) };
+  return {
+    ...cls,
+    season: cls.season + 1,
+    hallOfFame: [...(cls.hallOfFame ?? []), entry],
+    students: cls.students.map(s => ({ ...s, xp: 0, weekXp: 0, coins: 0, streak: 0, lastPointDay: undefined, participatedDay: undefined })),
+    log: [],
+    mission: null,
+    weekKey: gamiWeekKey(),
+  };
+}
+
+function gamiApplyAddStudent(cls: ClassGamification, name: string): ClassGamification {
+  return { ...cls, students: [...cls.students, { id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }] };
+}
+
 // AudioContext único e reutilizado: criar um por toque estoura o limite do
 // navegador (~6 no Chrome) em premiações rápidas e silencia o som.
 let chimeCtx: AudioContext | null = null;
@@ -8900,7 +9539,7 @@ const GamiSorteio = ({ students, onClose, onAwardParticipation }: { students: Ga
           <p className={`text-3xl sm:text-4xl font-black break-words ${winner ? 'text-white' : spinning ? 'text-white/90' : 'text-white/50'}`}>
             {display || (students.length === 0 ? 'Cadastre os alunos da turma primeiro' : pool.length === 0 ? 'Todos já foram sorteados! 🎉' : 'Toque em Sortear')}
           </p>
-          {winner && <p className="text-violet-100 text-xs font-black uppercase tracking-[0.25em] mt-4">✦ Sorteado ✦</p>}
+          {winner && <p className="text-violet-100 text-xs font-black uppercase tracking-[0.25em] mt-4 flex items-center justify-center gap-2"><Sparkle size={11} /> Sorteado <Sparkle size={11} /></p>}
         </motion.div>
         {winner && !awarded && (
           <button
@@ -8910,7 +9549,7 @@ const GamiSorteio = ({ students, onClose, onAwardParticipation }: { students: Ga
             <Hand size={16} /> +1 Participação para {winner.name.split(' ')[0]}
           </button>
         )}
-        {awarded && <p className="text-emerald-400 text-sm font-bold">Ponto registrado! ✓</p>}
+        {awarded && <p className="text-emerald-400 text-sm font-bold flex items-center justify-center gap-1"><Check size={15} /> Ponto registrado!</p>}
       </div>
       <div className="space-y-3">
         <label className="flex items-center justify-between bg-white/[0.06] border border-white/10 backdrop-blur rounded-2xl px-4 py-3">
@@ -9080,7 +9719,7 @@ const GamiGrupos = ({ students, onClose }: { students: GamiStudent[]; onClose: (
               <div className="mt-3 space-y-1.5">
                 {separations.map(([a, b], i) => (
                   <div key={i} className="flex items-center justify-between bg-red-500/15 border border-red-400/20 rounded-xl px-3 py-1.5 text-xs">
-                    <span className="text-red-300 font-medium">{students.find(s => s.id === a)?.name} ✕ {students.find(s => s.id === b)?.name}</span>
+                    <span className="text-red-300 font-medium inline-flex items-center gap-1">{students.find(s => s.id === a)?.name} <X size={11} /> {students.find(s => s.id === b)?.name}</span>
                     <button onClick={() => setSeparations(p => p.filter((_, j) => j !== i))} className="text-red-300/70"><X size={13} /></button>
                   </div>
                 ))}
@@ -9232,7 +9871,7 @@ const GamiBarulho = ({ onClose, onRewardClass }: { onClose: () => void; onReward
                 )}
                 {challenge.status === 'win' && (
                   <>
-                    <p className="text-lg font-black text-emerald-300">🎉 A turma venceu o desafio!</p>
+                    <p className="text-lg font-black text-emerald-300 flex items-center justify-center gap-1.5"><PartyPopper size={18} /> A turma venceu o desafio!</p>
                     <button
                       onClick={() => { onRewardClass(2); setChallenge(null); }}
                       className="mt-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-5 py-2.5 rounded-2xl shadow-lg shadow-emerald-950/50"
@@ -9465,6 +10104,11 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
   const [ring, setRing] = useState<{ side: 0 | 1; key: number; color: string; crit?: boolean } | null>(null);
   const [pops, setPops] = useState<{ id: number; side: 0 | 1; val: number; color: string; heal?: boolean }[]>([]);
   const [awarded, setAwarded] = useState(false);
+  // Batalha recebida por link/QR (#batalha=...) — perguntas prontas, sem IA
+  const [shared, setShared] = useState<SharedBattle | null>(null);
+  // Painel de compartilhamento (link/QR da batalha atual); null = fechado
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Tremor de tela + flash branco no impacto crítico: manipulação direta de
   // classe CSS (via ref) em vez de estado, pra reiniciar a animação mesmo em
@@ -9733,27 +10377,79 @@ const GamiBatalha = ({ teams, students, subject, level, onClose, onAwardTeam, is
     after(2600, () => { drawQuestion(); setPhase('question'); beginQuestionTimers(0); });
   };
 
-  const generate = async () => {
-    if (!topic.trim()) { setError('Informe o tema da batalha.'); return; }
-    if (hasRealTeams && pick.length !== 2) { setError('Escolha exatamente 2 equipes para a batalha.'); return; }
-    setError(''); setPhase('loading');
-    try {
-      const prompt = `Gere ${count} perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade ${difficulty}.
+  // Batalha recebida por link/QR: decodifica as perguntas do hash ao montar.
+  // O hash é limpo em seguida para o link não "grudar" na sessão do professor.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith('#batalha=')) return;
+    const b = decodeBattle(hash.slice('#batalha='.length));
+    window.location.hash = '';
+    if (!b) return;
+    setShared(b);
+    setTopic(b.topic);
+    questionsRef.current = b.questions;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Gera as perguntas via IA (compartilhado entre "Começar batalha" e
+  // "Gerar e compartilhar"). Lança em caso de falha.
+  const fetchQuestions = async (): Promise<GamiBattleQ[]> => {
+    const prompt = `Gere ${count} perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade ${difficulty}.
 Cada pergunta: enunciado curto (máximo 110 caracteres), 4 alternativas curtas (máximo 38 caracteres cada), apenas UMA correta.
 Varie os tipos: definição, complete a frase, verdadeiro ou falso disfarçado, qual é, quem foi.
 Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]}
 onde "correct" é o índice (0 a 3) da alternativa correta.`;
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
-      const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-      const parsed = JSON.parse(raw);
-      const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
-      if (!valid.length) throw new Error('sem perguntas');
-      questionsRef.current = valid;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(raw);
+    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
+    if (!valid.length) throw new Error('sem perguntas');
+    return valid;
+  };
+
+  const generate = async () => {
+    if (!topic.trim()) { setError('Informe o tema da batalha.'); return; }
+    if (hasRealTeams && pick.length !== 2) { setError('Escolha exatamente 2 equipes para a batalha.'); return; }
+    setError('');
+    // Perguntas já vieram prontas pelo link compartilhado: começa direto.
+    if (shared && questionsRef.current.length) { startBattle(); return; }
+    setPhase('loading');
+    try {
+      questionsRef.current = await fetchQuestions();
       startBattle();
     } catch {
       setError('Não consegui gerar as perguntas. Tente novamente.');
       setPhase('setup');
     }
+  };
+
+  // Gera as perguntas e abre o painel de link/QR — mesmo mecanismo do jogo
+  // Escape: a batalha inteira viaja no link, quem abre já entra pronta.
+  const generateAndShare = async () => {
+    if (!topic.trim()) { setError('Informe o tema da batalha.'); return; }
+    setError('');
+    if (!(shared && questionsRef.current.length)) {
+      setPhase('loading');
+      try {
+        questionsRef.current = await fetchQuestions();
+      } catch {
+        setError('Não consegui gerar as perguntas. Tente novamente.');
+        setPhase('setup');
+        return;
+      }
+      setPhase('setup');
+    }
+    setShareCopied(false);
+    setShareLink(battleShareUrl({ topic: topic.trim(), questions: questionsRef.current }));
+  };
+
+  const copyShareLink = async () => {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch { /* clipboard indisponível — o link fica visível para copiar manualmente */ }
   };
 
   // Atalho só para admin: pula a chamada de IA com perguntas fixas, pra
@@ -9931,7 +10627,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   const HpBox = ({ side, corner }: { side: 0 | 1; corner: string }) => (
     <div className={`absolute ${corner} w-[46%] bg-[#f8f0dc] rounded-xl border-2 border-[#5a4a3a] px-2.5 py-1.5 z-10 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_8px_rgba(0,0,0,0.4)]`}>
       <div className="flex items-center justify-between gap-1">
-        <p className="font-pixel text-[#3a3020] text-[10px] truncate leading-tight">{fighters[side].emoji} {fighters[side].name}</p>
+        <p className="font-pixel text-[#3a3020] text-[10px] truncate leading-tight inline-flex items-center gap-1"><EmojiIcon emoji={fighters[side].emoji} size={11} /> {fighters[side].name}</p>
         {hp[side] <= TEAM_MAX / 2 && hp[side] > 0 && <span className="font-pixel text-[7px] text-red-600 animate-pulse shrink-0">FÚRIA +2</span>}
       </div>
       <div className="flex items-center gap-1 mt-1">
@@ -9944,19 +10640,59 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
     </div>
   );
 
+  // ── Painel de compartilhamento (link/QR) — mesmo mecanismo do jogo Escape:
+  // a batalha inteira viaja codificada no link, sem backend. Renderizado por
+  // cima de qualquer fase (setup ou fim da batalha).
+  const sharePanelEl = shareLink !== null && (
+    <div className="fixed inset-0 z-[140] bg-black/70 backdrop-blur-sm flex items-center justify-center p-5" onClick={e => { if (e.target === e.currentTarget) setShareLink(null); }}>
+      <div className="bg-white rounded-3xl p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto no-scrollbar text-center shadow-2xl">
+        <p className="font-black text-gray-800 text-base flex items-center justify-center gap-1.5"><Swords size={16} /> Batalha pronta para compartilhar!</p>
+        <p className="text-sm text-gray-500 mt-1 leading-snug">{topic.trim()} · {questionsRef.current.length} pergunta{questionsRef.current.length === 1 ? '' : 's'}</p>
+
+        {/* QR — escaneia e a batalha abre pronta, com as mesmas perguntas */}
+        <div className="inline-block bg-white p-3 rounded-2xl border-2 border-gray-200 mt-4">
+          <QRCodeSVG value={shareLink} size={192} level="M" marginSize={1} />
+        </div>
+        <p className="text-xs text-gray-500 mt-2 leading-snug">Peça para <b>escanear o QR</b> com a câmera — ou envie o link. A batalha abre pronta, com as mesmas perguntas, sem gastar gerações de IA.</p>
+
+        {/* Link — alternativa ao QR (WhatsApp, Classroom, e-mail...) */}
+        <textarea
+          readOnly
+          value={shareLink}
+          onFocus={e => e.target.select()}
+          className="w-full mt-3 px-3 py-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-xl resize-none h-14 focus:outline-none"
+        />
+        <button onClick={copyShareLink} className="w-full mt-2 bg-gradient-to-r from-rose-500 to-red-600 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+          {shareCopied ? <><Check size={15} /> Link copiado!</> : <><Copy size={15} /> Copiar link</>}
+        </button>
+        {shareLink.length > 1900 && (
+          <p className="text-[11px] text-amber-600 font-medium mt-2 leading-snug flex items-start gap-1"><AlertTriangle size={13} className="shrink-0 mt-0.5" /> Muitas perguntas deixaram o QR denso. Se algum celular tiver dificuldade de ler, use o link.</p>
+        )}
+        <button onClick={() => setShareLink(null)} className="w-full mt-2 bg-gray-100 text-gray-600 font-bold py-2.5 rounded-xl text-sm">Fechar</button>
+      </div>
+    </div>
+  );
+
   if (phase === 'setup' || phase === 'loading') return (
     <GamiToolShell title="Batalha de Revisão" subtitle="Arena do conhecimento" icon={Swords} theme="crimson" onClose={onClose}>
+      {sharePanelEl}
       {phase === 'setup' && (
         <div className="space-y-4">
+          {shared && questionsRef.current.length > 0 && (
+            <div className="bg-emerald-500/15 border border-emerald-400/30 rounded-2xl p-4 backdrop-blur flex items-start gap-2">
+              <p className="text-sm text-emerald-200 leading-relaxed flex-1"><b className="inline-flex items-center gap-1"><Zap size={13} /> Batalha recebida por link:</b> {questionsRef.current.length} perguntas prontas sobre <b>{shared.topic || 'o tema compartilhado'}</b>. É só escolher as equipes e começar — sem gastar IA.</p>
+              <button onClick={() => { setShared(null); questionsRef.current = []; setTopic(''); }} className="text-emerald-300/70 text-[11px] font-bold underline shrink-0">descartar</button>
+            </div>
+          )}
           <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur">
             <p className="text-sm text-white/75 leading-relaxed"><b className="text-white">Batalha em turnos:</b> a IA gera perguntas e cada equipe responde na sua vez. <b className="text-emerald-300">Acertou = ataque de {HIT}.</b> <b className="text-red-300">Errou = contra-ataque de {WRONG_HIT}.</b> <b className="text-amber-300">Resposta em até 3s = CRÍTICO (+{CRIT_BONUS})</b>. <b className="text-emerald-300">{HEAL_STREAK} acertos seguidos curam {HEAL_AMOUNT} HP</b>. Abaixo de metade do HP entra em <b className="text-amber-300">Fúria (+{FURY_BONUS})</b>. Vence quem zerar o HP do rival!</p>
           </div>
           {error && <p className="text-sm text-red-300 font-medium bg-red-500/15 border border-red-400/25 rounded-xl p-3">{error}</p>}
-          <div>
+          {!shared && <div>
             <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Tema da revisão</label>
             <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Frações, Era Vargas, Sistema Solar…" className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400/50 bg-white/[0.08] text-white placeholder-white/30" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+          </div>}
+          {!shared && <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Banco de perguntas</label>
               <div className="flex gap-1.5">
@@ -9973,7 +10709,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 <option value="difícil">Difícil</option>
               </select>
             </div>
-          </div>
+          </div>}
           <div className="bg-white/[0.06] rounded-2xl p-4 border border-white/10 backdrop-blur">
             <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2">{hasRealTeams ? 'Escolha as 2 equipes da batalha' : 'Equipes da batalha'}</p>
             <div className="flex flex-wrap gap-2">
@@ -9985,10 +10721,10 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                     onClick={() => setPick(p => on ? p.filter(x => x !== i) : [...p, i].slice(-2))}
                     className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${on ? 'text-white border-white/40 shadow-lg scale-105' : 'text-white/50 border-white/10 bg-white/[0.06]'}`}
                     style={on ? { backgroundColor: t.color } : undefined}
-                  >{t.emoji} {t.name}</button>
+                  ><span className="inline-flex items-center gap-1"><EmojiIcon emoji={t.emoji} size={12} /> {t.name}</span></button>
                 );
               }) : fighters.map((f, i) => (
-                <span key={i} className="text-white text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: f.color }}>{f.emoji} {f.name}</span>
+                <span key={i} className="text-white text-xs font-bold px-3 py-1.5 rounded-full inline-flex items-center gap-1" style={{ backgroundColor: f.color }}><EmojiIcon emoji={f.emoji} size={12} /> {f.name}</span>
               ))}
             </div>
             {!hasRealTeams && <p className="text-[11px] text-white/35 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP aos vencedores.</p>}
@@ -9996,9 +10732,12 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           <button onClick={generate} className="w-full bg-gradient-to-r from-rose-500 to-red-600 text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-lg shadow-rose-950/60">
             <Swords size={20} /> Começar batalha
           </button>
+          <button onClick={generateAndShare} className="w-full bg-white/[0.08] border border-white/15 text-white/80 font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
+            <Share2 size={16} /> {shared ? 'Compartilhar esta batalha' : 'Gerar e compartilhar por link/QR'}
+          </button>
           {isAdmin && (
             <button onClick={startDevTest} className="w-full bg-white/[0.08] border border-dashed border-white/25 text-white/70 font-bold py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2">
-              🧪 Teste rápido (dev) — pula a IA, perguntas fixas
+              <TestTube size={14} /> Teste rápido (dev) — pula a IA, perguntas fixas
             </button>
           )}
         </div>
@@ -10016,6 +10755,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   // caixas creme — paleta própria, deliberadamente distinta do modo palco.
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
+      {sharePanelEl}
       {/* Deslocamento = tamanho do tile (48px) → loop sem emenda/corte nas listras.
           gami-crit-shake/gami-crit-flash são disparadas via classList (não estado),
           pra reiniciar mesmo em críticos consecutivos sem esperar re-render. */}
@@ -10109,7 +10849,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                             className={`h-[250px] w-auto max-w-none object-contain select-none drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]${poses[side] === 'wrong-cast' ? ' gami-glitch' : ''}${poses[side] === 'thinking' ? ' gami-tilt' : ''}`}
                           />
                         ) : (
-                          <span className="text-4xl sm:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]">{fighters[side].emoji}</span>
+                          <span className="drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)]"><EmojiIcon emoji={fighters[side].emoji} size={44} /></span>
                         )}
                     {poses[side] === 'thinking' ? (
                       <motion.span
@@ -10204,7 +10944,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   className="absolute top-[16%] inset-x-0"
                 >
                   <div className="py-4 text-center -skew-y-2" style={{ background: `linear-gradient(90deg, transparent 2%, ${fighters[1].color}e0 22%, ${fighters[1].color}e0 78%, transparent 98%)`, boxShadow: '0 5px 20px rgba(0,0,0,0.4)' }}>
-                    <p className="font-pixel text-white text-[13px] leading-relaxed px-6" style={{ textShadow: '0 2px 0 rgba(0,0,0,0.6)' }}>{fighters[1].emoji} {fighters[1].name}</p>
+                    <p className="font-pixel text-white text-[13px] leading-relaxed px-6 inline-flex items-center gap-1.5" style={{ textShadow: '0 2px 0 rgba(0,0,0,0.6)' }}><EmojiIcon emoji={fighters[1].emoji} size={14} /> {fighters[1].name}</p>
                   </div>
                 </motion.div>
                 {/* faixa de baixo — desliza da direita */}
@@ -10213,7 +10953,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   className="absolute bottom-[16%] inset-x-0"
                 >
                   <div className="py-4 text-center skew-y-2" style={{ background: `linear-gradient(90deg, transparent 2%, ${fighters[0].color}e0 22%, ${fighters[0].color}e0 78%, transparent 98%)`, boxShadow: '0 -5px 20px rgba(0,0,0,0.4)' }}>
-                    <p className="font-pixel text-white text-[13px] leading-relaxed px-6" style={{ textShadow: '0 2px 0 rgba(0,0,0,0.6)' }}>{fighters[0].emoji} {fighters[0].name}</p>
+                    <p className="font-pixel text-white text-[13px] leading-relaxed px-6 inline-flex items-center gap-1.5" style={{ textShadow: '0 2px 0 rgba(0,0,0,0.6)' }}><EmojiIcon emoji={fighters[0].emoji} size={14} /> {fighters[0].name}</p>
                   </div>
                 </motion.div>
                 {/* flash branco no momento em que o VS estampa */}
@@ -10261,14 +11001,14 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                 <ConfettiBurst />
                 <div className="relative bg-[#f8f0dc] border-4 border-[#5a4a3a] rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
                   <div className="relative inline-flex mb-3">
-                    <span className="w-20 h-20 rounded-full flex items-center justify-center text-4xl overflow-visible" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)` }}>
+                    <span className="w-20 h-20 rounded-full flex items-center justify-center overflow-visible" style={{ background: `radial-gradient(circle at 32% 28%, ${fighters[winner].color}dd, ${fighters[winner].color}55 62%, transparent 78%)` }}>
                       {TEAM_SPRITES[(fighters[winner].color || '').toLowerCase()] ? (
                         <motion.img
                           animate={{ y: [0, -6, 0], rotate: [0, -3, 3, 0] }} transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
                           src={(TEAM_SPRITES[fighters[winner].color.toLowerCase()].victory ?? TEAM_SPRITES[fighters[winner].color.toLowerCase()].idle)[0]}
                           alt={fighters[winner].name} draggable={false} className="h-24 w-auto object-contain select-none drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]"
                         />
-                      ) : fighters[winner].emoji}
+                      ) : <EmojiIcon emoji={fighters[winner].emoji} size={36} />}
                     </span>
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-white flex items-center justify-center shadow-lg">
                       <Crown size={15} className="text-amber-900" />
@@ -10278,7 +11018,7 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   <div className="space-y-1.5 mt-3">
                     {([winner, (1 - winner) as 0 | 1]).map((i, pos) => (
                       <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-xl border-2 ${pos === 0 ? 'bg-amber-100 border-amber-500/60' : 'bg-[#efe5cc] border-[#5a4a3a]/30'}`}>
-                        <span className="font-bold text-[#3a3020] text-xs">{pos === 0 ? '🏆' : '💔'} {fighters[i].emoji} {fighters[i].name}</span>
+                        <span className="font-bold text-[#3a3020] text-xs inline-flex items-center gap-1"><EmojiIcon emoji={pos === 0 ? '🏆' : '💔'} size={13} /> <EmojiIcon emoji={fighters[i].emoji} size={13} /> {fighters[i].name}</span>
                         <span className="font-pixel text-[#3a3020] text-[9px] tabular-nums">{hp[i]}/{TEAM_MAX} HP</span>
                       </div>
                     ))}
@@ -10286,16 +11026,17 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   {hasRealTeams && !awarded && winnerIds.length > 0 && (
                     <button
                       onClick={() => { onAwardTeam(pick[winner], winnerIds, 3); setAwarded(true); }}
-                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl border-2 border-emerald-700 shadow-[0_4px_0_rgba(0,0,0,0.2)]"
-                    >⚡ Dar +3 XP à equipe vencedora</button>
+                      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-xl border-2 border-emerald-700 shadow-[0_4px_0_rgba(0,0,0,0.2)] flex items-center justify-center gap-1.5"
+                    ><Zap size={15} /> Dar +3 XP à equipe vencedora</button>
                   )}
                   {hasRealTeams && !awarded && winnerIds.length === 0 && (
                     <p className="text-[11px] text-[#8a7a5a] font-bold mt-3">Vincule alunos a esta equipe na aba Equipes para premiar com XP.</p>
                   )}
-                  {awarded && <p className="text-emerald-700 text-sm font-bold mt-3">XP entregue! ✓</p>}
-                  <div className="flex justify-center gap-6 mt-4">
+                  {awarded && <p className="text-emerald-700 text-sm font-bold mt-3 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
+                  <div className="flex justify-center gap-5 mt-4">
                     <button onClick={startBattle} className="font-pixel text-[#8a5a1a] text-[9px] flex items-center gap-1.5"><Swords size={13} />Revanche</button>
                     <button onClick={() => setPhase('setup')} className="font-pixel text-[#7a2a2a] text-[9px] flex items-center gap-1.5"><RotateCcw size={13} />Nova batalha</button>
+                    <button onClick={() => { setShareCopied(false); setShareLink(battleShareUrl({ topic: topic.trim(), questions: questionsRef.current })); }} className="font-pixel text-[#1a5c8a] text-[9px] flex items-center gap-1.5"><Share2 size={13} />Compartilhar</button>
                   </div>
                 </div>
               </div>
@@ -10306,9 +11047,9 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
         <div className="bg-[#3d4a7d] border-t-4 border-[#2c3763] px-3 pt-3 pb-6 shrink-0">
           <div className="bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3.5 min-h-[71px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]">
             <p className="font-vt text-xl text-[#3a3020] leading-snug">
-              {phase === 'intro' ? `${fighters[0].name} desafia ${fighters[1].name}! Que vença o conhecimento! ⚔️`
+              {phase === 'intro' ? <>{fighters[0].name} desafia {fighters[1].name}! Que vença o conhecimento! <Swords size={18} className="inline -mt-1" /></>
                 : phase === 'anim' ? msg
-                : current ? <>{current.q} <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed">Pergunta {qNum} · vez de {fighters[turn].emoji} {fighters[turn].name}</span></> : ''}
+                : current ? <>{current.q} <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed items-center gap-1" style={{ display: 'flex' }}>Pergunta {qNum} · vez de <EmojiIcon emoji={fighters[turn].emoji} size={10} /> {fighters[turn].name}</span></> : ''}
             </p>
           </div>
           {current && phase !== 'intro' && (
@@ -10329,8 +11070,8 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
                   >
                     <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
                     <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
-                    {isCorrect && <span className="shrink-0 text-white font-black">✓</span>}
-                    {isWrongPick && <span className="shrink-0 text-white font-black">✗</span>}
+                    {isCorrect && <Check size={16} className="shrink-0 text-white" strokeWidth={3} />}
+                    {isWrongPick && <X size={16} className="shrink-0 text-white" strokeWidth={3} />}
                   </button>
                 );
               })}
@@ -10338,6 +11079,1103 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
           )}
         </div>
       )}
+    </motion.div>
+  );
+};
+
+// ─── Rumo ao Milhão — quiz de escada de prêmios (turma vs turma) ──────────────
+type MilhaoQ = { q: string; options: string[]; correct: number };
+// 9 degraus; "safe" = parada segura (errar acima dela não zera: cai pra ela).
+const MILHAO_LADDER: { prize: number; safe?: boolean }[] = [
+  { prize: 1000 }, { prize: 2000 }, { prize: 5000, safe: true },
+  { prize: 10000 }, { prize: 25000 }, { prize: 50000, safe: true },
+  { prize: 100000 }, { prize: 500000 }, { prize: 1000000 },
+];
+const fmtPrize = (v: number) => v >= 1000000
+  ? `R$ ${(v / 1000000).toLocaleString('pt-BR')} ${v === 1000000 ? 'milhão' : 'milhões'}`
+  : `R$ ${v.toLocaleString('pt-BR')}`;
+
+// Banco fixo pra testar o jogo sem chamar a IA (rápido, sem gastar cota).
+// 18 perguntas, ordenadas fácil → difícil (mesmo formato do que a IA gera).
+const MILHAO_SAMPLE_QUESTIONS: MilhaoQ[] = [
+  { q: 'Quantos dias tem uma semana?', options: ['5', '6', '7', '8'], correct: 2 },
+  { q: 'De que cor é o céu num dia sem nuvens?', options: ['Verde', 'Azul', 'Cinza', 'Roxo'], correct: 1 },
+  { q: 'Quantas patas tem um cachorro?', options: ['2', '3', '4', '6'], correct: 2 },
+  { q: 'Qual é a capital do Brasil?', options: ['Rio de Janeiro', 'Brasília', 'São Paulo', 'Salvador'], correct: 1 },
+  { q: 'Quanto é 7 x 8?', options: ['54', '56', '58', '64'], correct: 1 },
+  { q: 'Quem escreveu "Dom Casmurro"?', options: ['José de Alencar', 'Machado de Assis', 'Clarice Lispector', 'Monteiro Lobato'], correct: 1 },
+  { q: 'Qual planeta é conhecido como Planeta Vermelho?', options: ['Vênus', 'Júpiter', 'Marte', 'Saturno'], correct: 2 },
+  { q: 'Qual é o maior oceano do mundo?', options: ['Atlântico', 'Índico', 'Ártico', 'Pacífico'], correct: 3 },
+  { q: 'Em que ano o Brasil foi "descoberto"?', options: ['1500', '1822', '1889', '1600'], correct: 0 },
+  { q: 'Qual é o osso mais longo do corpo humano?', options: ['Úmero', 'Fêmur', 'Tíbia', 'Rádio'], correct: 1 },
+  { q: 'Quantos lados tem um hexágono?', options: ['5', '6', '7', '8'], correct: 1 },
+  { q: 'Qual gás as plantas liberam na fotossíntese?', options: ['Gás carbônico', 'Nitrogênio', 'Oxigênio', 'Hidrogênio'], correct: 2 },
+  { q: 'Quem pintou a Mona Lisa?', options: ['Michelangelo', 'Van Gogh', 'Da Vinci', 'Picasso'], correct: 2 },
+  { q: 'Qual é o menor país do mundo?', options: ['Mônaco', 'San Marino', 'Vaticano', 'Liechtenstein'], correct: 2 },
+  { q: 'Quanto é a raiz quadrada de 144?', options: ['10', '11', '12', '14'], correct: 2 },
+  { q: 'Em que continente fica o deserto do Saara?', options: ['Ásia', 'África', 'Oceania', 'América'], correct: 1 },
+  { q: 'Qual elemento químico tem símbolo "Au"?', options: ['Prata', 'Alumínio', 'Ouro', 'Argônio'], correct: 2 },
+  { q: 'Quem foi o primeiro presidente do Brasil?', options: ['Getúlio Vargas', 'Deodoro da Fonseca', 'Pedro Álvares Cabral', 'Juscelino Kubitschek'], correct: 1 },
+];
+
+// Animações do show (lâmpadas, feixes, brilhos, entrada das alternativas).
+const MILHAO_CSS = `
+@keyframes milhao-twinkle{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes milhao-sway{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(-7deg)}}
+@keyframes milhao-sway-r{0%,100%{transform:rotate(14deg)}50%{transform:rotate(7deg)}}
+@keyframes milhao-shine{0%{transform:translateX(-140%) skewX(-18deg)}55%,100%{transform:translateX(340%) skewX(-18deg)}}
+@keyframes milhao-pop{0%{opacity:0;transform:translateY(10px) scale(.96)}100%{opacity:1;transform:none}}
+@keyframes milhao-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes milhao-glow{0%,100%{box-shadow:0 0 10px rgba(255,210,77,.9)}50%{box-shadow:0 0 20px 5px rgba(255,210,77,.95)}}
+@keyframes milhao-glow-green{0%,100%{box-shadow:0 4px 0 rgba(0,0,0,.35),0 0 4px rgba(52,211,153,.4)}50%{box-shadow:0 4px 0 rgba(0,0,0,.35),0 0 18px 4px rgba(52,211,153,.85)}}
+@keyframes milhao-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){.milhao-anim *{animation:none!important}}
+`;
+// Brilho que "varre" botões/placas douradas. Pai precisa de relative + overflow-hidden.
+const MilhaoShine = () => (
+  <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)', animation: 'milhao-shine 3s ease-in-out infinite' }} />
+);
+// Ilustração do cenário (fundo do palco) — cobre o placeholder em CSS quando existir.
+const LeilaoFundo = () => (
+  <img src="/assets/battle/fundo.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
+// Ilustração do personagem (Corujão) no palco — PNG com fundo transparente recomendado.
+const LeilaoPersonagem = () => (
+  <img src="/assets/battle/personagem.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 h-full w-auto object-contain" style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
+// Cortina esquerda do palco
+const LeilaoCortinaEsquerda = () => (
+  <img src="/assets/battle/cortina_esquerda.png" alt="" className="absolute inset-y-0 left-0 h-full w-auto object-contain pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
+// Cortina direita (espelhada)
+const LeilaoCortinaDir = () => (
+  <img src="/assets/battle/cortina_esquerda.png" alt="" className="absolute inset-y-0 right-0 h-full w-auto object-contain pointer-events-none transform scale-x-[-1]" onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
+
+// Manter as antigas para compatibilidade temporária (caso GamiMilhao ainda seja usado)
+const MilhaoBgArt = () => (
+  <img src="/assets/battle/milhao-cortina.jpg" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
+const MilhaoCharacterArt = () => (
+  <img src="/assets/battle/milhao-personagem.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 h-40 w-auto object-contain" style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+);
+// Times genéricos para quem ainda não criou equipes na aba Equipes.
+const MILHAO_FALLBACK = [
+  { name: 'Time Azul', emoji: '🔵', color: '#3b82f6' },
+  { name: 'Time Vermelho', emoji: '🔴', color: '#ef4444' },
+  { name: 'Time Verde', emoji: '🟢', color: '#22c55e' },
+  { name: 'Time Amarelo', emoji: '🟡', color: '#eab308' },
+];
+
+const LeilaoDoSaber = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
+  teams: GamiTeam[];
+  students: GamiStudent[];
+  subject: string;
+  level: string;
+  onClose: () => void;
+  onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
+  isAdmin?: boolean;
+}) => {
+  const hasRealTeams = teams.length >= 2;
+  const [pick, setPick] = useState<number[]>(hasRealTeams ? [0, 1] : [0, 1, 2, 3]);
+  const contestants = useMemo(() => pick.map(i => hasRealTeams
+    ? { teamIdx: i, name: teams[i]?.name ?? '?', emoji: teams[i]?.emoji ?? '🦉', color: teams[i]?.color ?? '#6366f1' }
+    : { teamIdx: -1, ...MILHAO_FALLBACK[i] }),
+  [hasRealTeams, pick, teams]);
+
+  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
+  const [topic, setTopic] = useState('');
+  const [difficulty, setDifficulty] = useState('média');
+  const [error, setError] = useState('');
+
+  const poolRef = useRef<MilhaoQ[]>([]);
+  const usedRef = useRef<Set<number>>(new Set());
+
+  // Estado da partida
+  const [round, setRound] = useState(0);
+  const [q, setQ] = useState<MilhaoQ | null>(null);
+  const [tstates, setTstates] = useState<{ status: 'playing' | 'stopped' | 'fallen' | 'won'; coins: number }[]>([]);
+  const [bids, setBids] = useState<(number | null)[]>([]);
+  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [step, setStep] = useState<'bidding' | 'answering' | 'revealed' | 'decision'>('bidding');
+  const [hidden, setHidden] = useState<number[]>([]);
+  const [audience, setAudience] = useState<number[] | null>(null);
+  const [lifelines, setLifelines] = useState({ cartas: true, pular: true, plateia: true });
+  const [results, setResults] = useState<number[]>([]);
+  const [host, setHost] = useState('');
+  const [awarded, setAwarded] = useState(false);
+
+  const fetchPool = async (): Promise<MilhaoQ[]> => {
+    const prompt = `Gere 18 perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade base ${difficulty}.
+ORDENE da MAIS FÁCIL para a MAIS DIFÍCIL: as primeiras bem simples, as últimas desafiadoras.
+Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(raw);
+    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
+    if (valid.length < 4) throw new Error('poucas perguntas');
+    return valid;
+  };
+
+  const drawQuestion = (lvl: number): MilhaoQ => {
+    const pool = poolRef.current;
+    const third = Math.max(1, Math.floor(pool.length / 3));
+    const tier = lvl < 3 ? 0 : lvl < 6 ? 1 : 2;
+    const start = tier * third, endEx = tier === 2 ? pool.length : start + third;
+    let candidates: number[] = [];
+    for (let i = start; i < endEx; i++) if (!usedRef.current.has(i)) candidates.push(i);
+    if (candidates.length === 0) for (let i = start; i < endEx; i++) candidates.push(i);
+    if (candidates.length === 0) candidates = pool.map((_, i) => i);
+    const idx = candidates[Math.floor(Math.random() * candidates.length)];
+    usedRef.current.add(idx);
+    return pool[idx];
+  };
+
+  const lastSafePrize = (lvl: number) => {
+    let banked = 0;
+    for (let i = 0; i < lvl; i++) if (MILHAO_LADDER[i].safe) banked = MILHAO_LADDER[i].prize;
+    return banked;
+  };
+
+  const start = async (testMode = false) => {
+    if (!testMode && !topic.trim()) { setError('Informe o tema do jogo.'); return; }
+    if (pick.length < 2) { setError('Escolha pelo menos 2 equipes.'); return; }
+    setError(''); setPhase('loading');
+    try {
+      poolRef.current = testMode ? MILHAO_SAMPLE_QUESTIONS : await fetchPool();
+      usedRef.current = new Set();
+      setTstates(contestants.map(() => ({ status: 'playing', coins: 0 })));
+      setBids(contestants.map(() => null));
+      setAnswers(contestants.map(() => null));
+      setResults([]); setAwarded(false);
+      setRound(0); setHidden([]); setAudience(null);
+      setLifelines({ cartas: true, pular: true, plateia: true });
+      setQ(drawQuestion(0)); setStep('bidding');
+      setHost(`Pergunta ${MILHAO_LADDER[0].prize}! Fazam seus lances, Dragões…`);
+      setPhase('play');
+    } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
+  };
+
+  const allBid = contestants.every((_, i) => tstates[i]?.status !== 'playing' || bids[i] !== null);
+
+  const startAnswering = () => {
+    if (!allBid) return;
+    setStep('answering');
+    setHost('Observem a pergunta…');
+  };
+
+  const allAnswered = contestants.every((_, i) => tstates[i]?.status !== 'playing' || answers[i] !== null);
+
+  const revealAnswers = () => {
+    if (!q || step !== 'answering' || !allAnswered) return;
+    const last = round >= MILHAO_LADDER.length - 1;
+    const nt: { status: 'playing' | 'stopped' | 'fallen' | 'won'; coins: number }[] = tstates.map((ts, i) => {
+      if (ts.status !== 'playing') return ts;
+      const bid = bids[i] ?? 0;
+      if (answers[i] === q.correct) {
+        const newCoins = ts.coins + bid;
+        return { status: newCoins >= 1000000 ? 'won' : 'playing', coins: newCoins };
+      }
+      const safe = lastSafePrize(round);
+      const newCoins = Math.max(safe, ts.coins - bid);
+      return { status: newCoins === ts.coins ? 'playing' : 'fallen', coins: newCoins };
+    });
+    setTstates(nt);
+    setStep('revealed');
+    const ok = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] === q.correct && (nt[i]?.coins ?? 0) > 0).map(ct => ct.name);
+    const bad = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] !== q.correct).map(ct => ct.name);
+    setHost(
+      nt.some(t => t.status === 'won') && ok.length ? `CAMPEÃO! ${ok.join(' e ')} chegou ao MILHÃO!`
+      : ok.length && bad.length ? `${ok.join(', ')} ganham! ${bad.join(', ')} perdem.`
+      : ok.length ? `${ok.join(', ')} acertam!`
+      : `Ninguém acertou! A resposta era "${q.options[q.correct]}".`);
+  };
+
+  const finishGame = (states: { status: string; coins: number }[] = tstates) => {
+    setResults(states.map(t => t.coins));
+    setPhase('end');
+  };
+
+  const afterReveal = () => {
+    if (!tstates.some(t => t.status === 'playing') || tstates.some(t => t.status === 'won') || round >= MILHAO_LADDER.length - 1) { finishGame(); return; }
+    setBids(contestants.map(() => null));
+    setAnswers(contestants.map(() => null));
+    setStep('bidding');
+    setRound(round + 1); setQ(drawQuestion(round + 1));
+    setHost(`Próxima pergunta! Qual é o próximo lance?`);
+  };
+
+  const winnerIdx = useMemo(() => {
+    if (!results.length) return -1;
+    let best = 0;
+    results.forEach((p, i) => { if (p > results[best]) best = i; });
+    return results[best] > 0 ? best : -1;
+  }, [results]);
+
+  const awardWinner = () => {
+    if (awarded || winnerIdx < 0) return;
+    const c = contestants[winnerIdx];
+    if (c && c.teamIdx >= 0) {
+      const ids = students.filter(s => s.teamId === teams[c.teamIdx]?.id).map(s => s.id);
+      if (ids.length) onAwardTeam(c.teamIdx, ids, 3);
+    }
+    setAwarded(true);
+  };
+
+  const useCartas = () => {
+    if (!lifelines.cartas || !q || step !== 'answering') return;
+    const wrong = [0, 1, 2, 3].filter(i => i !== q.correct).sort(() => Math.random() - 0.5).slice(0, 2);
+    setHidden(wrong); setLifelines(l => ({ ...l, cartas: false }));
+    setAnswers(a => a.map(v => v !== null && wrong.includes(v) ? null : v));
+    setHost('Cartas! Duas alternativas erradas foram eliminadas.');
+  };
+  const usePular = () => {
+    if (!lifelines.pular || step !== 'answering') return;
+    setAnswers(contestants.map(() => null)); setHidden([]); setAudience(null);
+    setQ(drawQuestion(round)); setLifelines(l => ({ ...l, pular: false }));
+    setHost('Pulou! Pergunta nova, mesmo valor.');
+  };
+  const usePlateia = () => {
+    if (!lifelines.plateia || !q || step !== 'answering') return;
+    const visible = [0, 1, 2, 3].filter(i => !hidden.includes(i));
+    const dist = [0, 0, 0, 0];
+    const correctShare = 45 + Math.floor(Math.random() * 26);
+    dist[q.correct] = correctShare;
+    let rem = 100 - correctShare;
+    const others = visible.filter(i => i !== q.correct);
+    others.forEach((i, idx) => {
+      if (idx === others.length - 1) { dist[i] = rem; rem = 0; }
+      else { const s = Math.floor(Math.random() * (rem + 1)); dist[i] = s; rem -= s; }
+    });
+    setAudience(dist); setLifelines(l => ({ ...l, plateia: false }));
+    setHost('A plateia votou!');
+  };
+
+  const stage = (children: React.ReactNode) => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[130] flex flex-col overflow-hidden"
+      style={{ background: 'linear-gradient(180deg,#33102e 0%,#1e0a22 55%,#0d0410 100%)' }}>
+      <style>{MILHAO_CSS}</style>
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 8%,rgba(255,214,80,0.18),transparent 55%)' }} />
+      </div>
+      <button onClick={onClose} className="absolute top-12 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
+      <div className="relative flex-1 overflow-y-auto no-scrollbar px-4 pt-16 pb-8">{children}</div>
+    </motion.div>
+  );
+
+  const showLogo = (
+    <div className="text-center mb-1">
+      <div className="relative inline-block overflow-hidden rounded-2xl border-2 border-amber-300/50 px-6 py-2" style={{ background: 'linear-gradient(180deg,rgba(85,42,0,0.55),rgba(30,12,0,0.72))', boxShadow: '0 0 30px -6px rgba(255,210,77,0.5), inset 0 1px 0 rgba(255,255,255,0.12)' }}>
+        <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>LEILÃO DO SABER</p>
+        <MilhaoShine />
+      </div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1.5">jogo de leilão entre dragões</p>
+    </div>
+  );
+
+  if (phase === 'setup' || phase === 'loading') return stage(
+    <div className="max-w-md mx-auto">
+      {showLogo}
+      {phase === 'setup' && (
+        <div className="space-y-3.5 mt-4">
+          <div className="bg-white/10 border border-white/15 rounded-2xl p-4 backdrop-blur">
+            <p className="text-sm text-white/85 leading-relaxed">Até 4 equipes jogam <b className="text-amber-300">ao mesmo tempo</b>. Cada pergunta: todos fazem um <b className="text-amber-300">lance (1-10 moedas)</b>, depois veem a pergunta. Acertou? <b className="text-amber-300">Ganha as moedas do lance</b>. Errou? <b className="text-amber-300">Perde</b> (mas as paradas seguras protegem moedas). Vence quem chegar a <b className="text-amber-300">1 milhão de moedas</b>!</p>
+          </div>
+          {error && <p className="text-sm text-red-200 font-medium bg-red-500/25 border border-red-400/40 rounded-xl p-3">{error}</p>}
+          <div>
+            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Tema do jogo</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Frações, Brasil Colônia…" className="w-full border border-white/15 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 bg-white/10 text-white placeholder-white/40" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Dificuldade base</label>
+            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/15 rounded-xl px-3 py-2.5 text-sm bg-white/10 text-white [&>option]:text-gray-900">
+              <option value="fácil">Fácil</option>
+              <option value="média">Média</option>
+              <option value="difícil">Difícil</option>
+            </select>
+          </div>
+          <div className="bg-white/10 rounded-2xl p-4 border border-white/15 backdrop-blur">
+            <p className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-2">Escolha as equipes (2 a 4) — jogam ao mesmo tempo</p>
+            <div className="flex flex-wrap gap-2">
+              {(hasRealTeams ? teams.slice(0, 8) : MILHAO_FALLBACK).map((t, i) => {
+                const on = pick.includes(i);
+                return (
+                  <button key={i} onClick={() => setPick(p => on ? p.filter(x => x !== i) : (p.length >= 4 ? p : [...p, i]))}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all inline-flex items-center gap-1 ${on ? 'text-white border-white/50 shadow-lg scale-105' : 'text-white/60 border-white/15 bg-white/[0.06]'}`}
+                    style={on ? { backgroundColor: t.color } : undefined}>
+                    <EmojiIcon emoji={t.emoji} size={12} /> {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            {!hasRealTeams && <p className="text-[11px] text-white/45 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
+          </div>
+          <button onClick={() => start()} className="relative overflow-hidden w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+            <Coins size={20} /> Começar o leilão
+            <MilhaoShine />
+          </button>
+          <button onClick={() => start(true)} className="w-full text-amber-200 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 bg-white/[0.06] border border-dashed border-amber-300/40 active:scale-95 transition-transform">
+            <FlaskConical size={13} /> Testar com perguntas de exemplo (sem IA)
+          </button>
+        </div>
+      )}
+      {phase === 'loading' && (
+        <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <Loader2 size={40} className="animate-spin text-amber-300" />
+          <p className="text-sm font-bold text-white/70">No ar em instantes… montando as perguntas.</p>
+        </div>
+      )}
+    </div>
+  );
+
+  if (phase === 'end') {
+    const ranking = contestants.map((ct, i) => ({ ct, coins: results[i] ?? 0 })).sort((a, b) => b.coins - a.coins);
+    const champ = ranking[0];
+    return stage(
+      <div className="max-w-md mx-auto">
+        <ConfettiBurst />
+        {showLogo}
+        {champ && champ.coins > 0 && (
+          <div className="text-center mt-4 mb-5">
+            <div className="relative inline-flex flex-col items-center" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
+              <Crown size={30} className="text-amber-300 mb-1" style={{ filter: 'drop-shadow(0 0 10px rgba(255,210,77,0.8))' }} />
+              <div className="w-20 h-20 rounded-full border-4 border-amber-300 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-[0_0_40px_-4px_rgba(255,210,77,0.8)]">
+                <EmojiIcon emoji={champ.ct.emoji} size={40} />
+              </div>
+            </div>
+            <p className="font-black text-white text-lg mt-3">{champ.ct.name} é campeão!</p>
+            <p className="font-black text-3xl mt-1" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.6)' }}>{fmtPrize(champ.coins)}</p>
+          </div>
+        )}
+        <div className="space-y-2">
+          {ranking.map((r, pos) => (
+            <div key={r.ct.name + pos} className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border-2 ${pos === 0 ? 'bg-amber-400/20 border-amber-400/70' : 'bg-white/[0.07] border-white/12'}`}>
+              <span className="font-black text-sm w-6 text-center text-white/80">{pos === 0 ? <Crown size={18} className="text-amber-300 inline" /> : `${pos + 1}º`}</span>
+              <EmojiIcon emoji={r.ct.emoji} size={20} />
+              <span className="flex-1 font-black text-white text-sm">{r.ct.name}</span>
+              <span className="font-black text-amber-300 tabular-nums text-sm">{fmtPrize(r.coins)}</span>
+            </div>
+          ))}
+        </div>
+        {winnerIdx >= 0 && contestants[winnerIdx]?.teamIdx >= 0 && !awarded && (
+          <button onClick={awardWinner} className="w-full mt-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+            <Zap size={16} /> Dar +3 XP ao time campeão
+          </button>
+        )}
+        {awarded && <p className="text-emerald-300 text-sm font-bold text-center mt-3 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
+        <div className="flex gap-3 mt-3">
+          <button onClick={() => { setPhase('setup'); setResults([]); }} className="flex-1 text-amber-950 font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}><RotateCcw size={15} /> Jogar de novo</button>
+          <button onClick={onClose} className="flex-1 bg-white/10 border border-white/20 text-white/80 font-bold py-3 rounded-2xl text-sm">Sair</button>
+        </div>
+      </div>
+    );
+  }
+
+  const reveal = step === 'revealed';
+  const PALETTE = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
+      <style>{MILHAO_CSS}</style>
+      {/* ── PALCO ── */}
+      <div className="relative flex-1 overflow-hidden bg-white/5">
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#3a1030 0%,#2a0d3a 45%,#160718 100%)' }} />
+        <LeilaoFundo />
+        <LeilaoCortinaEsquerda />
+        <LeilaoCortinaDir />
+        <LeilaoPersonagem />
+        <button onClick={onClose} className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/55 text-white/90 border border-white/25 rounded-lg px-2.5 py-1.5 text-[11px] font-black active:scale-95 transition-transform"><X size={13} /> <span className="font-pixel text-[9px]">SAIR</span></button>
+        <span className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
+        {/* prêmio + times */}
+        <div className="absolute top-12 inset-x-14 z-10 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-1 mb-1">
+            {contestants.map((ct, i) => {
+              const st = tstates[i]?.status;
+              return (
+                <span key={i} className={`inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow border border-white/30 ${st === 'fallen' ? 'opacity-40 saturate-0' : st === 'stopped' ? 'opacity-70' : ''}`} style={{ backgroundColor: ct.color }}>
+                  <EmojiIcon emoji={ct.emoji} size={10} /> {ct.name}
+                  {st === 'stopped' && <Check size={9} strokeWidth={4} />}
+                  {st === 'fallen' && <X size={9} strokeWidth={4} />}
+                  {st === 'won' && <Crown size={9} />}
+                </span>
+              );
+            })}
+          </div>
+          <div className="relative inline-block overflow-hidden rounded-xl border border-amber-300/60 px-4 pt-1 pb-1.5" style={{ background: 'linear-gradient(180deg,rgba(70,35,0,0.72),rgba(25,10,0,0.85))', boxShadow: '0 0 18px -2px rgba(255,210,77,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
+            <p className="font-pixel text-[8px] text-amber-100/80 uppercase tracking-widest">Pergunta</p>
+            <p className="font-black text-2xl leading-none" style={{ color: '#ffd24d', textShadow: '0 0 16px rgba(255,210,77,0.7), 0 2px 0 rgba(90,40,0,0.6)' }}>{round + 1} de 9</p>
+            <MilhaoShine />
+          </div>
+        </div>
+        {/* balão do apresentador */}
+        <div className="absolute bottom-3 left-3 right-20 z-10 flex items-end gap-1.5">
+          <div className="w-9 h-9 shrink-0 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-lg"><Bird size={18} className="text-amber-200" /></div>
+          <div key={host} className="bg-white/95 rounded-2xl rounded-bl-sm px-3 py-2 shadow-xl" style={{ animation: 'milhao-pop 0.3s ease-out' }}>
+            <p className="font-vt text-[15px] text-gray-800 leading-tight">{host}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── PAINEL DE PERGUNTAS ── */}
+      <div className="bg-[#4a1b3e] border-t-4 border-[#2f1027] px-3 pt-3 pb-6 shrink-0 overflow-y-auto no-scrollbar max-h-[62%]">
+        {q && (
+          <>
+            <div key={`${round}-${q.q}`} className="relative bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3 min-h-[64px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_0_rgba(0,0,0,0.25)]" style={{ animation: 'milhao-pop 0.35s ease-out' }}>
+              {(['top-1.5 left-2', 'top-1.5 right-2', 'bottom-1.5 left-2', 'bottom-1.5 right-2'] as const).map(pos => (
+                <span key={pos} className={`absolute ${pos} w-1.5 h-1.5 rounded-full bg-[#c9b28a] border border-[#8a7a5a]`} />
+              ))}
+              <p className="font-vt text-xl text-[#3a3020] leading-snug">
+                {step === 'bidding' ? '🤔 Preparem-se para a pergunta!' : q.q}
+                <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed">Pergunta {round + 1} de {MILHAO_LADDER.length}</span>
+              </p>
+            </div>
+
+            {/* alternativas */}
+            {step !== 'bidding' && (
+              <div className="grid grid-cols-2 gap-2.5 max-w-lg w-full mx-auto my-4">
+                {q.options.map((opt, i) => {
+                  const isHidden = hidden.includes(i);
+                  const isCorrect = reveal && i === q.correct;
+                  const dimmed = reveal && !isCorrect;
+                  const anim = isCorrect ? 'milhao-glow-green 1.4s ease-in-out infinite'
+                    : `milhao-pop 0.35s ease-out ${i * 0.07}s backwards`;
+                  return (
+                    <div key={`${q.q}-${i}`}
+                      className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all border-2 border-black/25 shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_4px_0_rgba(0,0,0,0.35)] ${isHidden ? 'opacity-0 pointer-events-none' : ''} ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                      style={{ backgroundColor: PALETTE[i], animation: anim }}>
+                      <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
+                      <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
+                      <span className="shrink-0 flex gap-0.5">
+                        {contestants.map((ct, ti) => answers[ti] === i
+                          ? <span key={ti} className="w-2.5 h-2.5 rounded-full border border-white/80 shadow" style={{ backgroundColor: ct.color }} />
+                          : null)}
+                      </span>
+                      {audience && (
+                        <span className="shrink-0 flex flex-col items-end">
+                          <span className="font-pixel text-[9px] text-white/90 tabular-nums">{audience[i]}%</span>
+                          <span className="w-8 h-1.5 bg-black/25 rounded-full overflow-hidden mt-0.5"><span className="block h-full bg-white/80" style={{ width: `${audience[i]}%` }} /></span>
+                        </span>
+                      )}
+                      {isCorrect && <Check size={16} className="shrink-0 text-white" strokeWidth={3} />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* FASE 1: lances */}
+            {step === 'bidding' && (
+              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
+                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
+                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
+                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
+                    <span className="ml-auto text-white font-black text-[11px]">{tstates[ti].coins} 🪙</span>
+                    <div className="flex gap-1 shrink-0">
+                      {[1, 2, 5, 10].map(bid => (
+                        <button key={bid} onClick={() => setBids(b => b.map((v, j) => j === ti ? bid : v))}
+                          className={`w-8 h-8 rounded-lg font-pixel text-[10px] font-bold transition-all ${bids[ti] === bid ? 'bg-amber-400 text-amber-950 ring-2 ring-white scale-110' : 'bg-white/20 text-white active:scale-95'}`}>
+                          {bid}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* FASE 2: respostas */}
+            {step === 'answering' && (
+              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
+                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
+                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
+                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
+                    <div className="flex gap-1.5 ml-auto shrink-0">
+                      {[0, 1, 2, 3].map(o => (
+                        <button key={o} disabled={hidden.includes(o)} onClick={() => setAnswers(a => a.map((v, j) => j === ti ? o : v))}
+                          className={`w-8 h-8 rounded-lg font-pixel text-[10px] text-white border-2 border-black/25 transition-all ${hidden.includes(o) ? 'opacity-0 pointer-events-none' : answers[ti] === o ? 'ring-2 ring-white scale-110' : 'opacity-50 active:scale-95'}`}
+                          style={{ backgroundColor: PALETTE[o] }}>{['A', 'B', 'C', 'D'][o]}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ajudas */}
+            {step === 'answering' && (
+              <div className="grid grid-cols-3 gap-2 max-w-lg w-full mx-auto mb-3">
+                {([{ on: lifelines.cartas, fn: useCartas, Icon: Scissors, label: '50:50' },
+                   { on: lifelines.pular, fn: usePular, Icon: SkipForward, label: 'Pular' },
+                   { on: lifelines.plateia, fn: usePlateia, Icon: Users, label: 'Plateia' }] as const).map((a, i) => (
+                  <button key={i} onClick={a.fn} disabled={!a.on}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 font-pixel text-[8px] transition-all ${a.on ? 'bg-[#33122b] border-black/30 text-amber-200 active:scale-95' : 'bg-[#33122b]/50 border-black/20 text-white/25 line-through'}`}>
+                    <a.Icon size={15} /> {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* ações */}
+            <div className="max-w-lg w-full mx-auto">
+              {step === 'bidding' && (
+                <button onClick={startAnswering} disabled={!allBid} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                  <span className="font-pixel text-[10px]">REVELAR PERGUNTA</span>
+                  {allBid && <MilhaoShine />}
+                </button>
+              )}
+              {step === 'answering' && (
+                <button onClick={revealAnswers} disabled={!allAnswered} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                  <span className="font-pixel text-[10px]">REVELAR RESPOSTA</span>
+                  {allAnswered && <MilhaoShine />}
+                </button>
+              )}
+              {step === 'revealed' && (
+                <button onClick={afterReveal} className="w-full bg-[#33122b] border-2 border-black/30 text-white font-black py-3 rounded-xl font-pixel text-[10px] active:translate-y-0.5">CONTINUAR</button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+const GamiMilhao = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
+  teams: GamiTeam[];
+  students: GamiStudent[];
+  subject: string;
+  level: string;
+  onClose: () => void;
+  onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
+  isAdmin?: boolean;
+}) => {
+  const hasRealTeams = teams.length >= 2;
+  const [pick, setPick] = useState<number[]>(hasRealTeams ? [0, 1] : [0, 1, 2, 3]);
+  // Até 4 equipes jogam AO MESMO TEMPO: todas respondem cada pergunta e sobem juntas.
+  const contestants = useMemo(() => pick.map(i => hasRealTeams
+    ? { teamIdx: i, name: teams[i]?.name ?? '?', emoji: teams[i]?.emoji ?? '🦉', color: teams[i]?.color ?? '#6366f1' }
+    : { teamIdx: -1, ...MILHAO_FALLBACK[i] }),
+  [hasRealTeams, pick, teams]);
+
+  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
+  const [topic, setTopic] = useState('');
+  const [difficulty, setDifficulty] = useState('média');
+  const [error, setError] = useState('');
+
+  const poolRef = useRef<MilhaoQ[]>([]);
+  const usedRef = useRef<Set<number>>(new Set());
+
+  // Estado da partida — todas as equipes respondem a MESMA pergunta ao mesmo tempo.
+  const [round, setRound] = useState(0);              // degrau atual da rodada (0..8)
+  const [q, setQ] = useState<MilhaoQ | null>(null);
+  const [tstates, setTstates] = useState<{ status: 'playing' | 'stopped' | 'fallen' | 'won'; prize: number }[]>([]);
+  const [answers, setAnswers] = useState<(number | null)[]>([]);       // resposta de cada equipe na rodada
+  const [decisions, setDecisions] = useState<('stop' | 'go' | null)[]>([]); // parar ou arriscar
+  const [step, setStep] = useState<'answering' | 'revealed' | 'decision'>('answering');
+  const [hidden, setHidden] = useState<number[]>([]);      // 50:50
+  const [audience, setAudience] = useState<number[] | null>(null); // plateia
+  const [lifelines, setLifelines] = useState({ cartas: true, pular: true, plateia: true }); // ajudas da turma, 1x cada
+  const [results, setResults] = useState<number[]>([]);   // prêmio final por equipe
+  const [host, setHost] = useState('');
+  const [awarded, setAwarded] = useState(false);
+
+  const fetchPool = async (): Promise<MilhaoQ[]> => {
+    const prompt = `Gere 18 perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade base ${difficulty}.
+ORDENE da MAIS FÁCIL para a MAIS DIFÍCIL: as primeiras bem simples, as últimas desafiadoras.
+Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
+    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
+    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(raw);
+    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
+    if (valid.length < 4) throw new Error('poucas perguntas');
+    return valid;
+  };
+
+  // Sorteia uma pergunta do "andar" de dificuldade certo (fácil/média/difícil),
+  // preferindo as ainda não usadas para dois times pegarem perguntas diferentes.
+  const drawQuestion = (lvl: number): MilhaoQ => {
+    const pool = poolRef.current;
+    const third = Math.max(1, Math.floor(pool.length / 3));
+    const tier = lvl < 3 ? 0 : lvl < 6 ? 1 : 2;
+    const start = tier * third, endEx = tier === 2 ? pool.length : start + third;
+    let candidates: number[] = [];
+    for (let i = start; i < endEx; i++) if (!usedRef.current.has(i)) candidates.push(i);
+    if (candidates.length === 0) for (let i = start; i < endEx; i++) candidates.push(i);
+    if (candidates.length === 0) candidates = pool.map((_, i) => i);
+    const idx = candidates[Math.floor(Math.random() * candidates.length)];
+    usedRef.current.add(idx);
+    return pool[idx];
+  };
+
+  const lastSafePrize = (lvl: number) => {
+    let banked = 0;
+    for (let i = 0; i < lvl; i++) if (MILHAO_LADDER[i].safe) banked = MILHAO_LADDER[i].prize;
+    return banked;
+  };
+
+  const start = async (testMode = false) => {
+    if (!testMode && !topic.trim()) { setError('Informe o tema do jogo.'); return; }
+    if (pick.length < 2) { setError('Escolha pelo menos 2 equipes.'); return; }
+    setError(''); setPhase('loading');
+    try {
+      poolRef.current = testMode ? MILHAO_SAMPLE_QUESTIONS : await fetchPool();
+      usedRef.current = new Set();
+      setTstates(contestants.map(() => ({ status: 'playing', prize: 0 })));
+      setAnswers(contestants.map(() => null));
+      setDecisions(contestants.map(() => null));
+      setResults([]); setAwarded(false);
+      setRound(0); setHidden([]); setAudience(null);
+      setLifelines({ cartas: true, pular: true, plateia: true });
+      setQ(drawQuestion(0)); setStep('answering');
+      setHost(`Valendo ${fmtPrize(MILHAO_LADDER[0].prize)}! Cada equipe marca a sua resposta.`);
+      setPhase('play');
+    } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
+  };
+
+  const allAnswered = contestants.every((_, i) => tstates[i]?.status !== 'playing' || answers[i] !== null);
+
+  const revealAnswers = () => {
+    if (!q || step !== 'answering' || !allAnswered) return;
+    const last = round >= MILHAO_LADDER.length - 1;
+    const nt: { status: 'playing' | 'stopped' | 'fallen' | 'won'; prize: number }[] = tstates.map((ts, i) => {
+      if (ts.status !== 'playing') return ts;
+      if (answers[i] === q.correct) return { status: last ? 'won' : 'playing', prize: MILHAO_LADDER[round].prize };
+      return { status: 'fallen', prize: lastSafePrize(round) };
+    });
+    setTstates(nt);
+    setStep('revealed');
+    const ok = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] === q.correct).map(ct => ct.name);
+    const bad = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] !== q.correct).map(ct => ct.name);
+    setHost(
+      last && ok.length ? `INCRÍVEL! ${ok.join(' e ')} chegou ao MILHÃO!`
+      : ok.length && bad.length ? `${ok.join(', ')} sobe! ${bad.join(', ')} cai pra parada segura.`
+      : ok.length ? `Todas certas! Equipes chegam em ${fmtPrize(MILHAO_LADDER[round].prize)}.`
+      : `Ninguém acertou! A resposta era "${q.options[q.correct]}".`);
+  };
+
+  const finishGame = (states: { status: string; prize: number }[] = tstates) => {
+    setResults(states.map(t => t.prize));
+    setPhase('end');
+  };
+
+  const afterReveal = () => {
+    if (!tstates.some(t => t.status === 'playing') || round >= MILHAO_LADDER.length - 1) { finishGame(); return; }
+    setDecisions(contestants.map(() => null));
+    setStep('decision');
+    setHost(`Quem arrisca a próxima, valendo ${fmtPrize(MILHAO_LADDER[round + 1].prize)}? Cada equipe decide.`);
+  };
+
+  const allDecided = contestants.every((_, i) => tstates[i]?.status !== 'playing' || decisions[i] !== null);
+
+  const nextRound = () => {
+    if (!allDecided) return;
+    const nt = tstates.map((ts, i) => ts.status === 'playing' && decisions[i] === 'stop' ? { status: 'stopped' as const, prize: ts.prize } : ts);
+    setTstates(nt);
+    if (!nt.some(t => t.status === 'playing')) { finishGame(nt); return; }
+    const next = round + 1;
+    setRound(next); setQ(drawQuestion(next));
+    setAnswers(contestants.map(() => null)); setHidden([]); setAudience(null); setStep('answering');
+    setHost(`Valendo ${fmtPrize(MILHAO_LADDER[next].prize)}!`);
+  };
+
+  const winnerIdx = useMemo(() => {
+    if (!results.length) return -1;
+    let best = 0;
+    results.forEach((p, i) => { if (p > results[best]) best = i; });
+    return results[best] > 0 ? best : -1;
+  }, [results]);
+
+  const awardWinner = () => {
+    if (awarded || winnerIdx < 0) return;
+    const c = contestants[winnerIdx];
+    if (c && c.teamIdx >= 0) {
+      const ids = students.filter(s => s.teamId === teams[c.teamIdx]?.id).map(s => s.id);
+      if (ids.length) onAwardTeam(c.teamIdx, ids, 3);
+    }
+    setAwarded(true);
+  };
+
+  const useCartas = () => {
+    if (!lifelines.cartas || !q || step !== 'answering') return;
+    const wrong = [0, 1, 2, 3].filter(i => i !== q.correct).sort(() => Math.random() - 0.5).slice(0, 2);
+    setHidden(wrong); setLifelines(l => ({ ...l, cartas: false }));
+    setAnswers(a => a.map(v => v !== null && wrong.includes(v) ? null : v));
+    setHost('Cartas! Duas alternativas erradas foram eliminadas.');
+  };
+  const usePular = () => {
+    if (!lifelines.pular || step !== 'answering') return;
+    setAnswers(contestants.map(() => null)); setHidden([]); setAudience(null);
+    setQ(drawQuestion(round)); setLifelines(l => ({ ...l, pular: false }));
+    setHost('Pulou! Pergunta nova, mesmo valor.');
+  };
+  const usePlateia = () => {
+    if (!lifelines.plateia || !q || step !== 'answering') return;
+    const visible = [0, 1, 2, 3].filter(i => !hidden.includes(i));
+    const dist = [0, 0, 0, 0];
+    const correctShare = 45 + Math.floor(Math.random() * 26); // 45..70 %
+    dist[q.correct] = correctShare;
+    let rem = 100 - correctShare;
+    const others = visible.filter(i => i !== q.correct);
+    others.forEach((i, idx) => {
+      if (idx === others.length - 1) { dist[i] = rem; rem = 0; }
+      else { const s = Math.floor(Math.random() * (rem + 1)); dist[i] = s; rem -= s; }
+    });
+    setAudience(dist); setLifelines(l => ({ ...l, plateia: false }));
+    setHost('A plateia votou!');
+  };
+
+  // ── Palco do "programa" — fundo de estúdio com holofotes e cores vivas.
+  // É uma função (não um componente) de propósito: inlina o JSX, então os
+  // inputs do setup não remontam/perdem foco a cada tecla.
+  const stage = (children: React.ReactNode) => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="milhao-anim fixed inset-0 z-[130] flex flex-col overflow-hidden"
+      style={{ background: 'linear-gradient(180deg,#33102e 0%,#1e0a22 55%,#0d0410 100%)' }}>
+      <style>{MILHAO_CSS}</style>
+      {/* cenário: cortinas, sanca com lâmpadas e feixes de luz */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 8%,rgba(255,214,80,0.18),transparent 55%)' }} />
+        <div className="absolute inset-y-0 left-0 w-1/5" style={{ background: 'linear-gradient(90deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 left-0 w-1/5" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/5" style={{ background: 'linear-gradient(270deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/5" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)' }} />
+        <div className="absolute top-0 inset-x-0 h-8" style={{ background: 'linear-gradient(180deg,#a51a2a,#6e0d18)' }} />
+        <div className="absolute top-8 inset-x-0 h-[3px]" style={{ background: 'linear-gradient(90deg,#8a5a00,#ffd24d 30%,#ffd24d 70%,#8a5a00)' }} />
+        <div className="absolute top-10 inset-x-6 flex justify-between">
+          {Array.from({ length: 11 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)', animation: `milhao-twinkle 1.8s ease-in-out ${(i % 3) * 0.6}s infinite` }} />)}
+        </div>
+        <div className="absolute top-10 left-1/4 w-28 h-[130%] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.55),transparent 65%)', transformOrigin: 'top center', animation: 'milhao-sway 6s ease-in-out infinite' }} />
+        <div className="absolute top-10 right-1/4 w-28 h-[130%] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.55),transparent 65%)', transformOrigin: 'top center', animation: 'milhao-sway-r 6s ease-in-out infinite' }} />
+        <div className="absolute bottom-0 left-1/3 w-56 h-56 rounded-full blur-[90px]" style={{ background: 'rgba(124,58,237,0.35)' }} />
+      </div>
+      <MilhaoBgArt />
+      <button onClick={onClose} className="absolute top-12 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
+      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-4 pt-16 pb-8">{children}</div>
+    </motion.div>
+  );
+
+  // Título estilo letreiro do programa
+  const showLogo = (
+    <div className="text-center mb-1">
+      <div className="relative inline-block overflow-hidden rounded-2xl border-2 border-amber-300/50 px-6 py-2" style={{ background: 'linear-gradient(180deg,rgba(85,42,0,0.55),rgba(30,12,0,0.72))', boxShadow: '0 0 30px -6px rgba(255,210,77,0.5), inset 0 1px 0 rgba(255,255,255,0.12)' }}>
+        <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>RUMO AO MILHÃO</p>
+        <MilhaoShine />
+      </div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1.5">o show do saber</p>
+    </div>
+  );
+
+  // ── SETUP / LOADING ──
+  if (phase === 'setup' || phase === 'loading') return stage(
+    <div className="max-w-md mx-auto">
+      {showLogo}
+      {phase === 'setup' && (
+        <div className="space-y-3.5 mt-4">
+          <div className="bg-white/10 border border-white/15 rounded-2xl p-4 backdrop-blur">
+            <p className="text-sm text-white/85 leading-relaxed">Até 4 equipes jogam <b className="text-amber-300">ao mesmo tempo</b>: todas respondem cada pergunta e sobem juntas a <b className="text-amber-300">escada do milhão</b>. Errou? Cai pra última <b className="text-emerald-300">parada segura</b> e sai do jogo. Entre as perguntas, cada equipe decide: <b className="text-amber-300">parar e garantir</b> ou arriscar. A turma tem 3 ajudas pra partida: <b className="text-white">50:50</b>, <b className="text-white">Pular</b> e <b className="text-white">Plateia</b>. Vence quem juntar o maior prêmio!</p>
+          </div>
+          {error && <p className="text-sm text-red-200 font-medium bg-red-500/25 border border-red-400/40 rounded-xl p-3">{error}</p>}
+          <div>
+            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Tema do jogo</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Frações, Brasil Colônia…" className="w-full border border-white/15 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 bg-white/10 text-white placeholder-white/40" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Dificuldade base</label>
+            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/15 rounded-xl px-3 py-2.5 text-sm bg-white/10 text-white [&>option]:text-gray-900">
+              <option value="fácil">Fácil</option>
+              <option value="média">Média</option>
+              <option value="difícil">Difícil</option>
+            </select>
+          </div>
+          <div className="bg-white/10 rounded-2xl p-4 border border-white/15 backdrop-blur">
+            <p className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-2">Escolha as equipes (2 a 4) — jogam ao mesmo tempo</p>
+            <div className="flex flex-wrap gap-2">
+              {(hasRealTeams ? teams.slice(0, 8) : MILHAO_FALLBACK).map((t, i) => {
+                const on = pick.includes(i);
+                return (
+                  <button key={i} onClick={() => setPick(p => on ? p.filter(x => x !== i) : (p.length >= 4 ? p : [...p, i]))}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all inline-flex items-center gap-1 ${on ? 'text-white border-white/50 shadow-lg scale-105' : 'text-white/60 border-white/15 bg-white/[0.06]'}`}
+                    style={on ? { backgroundColor: t.color } : undefined}>
+                    <EmojiIcon emoji={t.emoji} size={12} /> {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            {!hasRealTeams && <p className="text-[11px] text-white/45 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
+          </div>
+          <button onClick={() => start()} className="relative overflow-hidden w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+            <Coins size={20} /> Começar o show
+            <MilhaoShine />
+          </button>
+          <button onClick={() => start(true)} className="w-full text-amber-200 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 bg-white/[0.06] border border-dashed border-amber-300/40 active:scale-95 transition-transform">
+            <FlaskConical size={13} /> Testar com perguntas de exemplo (sem IA)
+          </button>
+        </div>
+      )}
+      {phase === 'loading' && (
+        <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <Loader2 size={40} className="animate-spin text-amber-300" />
+          <p className="text-sm font-bold text-white/70">No ar em instantes… montando as perguntas.</p>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── END — grande final ──
+  if (phase === 'end') {
+    const ranking = contestants.map((ct, i) => ({ ct, prize: results[i] ?? 0 })).sort((a, b) => b.prize - a.prize);
+    const champ = ranking[0];
+    return stage(
+      <div className="max-w-md mx-auto">
+        <ConfettiBurst />
+        {showLogo}
+        {champ && champ.prize > 0 && (
+          <div className="text-center mt-4 mb-5">
+            <div className="relative inline-flex flex-col items-center" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
+              <Crown size={30} className="text-amber-300 mb-1" style={{ filter: 'drop-shadow(0 0 10px rgba(255,210,77,0.8))' }} />
+              <div className="w-20 h-20 rounded-full border-4 border-amber-300 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-[0_0_40px_-4px_rgba(255,210,77,0.8)]">
+                <EmojiIcon emoji={champ.ct.emoji} size={40} />
+              </div>
+            </div>
+            <p className="font-black text-white text-lg mt-3">{champ.ct.name} é campeão!</p>
+            <p className="font-black text-3xl mt-1" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.6)' }}>{fmtPrize(champ.prize)}</p>
+          </div>
+        )}
+        <div className="space-y-2">
+          {ranking.map((r, pos) => (
+            <div key={r.ct.name + pos} className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border-2 ${pos === 0 ? 'bg-amber-400/20 border-amber-400/70' : 'bg-white/[0.07] border-white/12'}`}>
+              <span className="font-black text-sm w-6 text-center text-white/80">{pos === 0 ? <Crown size={18} className="text-amber-300 inline" /> : `${pos + 1}º`}</span>
+              <EmojiIcon emoji={r.ct.emoji} size={20} />
+              <span className="flex-1 font-black text-white text-sm">{r.ct.name}</span>
+              <span className="font-black text-amber-300 tabular-nums text-sm">{fmtPrize(r.prize)}</span>
+            </div>
+          ))}
+        </div>
+        {winnerIdx >= 0 && contestants[winnerIdx]?.teamIdx >= 0 && !awarded && (
+          <button onClick={awardWinner} className="w-full mt-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
+            <Zap size={16} /> Dar +3 XP ao time campeão
+          </button>
+        )}
+        {awarded && <p className="text-emerald-300 text-sm font-bold text-center mt-3 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
+        <div className="flex gap-3 mt-3">
+          <button onClick={() => { setPhase('setup'); setResults([]); }} className="flex-1 text-amber-950 font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}><RotateCcw size={15} /> Jogar de novo</button>
+          <button onClick={onClose} className="flex-1 bg-white/10 border border-white/20 text-white/80 font-bold py-3 rounded-2xl text-sm">Sair</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── PLAY — palco do show ──
+  const reveal = step === 'revealed' || step === 'decision';
+  const PALETTE = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="milhao-anim fixed inset-0 z-[130] flex flex-col font-vt">
+      <style>{MILHAO_CSS}</style>
+      {/* ── PALCO (arte no topo) ── */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* Placeholder do palco em CSS (fica atrás). Some quando a arte real
+            /assets/battle/milhao-palco.jpg existir e carregar por cima. */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#3a1030 0%,#2a0d3a 45%,#160718 100%)' }} />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 12%,rgba(255,214,80,0.16),transparent 55%)' }} />
+        {/* piso de madeira do palco */}
+        <div className="absolute bottom-0 inset-x-0 h-14" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 2px, transparent 2px 34px), linear-gradient(180deg,#6b3416,#3a1a0a)' }} />
+        <div className="absolute bottom-0 inset-x-0 h-14 opacity-40" style={{ background: 'radial-gradient(ellipse at 50% 0,rgba(255,214,80,0.5),transparent 65%)' }} />
+        {/* cortinas com dobras de tecido */}
+        <div className="absolute inset-y-0 left-0 w-1/4" style={{ background: 'linear-gradient(90deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 left-0 w-1/4" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/4" style={{ background: 'linear-gradient(270deg,#7a0f1e,#c0293a 55%,transparent)' }} />
+        <div className="absolute inset-y-0 right-0 w-1/4" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)' }} />
+        {/* sanca com trilho dourado e letreiro de lâmpadas */}
+        <div className="absolute top-0 inset-x-0 h-8" style={{ background: 'linear-gradient(180deg,#a51a2a,#6e0d18)' }} />
+        <div className="absolute top-8 inset-x-0 h-[3px]" style={{ background: 'linear-gradient(90deg,#8a5a00,#ffd24d 30%,#ffd24d 70%,#8a5a00)' }} />
+        <div className="absolute top-9 left-1/3 w-24 h-[130%] blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.6),transparent 60%)', transformOrigin: 'top center', animation: 'milhao-sway 6s ease-in-out infinite' }} />
+        <div className="absolute top-9 right-1/3 w-24 h-[130%] blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.6),transparent 60%)', transformOrigin: 'top center', animation: 'milhao-sway-r 6s ease-in-out infinite' }} />
+        <div className="absolute top-10 inset-x-8 flex justify-between">
+          {Array.from({ length: 9 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)', animation: `milhao-twinkle 1.8s ease-in-out ${(i % 3) * 0.6}s infinite` }} />)}
+        </div>
+        {/* brilhos espalhados pelo cenário */}
+        {[[16, 34], [82, 28], [30, 58], [70, 52]].map(([x, y], i) => (
+          <span key={i} className="absolute w-1 h-1 rounded-full bg-white/80" style={{ left: `${x}%`, top: `${y}%`, boxShadow: '0 0 6px 2px rgba(255,255,255,0.55)', animation: `milhao-twinkle 2.4s ease-in-out ${i * 0.5}s infinite` }} />
+        ))}
+        {/* cortina/cenário em arte real — cobre todo o placeholder de CSS acima quando existir */}
+        <MilhaoBgArt />
+        {/* apresentador — placeholder em CSS (fica atrás) coberto pela arte real do personagem quando existir */}
+        <div className="absolute inset-x-0 bottom-10 z-[1] flex flex-col items-center">
+          <div className="w-28 h-16 rounded-[50%]" style={{ background: 'radial-gradient(ellipse,rgba(255,220,120,0.35),transparent 70%)' }} />
+          <div className="relative w-full flex justify-center -mt-14" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
+            <div className="w-16 h-16 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-xl"><Bird size={34} className="text-amber-200" /></div>
+            <MilhaoCharacterArt />
+          </div>
+        </div>
+
+        {/* ── OVERLAYS ── */}
+        <button onClick={onClose} className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/55 text-white/90 border border-white/25 rounded-lg px-2.5 py-1.5 text-[11px] font-black active:scale-95 transition-transform"><X size={13} /> <span className="font-pixel text-[9px]">SAIR</span></button>
+        <span className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
+        {/* prêmio + time */}
+        <div className="absolute top-12 inset-x-14 z-10 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-1 mb-1">
+            {contestants.map((ct, i) => {
+              const st = tstates[i]?.status;
+              return (
+                <span key={i} className={`inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow border border-white/30 ${st === 'fallen' ? 'opacity-40 saturate-0' : st === 'stopped' ? 'opacity-70' : ''}`} style={{ backgroundColor: ct.color }}>
+                  <EmojiIcon emoji={ct.emoji} size={10} /> {ct.name}
+                  {st === 'stopped' && <Check size={9} strokeWidth={4} />}
+                  {st === 'fallen' && <X size={9} strokeWidth={4} />}
+                  {st === 'won' && <Crown size={9} />}
+                </span>
+              );
+            })}
+          </div>
+          <div className="relative inline-block overflow-hidden rounded-xl border border-amber-300/60 px-4 pt-1 pb-1.5" style={{ background: 'linear-gradient(180deg,rgba(70,35,0,0.72),rgba(25,10,0,0.85))', boxShadow: '0 0 18px -2px rgba(255,210,77,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
+            <p className="font-pixel text-[8px] text-amber-100/80 uppercase tracking-widest">Valendo</p>
+            <p className="font-black text-2xl leading-none" style={{ color: '#ffd24d', textShadow: '0 0 16px rgba(255,210,77,0.7), 0 2px 0 rgba(90,40,0,0.6)' }}>{fmtPrize(MILHAO_LADDER[round].prize)}</p>
+            <MilhaoShine />
+          </div>
+        </div>
+        {/* escada de prêmios (lateral direita) */}
+        <div className="absolute top-1/2 -translate-y-1/2 right-2 z-10 w-14 border border-amber-300/25 rounded-xl p-1 flex flex-col-reverse gap-0.5 backdrop-blur" style={{ background: 'linear-gradient(180deg,rgba(20,8,30,0.72),rgba(0,0,0,0.6))' }}>
+          {MILHAO_LADDER.map((rung, i) => {
+            const isCur = i === round;
+            return (
+              <div key={i} className={`flex items-center justify-center gap-0.5 rounded-md text-[9px] font-black py-0.5 transition-all ${isCur ? 'bg-amber-300 text-amber-950 scale-110' : i < round ? 'text-emerald-300' : 'text-white/40'}`} style={isCur ? { animation: 'milhao-glow 1.6s ease-in-out infinite' } : undefined}>
+                {rung.safe && <Star size={8} className={isCur ? 'text-amber-900' : 'text-emerald-300'} />}{i + 1}
+                {contestants.map((ct, ti) => tstates[ti] && tstates[ti].status !== 'playing' && tstates[ti].prize === rung.prize
+                  ? <span key={ti} className="w-1.5 h-1.5 rounded-full border border-white/70" style={{ backgroundColor: ct.color }} />
+                  : null)}
+              </div>
+            );
+          })}
+        </div>
+        {/* balão de fala do apresentador */}
+        <div className="absolute bottom-3 left-3 right-20 z-10 flex items-end gap-1.5">
+          <div className="w-9 h-9 shrink-0 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-lg"><Bird size={18} className="text-amber-200" /></div>
+          <div key={host} className="bg-white/95 rounded-2xl rounded-bl-sm px-3 py-2 shadow-xl" style={{ animation: 'milhao-pop 0.3s ease-out' }}>
+            <p className="font-vt text-[15px] text-gray-800 leading-tight">{host}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── PAINEL DE PERGUNTAS (embaixo) — paleta vinho, combinando com o palco ── */}
+      <div className="bg-[#4a1b3e] border-t-4 border-[#2f1027] px-3 pt-3 pb-6 shrink-0 overflow-y-auto no-scrollbar max-h-[62%]">
+        {q && (
+          <>
+            <div key={`${round}-${q.q}`} className="relative bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3 min-h-[64px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_0_rgba(0,0,0,0.25)]" style={{ animation: 'milhao-pop 0.35s ease-out' }}>
+              {(['top-1.5 left-2', 'top-1.5 right-2', 'bottom-1.5 left-2', 'bottom-1.5 right-2'] as const).map(pos => (
+                <span key={pos} className={`absolute ${pos} w-1.5 h-1.5 rounded-full bg-[#c9b28a] border border-[#8a7a5a]`} />
+              ))}
+              <p className="font-vt text-xl text-[#3a3020] leading-snug">
+                {q.q}
+                <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed">Pergunta {round + 1} de {MILHAO_LADDER.length} · valendo pra todas as equipes</span>
+              </p>
+            </div>
+
+            {/* alternativas — os pontinhos coloridos mostram a escolha de cada equipe */}
+            <div className="grid grid-cols-2 gap-2.5 max-w-lg w-full mx-auto my-4">
+              {q.options.map((opt, i) => {
+                const isHidden = hidden.includes(i);
+                const isCorrect = reveal && i === q.correct;
+                const dimmed = reveal && !isCorrect;
+                const anim = isCorrect ? 'milhao-glow-green 1.4s ease-in-out infinite'
+                  : `milhao-pop 0.35s ease-out ${i * 0.07}s backwards`;
+                return (
+                  <div key={`${q.q}-${i}`}
+                    className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all border-2 border-black/25 shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_4px_0_rgba(0,0,0,0.35)] ${isHidden ? 'opacity-0 pointer-events-none' : ''} ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
+                    style={{ backgroundColor: PALETTE[i], animation: anim }}>
+                    <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
+                    <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
+                    <span className="shrink-0 flex gap-0.5">
+                      {contestants.map((ct, ti) => answers[ti] === i
+                        ? <span key={ti} className="w-2.5 h-2.5 rounded-full border border-white/80 shadow" style={{ backgroundColor: ct.color }} />
+                        : null)}
+                    </span>
+                    {audience && (
+                      <span className="shrink-0 flex flex-col items-end">
+                        <span className="font-pixel text-[9px] text-white/90 tabular-nums">{audience[i]}%</span>
+                        <span className="w-8 h-1.5 bg-black/25 rounded-full overflow-hidden mt-0.5"><span className="block h-full bg-white/80" style={{ width: `${audience[i]}%` }} /></span>
+                      </span>
+                    )}
+                    {isCorrect && <Check size={16} className="shrink-0 text-white" strokeWidth={3} />}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* resposta de cada equipe (todas jogam ao mesmo tempo) */}
+            {step === 'answering' && (
+              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
+                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
+                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
+                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
+                    <div className="flex gap-1.5 ml-auto shrink-0">
+                      {[0, 1, 2, 3].map(o => (
+                        <button key={o} disabled={hidden.includes(o)} onClick={() => setAnswers(a => a.map((v, j) => j === ti ? o : v))}
+                          className={`w-8 h-8 rounded-lg font-pixel text-[10px] text-white border-2 border-black/25 transition-all ${hidden.includes(o) ? 'opacity-0 pointer-events-none' : answers[ti] === o ? 'ring-2 ring-white scale-110' : 'opacity-50 active:scale-95'}`}
+                          style={{ backgroundColor: PALETTE[o] }}>{['A', 'B', 'C', 'D'][o]}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* decisão de cada equipe: parar ou arriscar */}
+            {step === 'decision' && (
+              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
+                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
+                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
+                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
+                    <div className="flex gap-1.5 ml-auto shrink-0">
+                      <button onClick={() => setDecisions(d => d.map((v, j) => j === ti ? 'stop' : v))}
+                        className={`px-2.5 py-1.5 rounded-lg border-2 font-pixel text-[8px] transition-all ${decisions[ti] === 'stop' ? 'bg-emerald-600 border-white text-white scale-105' : 'bg-emerald-900/60 border-black/25 text-emerald-200 active:scale-95'}`}>
+                        PARAR <span className="font-vt text-[11px]">{fmtPrize(tstates[ti].prize)}</span>
+                      </button>
+                      <button onClick={() => setDecisions(d => d.map((v, j) => j === ti ? 'go' : v))}
+                        className={`px-2.5 py-1.5 rounded-lg border-2 font-pixel text-[8px] transition-all ${decisions[ti] === 'go' ? 'border-white text-amber-950 scale-105' : 'border-black/25 text-amber-100 active:scale-95'}`}
+                        style={{ background: decisions[ti] === 'go' ? 'linear-gradient(135deg,#ffdf6b,#f59e0b)' : 'rgba(120,70,10,0.55)' }}>
+                        ARRISCAR
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ajudas da turma (valem 1x no jogo todo) */}
+            {step === 'answering' && (
+              <div className="grid grid-cols-3 gap-2 max-w-lg w-full mx-auto mb-3">
+                {([{ on: lifelines.cartas, fn: useCartas, Icon: Scissors, label: '50:50' },
+                   { on: lifelines.pular, fn: usePular, Icon: SkipForward, label: 'Pular' },
+                   { on: lifelines.plateia, fn: usePlateia, Icon: Users, label: 'Plateia' }] as const).map((a, i) => (
+                  <button key={i} onClick={a.fn} disabled={!a.on}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 font-pixel text-[8px] transition-all ${a.on ? 'bg-[#33122b] border-black/30 text-amber-200 active:scale-95' : 'bg-[#33122b]/50 border-black/20 text-white/25 line-through'}`}>
+                    <a.Icon size={15} /> {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* ações por passo */}
+            <div className="max-w-lg w-full mx-auto">
+              {step === 'answering' && (
+                <button onClick={revealAnswers} disabled={!allAnswered} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                  <span className="font-pixel text-[10px]">REVELAR RESPOSTA</span>
+                  {allAnswered && <MilhaoShine />}
+                </button>
+              )}
+              {step === 'revealed' && (
+                <button onClick={afterReveal} className="w-full bg-[#33122b] border-2 border-black/30 text-white font-black py-3 rounded-xl font-pixel text-[10px] active:translate-y-0.5">CONTINUAR</button>
+              )}
+              {step === 'decision' && (
+                <button onClick={nextRound} disabled={!allDecided} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none font-pixel text-[10px]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
+                  {decisions.some((d, i) => d === 'go' && tstates[i]?.status === 'playing') ? 'PRÓXIMA PERGUNTA' : 'GRANDE FINAL'}
+                  {allDecided && <MilhaoShine />}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </motion.div>
   );
 };
@@ -10795,7 +12633,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
         </div>
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] font-black tracking-widest uppercase text-amber-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur">★ Dia a dia</span>
+            <span className="text-[10px] font-black tracking-widest uppercase text-amber-300 bg-white/10 px-2 py-0.5 rounded-full backdrop-blur inline-flex items-center gap-1"><Star size={9} /> Dia a dia</span>
           </div>
           <h2 className="text-3xl font-black text-white mb-2 leading-tight">Diário de Classe</h2>
           <p className="text-sm text-indigo-100 max-w-[80%] leading-relaxed mb-4">
@@ -11395,7 +13233,11 @@ const GamificacaoScreen = ({
   const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(schedules[0]?.id ?? null);
   const [tab, setTab] = useState<'alunos' | 'equipes' | 'loja' | 'ajustes'>('alunos');
-  const [liveTool, setLiveTool] = useState<string | null>(null);
+  // Lido direto do estado inicial (não de um useEffect): assim, quem chega por
+  // atalho (card Batalha/QuaqueMagia da aba Jogos) já pinta a ferramenta na
+  // primeira renderização, sem o flash da aba Turma por trás antes do efeito
+  // rodar.
+  const [liveTool, setLiveTool] = useState<string | null>(() => initialLiveTool ?? null);
   const [kitExpanded, setKitExpanded] = useState(false);
   const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
   const [shopStudentId, setShopStudentId] = useState<string | null>(null);
@@ -11417,12 +13259,13 @@ const GamificacaoScreen = ({
     }
   }, [schedules, selectedClassId]);
 
-  // Abre direto uma ferramenta ao vivo (ex.: atalho "Batalha" vindo da aba Jogos).
+  // O valor inicial de liveTool já veio de initialLiveTool (acima); aqui só
+  // limpa o sinal no App, senão reabriria a ferramenta sozinha da próxima vez
+  // que esta tela montar por outro caminho (ex.: pela navegação inferior).
   useEffect(() => {
-    if (!initialLiveTool) return;
-    setLiveTool(initialLiveTool);
-    clearInitialLiveTool?.();
-  }, [initialLiveTool, clearInitialLiveTool]);
+    if (initialLiveTool) clearInitialLiveTool?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedSchedule = schedules.find(s => s.id === selectedClassId);
   const wk = gamiWeekKey();
@@ -11449,47 +13292,12 @@ const GamificacaoScreen = ({
     }
   };
 
-  const checkBadges = (students: GamiStudent[], _cls: ClassGamification): GamiStudent[] => {
-    return students.map(s => {
-      const badges = [...s.badges];
-      GAMI_BADGES.forEach(b => {
-        if (!badges.includes(b.id) && b.check(s)) badges.push(b.id);
-      });
-      return { ...s, badges };
-    });
-  };
-
+  // checkBadges/gamiApplyAward/gamiApplyPurchase/gamiApplyEndSeason/gamiApplyAddStudent
+  // são funções puras de nível de módulo (perto de GAMI_TEAM_PRESETS) — o
+  // assistente de IA do chat chama as MESMAS funções, então uma correção de
+  // regra vale pros dois caminhos automaticamente.
   const awardPoints = (studentIds: string[], behavior: GamiBehavior) => {
-    const points = behavior.points;
-    const coins = points > 0 ? Math.max(1, Math.floor(points / 5)) : 0;
-    const today = gamiTodayKey();
-
-    updateCls(cls => {
-      const isNewWeek = cls.weekKey !== wk;
-      const students = cls.students.map(raw => {
-        // Virada de semana: zera o XP semanal de todos antes de acumular
-        const s = isNewWeek ? { ...raw, weekXp: 0 } : raw;
-        if (!studentIds.includes(s.id)) return s;
-        const newXp = Math.max(0, s.xp + points);
-        const newTotal = s.totalXp + (points > 0 ? points : 0);
-        const newWeekXp = (s.weekXp ?? 0) + (points > 0 ? points : 0);
-        const newCoins = Math.max(0, s.coins + coins);
-        const streak = points > 0
-          ? (s.lastPointDay === today ? s.streak : s.lastPointDay === gamiYesterdayKey() ? s.streak + 1 : 1)
-          : s.streak;
-        return { ...s, xp: newXp, totalXp: newTotal, weekXp: newWeekXp, coins: newCoins, streak, lastPointDay: points > 0 ? today : s.lastPointDay };
-      });
-      const checked = checkBadges(students, { ...cls, weekKey: wk, students });
-      // Missão de semana anterior expira na virada — sem isso ela ficava "morta"
-      // no estado: parava de contar e nunca era limpa.
-      let mission = cls.mission && cls.mission.weekKey === wk ? cls.mission : null;
-      if (mission && points > 0) {
-        mission = { ...mission, progress: mission.progress + points * studentIds.length };
-      }
-      const logEntry: GamiLogEntry = { id: gamiRid(), studentIds, label: behavior.label, emoji: behavior.emoji, points, coins, kind: 'award', date: Date.now() };
-      return { ...cls, students: checked, weekKey: wk, log: [logEntry, ...cls.log].slice(0, 200), mission };
-    });
-
+    updateCls(cls => gamiApplyAward(cls, studentIds, behavior, wk));
     if (currentCls?.soundOn !== false) playChime();
     setAwardingStudentId(null);
   };
@@ -11497,21 +13305,19 @@ const GamificacaoScreen = ({
   const purchaseReward = (studentId: string, reward: GamiReward) => {
     let ok = true;
     updateCls(cls => {
-      const s = cls.students.find(x => x.id === studentId);
-      if (!s || s.coins < reward.cost) { ok = false; return cls; }
-      const students = cls.students.map(x => x.id === studentId ? { ...x, coins: x.coins - reward.cost } : x);
-      const logEntry: GamiLogEntry = { id: gamiRid(), studentIds: [studentId], label: reward.label, emoji: reward.emoji, points: 0, coins: -reward.cost, kind: 'purchase', date: Date.now() };
-      return { ...cls, students, log: [logEntry, ...cls.log].slice(0, 200) };
+      const result = gamiApplyPurchase(cls, studentId, reward);
+      ok = result.ok;
+      return result.cls;
     });
     if (!ok) { toast.error('Corujinhas insuficientes!'); return; }
-    toast.success(`${reward.emoji} ${reward.label} resgatada!`);
+    toast.success(`${reward.label} resgatada!`, <EmojiIcon emoji={reward.emoji} size={16} />);
     setShopStudentId(null);
   };
 
   const addStudent = () => {
     const name = newStudentName.trim();
     if (!name) return;
-    updateCls(cls => ({ ...cls, students: [...cls.students, { id: gamiRid(), name, xp: 0, totalXp: 0, weekXp: 0, coins: 0, badges: [], streak: 0 }] }));
+    updateCls(cls => gamiApplyAddStudent(cls, name));
     setNewStudentName('');
   };
 
@@ -11521,20 +13327,9 @@ const GamificacaoScreen = ({
 
   const endSeason = () => {
     if (!currentCls) return;
-    const top = [...currentCls.students].sort((a, b) => b.totalXp - a.totalXp).slice(0, 5);
-    const entry: GamiHallEntry = { season: currentCls.season, date: Date.now(), top: top.map(s => ({ name: s.name, xp: s.totalXp })) };
-    updateCls(cls => ({
-      ...cls,
-      season: cls.season + 1,
-      hallOfFame: [...(cls.hallOfFame ?? []), entry],
-      // totalXp é vitalício (nível/skins/badges) e sobrevive à virada de temporada.
-      students: cls.students.map(s => ({ ...s, xp: 0, weekXp: 0, coins: 0, streak: 0, lastPointDay: undefined, participatedDay: undefined })),
-      log: [],
-      mission: null,
-      weekKey: gamiWeekKey(),
-    }));
+    updateCls(cls => gamiApplyEndSeason(cls));
     setShowSeasonEnd(false);
-    toast.success('🏆 Nova temporada iniciada!');
+    toast.success('Nova temporada iniciada!', <Trophy size={16} />);
   };
 
   const LIVE_TOOLS = [
@@ -11545,7 +13340,8 @@ const GamificacaoScreen = ({
     { id: 'semaforo', icon: Siren, grad: 'from-emerald-400 via-amber-400 to-red-500', label: 'Semáforo' },
     { id: 'dado', icon: Dices, grad: 'from-slate-500 to-slate-700', label: 'Dado' },
     { id: 'placar', icon: Trophy, grad: 'from-amber-500 to-orange-600', label: 'Placar' },
-    { id: 'batalha', icon: Swords, grad: 'from-rose-500 to-red-600', label: 'Batalha' },
+    // A Batalha de Revisão (QuaqueMagia) saiu do Kit ao Vivo: agora mora só
+    // no card da aba Jogos (openBattle → initialLiveTool 'batalha').
   ];
 
   if (schedules.length === 0) {
@@ -11701,9 +13497,9 @@ const GamificacaoScreen = ({
                       className="bg-white rounded-2xl p-3 text-center shadow-sm border border-gray-100 active:scale-95 transition-transform"
                     >
                       <div className="relative mx-auto w-10 h-10 mb-1.5 flex items-center justify-center">
-                        <span className="text-[30px] leading-none">{skin[lvl]}</span>
+                        <EmojiIcon emoji={skin[lvl]} size={26} />
                         {s.streak >= 3 && (
-                          <span className="absolute -top-1 -right-1 text-[9px] bg-orange-400 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none">🔥</span>
+                          <span className="absolute -top-1 -right-1 bg-orange-400 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none"><Flame size={10} /></span>
                         )}
                       </div>
                       <p className="text-[11px] font-bold text-gray-800 truncate leading-tight">{s.name}</p>
@@ -11712,7 +13508,7 @@ const GamificacaoScreen = ({
                         <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                       </div>
                       {sWXp > 0 && <p className="text-[9px] text-amber-500 font-black mt-1">+{sWXp}</p>}
-                      {s.coins > 0 && <p className="text-[9px] text-yellow-500 font-bold">🪙{s.coins}</p>}
+                      {s.coins > 0 && <p className="text-[9px] text-yellow-500 font-bold inline-flex items-center"><Coins size={9} />{s.coins}</p>}
                     </button>
                   );
                 })}
@@ -11794,10 +13590,10 @@ const GamificacaoScreen = ({
               {currentCls.students.map(s => (
                 <div key={s.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-between shadow-sm border border-gray-100">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{skin[gamiLevel(s.totalXp)]}</span>
+                    <EmojiIcon emoji={skin[gamiLevel(s.totalXp)]} size={18} />
                     <div>
                       <p className="text-sm font-bold text-gray-800">{s.name}</p>
-                      <p className="text-[10px] text-gray-400">{GAMI_LEVELS[gamiLevel(s.totalXp)].name} · {s.totalXp} XP · 🪙{s.coins}</p>
+                      <p className="text-[10px] text-gray-400 inline-flex items-center gap-0.5">{GAMI_LEVELS[gamiLevel(s.totalXp)].name} · {s.totalXp} XP · <Coins size={11} className="text-amber-500" />{s.coins}</p>
                     </div>
                   </div>
                   <button onClick={() => removeStudent(s.id)} className="text-red-300 hover:text-red-500 p-1.5 transition-colors"><Trash2 size={14} /></button>
@@ -11812,7 +13608,7 @@ const GamificacaoScreen = ({
           <motion.div key="equipes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
             {currentCls.teams.length === 0 ? (
               <div className="text-center py-10">
-                <span className="text-4xl">🏆</span>
+                <Trophy size={36} className="text-amber-400 mx-auto" />
                 <p className="text-gray-500 mt-2 text-sm font-bold">Nenhuma equipe configurada</p>
                 <p className="text-gray-400 text-xs mt-1">Crie equipes abaixo.</p>
               </div>
@@ -11831,8 +13627,8 @@ const GamificacaoScreen = ({
                     <div key={t.team.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-black text-gray-400">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}°`}</span>
-                          <span className="text-2xl">{t.team.emoji}</span>
+                          <span className="text-lg font-black text-gray-400"><RankBadge rank={i} size={18} /></span>
+                          <EmojiIcon emoji={t.team.emoji} size={22} />
                           <span className="font-black text-gray-800">{t.team.name}</span>
                         </div>
                         <span className="font-black text-indigo-600 text-lg tabular-nums">{t.xp} <span className="text-xs font-bold text-indigo-300">XP</span></span>
@@ -11877,7 +13673,7 @@ const GamificacaoScreen = ({
                       onClick={() => updateCls(cls => ({ ...cls, teams: [...cls.teams, { ...p, id: gamiRid() }] }))}
                       className="flex items-center gap-1 bg-white border border-gray-200 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95 transition-transform"
                     >
-                      {p.emoji} + {p.name}
+                      <EmojiIcon emoji={p.emoji} size={14} /> + {p.name}
                     </button>
                   ))}
                 </div>
@@ -11887,7 +13683,7 @@ const GamificacaoScreen = ({
                 return (
                   <div key={team.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-black text-gray-800">{team.emoji} {team.name}</span>
+                      <span className="font-black text-gray-800 inline-flex items-center gap-1.5"><EmojiIcon emoji={team.emoji} size={16} /> {team.name}</span>
                       <button onClick={() => updateCls(cls => ({ ...cls, teams: cls.teams.filter(t => t.id !== team.id), students: cls.students.map(s => s.teamId === team.id ? { ...s, teamId: undefined } : s) }))} className="text-red-300 hover:text-red-500 transition-colors p-1">
                         <Trash2 size={14} />
                       </button>
@@ -11906,8 +13702,8 @@ const GamificacaoScreen = ({
                     <div key={s.id} className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-xs font-bold text-gray-700 shrink-0">{s.name}:</span>
                       {currentCls.teams.map(t => (
-                        <button key={t.id} onClick={() => updateCls(cls => ({ ...cls, students: cls.students.map(x => x.id === s.id ? { ...x, teamId: t.id } : x) }))} className="text-xs bg-white font-bold px-2 py-0.5 rounded-full border border-amber-200 active:scale-95 transition-transform">
-                          {t.emoji} {t.name}
+                        <button key={t.id} onClick={() => updateCls(cls => ({ ...cls, students: cls.students.map(x => x.id === s.id ? { ...x, teamId: t.id } : x) }))} className="text-xs bg-white font-bold px-2 py-0.5 rounded-full border border-amber-200 active:scale-95 transition-transform inline-flex items-center gap-1">
+                          <EmojiIcon emoji={t.emoji} size={12} /> {t.name}
                         </button>
                       ))}
                     </div>
@@ -11922,7 +13718,7 @@ const GamificacaoScreen = ({
         {tab === 'loja' && (
           <motion.div key="loja" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
             <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Resgatar</p>
-            <p className="text-xs text-gray-400 font-medium">Alunos trocam 🪙 corujinhas por privilégios. Selecione um aluno e depois resgate.</p>
+            <p className="text-xs text-gray-400 font-medium flex items-center gap-1">Alunos trocam <Coins size={12} className="text-amber-500" /> corujinhas por privilégios. Selecione um aluno e depois resgate.</p>
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
               {currentCls.students.map(s => (
                 <button
@@ -11930,9 +13726,9 @@ const GamificacaoScreen = ({
                   onClick={() => setShopStudentId(shopStudentId === s.id ? null : s.id)}
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${shopStudentId === s.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}
                 >
-                  <span>{skin[gamiLevel(s.totalXp)]}</span>
+                  <EmojiIcon emoji={skin[gamiLevel(s.totalXp)]} size={14} />
                   <span className="max-w-[60px] truncate">{s.name}</span>
-                  <span className={`font-black ${shopStudentId === s.id ? 'text-amber-300' : 'text-amber-500'}`}>🪙{s.coins}</span>
+                  <span className={`font-black inline-flex items-center gap-0.5 ${shopStudentId === s.id ? 'text-amber-300' : 'text-amber-500'}`}><Coins size={11} />{s.coins}</span>
                 </button>
               ))}
               {currentCls.students.length === 0 && <p className="text-xs text-gray-400 py-1">Adicione alunos na aba Alunos.</p>}
@@ -11950,10 +13746,10 @@ const GamificacaoScreen = ({
                 return (
                   <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-xl shrink-0">{r.emoji}</span>
+                      <span className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0"><EmojiIcon emoji={r.emoji} size={20} /></span>
                       <div>
                         <p className="font-bold text-gray-800 text-sm">{r.label}</p>
-                        <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 font-black bg-amber-100 rounded-full px-2 py-0.5 mt-1">🪙 {r.cost} corujinhas</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 font-black bg-amber-100 rounded-full px-2 py-0.5 mt-1"><Coins size={11} /> {r.cost} corujinhas</span>
                       </div>
                     </div>
                     {shopStudentId ? (
@@ -11975,13 +13771,13 @@ const GamificacaoScreen = ({
             {/* Configurar recompensas (inline) */}
             <div className="pt-1 space-y-2">
               <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Configurar recompensas</p>
-              <p className="text-xs text-gray-400">Recompensas que alunos resgatam com 🪙 corujinhas.</p>
+              <p className="text-xs text-gray-400 flex items-center gap-1">Recompensas que alunos resgatam com <Coins size={12} className="text-amber-500" /> corujinhas.</p>
               {currentCls.rewards.map(r => (
                 <div key={r.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-3 shadow-sm border border-gray-100">
-                  <span className="text-xl">{r.emoji}</span>
+                  <EmojiIcon emoji={r.emoji} size={20} />
                   <div className="flex-1">
                     <p className="text-sm font-bold text-gray-800">{r.label}</p>
-                    <p className="text-xs text-amber-500 font-black">🪙 {r.cost}</p>
+                    <p className="text-xs text-amber-500 font-black inline-flex items-center gap-0.5"><Coins size={11} /> {r.cost}</p>
                   </div>
                   <button onClick={() => updateCls(cls => ({ ...cls, rewards: cls.rewards.filter(x => x.id !== r.id) }))} className="text-red-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
                 </div>
@@ -11996,7 +13792,7 @@ const GamificacaoScreen = ({
                 <input value={newRewardLabel} onChange={e => setNewRewardLabel(e.target.value)} placeholder="Ex: Jogar jogo no computador..." maxLength={60} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-[10px] font-bold text-gray-400 mb-0.5 block">Custo em 🪙 corujinhas</label>
+                    <label className="text-[10px] font-bold text-gray-400 mb-0.5 block flex items-center gap-1">Custo em <Coins size={11} className="text-amber-500" /> corujinhas</label>
                     <input type="number" value={newRewardCost} onChange={e => setNewRewardCost(e.target.value)} min={1} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white" />
                   </div>
                   <button
@@ -12024,7 +13820,7 @@ const GamificacaoScreen = ({
                 <p className="text-xs text-gray-400">Ações disponíveis ao pontuar alunos.</p>
                 {currentCls.behaviors.map(b => (
                   <div key={b.id} className="bg-white rounded-xl px-3 py-2.5 flex items-center gap-3 shadow-sm border border-gray-100">
-                    <span className="text-xl">{b.emoji}</span>
+                    <EmojiIcon emoji={b.emoji} size={20} />
                     <span className="flex-1 text-sm font-bold text-gray-800">{b.label}</span>
                     <span className={`text-sm font-black tabular-nums mr-1 ${b.points > 0 ? 'text-emerald-500' : 'text-red-400'}`}>{b.points > 0 ? '+' : ''}{b.points} XP</span>
                     <button onClick={() => updateCls(cls => ({ ...cls, behaviors: cls.behaviors.filter(x => x.id !== b.id) }))} className="text-red-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
@@ -12064,8 +13860,8 @@ const GamificacaoScreen = ({
                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                   <p className="font-black text-gray-900 mb-1">Temporada {currentCls.season}</p>
                   <p className="text-xs text-gray-500 mb-4">Encerrar salva o pódio no Hall da Fama e zera XP e moedas de todos os alunos. Use no fim do bimestre.</p>
-                  <button onClick={() => setShowSeasonEnd(true)} className="w-full bg-red-500 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform">
-                    🏆 Encerrar Temporada {currentCls.season}
+                  <button onClick={() => setShowSeasonEnd(true)} className="w-full bg-red-500 text-white font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
+                    <Trophy size={15} /> Encerrar Temporada {currentCls.season}
                   </button>
                 </div>
                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
@@ -12077,7 +13873,7 @@ const GamificacaoScreen = ({
                         onClick={() => updateCls(cls => ({ ...cls, skin: skinKey }))}
                         className={`flex-1 p-3 rounded-xl border-2 text-center transition-all ${(currentCls.skin ?? 'coruja') === skinKey ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white'}`}
                       >
-                        <div className="flex justify-center gap-0.5 mb-1">{GAMI_SKINS[skinKey].slice(0, 3).map((e, i) => <span key={i} className="text-base">{e}</span>)}</div>
+                        <div className="flex justify-center gap-0.5 mb-1">{GAMI_SKINS[skinKey].slice(0, 3).map((e, i) => <EmojiIcon key={i} emoji={e} size={16} />)}</div>
                         <p className="text-[10px] font-bold text-gray-600 capitalize">{skinKey}</p>
                       </button>
                     ))}
@@ -12085,13 +13881,13 @@ const GamificacaoScreen = ({
                 </div>
                 {(currentCls.hallOfFame ?? []).length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">🏛️ Hall da Fama</p>
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Landmark size={12} /> Hall da Fama</p>
                     {[...(currentCls.hallOfFame ?? [])].reverse().map((entry, i) => (
                       <div key={i} className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
                         <p className="text-xs font-bold text-amber-600 mb-2">Temporada {entry.season} · {new Date(entry.date).toLocaleDateString('pt-BR')}</p>
                         {entry.top.map((t, j) => (
                           <div key={j} className="flex items-center justify-between py-0.5">
-                            <span className="text-xs font-bold text-gray-700">{j === 0 ? '🥇' : j === 1 ? '🥈' : j === 2 ? '🥉' : `${j + 1}°`} {t.name}</span>
+                            <span className="text-xs font-bold text-gray-700 inline-flex items-center gap-1"><RankBadge rank={j} /> {t.name}</span>
                             <span className="text-xs font-black text-amber-600 tabular-nums">{t.xp} XP</span>
                           </div>
                         ))}
@@ -12123,20 +13919,20 @@ const GamificacaoScreen = ({
             >
               <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
               <div className="flex items-center gap-3 mb-4">
-                <span className="text-3xl">{skin[gamiLevel(awardingStudent.totalXp)]}</span>
+                <EmojiIcon emoji={skin[gamiLevel(awardingStudent.totalXp)]} size={30} />
                 <div>
                   <p className="font-black text-gray-900 text-base">{awardingStudent.name}</p>
-                  <p className="text-xs text-indigo-400 font-bold">{GAMI_LEVELS[gamiLevel(awardingStudent.totalXp)].name} · {awardingStudent.totalXp} XP · 🪙{awardingStudent.coins}</p>
+                  <p className="text-xs text-indigo-400 font-bold inline-flex items-center gap-0.5">{GAMI_LEVELS[gamiLevel(awardingStudent.totalXp)].name} · {awardingStudent.totalXp} XP · <Coins size={11} />{awardingStudent.coins}</p>
                 </div>
                 {awardingStudent.streak >= 3 && (
-                  <span className="ml-auto bg-orange-100 text-orange-500 text-xs font-black px-2 py-1 rounded-full">🔥 {awardingStudent.streak} dias</span>
+                  <span className="ml-auto bg-orange-100 text-orange-500 text-xs font-black px-2 py-1 rounded-full inline-flex items-center gap-1"><Flame size={12} /> {awardingStudent.streak} dias</span>
                 )}
               </div>
               {awardingStudent.badges.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-4">
                   {awardingStudent.badges.map(bid => {
                     const badge = GAMI_BADGES.find(b => b.id === bid);
-                    return badge ? <span key={bid} className="bg-amber-50 text-amber-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">{badge.emoji} {badge.name}</span> : null;
+                    return badge ? <span key={bid} className="bg-amber-50 text-amber-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 inline-flex items-center gap-1"><EmojiIcon emoji={badge.emoji} size={11} /> {badge.name}</span> : null;
                   })}
                 </div>
               )}
@@ -12147,7 +13943,7 @@ const GamificacaoScreen = ({
                     onClick={() => awardPoints([awardingStudent.id], b)}
                     className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all active:scale-95 ${b.points > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-100 bg-red-50'}`}
                   >
-                    <span className="text-xl">{b.emoji}</span>
+                    <EmojiIcon emoji={b.emoji} size={20} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-gray-800 truncate">{b.label}</p>
                       <p className={`text-xs font-black tabular-nums ${b.points > 0 ? 'text-emerald-600' : 'text-red-500'}`}>{b.points > 0 ? '+' : ''}{b.points} XP</p>
@@ -12158,7 +13954,7 @@ const GamificacaoScreen = ({
                   onClick={() => {
                     const b = currentCls.behaviors.find(x => x.points > 0) ?? { id: 'all', label: 'Toda a turma', points: 5, emoji: '⭐' };
                     awardPoints(currentCls.students.map(s => s.id), b);
-                    toast.success(`${b.emoji} +${b.points} XP para toda a turma!`);
+                    toast.success(`+${b.points} XP para toda a turma!`, <EmojiIcon emoji={b.emoji} size={16} />);
                   }}
                   className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-indigo-200 bg-indigo-50 active:scale-95 transition-all"
                 >
@@ -12176,7 +13972,7 @@ const GamificacaoScreen = ({
         {showSeasonEnd && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center px-6">
             <motion.div initial={{ scale: 0.92 }} animate={{ scale: 1 }} exit={{ scale: 0.92 }} className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
-              <p className="text-xl font-black text-gray-900 text-center mb-2">🏆 Encerrar Temporada {currentCls.season}?</p>
+              <p className="text-xl font-black text-gray-900 text-center mb-2 flex items-center justify-center gap-2"><Trophy size={20} className="text-amber-500" /> Encerrar Temporada {currentCls.season}?</p>
               <p className="text-sm text-gray-500 text-center mb-6">O ranking será salvo no Hall da Fama e todos os XP e moedas serão zerados.</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowSeasonEnd(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-2xl text-sm">Cancelar</button>
@@ -12213,7 +14009,7 @@ const GamificacaoScreen = ({
                     onClick={() => { updateCls(cls => ({ ...cls, students: cls.students.map(s => s.id === teamStudentId ? { ...s, teamId: t.id } : s) })); setTeamStudentId(null); }}
                     className="w-full flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 active:scale-[0.98] transition-transform"
                   >
-                    <span className="text-2xl">{t.emoji}</span>
+                    <EmojiIcon emoji={t.emoji} size={22} />
                     <span className="font-bold text-gray-800">{t.name}</span>
                   </button>
                 ))}
@@ -12258,7 +14054,9 @@ const GamificacaoScreen = ({
             students={currentCls.students}
             subject={selectedSchedule?.subject ?? selectedSchedule?.name ?? 'Geral'}
             level={selectedSchedule?.level ?? 'Fundamental'}
-            onClose={() => setLiveTool(null)}
+            // A batalha só abre pelo card da aba Jogos (ou link #batalha=),
+            // então fechar volta pra lá — não pro Kit ao Vivo.
+            onClose={() => { setLiveTool(null); setScreen('estudio'); }}
             onAwardTeam={(teamIdx, _names, points) => {
               const team = currentCls.teams[teamIdx];
               if (!team) return;
@@ -12887,7 +14685,7 @@ const AdminScreen = () => {
               />
             </div>
             {storageUsed / LIBRARY_LIMIT_BYTES > 0.85 && (
-              <p className="text-xs text-red-500 font-medium mt-1">⚠ Espaço quase esgotado. Apague materiais antigos.</p>
+              <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1"><AlertTriangle size={12} /> Espaço quase esgotado. Apague materiais antigos.</p>
             )}
           </div>
 
@@ -13414,6 +15212,21 @@ function AppInner() {
 
   const [screen, setScreen] = useState<Screen>('home');
   const [plannerMode, setPlannerMode] = useState<PlannerMode>('plan');
+
+  // Links/QR compartilhados pelo professor:
+  //  #jogo=...    → jogo Escape (Mundo Perdido), que decodifica o quiz do hash
+  //  #batalha=... → Batalha de Revisão (QuaqueMagia), que decodifica as
+  //                 perguntas do hash ao montar
+  useEffect(() => {
+    const openSharedGame = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#jogo=')) setScreen('escape');
+      else if (hash.startsWith('#batalha=')) { setGamiInitialTool('batalha'); setScreen('gamificacao'); }
+    };
+    openSharedGame();
+    window.addEventListener('hashchange', openSharedGame);
+    return () => window.removeEventListener('hashchange', openSharedGame);
+  }, []);
   const [ferramentasTool, setFerramentasTool] = useState<string | null>(null);
   const [gamiInitialTool, setGamiInitialTool] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
@@ -14164,7 +15977,7 @@ function AppInner() {
       <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
         <div id="recaptcha-container" />
         <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-xl border border-indigo-100 flex flex-col items-center gap-5">
-          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-3xl">📱</div>
+          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center"><Smartphone size={28} className="text-indigo-500" /></div>
           <div className="text-center">
             <h2 className="text-xl font-black text-gray-900">Verificação de celular</h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -14797,7 +16610,10 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FE] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
+    // A aba Jogos usa o azul escuro do app (indigo-800, o tom mais escuro do
+    // degradê indigo-600→800) como fundo sólido; as demais telas seguem no
+    // cinza-claro padrão.
+    <div className={`min-h-screen ${screen === 'estudio' ? 'bg-indigo-800' : 'bg-[#F8F9FE]'} font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900`}>
       <ToastContainer />
 
       <AnimatePresence>
@@ -14852,7 +16668,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               className="bg-white w-full max-w-md rounded-t-[2.5rem] p-6 pb-10 shadow-2xl"
             >
               <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3 text-3xl">🔔</div>
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3"><Bell size={28} className="text-indigo-500" /></div>
                 <h2 className="text-xl font-black text-gray-900 mb-2">Ative avisos e sons</h2>
                 <p className="text-sm text-gray-500 leading-relaxed max-w-[300px]">
                   O Corujão te avisa <b className="text-gray-700">30 minutos antes de cada aula</b> e usa sons nos jogos da turma. Para isso, precisa da sua permissão de notificações.
@@ -15126,11 +16942,14 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             estudioContext={estudioContext} 
             messages={inboxMessages} 
             setMessages={setInboxMessages} 
-            classes={classes} 
-            schedules={schedules} 
-            savedResources={savedResources} 
-            addClassItems={addClassItems} 
+            classes={classes}
+            schedules={schedules}
+            savedResources={savedResources}
+            setSavedResources={setSavedResources}
+            addClassItems={addClassItems}
             customEvents={customEvents}
+            setCustomEvents={setCustomEvents}
+            setFerramentasTool={setFerramentasTool}
             notifications={allNotifications}
             setNotifications={handleSetNotifications}
             generatePlan={generatePlan}
@@ -15139,6 +16958,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             setPlannerSelectedClassId={setPlannerSelectedClassId}
             setPlannerMode={setPlannerMode}
             getScheduleBuffer={getScheduleBuffer}
+            user={user}
           />}
           {screen === 'calendar' && <CalendarScreen key="calendar" classes={classes} schedules={schedules} profile={profile} customEvents={customEvents} setCustomEvents={setCustomEvents} selectedDate={selectedDate} setSelectedDate={setSelectedDate} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} currentYear={currentYear} setCurrentYear={setCurrentYear} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} onImport={() => setImportRequest({ mode: 'calendar' })} />}
           {screen === 'dayDetail' && <DayDetailScreen key="dayDetail"
@@ -15228,6 +17048,10 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" />}
         </AnimatePresence>
+
+        {/* Mundo Perdido — jogo Escape em overlay de tela cheia (fora do
+            AnimatePresence: cobre a UI inteira, inclusive a navegação) */}
+        {screen === 'escape' && <EscapeGame onExitApp={() => setScreen('estudio')} />}
 
         <GlobalTaskIndicator 
           tasks={activeTasks} 

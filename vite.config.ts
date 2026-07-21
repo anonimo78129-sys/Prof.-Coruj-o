@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) => {
         manifest: false,
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          // Assets do jogo Escape (Mundo Perdido) somam ~130MB — ficam fora
+          // do precache do service worker e carregam sob demanda.
+          globIgnores: ['escape-assets/**'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
       }),
