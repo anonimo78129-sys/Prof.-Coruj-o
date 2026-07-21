@@ -11206,14 +11206,15 @@ const QUIZ_CSS = `
    abre DESLIZANDO pra fora com um leve overshoot e para mostrando uma faixa */
 @keyframes qz-open-l{0%,18%{transform:translateX(0)}80%{transform:translateX(-32%)}100%{transform:translateX(-30%)}}
 @keyframes qz-open-r{0%,18%{transform:translateX(0)}80%{transform:translateX(32%)}100%{transform:translateX(30%)}}
-/* balanço leve e contínuo (desliza de leve pra dentro e volta) */
-@keyframes qz-sway-l{0%,100%{transform:translateX(0)}50%{transform:translateX(-1.2%)}}
-@keyframes qz-sway-r{0%,100%{transform:translateX(0)}50%{transform:translateX(1.2%)}}
+/* balanço leve: topo preso, só a base da cortina balança (skewX com origem
+   no topo, como uma cortina pendurada na vara) */
+@keyframes qz-sway-l{0%,100%{transform:skewX(0deg)}50%{transform:skewX(1.1deg)}}
+@keyframes qz-sway-r{0%,100%{transform:skewX(0deg)}50%{transform:skewX(-1.1deg)}}
 .qz-anim-pop{animation:qz-pop .35s ease-out both}
 .qz-curtain-l{animation:qz-open-l 1.6s cubic-bezier(.25,.9,.25,1) both}
 .qz-curtain-r{animation:qz-open-r 1.6s cubic-bezier(.25,.9,.25,1) both}
-.qz-curtain-l img{animation:qz-sway-l 5s ease-in-out .4s infinite}
-.qz-curtain-r img{animation:qz-sway-r 5.4s ease-in-out .4s infinite}
+.qz-curtain-l img{transform-origin:top center;animation:qz-sway-l 5s ease-in-out .4s infinite}
+.qz-curtain-r img{transform-origin:top center;animation:qz-sway-r 5.4s ease-in-out .4s infinite}
 @media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l img,.qz-curtain-r img{animation:none!important}.qz-curtain-l{transform:translateX(-30%)}.qz-curtain-r{transform:translateX(30%)}}
 `;
 
