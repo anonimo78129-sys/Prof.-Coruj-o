@@ -11202,18 +11202,19 @@ const QUIZ_CSS = `
 @keyframes qz-beam{0%,100%{opacity:.3;transform:translateX(-8px)}50%{opacity:.6;transform:translateX(8px)}}
 @keyframes qz-spin{to{transform:rotate(360deg)}}
 @keyframes qz-rise{0%{opacity:0;transform:translateY(20px) scale(.9)}100%{opacity:1;transform:none}}
-/* cortina: começa fechada (cobre metade cada), abre com um leve overshoot e
-   para na faixa de 25% */
-@keyframes qz-curtain-open{0%{width:50%}18%{width:50%}78%{width:22%}100%{width:25%}}
-/* balanço leve e contínuo das cortinas (origem no topo da lateral externa) */
-@keyframes qz-sway-l{0%,100%{transform:rotate(0deg)}50%{transform:rotate(.7deg)}}
-@keyframes qz-sway-r{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-.7deg)}}
+/* cortina (imagem inteira): começa fechada (translateX 0, cobrindo o palco),
+   abre DESLIZANDO pra fora com um leve overshoot e para mostrando uma faixa */
+@keyframes qz-open-l{0%,18%{transform:translateX(0)}80%{transform:translateX(-27%)}100%{transform:translateX(-25%)}}
+@keyframes qz-open-r{0%,18%{transform:translateX(0)}80%{transform:translateX(27%)}100%{transform:translateX(25%)}}
+/* balanço leve e contínuo (desliza de leve pra dentro e volta) */
+@keyframes qz-sway-l{0%,100%{transform:translateX(0)}50%{transform:translateX(-1.2%)}}
+@keyframes qz-sway-r{0%,100%{transform:translateX(0)}50%{transform:translateX(1.2%)}}
 .qz-anim-pop{animation:qz-pop .35s ease-out both}
-.qz-curtain-l{animation:qz-curtain-open 1.5s cubic-bezier(.25,.9,.25,1) both}
-.qz-curtain-r{animation:qz-curtain-open 1.5s cubic-bezier(.25,.9,.25,1) both}
-.qz-curtain-l img{transform-origin:top left;animation:qz-sway-l 5s ease-in-out .3s infinite}
-.qz-curtain-r img{transform-origin:top right;animation:qz-sway-r 5.4s ease-in-out .3s infinite}
-@media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l,.qz-curtain-r,.qz-curtain-l img,.qz-curtain-r img{animation:none!important;width:25%}}
+.qz-curtain-l{animation:qz-open-l 1.6s cubic-bezier(.25,.9,.25,1) both}
+.qz-curtain-r{animation:qz-open-r 1.6s cubic-bezier(.25,.9,.25,1) both}
+.qz-curtain-l img{animation:qz-sway-l 5s ease-in-out .4s infinite}
+.qz-curtain-r img{animation:qz-sway-r 5.4s ease-in-out .4s infinite}
+@media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l img,.qz-curtain-r img{animation:none!important}.qz-curtain-l{transform:translateX(-25%)}.qz-curtain-r{transform:translateX(25%)}}
 `;
 
 // Paleta puxada das ilustrações: madeira azul (fundo), azul-ardósia (cortinas)
@@ -11402,16 +11403,15 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               <LeilaoPersonagem />
               {/* balcão na frente do palco (a cortina fica por cima dele) */}
               <img src="/assets/battle/balcao.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
-              {/* cortina esquerda — a cortina INTEIRA cabe na faixa (esticada,
-                  altura cheia) em vez de ser fatiada; abre balançando, para em
-                  25% e fica por cima do balcão. width 198% ≈ 1200/607 pra que
-                  só o tecido (metade da imagem) preencha exatamente a faixa. */}
-              <div aria-hidden className="qz-curtain-l absolute inset-y-0 left-0 overflow-hidden pointer-events-none" style={{ width: '25%' }}>
-                <img src="/assets/battle/cortina-dir.png" alt="" className="absolute right-0 top-0 h-full max-w-none" style={{ width: '198%' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+              {/* cortina esquerda — imagem INTEIRA no tamanho real (1200x760),
+                  sem recorte; começa fechada e desliza pra fora ao abrir. O que
+                  sai do quadro é clipado pelo banner (efeito natural de palco). */}
+              <div aria-hidden className="qz-curtain-l absolute inset-0 pointer-events-none">
+                <img src="/assets/battle/cortina-esq.png" alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
-              {/* cortina direita — cortina inteira esticada na faixa */}
-              <div aria-hidden className="qz-curtain-r absolute inset-y-0 right-0 overflow-hidden pointer-events-none" style={{ width: '25%' }}>
-                <img src="/assets/battle/cortina-esq.png" alt="" className="absolute left-0 top-0 h-full max-w-none" style={{ width: '198%' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+              {/* cortina direita — imagem inteira, desliza pra fora ao abrir */}
+              <div aria-hidden className="qz-curtain-r absolute inset-0 pointer-events-none">
+                <img src="/assets/battle/cortina-dir.png" alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
               {/* luz de palco suave por cima */}
               <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
