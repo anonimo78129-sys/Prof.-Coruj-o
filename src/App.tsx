@@ -11404,11 +11404,11 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               <img src="/assets/battle/balcao.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               {/* cortina esquerda (abre balançando, para em 25%, por cima do balcão) */}
               <div aria-hidden className="qz-curtain-l absolute inset-y-0 left-0 overflow-hidden pointer-events-none" style={{ width: '25%' }}>
-                <img src="/assets/battle/cortina-esq.png" alt="" className="absolute left-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                <img src="/assets/battle/cortina-dir.png" alt="" className="absolute right-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
               {/* cortina direita (abre balançando, para em 25%, por cima do balcão) */}
               <div aria-hidden className="qz-curtain-r absolute inset-y-0 right-0 overflow-hidden pointer-events-none" style={{ width: '25%' }}>
-                <img src="/assets/battle/cortina-dir.png" alt="" className="absolute right-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                <img src="/assets/battle/cortina-esq.png" alt="" className="absolute left-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
               {/* luz de palco suave por cima */}
               <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
