@@ -11208,8 +11208,8 @@ const QUIZ_CSS = `
 @keyframes qz-open-r{0%,18%{transform:translateX(0)}80%{transform:translateX(32%)}100%{transform:translateX(30%)}}
 /* balanço leve: topo preso, só a base da cortina balança (skewX com origem
    no topo, como uma cortina pendurada na vara) */
-@keyframes qz-sway-l{0%,100%{transform:skewX(0deg)}50%{transform:skewX(1.1deg)}}
-@keyframes qz-sway-r{0%,100%{transform:skewX(0deg)}50%{transform:skewX(-1.1deg)}}
+@keyframes qz-sway-l{0%,100%{transform:skewX(0deg)}50%{transform:skewX(2.2deg)}}
+@keyframes qz-sway-r{0%,100%{transform:skewX(0deg)}50%{transform:skewX(-2.2deg)}}
 .qz-anim-pop{animation:qz-pop .35s ease-out both}
 .qz-curtain-l{animation:qz-open-l 1.6s cubic-bezier(.25,.9,.25,1) both}
 .qz-curtain-r{animation:qz-open-r 1.6s cubic-bezier(.25,.9,.25,1) both}
