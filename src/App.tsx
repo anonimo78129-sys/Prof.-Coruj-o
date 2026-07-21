@@ -7991,7 +7991,6 @@ const EstudioScreen = ({
   studioReopenTaskId,
   setStudioReopenTaskId,
   openBattle,
-  openMilhao,
 }: {
   profile: UserProfile,
   setScreen: (s: Screen) => void,
@@ -8005,7 +8004,6 @@ const EstudioScreen = ({
   studioReopenTaskId: string | null,
   setStudioReopenTaskId: (id: string | null) => void,
   openBattle?: () => void,
-  openMilhao?: () => void,
 }) => {
   const [activeMode, setActiveMode] = useState<GameMode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -8327,23 +8325,6 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
       >
         <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
-      </button>
-
-      {/* RUMO AO MILHÃO — quiz de escada de prêmios (turma vs turma).
-          Placeholder dourado até a arte ficar pronta: troque este bloco por
-          uma <img src="/assets/battle/rumo-ao-milhao.jpg" .../> quando tiver a
-          ilustração, igual aos cards acima. */}
-      <button
-        aria-label="Rumo ao Milhão"
-        onClick={() => openMilhao?.()}
-        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform aspect-[1100/532] bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-700"
-      >
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-          <Coins size={40} className="text-white drop-shadow mb-1" />
-          <p className="font-black text-white text-2xl leading-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.4)]">RUMO AO MILHÃO</p>
-          <p className="text-amber-950/80 text-xs font-bold mt-1">Quem chega mais alto na escada do saber?</p>
-          <span className="mt-2 text-[9px] font-bold uppercase tracking-widest text-amber-950/50 bg-white/30 rounded-full px-2 py-0.5">arte em breve</span>
-        </div>
       </button>
 
       {/* Atividades menores */}
@@ -14085,24 +14066,6 @@ const GamificacaoScreen = ({
             }}
           />
         )}
-        {liveTool === 'milhao' && (
-          <LeilaoDoSaber
-            isAdmin={isAdminAccount(profile, user)}
-            teams={currentCls.teams}
-            students={currentCls.students}
-            subject={selectedSchedule?.subject ?? selectedSchedule?.name ?? 'Geral'}
-            level={selectedSchedule?.level ?? 'Fundamental'}
-            // Como a Batalha: só abre pelo card da aba Jogos, então fechar volta pra lá.
-            onClose={() => { setLiveTool(null); setScreen('estudio'); }}
-            onAwardTeam={(teamIdx, _names, points) => {
-              const team = currentCls.teams[teamIdx];
-              if (!team) return;
-              const ids = currentCls.students.filter(s => s.teamId === team.id).map(s => s.id);
-              if (ids.length === 0) return;
-              awardPoints(ids, { id: 'milhao', label: 'Rumo ao Milhão', points, emoji: '🪙' });
-            }}
-          />
-        )}
       </AnimatePresence>
     </motion.div>
   );
@@ -17078,7 +17041,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               }
             }
           }} onImportSyllabus={(cls) => setImportRequest({ mode: 'syllabus', targetClass: cls })} />}
-          {screen === 'estudio' && <EstudioScreen key="estudio" profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} openBattle={() => { setGamiInitialTool('batalha'); setScreen('gamificacao'); }} openMilhao={() => { setGamiInitialTool('milhao'); setScreen('gamificacao'); }} />}
+          {screen === 'estudio' && <EstudioScreen key="estudio" profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} schedules={schedules} addTask={addTask} updateTask={updateTask} activeTasks={activeTasks} removeTask={removeTask} studioReopenTaskId={studioReopenTaskId} setStudioReopenTaskId={setStudioReopenTaskId} openBattle={() => { setGamiInitialTool('batalha'); setScreen('gamificacao'); }} />}
           {screen === 'biblioteca' && <LibraryScreen key="biblioteca" user={user} setScreen={setScreen} profile={profile} notifications={allNotifications} setNotifications={handleSetNotifications} />}
           {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} initialLiveTool={gamiInitialTool} clearInitialLiveTool={() => setGamiInitialTool(null)} />}
           {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
