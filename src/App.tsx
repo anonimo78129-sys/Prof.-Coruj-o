@@ -8327,16 +8327,24 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
-      {/* QUIZ RELÂMPAGO — banner real entra em
-          /assets/battle/quiz-relampago.jpg quando estiver pronto (mesmo
-          aspecto 1100x532 dos outros cards); até lá, placeholder */}
+      {/* QUIZ RELÂMPAGO — card com mini-palco montado das ilustrações
+          (fundo azul + cortinas + professora). Some/cai pro fallback se
+          quiz-relampago.jpg existir e for a arte final do card. */}
       <button
         onClick={() => setScreen('quizrelampago')}
         aria-label="Quiz Relâmpago"
-        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-dashed border-white/50 mb-4 flex items-center justify-center bg-white/10 active:scale-[0.98] transition-transform"
-        style={{ aspectRatio: '1100 / 532' }}
+        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
+        style={{ aspectRatio: '1100 / 532', background: '#7ba6d4' }}
       >
-        <span className="text-white/70 font-bold text-sm tracking-wide">⚡ Quiz Relâmpago — banner em breve</span>
+        <img src="/assets/battle/fundo.png" alt="" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+        <img src="/assets/battle/cortina_esquerda.png" alt="" className="absolute inset-y-0 left-0 h-full w-auto object-contain" draggable={false} />
+        <img src="/assets/battle/cortina_esquerda.png" alt="" className="absolute inset-y-0 right-0 h-full w-auto object-contain scale-x-[-1]" draggable={false} />
+        <img src="/assets/battle/personagem.png" alt="" className="absolute bottom-0 right-4 h-[92%] w-auto object-contain" style={{ filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))' }} draggable={false} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(20,32,56,0.55) 0%, rgba(20,32,56,0.15) 45%, transparent 70%)' }} />
+        <div className="absolute inset-0 flex flex-col justify-center pl-6 pr-24 text-left">
+          <span className="inline-flex items-center gap-1.5 text-yellow-200 font-black text-2xl" style={{ textShadow: '0 2px 6px rgba(0,0,0,0.5)' }}>⚡ Quiz Relâmpago</span>
+          <span className="text-white/90 text-xs font-semibold mt-1" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>Quiz rápido pra turma toda • {QUIZ_RELAMPAGO_TOTAL} perguntas</span>
+        </div>
       </button>
 
       {/* Atividades menores */}
@@ -11181,8 +11189,51 @@ const MILHAO_FALLBACK = [
 
 // QUIZ RELÂMPAGO — quiz rápido de turma inteira (sem equipes): 10 perguntas
 // geradas por IA sobre o tema, uma pergunta por vez, tela cheia estilo show
-// (tábuas de madeira, caixa creme da pergunta, botões A/B/C/D coloridos).
+// (palco de madeira com cortinas e holofotes, caixa da pergunta e botões
+// A/B/C/D coloridos com feedback de acerto/erro).
 const QUIZ_RELAMPAGO_TOTAL = 10;
+
+const QUIZ_CSS = `
+@keyframes qz-twinkle{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes qz-shine{0%{transform:translateX(-160%) skewX(-18deg)}55%,100%{transform:translateX(360%) skewX(-18deg)}}
+@keyframes qz-pop{0%{opacity:0;transform:translateY(12px) scale(.95)}100%{opacity:1;transform:none}}
+@keyframes qz-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes qz-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes qz-beam{0%,100%{opacity:.3;transform:translateX(-8px)}50%{opacity:.6;transform:translateX(8px)}}
+@keyframes qz-spin{to{transform:rotate(360deg)}}
+@keyframes qz-rise{0%{opacity:0;transform:translateY(20px) scale(.9)}100%{opacity:1;transform:none}}
+.qz-anim-pop{animation:qz-pop .35s ease-out both}
+@media (prefers-reduced-motion:reduce){.qz-stage *{animation:none!important}}
+`;
+
+// Paleta puxada das ilustrações: madeira azul (fundo), azul-ardósia (cortinas)
+// e roxo/violeta (blazer da professora).
+//
+// Cenário de palco reaproveitado nas telas de setup/carregando/final: usa as
+// ilustrações reais (fundo de tábuas azuis + cortinas), com um véu escuro por
+// cima pra dar legibilidade ao texto.
+const QuizStage = ({ children }: { children: React.ReactNode }) => (
+  <div className="qz-stage relative flex-1 flex flex-col overflow-hidden" style={{ background: '#345b86' }}>
+    {/* tábuas azuis do fundo */}
+    <LeilaoFundo />
+    {/* véu pra escurecer e dar contraste ao texto */}
+    <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(28,44,72,0.45) 0%, rgba(24,38,64,0.72) 60%, rgba(20,32,55,0.88) 100%)' }} />
+    {/* feixes de luz */}
+    <div aria-hidden className="absolute -top-10 left-1/4 w-40 h-[70%] pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(200,224,255,0.28), transparent 70%)', filter: 'blur(8px)', transformOrigin: 'top', animation: 'qz-beam 6s ease-in-out infinite' }} />
+    <div aria-hidden className="absolute -top-10 right-1/4 w-40 h-[70%] pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(198,178,240,0.28), transparent 70%)', filter: 'blur(8px)', transformOrigin: 'top', animation: 'qz-beam 7s ease-in-out infinite reverse' }} />
+    {/* cortinas laterais (ilustração) */}
+    <LeilaoCortinaEsquerda />
+    <LeilaoCortinaDir />
+    {/* fileira de luzinhas no topo */}
+    <div aria-hidden className="absolute top-0 inset-x-0 h-3 flex justify-center gap-3 pointer-events-none">
+      {Array.from({ length: 14 }).map((_, i) => (
+        <span key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: '#eaf2ff', boxShadow: '0 0 6px rgba(210,228,255,0.9)', animation: `qz-twinkle 1.6s ease-in-out ${i * 0.12}s infinite` }} />
+      ))}
+    </div>
+    {children}
+  </div>
+);
+
 const QuizRelampago = ({ onExitApp }: { onExitApp: () => void }) => {
   const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
   const [topic, setTopic] = useState('');
@@ -11225,127 +11276,253 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         if (next >= questions.length) setPhase('end'); else setSelected(null);
         return next;
       });
-    }, 1200);
+    }, 1500);
   };
 
-  const woodBg = 'repeating-linear-gradient(90deg, #7a4a24 0 26px, #6b3f1f 26px 28px), linear-gradient(180deg, #8a5a30, #6b3f1f)';
+  // piso de tábuas azuis (combina com o fundo.png das ilustrações)
+  const plankBg = 'repeating-linear-gradient(90deg, rgba(18,36,64,0.32) 0 2px, transparent 2px 32px), linear-gradient(180deg, #6f9fce, #47709e)';
   const letterColors = ['#dc4b4b', '#e0ab2e', '#3fae6c', '#3d7fd6'];
+  const letterColorsDark = ['#a82f2f', '#a97c14', '#2a7d49', '#265a99'];
+  // acento roxo/violeta (do blazer da professora) — usado em CTA, títulos, foco
+  const violet = 'linear-gradient(180deg,#8b6fc4,#6a4f96)';
   const q = questions[idx];
+  const answered = selected !== null;
+  const gotIt = answered && selected === q?.correct;
+  const suggestions = ['Sistema Solar', 'Frações', 'Corpo Humano', 'Brasil Colônia', 'Verbos'];
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col select-none">
+      <style>{QUIZ_CSS}</style>
+
       {phase === 'setup' && (
-        <div className="flex-1 flex flex-col px-6 py-8" style={{ background: 'linear-gradient(180deg,#5a3a1e,#3a2413)' }}>
-          <button onClick={onExitApp} aria-label="Fechar" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white mb-6">
-            <X size={18} />
-          </button>
-          <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 max-w-sm mx-auto w-full">
-            <p className="text-5xl">⚡</p>
-            <h1 className="text-2xl font-black text-yellow-300">Quiz Relâmpago</h1>
-            <p className="text-white/80 text-sm">{QUIZ_RELAMPAGO_TOTAL} perguntas rápidas pra turma toda responder junto. Diga o tema da aula.</p>
-            <input
-              value={topic}
-              onChange={e => setTopic(e.target.value)}
-              placeholder="Ex.: Sistema Solar"
-              className="w-full rounded-full px-4 py-3 text-sm font-semibold text-[#3a2413] bg-[#f5ecd7] outline-none"
-            />
-            {error && <p className="text-rose-300 text-xs font-semibold">{error}</p>}
-            <button onClick={() => start(false)} className="w-full rounded-full py-3 font-bold text-[#3a2413] bg-yellow-400 active:scale-[0.98] transition-transform">
-              Começar o quiz
-            </button>
-            <button onClick={() => start(true)} className="w-full rounded-full py-3 font-bold text-white/90 bg-white/10 border border-white/30 active:scale-[0.98] transition-transform">
-              Testar com perguntas de exemplo (sem IA)
-            </button>
-          </div>
-        </div>
-      )}
-
-      {phase === 'loading' && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4" style={{ background: 'linear-gradient(180deg,#5a3a1e,#3a2413)' }}>
-          <Loader2 size={36} className="text-yellow-300 animate-spin" />
-          <p className="text-white/90 text-sm font-semibold">Gerando perguntas...</p>
-        </div>
-      )}
-
-      {phase === 'play' && q && (
-        <>
-          {/* header: fechar, progresso, pausar */}
-          <div className="shrink-0 flex items-center gap-3 px-4 py-3" style={{ background: 'linear-gradient(180deg,#6b4423,#4a2f18)' }}>
-            <button onClick={onExitApp} aria-label="Fechar" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0">
+        <QuizStage>
+          <div className="relative z-10 flex-1 flex flex-col px-6 py-6">
+            <button onClick={onExitApp} aria-label="Fechar" className="w-9 h-9 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white mb-2 active:scale-95 transition-transform">
               <X size={18} />
             </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-amber-200 tracking-wide">PERGUNTA <span className="text-yellow-300">{idx + 1}</span> / {questions.length}</p>
-              <div className="h-1.5 rounded-full bg-black/30 mt-1 overflow-hidden">
-                <div className="h-full bg-yellow-400 rounded-full transition-all" style={{ width: `${((idx + (selected !== null ? 1 : 0)) / questions.length) * 100}%` }} />
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 max-w-sm mx-auto w-full">
+              {/* selo com a professora (ilustração) */}
+              <div className="relative" style={{ animation: 'qz-float 3.5s ease-in-out infinite' }}>
+                <div className="w-28 h-28 rounded-full overflow-hidden shadow-2xl border-4" style={{ borderColor: '#c9b6e8', background: '#e9e2f5', boxShadow: '0 12px 30px rgba(0,0,0,0.45), 0 0 26px rgba(160,130,215,0.5)' }}>
+                  <img src="/assets/battle/personagem.png" alt="" className="w-full h-full object-cover object-top scale-125 translate-y-1" onError={e => { e.currentTarget.parentElement!.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2.5rem">⚡</div>'; }} />
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full flex items-center justify-center text-lg shadow-lg border-2 border-white/70" style={{ background: violet }}>⚡</span>
               </div>
-            </div>
-            <button onClick={() => setPaused(p => !p)} aria-label={paused ? 'Retomar' : 'Pausar'} className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0">
-              {paused ? <Play size={16} /> : <Pause size={16} />}
-            </button>
-          </div>
+              <div>
+                <h1 className="text-3xl font-black text-white tracking-tight" style={{ textShadow: '0 2px 0 #3a2963, 0 0 22px rgba(160,130,215,0.6)' }}>Quiz Relâmpago</h1>
+                <p className="text-indigo-100/85 text-sm mt-2 leading-relaxed">{QUIZ_RELAMPAGO_TOTAL} perguntas rápidas pra turma toda responder junto.<br/>Escolha o tema da aula.</p>
+              </div>
 
-          {/* área rolável: banner + pergunta/alternativas. Se a pergunta ou
-              as alternativas vierem mais longas que o normal, a caixa cresce
-              e essa área rola — os botões A/B/C/D nunca ficam cortados. */}
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-            {/* espaço do banner — reservado, sem ilustração ainda.
-                Proporção 1200x760 pra encaixar certinho quando a arte chegar. */}
-            <div className="w-full bg-white shrink-0" style={{ aspectRatio: '1200 / 760' }} />
-
-            {/* caixa da pergunta + alternativas */}
-            <div className="shrink-0 px-4 pt-6 pb-6" style={{ background: woodBg }}>
-              <div className="bg-[#f5ecd7] rounded-2xl p-4 shadow-xl">
-                <p className="font-bold text-[#3a2413] text-base leading-snug mb-3 break-words">{q.q}</p>
-                <div className="space-y-2">
-                  {q.options.map((opt, i) => (
-                    <div key={i} className="flex items-start gap-2 bg-[#efe3c8] rounded-2xl px-3 py-2">
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: letterColors[i] }}>
-                        {String.fromCharCode(65 + i)}
-                      </span>
-                      <span className="text-sm font-semibold text-[#3a2413] leading-snug break-words min-w-0">{opt}</span>
-                    </div>
+              {/* card do formulário */}
+              <div className="w-full rounded-3xl p-4 border border-white/15 backdrop-blur-sm" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                <label className="block text-left text-[11px] font-bold text-indigo-200/90 tracking-wide mb-1.5 ml-1">TEMA DO QUIZ</label>
+                <input
+                  value={topic}
+                  onChange={e => setTopic(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') start(false); }}
+                  placeholder="Ex.: Sistema Solar"
+                  className="w-full rounded-2xl px-4 py-3 text-sm font-semibold text-[#2f2148] bg-[#f3eefb] outline-none focus:ring-2 focus:ring-[#b79af0] placeholder:text-[#9a8bb5]"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {suggestions.map(s => (
+                    <button key={s} onClick={() => { setTopic(s); setError(''); }} className="text-[11px] font-semibold text-indigo-100 bg-white/10 hover:bg-white/20 border border-white/15 rounded-full px-2.5 py-1 active:scale-95 transition">
+                      {s}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <p className="text-center text-white/70 text-[11px] font-bold tracking-wide mt-4 mb-3">
-                {paused ? 'JOGO PAUSADO' : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
+              {error && <p className="text-rose-300 text-xs font-semibold -mt-1">{error}</p>}
+
+              <div className="w-full flex flex-col gap-2.5">
+                <button onClick={() => start(false)} className="relative overflow-hidden w-full rounded-2xl py-3.5 font-black text-white text-base border-2 shadow-xl active:scale-[0.98] transition-transform" style={{ background: violet, borderColor: '#c9b6e8' }}>
+                  <span className="relative z-10 flex items-center justify-center gap-2"><Zap size={18} /> Começar o quiz</span>
+                  <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)', animation: 'qz-shine 3.2s ease-in-out infinite' }} />
+                </button>
+                <button onClick={() => start(true)} className="w-full rounded-2xl py-2.5 font-bold text-indigo-100/90 text-sm bg-white/8 border border-white/20 active:scale-[0.98] transition-transform">
+                  Testar com perguntas de exemplo
+                </button>
+              </div>
+            </div>
+          </div>
+        </QuizStage>
+      )}
+
+      {phase === 'loading' && (
+        <QuizStage>
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-5">
+            <div className="relative w-20 h-20">
+              <div className="absolute inset-0 rounded-full border-4 border-white/15" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent" style={{ borderTopColor: '#c4b0ec', borderRightColor: '#c4b0ec', animation: 'qz-spin 0.9s linear infinite' }} />
+              <div className="absolute inset-0 flex items-center justify-center text-3xl" style={{ animation: 'qz-float 2.4s ease-in-out infinite' }}>⚡</div>
+            </div>
+            <div className="text-center">
+              <p className="text-white font-black text-lg">Preparando o palco…</p>
+              <p className="text-indigo-100/75 text-sm mt-1">Gerando {QUIZ_RELAMPAGO_TOTAL} perguntas sobre {topic || 'o tema'}.</p>
+            </div>
+          </div>
+        </QuizStage>
+      )}
+
+      {phase === 'play' && q && (
+        <div className="flex-1 flex flex-col min-h-0" style={{ background: '#213a58' }}>
+          {/* HEADER — barra azul com progresso e placar */}
+          <div className="shrink-0 px-3 py-2.5 flex items-center gap-2.5 border-b-4 border-black/25" style={{ background: 'linear-gradient(180deg,#5a86b8,#3a5d88)' }}>
+            <button onClick={onExitApp} aria-label="Fechar" className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
+              <X size={18} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[11px] font-black text-white tracking-wide">PERGUNTA <span className="text-white text-sm">{idx + 1}</span> <span className="text-indigo-100/60">/ {questions.length}</span></p>
+                <span className="flex items-center gap-1 text-[11px] font-black text-emerald-200 bg-black/30 rounded-full px-2 py-0.5">
+                  <CheckCircle2 size={12} /> {score}
+                </span>
+              </div>
+              {/* progresso segmentado */}
+              <div className="flex gap-1">
+                {questions.map((_, i) => (
+                  <span key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-black/30">
+                    <span className="block h-full rounded-full transition-all duration-300" style={{ width: i < idx || (i === idx && answered) ? '100%' : '0%', background: i === idx ? '#efe6ff' : '#b79af0' }} />
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => setPaused(p => !p)} aria-label={paused ? 'Retomar' : 'Pausar'} className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
+              {paused ? <Play size={16} /> : <Pause size={16} />}
+            </button>
+          </div>
+
+          {/* ÁREA ROLÁVEL: banner (ilustração) + pergunta + alternativas */}
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+            {/* BANNER 1200x760 — palco com fundo azul, cortinas e a professora */}
+            <div className="w-full shrink-0 relative overflow-hidden" style={{ aspectRatio: '1200 / 760', background: '#7ba6d4' }}>
+              <LeilaoFundo />
+              <LeilaoCortinaEsquerda />
+              <LeilaoCortinaDir />
+              <LeilaoPersonagem />
+              {/* luz de palco suave por cima da professora */}
+              <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
+            </div>
+
+            {/* palco de tábuas azuis com a pergunta e as respostas */}
+            <div className="relative shrink-0 px-4 pt-5 pb-7 flex-1" style={{ background: plankBg }}>
+              {/* moldura superior */}
+              <div aria-hidden className="absolute top-0 inset-x-0 h-2" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.25),transparent)' }} />
+
+              {/* CARTÃO DA PERGUNTA — balão creme com bico apontando pro banner */}
+              <div key={idx} className="relative qz-anim-pop">
+                <div aria-hidden className="absolute -top-2 left-8 w-4 h-4 rotate-45 bg-[#f7efdc]" style={{ boxShadow: '-2px -2px 4px rgba(0,0,0,0.08)' }} />
+                <div className="relative bg-[#f7efdc] rounded-3xl p-4 shadow-2xl border border-[#d8c9a4]">
+                  {/* parafusos decorativos */}
+                  <span aria-hidden className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#cbb98d]" />
+                  <span aria-hidden className="absolute bottom-2.5 left-2.5 w-2 h-2 rounded-full bg-[#cbb98d]" />
+                  <p className="font-extrabold text-[#3a2413] text-lg leading-snug mb-3.5 break-words">{q.q}</p>
+                  <div className="space-y-2">
+                    {q.options.map((opt, i) => {
+                      const isCorrect = i === q.correct;
+                      const rowState = answered && isCorrect ? 'correct' : answered && selected === i ? 'wrong' : 'idle';
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-start gap-2.5 rounded-2xl px-3 py-2 transition-colors border"
+                          style={{
+                            background: rowState === 'correct' ? '#d8f2df' : rowState === 'wrong' ? '#fadada' : '#efe3c8',
+                            borderColor: rowState === 'correct' ? '#3fae6c' : rowState === 'wrong' ? '#dc4b4b' : 'transparent',
+                          }}
+                        >
+                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-black shrink-0 shadow" style={{ background: letterColors[i] }}>
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          <span className="text-[15px] font-semibold text-[#3a2413] leading-snug break-words min-w-0 flex-1">{opt}</span>
+                          {rowState === 'correct' && <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />}
+                          {rowState === 'wrong' && <X size={18} className="text-rose-600 shrink-0 mt-0.5" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* faixa de instrução / feedback */}
+              <p className="text-center text-[12px] font-black tracking-wide mt-5 mb-3" style={{ color: answered ? (gotIt ? '#7bf0a6' : '#ff9a9a') : 'rgba(255,255,255,0.75)' }}>
+                {paused ? '⏸  JOGO PAUSADO' : answered ? (gotIt ? '✓  RESPOSTA CERTA!' : '✗  ERA A LETRA ' + String.fromCharCode(65 + q.correct)) : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
               </p>
 
-              <div className="grid grid-cols-4 gap-2">
+              {/* BOTÕES A/B/C/D */}
+              <div className="grid grid-cols-4 gap-2.5">
                 {q.options.map((_, i) => {
-                  const showState = selected !== null;
                   const isCorrect = i === q.correct;
-                  const dim = showState && !isCorrect && selected !== i;
+                  const isSel = selected === i;
+                  const dim = answered && !isCorrect && !isSel;
+                  const animCls = answered && isCorrect ? '' : answered && isSel ? '' : '';
                   return (
                     <button
                       key={i}
-                      disabled={showState || paused}
+                      disabled={answered || paused}
                       onClick={() => answer(i)}
-                      className="aspect-square rounded-2xl flex items-center justify-center text-white font-black text-2xl border-2 border-white/80 shadow-lg active:scale-95 transition-transform"
-                      style={{ background: letterColors[i], opacity: dim ? 0.4 : 1, outline: showState && isCorrect ? '3px solid #fff' : 'none' }}
+                      className="relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-b-4 active:translate-y-0.5 active:border-b-2 transition-all"
+                      style={{
+                        background: `linear-gradient(180deg, ${letterColors[i]}, ${letterColorsDark[i]})`,
+                        borderColor: 'rgba(0,0,0,0.35)',
+                        opacity: dim ? 0.35 : 1,
+                        boxShadow: answered && isCorrect ? '0 0 0 3px #fff, 0 0 22px 4px rgba(123,240,166,0.8)' : answered && isSel ? '0 0 0 3px #fff, 0 0 18px 3px rgba(255,120,120,0.8)' : '0 4px 10px rgba(0,0,0,0.35)',
+                        animation: answered && isSel && !isCorrect ? 'qz-shake 0.4s ease' : 'none',
+                      }}
                     >
-                      {String.fromCharCode(65 + i)}
+                      <span aria-hidden className="absolute inset-x-1.5 top-1.5 h-1/3 rounded-t-xl pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.35),transparent)' }} />
+                      {answered && isCorrect ? <CheckCircle2 size={30} /> : answered && isSel ? <X size={30} /> : String.fromCharCode(65 + i)}
                     </button>
                   );
                 })}
               </div>
             </div>
           </div>
-        </>
-      )}
-
-      {phase === 'end' && (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-3" style={{ background: 'linear-gradient(180deg,#5a3a1e,#3a2413)' }}>
-          <p className="text-6xl">🏆</p>
-          <h2 className="text-2xl font-black text-yellow-300">Quiz concluído!</h2>
-          <p className="text-white/90">Vocês acertaram <b>{score}</b> de <b>{questions.length}</b> perguntas.</p>
-          <button onClick={onExitApp} className="mt-3 px-6 py-3 rounded-full bg-yellow-400 text-[#3a2413] font-bold active:scale-[0.98] transition-transform">
-            Voltar aos Jogos
-          </button>
         </div>
       )}
+
+      {phase === 'end' && (() => {
+        const pct = questions.length ? Math.round((score / questions.length) * 100) : 0;
+        const stars = pct >= 90 ? 3 : pct >= 60 ? 2 : pct >= 30 ? 1 : 0;
+        const msg = pct >= 90 ? 'Turma brilhante! 🌟' : pct >= 60 ? 'Mandaram muito bem!' : pct >= 30 ? 'Bom jogo — dá pra revisar e voltar!' : 'Bora revisar e tentar de novo!';
+        return (
+          <QuizStage>
+            <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
+              <div className="text-6xl" style={{ animation: 'qz-float 3s ease-in-out infinite' }}>🏆</div>
+              <h2 className="text-2xl font-black text-white" style={{ textShadow: '0 2px 0 #3a2963, 0 0 20px rgba(160,130,215,0.5)' }}>Quiz concluído!</h2>
+
+              {/* estrelas */}
+              <div className="flex gap-1.5">
+                {[0, 1, 2].map(s => (
+                  <Star key={s} size={30} className={s < stars ? 'text-yellow-300' : 'text-white/20'} fill={s < stars ? '#fde047' : 'transparent'} style={{ animation: s < stars ? `qz-rise .4s ease-out ${s * 0.12}s both` : 'none' }} />
+                ))}
+              </div>
+
+              {/* placar em anel */}
+              <div className="relative w-40 h-40 my-1">
+                <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.28)" strokeWidth="12" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="#b79af0" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${(pct / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`} style={{ transition: 'stroke-dasharray 1s ease' }} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-4xl font-black text-white">{score}<span className="text-xl text-indigo-100/60">/{questions.length}</span></span>
+                  <span className="text-xs font-bold text-indigo-100/75">{pct}% de acerto</span>
+                </div>
+              </div>
+
+              <p className="text-indigo-100 font-semibold">{msg}</p>
+
+              <div className="w-full max-w-xs flex flex-col gap-2.5 mt-1">
+                <button onClick={() => { setPhase('setup'); setTopic(''); }} className="w-full rounded-2xl py-3 font-black text-white border-2 shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2" style={{ background: violet, borderColor: '#c9b6e8' }}>
+                  <RotateCcw size={18} /> Jogar de novo
+                </button>
+                <button onClick={onExitApp} className="w-full rounded-2xl py-2.5 font-bold text-indigo-100/90 bg-white/8 border border-white/20 active:scale-[0.98] transition-transform">
+                  Voltar aos Jogos
+                </button>
+              </div>
+            </div>
+          </QuizStage>
+        );
+      })()}
     </div>
   );
 };
