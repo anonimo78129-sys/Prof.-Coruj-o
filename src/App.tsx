@@ -11214,22 +11214,8 @@ const QUIZ_CSS = `
 // cima pra dar legibilidade ao texto.
 const QuizStage = ({ children }: { children: React.ReactNode }) => (
   <div className="qz-stage relative flex-1 flex flex-col overflow-hidden" style={{ background: '#345b86' }}>
-    {/* tábuas azuis do fundo */}
-    <LeilaoFundo />
-    {/* véu pra escurecer e dar contraste ao texto */}
-    <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(28,44,72,0.45) 0%, rgba(24,38,64,0.72) 60%, rgba(20,32,55,0.88) 100%)' }} />
-    {/* feixes de luz */}
-    <div aria-hidden className="absolute -top-10 left-1/4 w-40 h-[70%] pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(200,224,255,0.28), transparent 70%)', filter: 'blur(8px)', transformOrigin: 'top', animation: 'qz-beam 6s ease-in-out infinite' }} />
-    <div aria-hidden className="absolute -top-10 right-1/4 w-40 h-[70%] pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(198,178,240,0.28), transparent 70%)', filter: 'blur(8px)', transformOrigin: 'top', animation: 'qz-beam 7s ease-in-out infinite reverse' }} />
-    {/* cortinas laterais (ilustração) */}
-    <LeilaoCortinaEsquerda />
-    <LeilaoCortinaDir />
-    {/* fileira de luzinhas no topo */}
-    <div aria-hidden className="absolute top-0 inset-x-0 h-3 flex justify-center gap-3 pointer-events-none">
-      {Array.from({ length: 14 }).map((_, i) => (
-        <span key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: '#eaf2ff', boxShadow: '0 0 6px rgba(210,228,255,0.9)', animation: `qz-twinkle 1.6s ease-in-out ${i * 0.12}s infinite` }} />
-      ))}
-    </div>
+    {/* apenas a ilustração enviada (tábuas azuis, versão vertical) */}
+    <img src="/assets/battle/fundo-vertical.jpg" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
     {children}
   </div>
 );
@@ -11394,13 +11380,21 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
 
           {/* ÁREA ROLÁVEL: banner (ilustração) + pergunta + alternativas */}
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-            {/* BANNER 1200x760 — palco com fundo azul, cortinas e a professora */}
+            {/* BANNER 1200x760 — palco com fundo azul, a professora ao centro
+                e as cortinas POR CIMA dela, emoldurando só as laterais (faixa
+                de ~24% de cada lado; a professora fica visível no meio). */}
             <div className="w-full shrink-0 relative overflow-hidden" style={{ aspectRatio: '1200 / 760', background: '#7ba6d4' }}>
               <LeilaoFundo />
-              <LeilaoCortinaEsquerda />
-              <LeilaoCortinaDir />
               <LeilaoPersonagem />
-              {/* luz de palco suave por cima da professora */}
+              {/* cortina esquerda por cima da professora */}
+              <div aria-hidden className="absolute inset-y-0 left-0 w-[24%] overflow-hidden pointer-events-none">
+                <img src="/assets/battle/cortina_esquerda.png" alt="" className="h-full w-auto max-w-none object-cover object-left" style={{ filter: 'drop-shadow(6px 0 10px rgba(0,0,0,0.35))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+              </div>
+              {/* cortina direita (espelhada) por cima da professora */}
+              <div aria-hidden className="absolute inset-y-0 right-0 w-[24%] overflow-hidden pointer-events-none scale-x-[-1]">
+                <img src="/assets/battle/cortina_esquerda.png" alt="" className="h-full w-auto max-w-none object-cover object-left" style={{ filter: 'drop-shadow(6px 0 10px rgba(0,0,0,0.35))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+              </div>
+              {/* luz de palco suave por cima de tudo */}
               <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
             </div>
 
