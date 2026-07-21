@@ -11204,8 +11204,8 @@ const QUIZ_CSS = `
 @keyframes qz-rise{0%{opacity:0;transform:translateY(20px) scale(.9)}100%{opacity:1;transform:none}}
 /* cortina (imagem inteira): começa fechada (translateX 0, cobrindo o palco),
    abre DESLIZANDO pra fora com um leve overshoot e para mostrando uma faixa */
-@keyframes qz-open-l{0%,18%{transform:translateX(0)}80%{transform:translateX(-20%)}100%{transform:translateX(-18%)}}
-@keyframes qz-open-r{0%,18%{transform:translateX(0)}80%{transform:translateX(20%)}100%{transform:translateX(18%)}}
+@keyframes qz-open-l{0%,18%{transform:translateX(0)}80%{transform:translateX(-32%)}100%{transform:translateX(-30%)}}
+@keyframes qz-open-r{0%,18%{transform:translateX(0)}80%{transform:translateX(32%)}100%{transform:translateX(30%)}}
 /* balanço leve e contínuo (desliza de leve pra dentro e volta) */
 @keyframes qz-sway-l{0%,100%{transform:translateX(0)}50%{transform:translateX(-1.2%)}}
 @keyframes qz-sway-r{0%,100%{transform:translateX(0)}50%{transform:translateX(1.2%)}}
@@ -11214,7 +11214,7 @@ const QUIZ_CSS = `
 .qz-curtain-r{animation:qz-open-r 1.6s cubic-bezier(.25,.9,.25,1) both}
 .qz-curtain-l img{animation:qz-sway-l 5s ease-in-out .4s infinite}
 .qz-curtain-r img{animation:qz-sway-r 5.4s ease-in-out .4s infinite}
-@media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l img,.qz-curtain-r img{animation:none!important}.qz-curtain-l{transform:translateX(-18%)}.qz-curtain-r{transform:translateX(18%)}}
+@media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l img,.qz-curtain-r img{animation:none!important}.qz-curtain-l{transform:translateX(-30%)}.qz-curtain-r{transform:translateX(30%)}}
 `;
 
 // Paleta puxada das ilustrações: madeira azul (fundo), azul-ardósia (cortinas)
