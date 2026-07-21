@@ -11382,21 +11382,23 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
 
           {/* ÁREA ROLÁVEL: banner (ilustração) + pergunta + alternativas */}
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-            {/* BANNER 1200x760 — palco com fundo azul, a professora ao centro
-                e as cortinas POR CIMA dela, emoldurando só as laterais (faixa
-                de ~24% de cada lado; a professora fica visível no meio). */}
+            {/* BANNER 1200x760 — palco completo: fundo azul + professora ao
+                centro, cortinas (esquerda/direita) emoldurando as laterais em
+                altura cheia POR CIMA dela, e o balcão na frente do palco. */}
             <div className="w-full shrink-0 relative overflow-hidden" style={{ aspectRatio: '1200 / 760', background: '#7ba6d4' }}>
               <LeilaoFundo />
               <LeilaoPersonagem />
-              {/* cortina esquerda por cima da professora */}
-              <div aria-hidden className="absolute inset-y-0 left-0 w-[24%] overflow-hidden pointer-events-none">
-                <img src="/assets/battle/cortina_esquerda.png" alt="" className="h-full w-auto max-w-none object-cover object-left" style={{ filter: 'drop-shadow(6px 0 10px rgba(0,0,0,0.35))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+              {/* cortina esquerda (faixa lateral de altura cheia) */}
+              <div aria-hidden className="absolute inset-y-0 left-0 w-[40%] overflow-hidden pointer-events-none">
+                <img src="/assets/battle/cortina-esq.png" alt="" className="absolute left-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
-              {/* cortina direita (espelhada) por cima da professora */}
-              <div aria-hidden className="absolute inset-y-0 right-0 w-[24%] overflow-hidden pointer-events-none scale-x-[-1]">
-                <img src="/assets/battle/cortina_esquerda.png" alt="" className="h-full w-auto max-w-none object-cover object-left" style={{ filter: 'drop-shadow(6px 0 10px rgba(0,0,0,0.35))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+              {/* cortina direita (faixa lateral de altura cheia) */}
+              <div aria-hidden className="absolute inset-y-0 right-0 w-[40%] overflow-hidden pointer-events-none">
+                <img src="/assets/battle/cortina-dir.png" alt="" className="absolute right-0 top-0 h-full w-auto max-w-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
-              {/* luz de palco suave por cima de tudo */}
+              {/* balcão na frente do palco (cobre a base das cortinas e da professora) */}
+              <img src="/assets/battle/balcao.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              {/* luz de palco suave por cima */}
               <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
             </div>
 
