@@ -8327,6 +8327,17 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
         <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
       </button>
 
+      {/* QUIZ RELÂMPAGO — card reservado, sem ação de clique ainda; banner
+          real entra em /assets/battle/quiz-relampago.jpg quando estiver
+          pronto (mesmo aspecto 1100x532 dos outros cards) */}
+      <div
+        aria-label="Quiz Relâmpago — em breve"
+        className="w-full relative overflow-hidden rounded-[2rem] border-2 border-dashed border-white/50 mb-4 flex items-center justify-center bg-white/10"
+        style={{ aspectRatio: '1100 / 532' }}
+      >
+        <span className="text-white/70 font-bold text-sm tracking-wide">Quiz Relâmpago — banner em breve</span>
+      </div>
+
       {/* Atividades menores */}
       <div className="grid grid-cols-2 gap-3 mb-8">
         {smallActivities.map(m => {
