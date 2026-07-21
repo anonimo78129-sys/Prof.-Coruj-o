@@ -11285,46 +11285,51 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
             </button>
           </div>
 
-          {/* espaço do banner — reservado, sem ilustração ainda */}
-          <div className="flex-1 min-h-[120px] bg-white" />
+          {/* área rolável: banner + pergunta/alternativas. Se a pergunta ou
+              as alternativas vierem mais longas que o normal, a caixa cresce
+              e essa área rola — os botões A/B/C/D nunca ficam cortados. */}
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+            {/* espaço do banner — reservado, sem ilustração ainda */}
+            <div className="min-h-[120px] bg-white shrink-0" />
 
-          {/* caixa da pergunta + alternativas */}
-          <div className="shrink-0 px-4 pt-6 pb-6" style={{ background: woodBg }}>
-            <div className="bg-[#f5ecd7] rounded-2xl p-4 shadow-xl">
-              <p className="font-bold text-[#3a2413] text-base leading-snug mb-3">{q.q}</p>
-              <div className="space-y-2">
-                {q.options.map((opt, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-[#efe3c8] rounded-full px-3 py-2">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: letterColors[i] }}>
-                      {String.fromCharCode(65 + i)}
-                    </span>
-                    <span className="text-sm font-semibold text-[#3a2413]">{opt}</span>
-                  </div>
-                ))}
+            {/* caixa da pergunta + alternativas */}
+            <div className="shrink-0 px-4 pt-6 pb-6" style={{ background: woodBg }}>
+              <div className="bg-[#f5ecd7] rounded-2xl p-4 shadow-xl">
+                <p className="font-bold text-[#3a2413] text-base leading-snug mb-3 break-words">{q.q}</p>
+                <div className="space-y-2">
+                  {q.options.map((opt, i) => (
+                    <div key={i} className="flex items-start gap-2 bg-[#efe3c8] rounded-2xl px-3 py-2">
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: letterColors[i] }}>
+                        {String.fromCharCode(65 + i)}
+                      </span>
+                      <span className="text-sm font-semibold text-[#3a2413] leading-snug break-words min-w-0">{opt}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <p className="text-center text-white/70 text-[11px] font-bold tracking-wide mt-4 mb-3">
-              {paused ? 'JOGO PAUSADO' : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
-            </p>
+              <p className="text-center text-white/70 text-[11px] font-bold tracking-wide mt-4 mb-3">
+                {paused ? 'JOGO PAUSADO' : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
+              </p>
 
-            <div className="grid grid-cols-4 gap-2">
-              {q.options.map((_, i) => {
-                const showState = selected !== null;
-                const isCorrect = i === q.correct;
-                const dim = showState && !isCorrect && selected !== i;
-                return (
-                  <button
-                    key={i}
-                    disabled={showState || paused}
-                    onClick={() => answer(i)}
-                    className="aspect-square rounded-2xl flex items-center justify-center text-white font-black text-2xl border-2 border-white/80 shadow-lg active:scale-95 transition-transform"
-                    style={{ background: letterColors[i], opacity: dim ? 0.4 : 1, outline: showState && isCorrect ? '3px solid #fff' : 'none' }}
-                  >
-                    {String.fromCharCode(65 + i)}
-                  </button>
-                );
-              })}
+              <div className="grid grid-cols-4 gap-2">
+                {q.options.map((_, i) => {
+                  const showState = selected !== null;
+                  const isCorrect = i === q.correct;
+                  const dim = showState && !isCorrect && selected !== i;
+                  return (
+                    <button
+                      key={i}
+                      disabled={showState || paused}
+                      onClick={() => answer(i)}
+                      className="aspect-square rounded-2xl flex items-center justify-center text-white font-black text-2xl border-2 border-white/80 shadow-lg active:scale-95 transition-transform"
+                      style={{ background: letterColors[i], opacity: dim ? 0.4 : 1, outline: showState && isCorrect ? '3px solid #fff' : 'none' }}
+                    >
+                      {String.fromCharCode(65 + i)}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </>
