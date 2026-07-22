@@ -11204,6 +11204,7 @@ const QUIZ_CSS = `
 @keyframes qz-rise{0%{opacity:0;transform:translateY(20px) scale(.9)}100%{opacity:1;transform:none}}
 /* cortina (imagem inteira): começa fechada (translateX 0, cobrindo o palco),
    abre DESLIZANDO pra fora com um leve overshoot e para mostrando uma faixa */
+@keyframes qz-pose{0%{opacity:0;transform:translateX(-50%) scale(.97)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
 @keyframes qz-open-l{0%,18%{transform:translateX(0)}80%{transform:translateX(-32%)}100%{transform:translateX(-30%)}}
 @keyframes qz-open-r{0%,18%{transform:translateX(0)}80%{transform:translateX(32%)}100%{transform:translateX(30%)}}
 /* balanço leve: topo preso, só a base da cortina balança (skewX com origem
@@ -11211,6 +11212,7 @@ const QUIZ_CSS = `
 @keyframes qz-sway-l{0%,100%{transform:skewX(0deg)}50%{transform:skewX(2.2deg)}}
 @keyframes qz-sway-r{0%,100%{transform:skewX(0deg)}50%{transform:skewX(-2.2deg)}}
 .qz-anim-pop{animation:qz-pop .35s ease-out both}
+.qz-pose{animation:qz-pose .3s ease-out}
 .qz-curtain-l{animation:qz-open-l 1.6s cubic-bezier(.25,.9,.25,1) both}
 .qz-curtain-r{animation:qz-open-r 1.6s cubic-bezier(.25,.9,.25,1) both}
 .qz-curtain-l img{transform-origin:top center;animation:qz-sway-l 5s ease-in-out .4s infinite}
@@ -11289,6 +11291,11 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   const answered = selected !== null;
   const gotIt = answered && selected === q?.correct;
   const suggestions = ['Sistema Solar', 'Frações', 'Corpo Humano', 'Brasil Colônia', 'Verbos'];
+  // pose da professora conforme o momento (troca com fallback pra personagem.png
+  // enquanto os assets novos não existirem)
+  const poseSrc = !answered ? '/assets/battle/personagem-lado.png'
+    : gotIt ? '/assets/battle/personagem-acerto.png'
+    : '/assets/battle/personagem-erro.png';
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col select-none">
@@ -11401,7 +11408,16 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                 25% de cada lado, ficando levemente balançando. */}
             <div className="w-full shrink-0 relative overflow-hidden" style={{ aspectRatio: '1200 / 760', background: '#7ba6d4' }}>
               <LeilaoFundo />
-              <LeilaoPersonagem />
+              {/* professora reage ao jogo: olhando pro lado (padrão), comemorando
+                  no acerto, surpresa no erro. Fallback pra personagem.png. */}
+              <img
+                key={poseSrc}
+                src={poseSrc}
+                alt=""
+                className="qz-pose absolute bottom-0 left-1/2 -translate-x-1/2 h-full w-auto object-contain"
+                style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }}
+                onError={e => { const el = e.currentTarget; if (el.dataset.fb !== '1') { el.dataset.fb = '1'; el.src = '/assets/battle/personagem.png'; } else { el.style.display = 'none'; } }}
+              />
               {/* balcão na frente do palco (a cortina fica por cima dele) */}
               <img src="/assets/battle/balcao.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               {/* cortina esquerda — imagem INTEIRA no tamanho real (1200x760),
