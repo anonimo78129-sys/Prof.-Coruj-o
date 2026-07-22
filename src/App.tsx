@@ -11476,7 +11476,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                       onClick={() => answer(i)}
                       className="relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-[3px] active:translate-y-0.5 transition-all"
                       style={{
-                        background: `linear-gradient(180deg, ${letterColors[i]}, ${letterColorsDark[i]})`,
+                        background: letterColors[i],
                         borderColor: 'rgba(255,255,255,0.9)',
                         opacity: dim ? 0.35 : 1,
                         boxShadow: answered && isCorrect ? '0 0 0 3px #fff, 0 0 22px 4px rgba(123,240,166,0.8)' : answered && isSel ? '0 0 0 3px #fff, 0 0 18px 3px rgba(255,120,120,0.8)' : '0 4px 10px rgba(0,0,0,0.35)',
