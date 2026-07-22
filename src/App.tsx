@@ -11425,7 +11425,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
 
               {/* CARTÃO DA PERGUNTA — balão creme com bico apontando pro banner */}
               <div key={idx} className="relative qz-anim-pop">
-                <div aria-hidden className="absolute -top-2 left-8 w-4 h-4 rotate-45 bg-[#f7efdc]" style={{ boxShadow: '-2px -2px 4px rgba(0,0,0,0.08)' }} />
+                <div aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-[#f7efdc]" style={{ boxShadow: '-2px -2px 4px rgba(0,0,0,0.08)' }} />
                 <div className="relative bg-[#f7efdc] rounded-3xl p-4 shadow-2xl border border-[#d8c9a4]">
                   {/* parafusos decorativos */}
                   <span aria-hidden className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#cbb98d]" />
@@ -11474,10 +11474,10 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                       key={i}
                       disabled={answered || paused}
                       onClick={() => answer(i)}
-                      className="relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-b-4 active:translate-y-0.5 active:border-b-2 transition-all"
+                      className="relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-[3px] active:translate-y-0.5 transition-all"
                       style={{
                         background: `linear-gradient(180deg, ${letterColors[i]}, ${letterColorsDark[i]})`,
-                        borderColor: 'rgba(0,0,0,0.35)',
+                        borderColor: 'rgba(255,255,255,0.9)',
                         opacity: dim ? 0.35 : 1,
                         boxShadow: answered && isCorrect ? '0 0 0 3px #fff, 0 0 22px 4px rgba(123,240,166,0.8)' : answered && isSel ? '0 0 0 3px #fff, 0 0 18px 3px rgba(255,120,120,0.8)' : '0 4px 10px rgba(0,0,0,0.35)',
                         animation: answered && isSel && !isCorrect ? 'qz-shake 0.4s ease' : 'none',
