@@ -11204,7 +11204,12 @@ const QUIZ_CSS = `
 @keyframes qz-rise{0%{opacity:0;transform:translateY(20px) scale(.9)}100%{opacity:1;transform:none}}
 /* cortina (imagem inteira): começa fechada (translateX 0, cobrindo o palco),
    abre DESLIZANDO pra fora com um leve overshoot e para mostrando uma faixa */
-@keyframes qz-pose{0%{opacity:0;transform:translateX(-50%) scale(.97)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
+/* professora — animações de frames (troca de background-image por keyframes) */
+@keyframes qz-fr-acertou{0%,32%{background-image:url(/assets/battle/acertou-1.png)}33%,65%{background-image:url(/assets/battle/acertou-2.png)}66%,100%{background-image:url(/assets/battle/acertou-3.png)}}
+@keyframes qz-fr-errou{0%,32%{background-image:url(/assets/battle/errou-1.png)}33%,65%{background-image:url(/assets/battle/errou-2.png)}66%,100%{background-image:url(/assets/battle/errou-3.png)}}
+@keyframes qz-fr-agua{0%,24%{background-image:url(/assets/battle/agua-1.png)}25%,49%{background-image:url(/assets/battle/agua-2.png)}50%,100%{background-image:url(/assets/battle/agua-3.png)}}
+@keyframes qz-fr-cartao{0%,24%{background-image:url(/assets/battle/cartao-1.png)}25%,49%{background-image:url(/assets/battle/cartao-2.png)}50%,100%{background-image:url(/assets/battle/cartao-3.png)}}
+@keyframes qz-fr-acenar{0%,19%{background-image:url(/assets/battle/acenar-1.png)}20%,39%{background-image:url(/assets/battle/acenar-2.png)}40%,59%{background-image:url(/assets/battle/acenar-3.png)}60%,79%{background-image:url(/assets/battle/acenar-2.png)}80%,100%{background-image:url(/assets/battle/acenar-1.png)}}
 @keyframes qz-open-l{0%,18%{transform:translateX(0)}80%{transform:translateX(-32%)}100%{transform:translateX(-30%)}}
 @keyframes qz-open-r{0%,18%{transform:translateX(0)}80%{transform:translateX(32%)}100%{transform:translateX(30%)}}
 /* balanço leve: topo preso, só a base da cortina balança (skewX com origem
@@ -11212,7 +11217,15 @@ const QUIZ_CSS = `
 @keyframes qz-sway-l{0%,100%{transform:skewX(0deg)}50%{transform:skewX(2.2deg)}}
 @keyframes qz-sway-r{0%,100%{transform:skewX(0deg)}50%{transform:skewX(-2.2deg)}}
 .qz-anim-pop{animation:qz-pop .35s ease-out both}
-.qz-pose{animation:qz-pose .3s ease-out}
+.qz-actor{background-repeat:no-repeat;background-position:center bottom;background-size:contain;background-image:url(/assets/battle/personagem.png)}
+.qz-actor-neutro,.qz-actor-lado{background-image:url(/assets/battle/personagem.png)}
+.qz-actor-cabelo{background-image:url(/assets/battle/cabelo.png)}
+.qz-actor-acertou{animation:qz-fr-acertou .7s both}
+.qz-actor-errou{animation:qz-fr-errou .7s both}
+.qz-actor-agua{animation:qz-fr-agua 2.4s infinite}
+.qz-actor-cartao{animation:qz-fr-cartao 2.6s infinite}
+.qz-actor-acenar{animation:qz-fr-acenar 1.9s infinite}
+@media (prefers-reduced-motion:reduce){.qz-actor-agua,.qz-actor-cartao,.qz-actor-acenar,.qz-actor-acertou,.qz-actor-errou{animation:none!important}}
 .qz-curtain-l{animation:qz-open-l 1.6s cubic-bezier(.25,.9,.25,1) both}
 .qz-curtain-r{animation:qz-open-r 1.6s cubic-bezier(.25,.9,.25,1) both}
 .qz-curtain-l img{transform-origin:top center;animation:qz-sway-l 5s ease-in-out .4s infinite}
@@ -11291,11 +11304,21 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   const answered = selected !== null;
   const gotIt = answered && selected === q?.correct;
   const suggestions = ['Sistema Solar', 'Frações', 'Corpo Humano', 'Brasil Colônia', 'Verbos'];
-  // pose da professora conforme o momento (troca com fallback pra personagem.png
-  // enquanto os assets novos não existirem)
-  const poseSrc = !answered ? '/assets/battle/personagem-lado.png'
-    : gotIt ? '/assets/battle/personagem-acerto.png'
-    : '/assets/battle/personagem-erro.png';
+
+  // Professora "viva": enquanto a pergunta está no ar, ela faz ações ambientes
+  // em rodízio (bebendo água, acenando, olhando cartão, arrumando cabelo, parada);
+  // ao responder, reage (acertou/errou). Cada ação é uma animação de frames em CSS.
+  const [actor, setActor] = useState('neutro');
+  useEffect(() => {
+    if (phase !== 'play') return;
+    if (answered) { setActor(gotIt ? 'acertou' : 'errou'); return; }
+    const idles = ['neutro', 'cartao', 'agua', 'acenar', 'cabelo', 'neutro'];
+    setActor('cartao');
+    const id = setInterval(() => {
+      setActor(idles[Math.floor(Math.random() * idles.length)]);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [phase, answered, gotIt, idx]);
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col select-none">
@@ -11408,16 +11431,20 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                 25% de cada lado, ficando levemente balançando. */}
             <div className="w-full shrink-0 relative overflow-hidden" style={{ aspectRatio: '1200 / 760', background: '#7ba6d4' }}>
               <LeilaoFundo />
-              {/* professora reage ao jogo: olhando pro lado (padrão), comemorando
-                  no acerto, surpresa no erro. Fallback pra personagem.png. */}
-              <img
-                key={poseSrc}
-                src={poseSrc}
-                alt=""
-                className="qz-pose absolute bottom-0 left-1/2 -translate-x-1/2 h-full w-auto object-contain"
+              {/* professora "viva": ações ambientes em rodízio enquanto a pergunta
+                  está no ar (bebendo água, acenando, olhando cartão, arrumando
+                  cabelo, parada) e reação no acerto/erro — animação de frames CSS */}
+              <div
+                aria-hidden
+                className={`qz-actor qz-actor-${actor} absolute inset-0 pointer-events-none`}
                 style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }}
-                onError={e => { const el = e.currentTarget; if (el.dataset.fb !== '1') { el.dataset.fb = '1'; el.src = '/assets/battle/personagem.png'; } else { el.style.display = 'none'; } }}
               />
+              {/* preload dos frames pra não piscar na primeira troca */}
+              <div aria-hidden style={{ display: 'none' }}>
+                {['acertou-1', 'acertou-2', 'acertou-3', 'errou-1', 'errou-2', 'errou-3', 'agua-1', 'agua-2', 'agua-3', 'acenar-1', 'acenar-2', 'acenar-3', 'cartao-1', 'cartao-2', 'cartao-3', 'cabelo'].map(n => (
+                  <img key={n} src={`/assets/battle/${n}.png`} alt="" />
+                ))}
+              </div>
               {/* balcão na frente do palco (a cortina fica por cima dele) */}
               <img src="/assets/battle/balcao.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
               {/* cortina esquerda — imagem INTEIRA no tamanho real (1200x760),
