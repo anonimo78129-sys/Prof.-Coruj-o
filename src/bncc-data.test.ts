@@ -6,8 +6,8 @@ import {
 
 // Habilidades reais usadas como "banco injetado no comando" nos testes.
 const SKILLS: BnccSkill[] = [
-  { code: 'EF05LP01', desc: 'Inferir informações implícitas nos textos lidos', tags: ['leitura'] },
-  { code: 'EF04LP01', desc: 'Ler e compreender cartas pessoais de reclamação', tags: ['leitura'] },
+  { code: 'EF05LP01', desc: 'Inferir informações implícitas nos textos lidos' },
+  { code: 'EF04LP01', desc: 'Ler e compreender cartas pessoais de reclamação' },
 ];
 
 /** Plano mínimo no formato que o gerador produz. */
@@ -221,46 +221,46 @@ Leitura
 });
 
 describe('selectBnccSkills', () => {
-  it('devolve habilidades reais da disciplina e da série', () => {
-    const skills = selectBnccSkills('Língua Portuguesa', '5º ano', 'leitura e interpretação', 3);
+  it('devolve habilidades reais da disciplina e da série', async () => {
+    const skills = await selectBnccSkills('Língua Portuguesa', '5º ano', 'leitura e interpretação', 3);
     expect(skills.length).toBeGreaterThan(0);
     expect(skills.length).toBeLessThanOrEqual(3);
     // todo código selecionado precisa ter o formato oficial
     skills.forEach(s => expect(s.code).toMatch(/^(EF\d{2}[A-Z]{2}\d{2}|EM13[A-Z]{3}\d{3})$/));
   });
 
-  it('aceita variações do nome da disciplina', () => {
-    expect(selectBnccSkills('português', '5º ano', 'leitura', 2).length).toBeGreaterThan(0);
+  it('aceita variações do nome da disciplina', async () => {
+    expect((await selectBnccSkills('português', '5º ano', 'leitura', 2)).length).toBeGreaterThan(0);
   });
 
-  it('devolve lista vazia para disciplina fora do banco', () => {
-    expect(selectBnccSkills('Antropologia Visual', '5º ano', 'cultura', 3)).toEqual([]);
+  it('devolve lista vazia para disciplina fora do banco', async () => {
+    expect(await selectBnccSkills('Antropologia Visual', '5º ano', 'cultura', 3)).toEqual([]);
   });
 
   // ── Regressão: apelidos curtos casando dentro de outra palavra ─────────────
   // O casamento era por `includes` cru, então o apelido "ci" de Ciências casava
   // dentro de "soCIologia" e o professor recebia habilidades de Ciências da
   // Natureza (EM13CNT) num plano de Sociologia — que é Ciências Humanas.
-  it('não confunde Sociologia com Ciências por causa do apelido "ci"', () => {
-    const skills = selectBnccSkills('Sociologia', '1º ano médio', 'cidadania', 3);
+  it('não confunde Sociologia com Ciências por causa do apelido "ci"', async () => {
+    const skills = await selectBnccSkills('Sociologia', '1º ano médio', 'cidadania', 3);
     skills.forEach(s => expect(s.code).not.toMatch(/^EM13CNT/));
   });
 
-  it('não confunde Astrobiologia com Biologia por causa do apelido "bio"', () => {
-    expect(selectBnccSkills('Astrobiologia Aplicada', '5º ano', 'planetas', 3)).toEqual([]);
+  it('não confunde Astrobiologia com Biologia por causa do apelido "bio"', async () => {
+    expect(await selectBnccSkills('Astrobiologia Aplicada', '5º ano', 'planetas', 3)).toEqual([]);
   });
 
-  it('mantém Educação Física em Educação Física, e não em Física', () => {
-    const skills = selectBnccSkills('Educação Física', '2º ano', 'movimento', 3);
+  it('mantém Educação Física em Educação Física, e não em Física', async () => {
+    const skills = await selectBnccSkills('Educação Física', '2º ano', 'movimento', 3);
     expect(skills.length).toBeGreaterThan(0);
     skills.forEach(s => expect(s.code).toMatch(/EF$|EF\d{2}$|^EF\d{2}EF/));
   });
 
-  it('o nome composto vence o apelido de uma palavra só', () => {
+  it('o nome composto vence o apelido de uma palavra só', async () => {
     // "Educação Física II" contém a palavra "física"; ainda assim deve casar
     // com Educação Física, que é o nome composto mais específico.
-    const composta = selectBnccSkills('Educação Física II', '2º ano', 'movimento', 2);
-    const simples  = selectBnccSkills('Educação Física', '2º ano', 'movimento', 2);
+    const composta = await selectBnccSkills('Educação Física II', '2º ano', 'movimento', 2);
+    const simples  = await selectBnccSkills('Educação Física', '2º ano', 'movimento', 2);
     expect(composta.map(s => s.code)).toEqual(simples.map(s => s.code));
   });
 
@@ -268,30 +268,30 @@ describe('selectBnccSkills', () => {
   // A detecção exigia o formato "9º ano". Uma turma chamada "9º B" — como as
   // escolas de fato nomeiam — não era reconhecida, caía no primeiro bloco e o
   // professor de 9º ano recebia habilidades de 1º ano do fundamental.
-  it('reconhece turma nomeada como "9º B", sem a palavra ano', () => {
-    const curta  = selectBnccSkills('Matemática', '9º B', 'números', 2);
-    const longa  = selectBnccSkills('Matemática', '9º ano', 'números', 2);
+  it('reconhece turma nomeada como "9º B", sem a palavra ano', async () => {
+    const curta  = await selectBnccSkills('Matemática', '9º B', 'números', 2);
+    const longa  = await selectBnccSkills('Matemática', '9º ano', 'números', 2);
     expect(curta.length).toBeGreaterThan(0);
     expect(curta.map(s => s.code)).toEqual(longa.map(s => s.code));
     curta.forEach(s => expect(s.code).not.toMatch(/^EF0[1-5]/));
   });
 
-  it('reconhece "6º C" como anos finais', () => {
-    const skills = selectBnccSkills('Ciências', '6º C', 'matéria', 2);
+  it('reconhece "6º C" como anos finais', async () => {
+    const skills = await selectBnccSkills('Ciências', '6º C', 'matéria', 2);
     expect(skills.length).toBeGreaterThan(0);
     skills.forEach(s => expect(s.code).toMatch(/^EF0[6-9]/));
   });
 
-  it('usa o nível da turma quando o nome não diz a série', () => {
-    const semNivel = selectBnccSkills('Matemática', 'Turma A', 'funções', 2);
-    const comNivel = selectBnccSkills('Matemática', 'Turma A', 'funções', 2, 'Ensino Médio');
+  it('usa o nível da turma quando o nome não diz a série', async () => {
+    const semNivel = await selectBnccSkills('Matemática', 'Turma A', 'funções', 2);
+    const comNivel = await selectBnccSkills('Matemática', 'Turma A', 'funções', 2, 'Ensino Médio');
     expect(semNivel).toEqual([]);            // não dá para inferir: não ancora
     expect(comNivel.length).toBeGreaterThan(0);
     comNivel.forEach(s => expect(s.code).toMatch(/^EM13/));
   });
 
-  it('reconhece "2ª série" como Ensino Médio', () => {
-    const skills = selectBnccSkills('História', '2ª série', 'cidadania', 2);
+  it('reconhece "2ª série" como Ensino Médio', async () => {
+    const skills = await selectBnccSkills('História', '2ª série', 'cidadania', 2);
     expect(skills.length).toBeGreaterThan(0);
     skills.forEach(s => expect(s.code).toMatch(/^EM13/));
   });
@@ -300,31 +300,48 @@ describe('selectBnccSkills', () => {
   // Antes, quando a disciplina não tinha bloco para a etapa pedida, caía no
   // primeiro bloco. Educação Física no Ensino Médio devolvia EF01EF01, que é
   // habilidade de 1º ano do fundamental.
-  it('não inventa etapa quando a disciplina não cobre o Ensino Médio', () => {
-    expect(selectBnccSkills('Educação Física', '1º ano médio', 'movimento', 3)).toEqual([]);
+  it('não inventa etapa quando a disciplina não cobre o Ensino Médio', async () => {
+    // Ensino Religioso existe só no Ensino Fundamental na BNCC.
+    expect(await selectBnccSkills('Ensino Religioso', '1º ano médio', 'ética', 3)).toEqual([]);
   });
 
-  it('não ancora nada quando a etapa não pode ser inferida', () => {
-    expect(selectBnccSkills('Matemática', 'Turma A', 'frações', 3)).toEqual([]);
+  it('Educação Física no Ensino Médio cai na área de Linguagens', async () => {
+    const skills = await selectBnccSkills('Educação Física', '1º ano médio', 'esporte', 2);
+    expect(skills.length).toBeGreaterThan(0);
+    skills.forEach(s => expect(s.code).toMatch(/^EM13LGG/));
   });
 
-  it('não devolve habilidades de fundamental para turma de infantil', () => {
-    expect(selectBnccSkills('Arte', 'Maternal II', 'cores', 3)).toEqual([]);
+  it('não ancora nada quando a etapa não pode ser inferida', async () => {
+    expect(await selectBnccSkills('Matemática', 'Turma A', 'frações', 3)).toEqual([]);
   });
 
-  it('aceita disciplina qualificada por especialidade', () => {
-    const marinha = selectBnccSkills('Biologia Marinha', '1º ano médio', 'ecossistemas', 2);
-    const pura    = selectBnccSkills('Biologia', '1º ano médio', 'ecossistemas', 2);
+  it('devolve objetivos da Educação Infantil, nunca do fundamental', async () => {
+    const skills = await selectBnccSkills('Arte', 'Maternal II', 'cores e desenho', 3);
+    expect(skills.length).toBeGreaterThan(0);
+    skills.forEach(s => expect(s.code).toMatch(/^EI/));
+  });
+
+  it('respeita o grupo etário da Educação Infantil', async () => {
+    // Maternal = crianças bem pequenas (grupo 02) · Berçário = bebês (grupo 01)
+    const maternal = await selectBnccSkills('', 'Maternal II', 'movimento', 3, 'Educação Infantil');
+    const bercario = await selectBnccSkills('', 'Berçário I', 'movimento', 3, 'Educação Infantil');
+    maternal.forEach(s => expect(s.code).toMatch(/^EI02/));
+    bercario.forEach(s => expect(s.code).toMatch(/^EI01/));
+  });
+
+  it('aceita disciplina qualificada por especialidade', async () => {
+    const marinha = await selectBnccSkills('Biologia Marinha', '1º ano médio', 'ecossistemas', 2);
+    const pura    = await selectBnccSkills('Biologia', '1º ano médio', 'ecossistemas', 2);
     expect(marinha.map(s => s.code)).toEqual(pura.map(s => s.code));
   });
 
-  it('respeita o limite pedido', () => {
-    expect(selectBnccSkills('Língua Portuguesa', '5º ano', 'leitura', 1).length).toBe(1);
+  it('respeita o limite pedido', async () => {
+    expect((await selectBnccSkills('Língua Portuguesa', '5º ano', 'leitura', 1)).length).toBe(1);
   });
 
-  it('as habilidades selecionadas sobrevivem à validação', () => {
+  it('as habilidades selecionadas sobrevivem à validação', async () => {
     // Garante que o que entra no comando é exatamente o que a validação aceita.
-    const skills = selectBnccSkills('Matemática', '5º ano', 'frações', 2);
+    const skills = await selectBnccSkills('Matemática', '5º ano', 'frações', 2);
     if (skills.length === 0) return;
     const planoGerado = `## HABILIDADE (BNCC)\n${formatBnccBlock(skills)}\n\n## AVALIAÇÃO\nObservação`;
     expect(validateBnccSection(planoGerado, skills).corrected).toBe(false);

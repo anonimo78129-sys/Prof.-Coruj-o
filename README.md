@@ -170,7 +170,7 @@ npm run dev
 O arquivo `firebase-applet-config.json` na raiz contém a configuração do projeto Firebase (já incluso). Para usar seu próprio projeto Firebase:
 
 1. Crie um projeto em [console.firebase.google.com](https://console.firebase.google.com/)
-2. Ative **Authentication** (Google), **Firestore**, **Storage** e **Cloud Messaging**
+2. Ative **Authentication** (e-mail/senha), **Firestore**, **Storage** e **Cloud Messaging**
 3. Substitua o conteúdo de `firebase-applet-config.json` com os dados do seu projeto
 4. Publique as regras: `firebase deploy --only firestore:rules,storage:rules`
 
@@ -194,8 +194,49 @@ npm run lint    # checagem de tipos (tsc) + eslint
 
 A suíte cobre as funções puras do app — com destaque para a **validação
 determinística das habilidades da BNCC** (`src/bncc-data.ts`), que confere os
-códigos devolvidos pela IA contra o banco local e reescreve a seção quando a
-IA inventa, esquece ou omite habilidades.
+códigos devolvidos pela IA contra o dataset oficial e reescreve a seção quando
+a IA inventa, esquece ou omite habilidades.
+
+---
+
+## Dados da BNCC
+
+O app ancora os planos de aula em **1.580 aprendizagens oficiais vigentes**:
+
+| Etapa | Cobertura |
+|---|---|
+| Educação Infantil | 93 objetivos de aprendizagem (`EI01CG01`…) |
+| Ensino Fundamental | 1.304 habilidades (`EF01LP01`, `EF15LP01`, `EF67LP08`…) |
+| Ensino Médio | 183 habilidades (`EM13CNT101`, `EM13LP01`…) |
+
+O arquivo `src/bncc-dataset.ts` é **gerado**, não editado à mão. Para regerar:
+
+```bash
+python3 scripts/gerar-bncc-dataset.py
+```
+
+Ele é carregado por **import dinâmico** — vira um bloco separado de ~96 KB
+comprimido, fora do primeiro carregamento do app.
+
+### Como a ancoragem funciona
+
+1. O app identifica **etapa, ano e disciplina** a partir do nível e do nome da
+   turma (aceita `9º B`, `3º A`, `2ª série`, `Maternal II`).
+2. Seleciona as aprendizagens reais mais próximas do tópico da aula e as injeta
+   no comando enviado à IA.
+3. Depois da resposta, **confere os códigos** contra o dataset e reescreve a
+   seção se a IA inventou, esqueceu ou omitiu algum.
+
+Quando a etapa não pode ser inferida, ou a disciplina não existe naquela etapa
+(Ensino Religioso não tem Ensino Médio), o app **não ancora nada** — é melhor
+deixar a IA escolher do que fixar um código da série errada.
+
+### Crédito
+
+Dados extraídos de [bncc-dev/bncc-dados](https://github.com/bncc-dev/bncc-dados)
+(licença **CC BY 4.0**), que compila as planilhas oficiais de
+[downloadbncc.mec.gov.br](https://downloadbncc.mec.gov.br/) e as verifica
+caractere a caractere contra o PDF homologado da BNCC (MEC, 2018).
 
 ---
 

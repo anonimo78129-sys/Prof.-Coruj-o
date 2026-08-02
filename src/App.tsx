@@ -26,7 +26,7 @@ import { auth, db, storage, logOut, getFcmToken, createUserWithEmailAndPassword,
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { selectBnccSkills, validateBnccSection, SUBJECT_OPTIONS } from './bncc-data';
+import { selectBnccSkills, validateBnccSection, formatBnccBlock, SUBJECT_OPTIONS } from './bncc-data';
 import EscapeGame from './escape/EscapeGame';
 import { QRCodeSVG } from 'qrcode.react';
 import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
@@ -16740,10 +16740,12 @@ function AppInner() {
       const isFundamental = classLevel.toLowerCase().includes('fundamental');
       const isMedio = classLevel.toLowerCase().includes('médio') || classLevel.toLowerCase().includes('medio');
 
-      // ── Solução 2: selecionar habilidades BNCC do banco local ──────────────
-      const bnccSkills = isEarlyChildhood ? [] : selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4, classLevel);
+      // ── Solução 2: selecionar aprendizagens da BNCC do dataset oficial ────
+      // Vale para as três etapas: a Educação Infantil também tem objetivos
+      // codificados na BNCC (EI01CG01 etc.), então ela deixou de ser exceção.
+      const bnccSkills = await selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4, classLevel);
       const bnccBlock  = bnccSkills.length > 0
-        ? bnccSkills.map(s => `- ${s.code} — ${s.desc}`).join('\n')
+        ? formatBnccBlock(bnccSkills)
         : isEarlyChildhood
           ? '- [Campos de Experiências da BNCC-EI pertinentes]'
           : '- [escolha habilidades BNCC reais para a disciplina e série]';
@@ -16756,10 +16758,17 @@ function AppInner() {
             ? `NÍVEL: Ensino Médio — aprofunde conceitos, estimule pensamento crítico, análise e produção textual. Conecte com ENEM e vestibular quando pertinente.`
             : '';
 
-      const bnccSectionTitle = isEarlyChildhood ? 'CAMPOS DE EXPERIÊNCIAS (BNCC-EI)' : 'HABILIDADE (BNCC)';
-      const bnccSectionInstructions = isEarlyChildhood
-        ? 'Liste os Campos de Experiências da BNCC da Educação Infantil relacionados (ex: O eu, o outro e o nós; Corpo, gestos e movimentos; Traços, sons, cores e formas; Espaços, tempos, quantidades, relações e transformações; Escuta, fala, pensamento e imaginação).'
-        : 'USE OBRIGATORIAMENTE as habilidades abaixo (são códigos reais verificados). Copie os códigos exatamente:';
+      const bnccSectionTitle = isEarlyChildhood ? 'OBJETIVOS DE APRENDIZAGEM (BNCC-EI)' : 'HABILIDADE (BNCC)';
+      // Com objetivos/habilidades reais em mãos, a instrução é a mesma nas três
+      // etapas: copiar os códigos verificados. O texto de fallback só entra
+      // quando o dataset não cobre a combinação disciplina + etapa.
+      const bnccSectionInstructions = bnccSkills.length > 0
+        ? (isEarlyChildhood
+            ? 'USE OBRIGATORIAMENTE os objetivos de aprendizagem abaixo (são códigos reais da BNCC da Educação Infantil). Copie os códigos exatamente:'
+            : 'USE OBRIGATORIAMENTE as habilidades abaixo (são códigos reais verificados). Copie os códigos exatamente:')
+        : (isEarlyChildhood
+            ? 'Liste os Campos de Experiências da BNCC da Educação Infantil relacionados (ex: O eu, o outro e o nós; Corpo, gestos e movimentos; Traços, sons, cores e formas; Espaços, tempos, quantidades, relações e transformações; Escuta, fala, pensamento e imaginação).'
+            : 'Escolha habilidades BNCC reais para a disciplina e série.');
 
       const avaliacaoBlock = isEarlyChildhood
         ? '## AVALIAÇÃO / REGISTRO\n[Formas de registro e observação — ex: portfólio, registros fotográficos, roda de conversa, observação sistemática. SEM provas ou notas na Ed. Infantil.]'
@@ -16814,7 +16823,7 @@ ${avaliacaoBlock}
       // ── Validação local determinística das habilidades BNCC ──────────────
       // Substitui a chamada de IA por verificação contra o banco local
       // (implementação e testes em src/bncc-data.ts).
-      const planResult = validateBnccSection(planDraft, bnccSkills).text;
+      const planResult = validateBnccSection(planDraft, bnccSkills, `## ${bnccSectionTitle}`).text;
 
       setPlannerPlan(planResult);
       updateTask(taskId, { status: 'completed', result: planResult });
