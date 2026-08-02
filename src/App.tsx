@@ -26,7 +26,7 @@ import { auth, db, storage, logOut, getFcmToken, createUserWithEmailAndPassword,
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, increment, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
+import { selectBnccSkills, validateBnccSection, SUBJECT_OPTIONS } from './bncc-data';
 import EscapeGame from './escape/EscapeGame';
 import { QRCodeSVG } from 'qrcode.react';
 import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
@@ -34,6 +34,7 @@ import {
   escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
   AI_PRICING, estimateCostUSD,
+  TRIAL_DAYS, trialDaysRemaining, isTrialExpired, trialLabel,
 } from './utils';
 import { INFORMATICA_LESSONS, JOGOS_LESSONS } from './seed-lessons';
 
@@ -2461,9 +2462,8 @@ const PlannerScreen = ({
   getSuggestion,
   getScheduleBuffer,
   setPlannerMode,
-  generationsUsed,
+  trialDaysLeft,
   isLimitReached,
-  freeGenerationLimit,
 }: {
   schedules: ClassSchedule[], 
   setSchedules: (s: ClassSchedule[]) => void,
@@ -2512,9 +2512,8 @@ const PlannerScreen = ({
   getSuggestion: (topic?: string, classId?: string) => Promise<void>,
   getScheduleBuffer: (topic: string, duration: number, startDateStr: string, avoidCollisions: boolean, selectedClass: ClassSchedule, existingClasses: ClassItem[]) => ClassItem[],
   setPlannerMode: (m: PlannerMode) => void,
-  generationsUsed: number,
+  trialDaysLeft: number,
   isLimitReached: boolean,
-  freeGenerationLimit: number,
 }) => {
   const currentResult = mode === 'plan' ? plan : 
                         mode === 'slides' ? presentationData :
@@ -3251,9 +3250,9 @@ const PlannerScreen = ({
             </AnimatePresence>
             {!profile?.isPro && profile?.role !== 'admin' && (
               <div className="flex items-center justify-between mb-1 px-1">
-                <span className="text-xs text-gray-400">Gerações usadas</span>
-                <span className={`text-xs font-bold ${isLimitReached ? 'text-red-500' : generationsUsed >= freeGenerationLimit - 2 ? 'text-amber-500' : 'text-gray-500'}`}>
-                  {generationsUsed}/{freeGenerationLimit}
+                <span className="text-xs text-gray-400">Teste gratuito</span>
+                <span className={`text-xs font-bold ${isLimitReached ? 'text-red-500' : trialDaysLeft <= 2 ? 'text-amber-500' : 'text-gray-500'}`}>
+                  {isLimitReached ? 'Encerrado' : trialDaysLeft === 1 ? 'Último dia' : `${trialDaysLeft} dias restantes`}
                 </span>
               </div>
             )}
@@ -4970,14 +4969,14 @@ const ProfileScreen = ({
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center"><Lock size={18} className="text-indigo-600" /></div>
             <div>
-              <p className="font-bold text-gray-900 text-sm">Modo Gratuito</p>
-              <p className="text-xs text-gray-400">{profile.generationsUsed ?? 0} de 10 gerações usadas</p>
+              <p className="font-bold text-gray-900 text-sm">Teste Gratuito</p>
+              <p className="text-xs text-gray-400">{trialLabel(profile.createdAt)} · criação ilimitada</p>
             </div>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
             <div
               className="bg-gradient-to-r from-indigo-500 to-violet-500 h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(100, ((profile.generationsUsed ?? 0) / 10) * 100)}%` }}
+              style={{ width: `${Math.round((trialDaysRemaining(profile.createdAt) / TRIAL_DAYS) * 100)}%` }}
             />
           </div>
           <a
@@ -16213,13 +16212,19 @@ function AppInner() {
     }
   };
 
-  const FREE_GENERATION_LIMIT = 10;
+  // Plano gratuito por tempo: TRIAL_DAYS dias de criação ilimitada a partir do
+  // cadastro. O contador `generationsUsed` continua sendo alimentado, mas agora
+  // serve só de métrica no painel admin — não tranca mais o professor.
+  const trialDaysLeft = useMemo(
+    () => trialDaysRemaining(profile?.createdAt),
+    [profile?.createdAt],
+  );
 
   const isLimitReached = useMemo(() => {
     if (!user) return false;
     if (isAdminAccount(profile, user)) return false;
     if (profile?.isPro) return false;
-    return (profile?.generationsUsed ?? 0) >= FREE_GENERATION_LIMIT;
+    return isTrialExpired(profile?.createdAt);
   }, [user, profile]);
 
   const recordGeneration = async () => {
@@ -16470,9 +16475,9 @@ function AppInner() {
           <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6">
             <Sparkles size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Limite do plano gratuito</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Seu teste gratuito terminou</h2>
           <p className="text-gray-500 mb-2">
-            Você usou todas as <strong>{FREE_GENERATION_LIMIT} gerações gratuitas</strong>. Ative o plano Pro para continuar gerando planos, atividades e slides ilimitados.
+            Você aproveitou os <strong>{TRIAL_DAYS} dias gratuitos</strong> para criar à vontade. Ative o plano Pro para continuar gerando planos, atividades, slides e provas sem limite.
           </p>
           <p className="text-sm text-gray-400 mb-6">Seu histórico e materiais já gerados continuam disponíveis.</p>
           <div className="p-4 bg-indigo-50 text-indigo-800 rounded-xl mb-4 text-sm">
@@ -16807,22 +16812,9 @@ ${avaliacaoBlock}
       const planDraft = response.text || '';
 
       // ── Validação local determinística das habilidades BNCC ──────────────
-      // Substitui a chamada de IA por verificação contra o banco local.
-      let planResult = planDraft;
-      if (bnccSkills.length > 0) {
-        const validCodes = new Set(bnccSkills.map(s => s.code.toUpperCase()));
-        const allCodesInPlan = (planDraft.match(/\b(EF\d{2}[A-Z]{2}\d{2}|EM13[A-Z]{3}\d{3})\b/g) || [])
-          .map(c => c.toUpperCase());
-        const hasInvalidCode = allCodesInPlan.some(c => !validCodes.has(c));
-        const hasMissingCode = bnccSkills.some(s => !allCodesInPlan.includes(s.code.toUpperCase()));
-        if (hasInvalidCode || hasMissingCode || allCodesInPlan.length === 0) {
-          const correctSection = `## HABILIDADE (BNCC)\n${bnccBlock}`;
-          planResult = planDraft.replace(
-            /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/i,
-            correctSection + '\n'
-          );
-        }
-      }
+      // Substitui a chamada de IA por verificação contra o banco local
+      // (implementação e testes em src/bncc-data.ts).
+      const planResult = validateBnccSection(planDraft, bnccSkills).text;
 
       setPlannerPlan(planResult);
       updateTask(taskId, { status: 'completed', result: planResult });
@@ -17347,9 +17339,8 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
             getSuggestion={getSuggestion}
             getScheduleBuffer={getScheduleBuffer}
             setPlannerMode={setPlannerMode}
-            generationsUsed={profile?.generationsUsed ?? 0}
+            trialDaysLeft={trialDaysLeft}
             isLimitReached={isLimitReached}
-            freeGenerationLimit={FREE_GENERATION_LIMIT}
           />}
           {screen === 'chat' && <ChatScreen 
             key="chat" 

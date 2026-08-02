@@ -101,3 +101,37 @@ export const AI_PRICING = {
 };
 export const estimateCostUSD = (inputTokens: number, outputTokens: number): number =>
   (inputTokens * AI_PRICING.inputUsdPer1M + outputTokens * AI_PRICING.outputUsdPer1M) / 1_000_000;
+
+// ── Período de teste gratuito ───────────────────────────────────────────────
+// O plano gratuito é por tempo, não por quantidade: o professor tem TRIAL_DAYS
+// dias a partir do cadastro para criar à vontade. A data de referência é o
+// `createdAt` do perfil, que as regras do Firestore tornam imutável para o dono
+// (senão bastaria reescrever o campo para renovar o teste).
+export const TRIAL_DAYS = 7;
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Dias restantes do teste gratuito, de TRIAL_DAYS a 0.
+ * Retorna TRIAL_DAYS quando a data é ausente ou inválida — conta antiga ou
+ * relógio bagunçado não deve trancar o professor para fora do app.
+ */
+export const trialDaysRemaining = (createdAt: string | undefined | null, now: Date = new Date()): number => {
+  if (!createdAt) return TRIAL_DAYS;
+  const start = new Date(createdAt).getTime();
+  if (Number.isNaN(start)) return TRIAL_DAYS;
+  const elapsedDays = Math.floor((now.getTime() - start) / MS_PER_DAY);
+  // clamp em cima cobre createdAt no futuro (fuso/relógio adiantado)
+  return Math.min(TRIAL_DAYS, Math.max(0, TRIAL_DAYS - elapsedDays));
+};
+
+export const isTrialExpired = (createdAt: string | undefined | null, now: Date = new Date()): boolean =>
+  trialDaysRemaining(createdAt, now) <= 0;
+
+/** Rótulo curto para a interface: "7 dias restantes", "último dia", "teste encerrado". */
+export const trialLabel = (createdAt: string | undefined | null, now: Date = new Date()): string => {
+  const d = trialDaysRemaining(createdAt, now);
+  if (d <= 0) return 'Teste encerrado';
+  if (d === 1) return 'Último dia de teste';
+  return `${d} dias restantes`;
+};

@@ -3,6 +3,7 @@ import {
   escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
   formatApiError, fmtBytes, toISODate, guessMimeType,
   AI_PRICING, estimateCostUSD,
+  TRIAL_DAYS, trialDaysRemaining, isTrialExpired, trialLabel,
 } from './utils';
 
 describe('escapeHtml', () => {
@@ -94,5 +95,81 @@ describe('estimateCostUSD', () => {
     expect(estimateCostUSD(1_000_000, 0)).toBeCloseTo(AI_PRICING.inputUsdPer1M);
     expect(estimateCostUSD(0, 1_000_000)).toBeCloseTo(AI_PRICING.outputUsdPer1M);
     expect(estimateCostUSD(0, 0)).toBe(0);
+  });
+});
+
+// ── Período de teste gratuito ───────────────────────────────────────────────
+const dias = (n: number) => new Date(Date.UTC(2026, 0, 10 + n, 12, 0, 0));
+const CADASTRO = new Date(Date.UTC(2026, 0, 10, 12, 0, 0)).toISOString();
+
+describe('trialDaysRemaining', () => {
+  it('começa com os 7 dias cheios no momento do cadastro', () => {
+    expect(trialDaysRemaining(CADASTRO, dias(0))).toBe(TRIAL_DAYS);
+  });
+
+  it('desconta um dia por dia corrido', () => {
+    expect(trialDaysRemaining(CADASTRO, dias(1))).toBe(6);
+    expect(trialDaysRemaining(CADASTRO, dias(3))).toBe(4);
+    expect(trialDaysRemaining(CADASTRO, dias(6))).toBe(1);
+  });
+
+  it('chega a zero no sétimo dia', () => {
+    expect(trialDaysRemaining(CADASTRO, dias(7))).toBe(0);
+  });
+
+  it('não fica negativo depois de vencido', () => {
+    expect(trialDaysRemaining(CADASTRO, dias(90))).toBe(0);
+  });
+
+  it('não conta horas soltas como um dia inteiro', () => {
+    const quase = new Date(Date.UTC(2026, 0, 11, 11, 59, 0)); // 23h59 após o cadastro
+    expect(trialDaysRemaining(CADASTRO, quase)).toBe(TRIAL_DAYS);
+  });
+
+  it('libera o teste quando não há data de cadastro (conta antiga)', () => {
+    expect(trialDaysRemaining(undefined, dias(0))).toBe(TRIAL_DAYS);
+    expect(trialDaysRemaining(null, dias(0))).toBe(TRIAL_DAYS);
+    expect(trialDaysRemaining('', dias(0))).toBe(TRIAL_DAYS);
+  });
+
+  it('libera o teste quando a data é inválida', () => {
+    expect(trialDaysRemaining('ontem de manhã', dias(0))).toBe(TRIAL_DAYS);
+  });
+
+  it('não passa de 7 dias com data de cadastro no futuro', () => {
+    // relógio do aparelho adiantado não deve render teste extra
+    const futuro = new Date(Date.UTC(2026, 5, 1)).toISOString();
+    expect(trialDaysRemaining(futuro, dias(0))).toBe(TRIAL_DAYS);
+  });
+});
+
+describe('isTrialExpired', () => {
+  it('é falso durante o teste', () => {
+    expect(isTrialExpired(CADASTRO, dias(0))).toBe(false);
+    expect(isTrialExpired(CADASTRO, dias(6))).toBe(false);
+  });
+
+  it('é verdadeiro a partir do sétimo dia', () => {
+    expect(isTrialExpired(CADASTRO, dias(7))).toBe(true);
+    expect(isTrialExpired(CADASTRO, dias(30))).toBe(true);
+  });
+
+  it('não expira conta sem data de cadastro', () => {
+    expect(isTrialExpired(undefined, dias(0))).toBe(false);
+  });
+});
+
+describe('trialLabel', () => {
+  it('mostra a contagem no plural', () => {
+    expect(trialLabel(CADASTRO, dias(0))).toBe('7 dias restantes');
+    expect(trialLabel(CADASTRO, dias(2))).toBe('5 dias restantes');
+  });
+
+  it('trata o último dia sem dizer "1 dias"', () => {
+    expect(trialLabel(CADASTRO, dias(6))).toBe('Último dia de teste');
+  });
+
+  it('avisa quando encerrou', () => {
+    expect(trialLabel(CADASTRO, dias(7))).toBe('Teste encerrado');
   });
 });

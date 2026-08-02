@@ -41,9 +41,16 @@ service cloud.firestore {
     }
     // Campos de cobrança: o dono não pode se dar PRO nem baixar o contador de
     // gerações (só incrementá-lo). Apenas admins escrevem esses campos livremente.
+    //
+    // `createdAt` marca o início do teste gratuito de 7 dias, então também é
+    // imutável depois de gravado — sem isso bastaria reescrever a data para
+    // renovar o teste indefinidamente. Ressalva conhecida: na criação do
+    // documento a data ainda vem do cliente, então uma conta nova pode nascer
+    // com data adiantada. Fechar isso exigiria carimbar a data no servidor.
     function billingFieldsProtected() {
       return (!('isPro' in request.resource.data) || request.resource.data.isPro == resource.data.get('isPro', false))
-          && (!('generationsUsed' in request.resource.data) || request.resource.data.generationsUsed >= resource.data.get('generationsUsed', 0));
+          && (!('generationsUsed' in request.resource.data) || request.resource.data.generationsUsed >= resource.data.get('generationsUsed', 0))
+          && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.get('createdAt', request.resource.data.createdAt));
     }
     function noBillingPrivilegeCreated() {
       return (!('isPro' in request.resource.data) || request.resource.data.isPro == false)

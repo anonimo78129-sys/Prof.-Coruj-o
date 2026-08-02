@@ -421,6 +421,27 @@ const detectGradeKey = (className: string): string => {
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /**
+ * Quão bem o nome digitado pela disciplina casa com um dos nomes conhecidos.
+ * 3 = igual · 2 = nome composto contido · 1 = apelido como palavra inteira · 0 = não casa
+ *
+ * O casamento por palavra inteira é essencial: com `includes` cru, o apelido
+ * "ci" de Ciências casava dentro de "soCIologia" e o professor de Sociologia
+ * recebia habilidades de Ciências da Natureza no plano de aula. Pelo mesmo
+ * motivo "bio" casava dentro de "astrobiologia".
+ */
+const subjectMatchScore = (normSubject: string, names: string[]): number => {
+  const words = normSubject.split(/\s+/).filter(Boolean);
+  let best = 0;
+  for (const name of names) {
+    const n = norm(name);
+    if (n === normSubject) return 3;
+    if (n.includes(' ') && normSubject.includes(n)) best = Math.max(best, 2);
+    else if (words.includes(n)) best = Math.max(best, 1);
+  }
+  return best;
+};
+
+/**
  * Seleciona as habilidades BNCC mais relevantes para a combinação
  * disciplina + turma + tópico da aula.
  *
@@ -440,8 +461,14 @@ export const selectBnccSkills = (
   const normTopic   = norm(topic);
   const topicWords  = normTopic.split(/\s+/).filter(w => w.length > 3);
 
-  // 1. Encontrar a disciplina
-  const found = bnccData.find(s => s.names.some(n => norm(n) === normSubject || normSubject.includes(norm(n))));
+  // 1. Encontrar a disciplina — vence o casamento mais específico, para que
+  //    "Educação Física" não caia em Física por conta da segunda palavra.
+  let found: BnccSubject | undefined;
+  let bestScore = 0;
+  for (const candidate of bnccData) {
+    const score = subjectMatchScore(normSubject, candidate.names);
+    if (score > bestScore) { bestScore = score; found = candidate; }
+  }
   if (!found) return [];
 
   // 2. Encontrar o bloco de série mais próximo
@@ -480,3 +507,82 @@ export const SUBJECT_OPTIONS = [
   'Língua Inglesa',
   'Outra',
 ];
+
+// ── Validação determinística das habilidades no plano gerado ─────────────────
+// A IA inventa códigos de habilidade que não existem. Em vez de pedir a ela que
+// confira o próprio trabalho, conferimos aqui: extraímos os códigos do texto e
+// comparamos com as habilidades reais que foram injetadas no comando. Se houver
+// código inventado, faltando, ou nenhum código, a seção é reescrita.
+
+// Padrão como string: a expressão global é construída a cada uso para não
+// carregar `lastIndex` entre chamadas.
+const BNCC_CODE_SOURCE = '\\b(EF\\d{2}[A-Z]{2}\\d{2}|EM13[A-Z]{3}\\d{3})\\b';
+
+/** Todos os códigos BNCC presentes no texto, em maiúsculas e sem repetição. */
+export const extractBnccCodes = (text: string): string[] => {
+  const found = text.match(new RegExp(BNCC_CODE_SOURCE, 'g')) || [];
+  return [...new Set(found.map(c => c.toUpperCase()))];
+};
+
+/** Bloco em Markdown com as habilidades verificadas, uma por linha. */
+export const formatBnccBlock = (skills: BnccSkill[]): string =>
+  skills.map(s => `- ${s.code} — ${s.desc}`).join('\n');
+
+export type BnccValidationReason =
+  | 'ok'              // o plano já está correto
+  | 'codigo-invalido' // a IA citou código que não existe no banco
+  | 'codigo-faltante' // faltou citar alguma habilidade injetada
+  | 'sem-codigo'      // o plano não trouxe nenhum código
+  | 'secao-ausente';  // a IA nem gerou a seção de habilidades
+
+export interface BnccValidationResult {
+  /** Plano corrigido (ou o original, se nada precisou mudar). */
+  text: string;
+  corrected: boolean;
+  reason: BnccValidationReason;
+  invalidCodes: string[];
+  missingCodes: string[];
+}
+
+const BNCC_SECTION_TITLE = '## HABILIDADE (BNCC)';
+const BNCC_SECTION_PATTERN = /## Habilidade \(BNCC\)[\s\S]*?(?=\n## |\n---|\n#[^#]|$)/i;
+
+/**
+ * Confere as habilidades BNCC de um plano gerado contra as habilidades reais
+ * que foram entregues à IA, e reescreve a seção quando necessário.
+ *
+ * Quando a seção não existe no plano, ela é acrescentada ao final — antes esse
+ * caso passava batido e o plano saía sem nenhuma habilidade.
+ */
+export const validateBnccSection = (planText: string, skills: BnccSkill[]): BnccValidationResult => {
+  const unchanged: BnccValidationResult = {
+    text: planText, corrected: false, reason: 'ok', invalidCodes: [], missingCodes: [],
+  };
+  // Sem habilidades injetadas (educação infantil, disciplina fora do banco) não
+  // há contra o que comparar — devolve o plano como veio.
+  if (skills.length === 0) return unchanged;
+
+  const validCodes = new Set(skills.map(s => s.code.toUpperCase()));
+  const codesInPlan = extractBnccCodes(planText);
+
+  const invalidCodes = codesInPlan.filter(c => !validCodes.has(c));
+  const missingCodes = skills.map(s => s.code.toUpperCase()).filter(c => !codesInPlan.includes(c));
+
+  const hasSection = BNCC_SECTION_PATTERN.test(planText);
+
+  if (invalidCodes.length === 0 && missingCodes.length === 0 && hasSection) return unchanged;
+
+  const correctSection = `${BNCC_SECTION_TITLE}\n${formatBnccBlock(skills)}`;
+
+  const reason: BnccValidationReason =
+    !hasSection            ? 'secao-ausente'
+    : invalidCodes.length  ? 'codigo-invalido'
+    : missingCodes.length  ? 'codigo-faltante'
+    : 'sem-codigo';
+
+  const text = hasSection
+    ? planText.replace(BNCC_SECTION_PATTERN, correctSection + '\n')
+    : `${planText.replace(/\s+$/, '')}\n\n${correctSection}\n`;
+
+  return { text, corrected: true, reason, invalidCodes, missingCodes };
+};

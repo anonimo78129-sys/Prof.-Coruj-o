@@ -88,12 +88,31 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Foto de perfil (upload via Firebase Storage)
 - Nome, escola, área e nível de ensino
 - Painel de estatísticas: turmas, materiais e gerações de IA
+- Teste gratuito de 7 dias e ativação do plano Pro
 - Edição de dados e zona de configuração
 
 ### PWA (App instalável)
 - Instalável no celular e no computador (Android, iOS, Windows, Mac)
 - Service worker com cache de ativos estáticos
-- Funciona offline (interface e dados em cache)
+- A **interface** abre offline; os **dados** (turmas, planos, diário) exigem
+  conexão — o Firestore roda sem persistência local por enquanto
+
+---
+
+## Planos
+
+| Plano | O que inclui |
+|---|---|
+| **Teste gratuito** | **7 dias** a partir do cadastro, com criação ilimitada de planos, atividades, provas, slides, jogos e materiais |
+| **Pro** | Criação ilimitada sem prazo — ativado via WhatsApp |
+
+O teste começa na data de cadastro (`createdAt` do perfil), que as regras do
+Firestore tornam imutável para o próprio usuário. Quando o prazo termina, o
+professor continua acessando o perfil e **todo o material já criado** — só a
+geração de conteúdo novo fica bloqueada.
+
+> A contagem é feita no cliente. Como as chamadas de IA saem do navegador (ver
+> `SECURITY-ANALYSIS.md`), a validação forte do prazo exigiria um backend.
 
 ---
 
@@ -106,7 +125,7 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 | Animações | Framer Motion (motion/react) |
 | IA | Google Gemini 2.5 Flash (`@google/genai`) |
 | Banco de dados | Firebase Firestore (sync em tempo real) |
-| Autenticação | Firebase Auth (Google) |
+| Autenticação | Firebase Auth (e-mail e senha) |
 | Armazenamento | Firebase Storage |
 | Notificações | Firebase Cloud Messaging (FCM) |
 | Imagens | Pixabay API (opcional) / Unsplash fallback |
@@ -163,6 +182,20 @@ O arquivo `firebase-applet-config.json` na raiz contém a configuração do proj
 npm run build
 # Saída em /dist — pode ser publicada em qualquer CDN estático
 ```
+
+---
+
+## Testes
+
+```bash
+npm test        # roda a suíte
+npm run lint    # checagem de tipos (tsc) + eslint
+```
+
+A suíte cobre as funções puras do app — com destaque para a **validação
+determinística das habilidades da BNCC** (`src/bncc-data.ts`), que confere os
+códigos devolvidos pela IA contra o banco local e reescreve a seção quando a
+IA inventa, esquece ou omite habilidades.
 
 ---
 
