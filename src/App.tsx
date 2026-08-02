@@ -16741,7 +16741,7 @@ function AppInner() {
       const isMedio = classLevel.toLowerCase().includes('médio') || classLevel.toLowerCase().includes('medio');
 
       // ── Solução 2: selecionar habilidades BNCC do banco local ──────────────
-      const bnccSkills = isEarlyChildhood ? [] : selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4);
+      const bnccSkills = isEarlyChildhood ? [] : selectBnccSkills(selectedClass?.subject || profile.subject || '', className, targetTopic, 4, classLevel);
       const bnccBlock  = bnccSkills.length > 0
         ? bnccSkills.map(s => `- ${s.code} — ${s.desc}`).join('\n')
         : isEarlyChildhood

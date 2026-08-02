@@ -409,12 +409,39 @@ export const bnccData: BnccSubject[] = [
 
 // ── Funções auxiliares ────────────────────────────────────────────────────────
 
-/** Detecta o grupo de série a partir do nome da turma. */
-const detectGradeKey = (className: string): string => {
-  const s = className.toLowerCase();
-  if (/ensino médio|médio|1ª série|2ª série|3ª série|\bem\b/.test(s)) return 'médio';
-  const match = s.match(/([1-9])[°º\s]*ano/);
-  return match ? match[1] : '';
+const ORDINAL_EXTENSO: Record<string, string> = {
+  primeiro: '1', segundo: '2', terceiro: '3', quarto: '4', quinto: '5',
+  sexto: '6', setimo: '7', oitavo: '8', nono: '9',
+};
+
+/**
+ * Detecta a etapa/ano a partir do nome da turma e do nível cadastrado.
+ *
+ * O nível (`level` da turma) é a fonte mais confiável e vem primeiro. O nome da
+ * turma é o plano B, e precisa aceitar como as escolas realmente nomeiam:
+ * "9º B", "3º A", "2ª série" — antes só era reconhecido o formato "9º ano",
+ * então uma turma chamada "9º B" caía no bloco de 1º ano do fundamental.
+ *
+ * Retorna '' quando não dá para inferir — e nesse caso nada é ancorado.
+ */
+const detectGradeKey = (className: string, level?: string): string => {
+  const lvl = norm(level || '');
+  if (/infantil|creche|pre-?escola/.test(lvl)) return 'infantil';
+  if (/medio/.test(lvl)) return 'medio';
+
+  const s = norm(className);
+  if (/infantil|creche|pre-?escola|maternal|jardim/.test(s)) return 'infantil';
+  // "2ª série", "3a serie" e "ensino médio" indicam Ensino Médio
+  if (/ensino medio|\bmedio\b|[1-3]\s*[ªa°º]?\s*serie/.test(s)) return 'medio';
+
+  // "9º ano", "9º B", "9 ano", "9ºB" — o ordinal basta, não exige a palavra "ano"
+  const ordinal = s.match(/\b([1-9])\s*[°ºª]/) || s.match(/\b([1-9])\s*ano\b/);
+  if (ordinal) return ordinal[1];
+
+  for (const [palavra, digito] of Object.entries(ORDINAL_EXTENSO)) {
+    if (new RegExp(`\\b${palavra}\\b`).test(s)) return digito;
+  }
+  return '';
 };
 
 /** Normaliza string para comparação. */
@@ -455,9 +482,10 @@ export const selectBnccSkills = (
   className: string,
   topic: string,
   count = 4,
+  level?: string,
 ): BnccSkill[] => {
   const normSubject = norm(subject);
-  const gradeKey    = detectGradeKey(className);
+  const gradeKey    = detectGradeKey(className, level);
   const normTopic   = norm(topic);
   const topicWords  = normTopic.split(/\s+/).filter(w => w.length > 3);
 
@@ -471,9 +499,13 @@ export const selectBnccSkills = (
   }
   if (!found) return [];
 
-  // 2. Encontrar o bloco de série mais próximo
-  let block = found.blocks.find(b => b.gradeKeys.some(k => gradeKey.includes(k) || k.includes(gradeKey)));
-  if (!block) block = found.blocks[0]; // fallback: primeiro bloco
+  // 2. Encontrar o bloco da etapa. Sem etapa identificada, ou sem bloco para a
+  //    etapa pedida, NÃO ancoramos nada: é melhor deixar a IA escolher (e o
+  //    comando pede habilidades reais) do que injetar código da etapa errada.
+  //    O fallback antigo para o primeiro bloco entregava, por exemplo,
+  //    habilidades de 1º ano do fundamental numa turma de Ensino Médio.
+  const block = found.blocks.find(b => b.gradeKeys.some(k => norm(k) === gradeKey));
+  if (!block) return [];
 
   // 3. Pontuar por relevância temática e selecionar
   const scored = block.skills.map(skill => {
@@ -516,7 +548,19 @@ export const SUBJECT_OPTIONS = [
 
 // Padrão como string: a expressão global é construída a cada uso para não
 // carregar `lastIndex` entre chamadas.
-const BNCC_CODE_SOURCE = '\\b(EF\\d{2}[A-Z]{2}\\d{2}|EM13[A-Z]{3}\\d{3})\\b';
+// Formatos oficiais (BNCC/MEC):
+//  · Ensino Fundamental — EF + ano OU faixa de anos + componente + sequencial
+//    Faixas agrupadas são comuns: EF15LP01 (1º ao 5º), EF67LP01 (6º e 7º),
+//    EF12EF01, EF35AR01, EF69CI01, EF89GE01.
+//    Componentes: LP MA CI GE HI AR EF ER LI
+//  · Ensino Médio — EM13 + área (3 letras) + 3 dígitos: EM13LGG101, EM13MAT101,
+//    EM13CNT101, EM13CHS101. E TAMBÉM componente específico com 2 letras e
+//    2 dígitos: EM13LP01 (Língua Portuguesa), EM13LI01 (Língua Inglesa).
+//  · Educação Infantil — EI + grupo etário (01/02/03) + campo de experiência
+//    (EO CG TS EF ET) + sequencial: EI01CG02, EI02EO01, EI03ET05.
+// A alternativa de 3 letras vem antes da de 2 para não recortar EM13LGG101.
+const BNCC_CODE_SOURCE =
+  '\\b(EF\\d{2}[A-Z]{2}\\d{2}|EM13[A-Z]{3}\\d{3}|EM13[A-Z]{2}\\d{2}|EI0[1-3][A-Z]{2}\\d{2})\\b';
 
 /** Todos os códigos BNCC presentes no texto, em maiúsculas e sem repetição. */
 export const extractBnccCodes = (text: string): string[] => {

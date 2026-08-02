@@ -52,6 +52,46 @@ describe('extractBnccCodes', () => {
   it('devolve lista vazia para texto sem código', () => {
     expect(extractBnccCodes('Plano de aula sobre leitura.')).toEqual([]);
   });
+
+  // ── Formatos oficiais que a expressão precisa cobrir ──────────────────────
+  it('reconhece faixas de anos agrupadas do fundamental', () => {
+    // EF15 = 1º ao 5º · EF67 = 6º e 7º · EF12, EF35, EF69, EF89
+    expect(extractBnccCodes('EF15LP01 EF67LP01 EF12EF01 EF35AR01 EF89GE01')).toEqual(
+      ['EF15LP01', 'EF67LP01', 'EF12EF01', 'EF35AR01', 'EF89GE01'],
+    );
+  });
+
+  it('reconhece todos os componentes do fundamental', () => {
+    const codigos = 'EF01LP01 EF01MA01 EF01CI01 EF01GE01 EF01HI01 EF01AR01 EF01EF01 EF01ER01 EF07LI01';
+    expect(extractBnccCodes(codigos)).toHaveLength(9);
+  });
+
+  it('reconhece as quatro áreas do Ensino Médio', () => {
+    expect(extractBnccCodes('EM13LGG101 EM13MAT101 EM13CNT101 EM13CHS101')).toHaveLength(4);
+  });
+
+  // Regressão: a expressão só aceitava EM13 + 3 letras + 3 dígitos, então os
+  // códigos de componente específico do Ensino Médio passavam despercebidos.
+  it('reconhece códigos de componente específico do Ensino Médio', () => {
+    expect(extractBnccCodes('EM13LP01 e EM13LI05')).toEqual(['EM13LP01', 'EM13LI05']);
+  });
+
+  it('não recorta os códigos de área ao aceitar os de componente', () => {
+    expect(extractBnccCodes('EM13LGG101')).toEqual(['EM13LGG101']);
+  });
+
+  // Regressão: a Educação Infantil também tem códigos na BNCC (117 objetivos),
+  // e nenhum deles era reconhecido.
+  it('reconhece códigos da Educação Infantil', () => {
+    // EI + grupo etário (01/02/03) + campo de experiência + sequencial
+    expect(extractBnccCodes('EI01CG02 EI02EO01 EI03ET05 EI03TS02 EI02EF01')).toEqual(
+      ['EI01CG02', 'EI02EO01', 'EI03ET05', 'EI03TS02', 'EI02EF01'],
+    );
+  });
+
+  it('rejeita grupo etário inexistente na Educação Infantil', () => {
+    expect(extractBnccCodes('EI04EO01 EI00CG01')).toEqual([]);
+  });
 });
 
 describe('formatBnccBlock', () => {
@@ -222,6 +262,54 @@ describe('selectBnccSkills', () => {
     const composta = selectBnccSkills('Educação Física II', '2º ano', 'movimento', 2);
     const simples  = selectBnccSkills('Educação Física', '2º ano', 'movimento', 2);
     expect(composta.map(s => s.code)).toEqual(simples.map(s => s.code));
+  });
+
+  // ── Regressão: turma nomeada sem a palavra "ano" ──────────────────────────
+  // A detecção exigia o formato "9º ano". Uma turma chamada "9º B" — como as
+  // escolas de fato nomeiam — não era reconhecida, caía no primeiro bloco e o
+  // professor de 9º ano recebia habilidades de 1º ano do fundamental.
+  it('reconhece turma nomeada como "9º B", sem a palavra ano', () => {
+    const curta  = selectBnccSkills('Matemática', '9º B', 'números', 2);
+    const longa  = selectBnccSkills('Matemática', '9º ano', 'números', 2);
+    expect(curta.length).toBeGreaterThan(0);
+    expect(curta.map(s => s.code)).toEqual(longa.map(s => s.code));
+    curta.forEach(s => expect(s.code).not.toMatch(/^EF0[1-5]/));
+  });
+
+  it('reconhece "6º C" como anos finais', () => {
+    const skills = selectBnccSkills('Ciências', '6º C', 'matéria', 2);
+    expect(skills.length).toBeGreaterThan(0);
+    skills.forEach(s => expect(s.code).toMatch(/^EF0[6-9]/));
+  });
+
+  it('usa o nível da turma quando o nome não diz a série', () => {
+    const semNivel = selectBnccSkills('Matemática', 'Turma A', 'funções', 2);
+    const comNivel = selectBnccSkills('Matemática', 'Turma A', 'funções', 2, 'Ensino Médio');
+    expect(semNivel).toEqual([]);            // não dá para inferir: não ancora
+    expect(comNivel.length).toBeGreaterThan(0);
+    comNivel.forEach(s => expect(s.code).toMatch(/^EM13/));
+  });
+
+  it('reconhece "2ª série" como Ensino Médio', () => {
+    const skills = selectBnccSkills('História', '2ª série', 'cidadania', 2);
+    expect(skills.length).toBeGreaterThan(0);
+    skills.forEach(s => expect(s.code).toMatch(/^EM13/));
+  });
+
+  // ── Regressão: fallback para o primeiro bloco ─────────────────────────────
+  // Antes, quando a disciplina não tinha bloco para a etapa pedida, caía no
+  // primeiro bloco. Educação Física no Ensino Médio devolvia EF01EF01, que é
+  // habilidade de 1º ano do fundamental.
+  it('não inventa etapa quando a disciplina não cobre o Ensino Médio', () => {
+    expect(selectBnccSkills('Educação Física', '1º ano médio', 'movimento', 3)).toEqual([]);
+  });
+
+  it('não ancora nada quando a etapa não pode ser inferida', () => {
+    expect(selectBnccSkills('Matemática', 'Turma A', 'frações', 3)).toEqual([]);
+  });
+
+  it('não devolve habilidades de fundamental para turma de infantil', () => {
+    expect(selectBnccSkills('Arte', 'Maternal II', 'cores', 3)).toEqual([]);
   });
 
   it('aceita disciplina qualificada por especialidade', () => {
