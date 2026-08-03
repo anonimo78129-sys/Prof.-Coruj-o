@@ -4,7 +4,9 @@
 # Prof. Corujão — IA para Professores Brasileiros
 
 **Assistente pedagógico com IA para professores da educação básica brasileira.**  
-Planos de aula BNCC, slides, atividades, gamificação de turma, diário de classe e muito mais — tudo em português.
+Planos de aula com habilidades da BNCC conferidas contra o dataset oficial,
+slides, atividades, provas, jogos, gamificação de turma, diário de classe e
+calendário letivo — tudo em português.
 
 [![Deploy](https://img.shields.io/badge/deploy-Firebase-orange?logo=firebase)](https://firebase.google.com/)
 [![PWA](https://img.shields.io/badge/PWA-instalável-blue?logo=googlechrome)](https://web.dev/progressive-web-apps/)
@@ -19,44 +21,76 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 ## Funcionalidades
 
 ### Planejamento com IA
-- **Plano de Aula** — gera planos completos alinhados à BNCC com objetivos, metodologia, recursos e avaliação
-- **Slides** — apresentações prontas com imagens do Pixabay e design responsivo
-- **Atividades** — exercícios e tarefas personalizadas por turma e nível
-- **Provas** — questões objetivas e discursivas com gabarito
-- **Sequência Didática** — sequências completas com múltiplas aulas
-- **Estúdio** — chat avançado com histórico, contexto de turma e geração de materiais em múltiplas etapas
+- **Plano de Aula** — documento completo: área de conhecimento, eixo temático, conteúdos, objetivos, perguntas mobilizadoras, metodologia com os tempos de abertura, desenvolvimento e fechamento calculados pela duração da aula, habilidades da BNCC, recursos, avaliação e referências
+- **Slides** — apresentação pronta, com imagens buscadas por tema, paleta derivada de uma cor escolhida pelo professor e editor visual para ajustar cada lâmina
+- **Atividades** e **Provas** — exercícios no nível da turma; provas com questões objetivas e discursivas mais gabarito
+- **Sequência Didática** — várias aulas encadeadas sobre o mesmo tema
+- **Estúdio** — geração em segundo plano, com histórico e contexto de turma
+
+Tom do texto, grau de complexidade, foco pedagógico, número de aulas, duração e
+turno são ajustáveis antes de gerar.
+
+### Habilidades da BNCC conferidas
+Modelos de linguagem inventam código de habilidade. O plano sai bonito e o
+código não existe. Aqui a conferência não depende da IA:
+
+1. O app identifica etapa, ano e disciplina pelo nível e pelo nome da turma
+2. Seleciona as aprendizagens reais correspondentes e as injeta no comando
+3. Depois da resposta, extrai todos os códigos do texto e compara com o dataset
+   oficial — se a IA inventou, esqueceu ou omitiu, a seção é reescrita
+
+São **1.580 aprendizagens vigentes**, das três etapas. Detalhes em
+[Dados da BNCC](#dados-da-bncc).
 
 ### Ferramentas Pedagógicas
 | Ferramenta | Descrição |
 |---|---|
-| Parecer Descritivo | Comentários de boletim e pareceres individuais por aluno |
-| Adaptação Inclusiva | Adapta atividades para TEA, TDAH, dislexia e outras necessidades |
-| Rubrica de Avaliação | Critérios e níveis prontos para qualquer trabalho ou projeto |
+| Parecer Descritivo | Pareceres individuais e comentários de boletim, com impressão em papel timbrado |
+| Adaptação Inclusiva | Adapta atividades para TDAH, TEA, dislexia, deficiência intelectual, baixa visão, surdez e altas habilidades |
+| Rubrica de Avaliação | Critérios e níveis de desempenho para trabalhos e projetos |
 | Nivelador de Texto | Reescreve textos no nível de leitura da turma |
 | Comunicação com Famílias | Bilhetes, comunicados e mensagens prontas para WhatsApp |
 | Material de Vídeo | Transforma vídeos do YouTube em aula e atividades |
-| Material do meu PDF | Gera materiais a partir do seu livro ou apostila |
+| Material do meu PDF | Gera materiais a partir do livro ou apostila do professor |
 
 ### Jogos Educativos (IA)
-- Quiz interativo
-- Caça-palavras
-- Palavras cruzadas
-- Bingo
-- Escape Room temático (Medieval / Laboratório / Detetive / Espaço)
-- Jogo da Memória
-- Sequência (ordenar eventos/etapas)
-- Flashcards
-- Jogo de história narrativa
+Quiz, caça-palavras, palavras cruzadas, bingo, jogo da memória, sequência
+lógica, flashcards, história narrativa e sala de escape — esta em quatro
+ambientações: Pergaminho Medieval, Laboratório Científico, Investigação
+Detetivesca e Estação Espacial. Todas exportáveis para impressão.
+
+A IA fornece o conteúdo; a estrutura é montada pelo próprio app. O encaixe das
+palavras na grade e o sorteio das cartelas seguem algoritmos próprios, então o
+jogo sempre sai jogável.
+
+### Mundo Perdido
+Jogo narrativo em tela cheia, com trilha sonora e centenas de cenários. Um
+estudante adormece a três dias da prova final e acorda num jardim que só abre
+passagem quando ele acerta perguntas sobre plantas. Enigmas de botânica,
+escolhas que mudam as reações dos personagens e um final que o jogador decide.
+O professor pode gerar o próprio conjunto de perguntas e compartilhar a partida.
+
+### Jogos de Competição em Turma
+- **Batalha de Equipes** — combate por acertos
+- **O Milhão** — escada de prêmios com patamares de segurança
+- **Leilão do Saber** — as equipes apostam pontos antes de saber se acertaram
+- **Quiz Relâmpago** — dez rodadas rápidas, com cenário animado e personagem que reage a cada resposta
+
+As perguntas são geradas pela disciplina e nível da turma, e os pontos viram
+experiência na gamificação.
+
+### Instrumentos para Conduzir a Aula
+Sorteador de alunos, cronômetro, formador automático de grupos, medidor de
+ruído da sala, semáforo de comportamento, dado virtual e placar de equipes.
 
 ### Gamificação de Turma
-- Sistema de **XP e moedas** por comportamento e participação
-- **Equipes** com personalização de nome, emoji e cor
-- **Missões semanais** com meta e recompensa configurável
-- **Loja de recompensas** onde alunos trocam moedas por prêmios
-- **Hall da Fama** com pódio dos melhores alunos por temporada
-- Log de todas as ações (pontuação, compras, recompensas)
-- Suporte a cadastro em massa de alunos
-- Dois temas visuais: Coruja e Emblema
+- **XP e moedas** por comportamentos que o professor configura — participar, ajudar um colega e entregar a tarefa somam; atrapalhar a aula desconta
+- **Seis níveis**: Aprendiz, Explorador, Estudioso, Sábio, Mestre e Lenda, a partir de 0, 40, 100, 200, 320 e 480 pontos
+- **Medalhas** por marcos, incluindo sequências de dias seguidos pontuando
+- **Loja de recompensas** propositalmente não material: ajudante do dia, escolher a música da aula, mensagem positiva para casa, um dia a mais no prazo
+- **Equipes**, **missões semanais** com meta e prêmio, e **temporadas** encerráveis com registro no Hall da Fama
+- Histórico completo das ações e cadastro em massa de alunos
+- Dois conjuntos visuais: Coruja e Emblema
 
 ### Gestão de Turmas
 - Cadastro de turmas com dias da semana e **horários reais por dia**
@@ -68,6 +102,8 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - **Importação de Calendário Letivo via PDF** — a IA extrai todos os feriados, recessos, reuniões e eventos
 - **Importação de Ementa via PDF** — a IA lê os módulos e distribui as aulas no calendário pelos dias da turma
 - Detalhe diário com listagem de aulas e eventos
+- Feriados nacionais calculados para qualquer ano, incluindo as datas móveis
+  que dependem da Páscoa
 
 ### Diário de Bordo
 - Registro de **chamada/frequência** por aula (Presente / Falta / Atestado)
@@ -76,9 +112,12 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Sincronizado via Firestore por turma
 
 ### Acervo de Materiais
-- Biblioteca pessoal de tudo que foi gerado (slides, atividades, planos, provas)
-- Busca por título e filtro por tipo
-- Remoção com confirmação
+- Biblioteca pessoal do que foi gerado, com busca por título e filtro por tipo
+- Acervo compartilhado com materiais curados pela administração
+- Exportação em **Word** e **PowerPoint**, e layouts de impressão feitos para
+  cada tipo de conteúdo: plano de aula, parecer com campo de assinatura,
+  bilhete para a família, lista de chamada, cartelas de bingo e caderno da sala
+  de escape
 
 ### Chat IA (Corujão)
 - Chat pedagógico em português com suporte a anexos (imagens, PDFs)
@@ -89,6 +128,8 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Nome, escola, área e nível de ensino
 - Painel de estatísticas: turmas, materiais e gerações de IA
 - Teste gratuito de 7 dias e ativação do plano Pro
+- **Lembrete de aula** no celular cerca de 30 minutos antes, mesmo com o app
+  fechado, respeitando o fuso horário do professor
 - Edição de dados e zona de configuração
 
 ### PWA (App instalável)
@@ -129,6 +170,8 @@ geração de conteúdo novo fica bloqueada.
 | Armazenamento | Firebase Storage |
 | Notificações | Firebase Cloud Messaging (FCM) |
 | Imagens | Pixabay API (opcional) / Unsplash fallback |
+| Exportação | `docx`, `pptxgenjs`, `jszip` |
+| Currículo | Dataset BNCC com 1.580 aprendizagens, carregado sob demanda |
 | Build | Vite 6 + vite-plugin-pwa |
 | Deploy | Firebase Hosting / Vercel / Cloud Run |
 
@@ -243,3 +286,6 @@ caractere a caractere contra o PDF homologado da BNCC (MEC, 2018).
 ## Licença
 
 Projeto de uso educacional. Desenvolvido com ❤️ para professores brasileiros.
+
+Os dados da BNCC embutidos em `src/bncc-dataset.ts` são de terceiros e seguem a
+licença **CC BY 4.0** — veja o [crédito](#crédito) acima.
