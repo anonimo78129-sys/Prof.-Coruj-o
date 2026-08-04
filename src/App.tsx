@@ -9408,6 +9408,118 @@ const playHealChime = () => {
   } catch { /* sem áudio disponível */ }
 };
 
+// Estalo curto do cronômetro nos segundos finais — fica mais agudo no aperto.
+const playTick = (urgent = false) => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(urgent ? 1600 : 1050, ctx.currentTime);
+    g.gain.setValueAtTime(urgent ? 0.055 : 0.03, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.07);
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.08);
+    setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, 200);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Raio: frequência despencando com chiado por cima — toca quando o combo sobe.
+const playZap = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(2200, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(280, ctx.currentTime + 0.18);
+    g.gain.setValueAtTime(0.09, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.24);
+
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(1800, ctx.currentTime);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.09, ctx.currentTime);
+    ng.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.14);
+    src.connect(filter); filter.connect(ng); ng.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.16);
+    setTimeout(() => { try { o.disconnect(); g.disconnect(); src.disconnect(); filter.disconnect(); ng.disconnect(); } catch {} }, 400);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Rufar de tambor: batidas de ruído acelerando com um zumbido subindo por
+// cima. Toca no intervalo de suspense, entre o toque na resposta e a revelação.
+const playDrumroll = (ms = 1400) => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const dur = ms / 1000;
+    const nodes: AudioNode[] = [];
+    const HITS = 20;
+    for (let i = 0; i < HITS; i++) {
+      const p = i / HITS;
+      const t = t0 + dur * Math.pow(p, 1.4);           // batidas acelerando no fim
+      const src = ctx.createBufferSource();
+      src.buffer = getNoiseBuffer(ctx);
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(600 + p * 700, t);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.035 + p * 0.05, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      src.connect(f); f.connect(g); g.connect(ctx.destination);
+      src.start(t); src.stop(t + 0.07);
+      nodes.push(src, f, g);
+    }
+    // zumbido grave subindo junto, pra sensação de "vai revelar"
+    const o = ctx.createOscillator();
+    const og = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(110, t0);
+    o.frequency.exponentialRampToValueAtTime(240, t0 + dur);
+    og.gain.setValueAtTime(0.0001, t0);
+    og.gain.exponentialRampToValueAtTime(0.07, t0 + dur * 0.75);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(og); og.connect(ctx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+    nodes.push(o, og);
+    setTimeout(() => { nodes.forEach(n => { try { n.disconnect(); } catch {} }); }, ms + 400);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Fanfarra do fim de jogo — acorde ascendente, mais longo que o playHealChime.
+const playFanfare = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    [523, 659, 784, 1046].forEach((freq, i) => {
+      const t = ctx.currentTime + i * 0.13;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.13, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.52);
+      setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, (i * 130) + 800);
+    });
+  } catch { /* sem áudio disponível */ }
+};
+
 const gamiDefaultClass = (classId: string): ClassGamification => ({
   id: classId,
   students: [],
@@ -11072,28 +11184,28 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
 };
 
 // ─── Quiz Relâmpago — tipos e banco de perguntas de teste ────────────────────
-type QuizQ = { q: string; options: string[]; correct: number };
+type QuizQ = { q: string; options: string[]; correct: number; explain?: string };
 // Banco fixo pra testar o jogo sem chamar a IA (rápido, sem gastar cota).
 // 18 perguntas, ordenadas fácil → difícil (mesmo formato do que a IA gera).
 const QUIZ_SAMPLE_QUESTIONS: QuizQ[] = [
-  { q: 'Quantos dias tem uma semana?', options: ['5', '6', '7', '8'], correct: 2 },
-  { q: 'De que cor é o céu num dia sem nuvens?', options: ['Verde', 'Azul', 'Cinza', 'Roxo'], correct: 1 },
-  { q: 'Quantas patas tem um cachorro?', options: ['2', '3', '4', '6'], correct: 2 },
-  { q: 'Qual é a capital do Brasil?', options: ['Rio de Janeiro', 'Brasília', 'São Paulo', 'Salvador'], correct: 1 },
-  { q: 'Quanto é 7 x 8?', options: ['54', '56', '58', '64'], correct: 1 },
-  { q: 'Quem escreveu "Dom Casmurro"?', options: ['José de Alencar', 'Machado de Assis', 'Clarice Lispector', 'Monteiro Lobato'], correct: 1 },
-  { q: 'Qual planeta é conhecido como Planeta Vermelho?', options: ['Vênus', 'Júpiter', 'Marte', 'Saturno'], correct: 2 },
-  { q: 'Qual é o maior oceano do mundo?', options: ['Atlântico', 'Índico', 'Ártico', 'Pacífico'], correct: 3 },
-  { q: 'Em que ano o Brasil foi "descoberto"?', options: ['1500', '1822', '1889', '1600'], correct: 0 },
-  { q: 'Qual é o osso mais longo do corpo humano?', options: ['Úmero', 'Fêmur', 'Tíbia', 'Rádio'], correct: 1 },
-  { q: 'Quantos lados tem um hexágono?', options: ['5', '6', '7', '8'], correct: 1 },
-  { q: 'Qual gás as plantas liberam na fotossíntese?', options: ['Gás carbônico', 'Nitrogênio', 'Oxigênio', 'Hidrogênio'], correct: 2 },
-  { q: 'Quem pintou a Mona Lisa?', options: ['Michelangelo', 'Van Gogh', 'Da Vinci', 'Picasso'], correct: 2 },
-  { q: 'Qual é o menor país do mundo?', options: ['Mônaco', 'San Marino', 'Vaticano', 'Liechtenstein'], correct: 2 },
-  { q: 'Quanto é a raiz quadrada de 144?', options: ['10', '11', '12', '14'], correct: 2 },
-  { q: 'Em que continente fica o deserto do Saara?', options: ['Ásia', 'África', 'Oceania', 'América'], correct: 1 },
-  { q: 'Qual elemento químico tem símbolo "Au"?', options: ['Prata', 'Alumínio', 'Ouro', 'Argônio'], correct: 2 },
-  { q: 'Quem foi o primeiro presidente do Brasil?', options: ['Getúlio Vargas', 'Deodoro da Fonseca', 'Pedro Álvares Cabral', 'Juscelino Kubitschek'], correct: 1 },
+  { q: 'Quantos dias tem uma semana?', options: ['5', '6', '7', '8'], correct: 2, explain: 'A semana tem 7 dias: de segunda a domingo.' },
+  { q: 'De que cor é o céu num dia sem nuvens?', options: ['Verde', 'Azul', 'Cinza', 'Roxo'], correct: 1, explain: 'A luz do Sol se espalha no ar e a cor azul se espalha mais que as outras.' },
+  { q: 'Quantas patas tem um cachorro?', options: ['2', '3', '4', '6'], correct: 2, explain: 'Cachorro é um quadrúpede: anda sobre 4 patas.' },
+  { q: 'Qual é a capital do Brasil?', options: ['Rio de Janeiro', 'Brasília', 'São Paulo', 'Salvador'], correct: 1, explain: 'Brasília é a capital desde 1960, quando o governo saiu do Rio de Janeiro.' },
+  { q: 'Quanto é 7 x 8?', options: ['54', '56', '58', '64'], correct: 1, explain: '7 x 8 = 56. Dá pra conferir somando 7 oito vezes.' },
+  { q: 'Quem escreveu "Dom Casmurro"?', options: ['José de Alencar', 'Machado de Assis', 'Clarice Lispector', 'Monteiro Lobato'], correct: 1, explain: 'Machado de Assis publicou Dom Casmurro em 1899, com o famoso ciúme de Bentinho.' },
+  { q: 'Qual planeta é conhecido como Planeta Vermelho?', options: ['Vênus', 'Júpiter', 'Marte', 'Saturno'], correct: 2, explain: 'Marte parece vermelho porque o solo dele é cheio de ferro enferrujado.' },
+  { q: 'Qual é o maior oceano do mundo?', options: ['Atlântico', 'Índico', 'Ártico', 'Pacífico'], correct: 3, explain: 'O Pacífico é o maior: sozinho cobre quase um terço da superfície da Terra.' },
+  { q: 'Em que ano o Brasil foi "descoberto"?', options: ['1500', '1822', '1889', '1600'], correct: 0, explain: 'A frota de Cabral chegou ao litoral da Bahia em 1500 — mas já havia povos indígenas aqui.' },
+  { q: 'Qual é o osso mais longo do corpo humano?', options: ['Úmero', 'Fêmur', 'Tíbia', 'Rádio'], correct: 1, explain: 'O fêmur, o osso da coxa, é o mais longo e também o mais resistente.' },
+  { q: 'Quantos lados tem um hexágono?', options: ['5', '6', '7', '8'], correct: 1, explain: 'O prefixo "hexa" quer dizer seis: o hexágono tem 6 lados.' },
+  { q: 'Qual gás as plantas liberam na fotossíntese?', options: ['Gás carbônico', 'Nitrogênio', 'Oxigênio', 'Hidrogênio'], correct: 2, explain: 'As plantas absorvem gás carbônico e devolvem oxigênio para o ar.' },
+  { q: 'Quem pintou a Mona Lisa?', options: ['Michelangelo', 'Van Gogh', 'Da Vinci', 'Picasso'], correct: 2, explain: 'Leonardo da Vinci pintou a Mona Lisa por volta de 1503, na Itália.' },
+  { q: 'Qual é o menor país do mundo?', options: ['Mônaco', 'San Marino', 'Vaticano', 'Liechtenstein'], correct: 2, explain: 'O Vaticano tem menos de meio quilômetro quadrado e fica dentro de Roma.' },
+  { q: 'Quanto é a raiz quadrada de 144?', options: ['10', '11', '12', '14'], correct: 2, explain: '12 x 12 = 144, então a raiz quadrada de 144 é 12.' },
+  { q: 'Em que continente fica o deserto do Saara?', options: ['Ásia', 'África', 'Oceania', 'América'], correct: 1, explain: 'O Saara ocupa o norte da África e é o maior deserto quente do mundo.' },
+  { q: 'Qual elemento químico tem símbolo "Au"?', options: ['Prata', 'Alumínio', 'Ouro', 'Argônio'], correct: 2, explain: 'Au vem de "aurum", que quer dizer ouro em latim.' },
+  { q: 'Quem foi o primeiro presidente do Brasil?', options: ['Getúlio Vargas', 'Deodoro da Fonseca', 'Pedro Álvares Cabral', 'Juscelino Kubitschek'], correct: 1, explain: 'Deodoro da Fonseca assumiu em 1889, logo após a Proclamação da República.' },
 ];
 
 // Ilustração do cenário (fundo do palco) — cobre o placeholder em CSS quando existir.
@@ -11145,6 +11257,69 @@ const QUIZ_CSS = `
 .qz-curtain-l img{transform-origin:top center;animation:qz-sway-l 5s ease-in-out .4s infinite}
 .qz-curtain-r img{transform-origin:top center;animation:qz-sway-r 5.4s ease-in-out .4s infinite}
 @media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l img,.qz-curtain-r img{animation:none!important}.qz-curtain-l{transform:translateX(-30%)}.qz-curtain-r{transform:translateX(30%)}}
+/* clarão verde/vermelho no instante da resposta */
+@keyframes qz-flash{0%{opacity:.5}100%{opacity:0}}
+.qz-flash{animation:qz-flash .45s ease-out both}
+/* pontos ganhos subindo e sumindo */
+@keyframes qz-score-pop{0%{opacity:0;transform:translate(-50%,0) scale(.5)}25%{opacity:1;transform:translate(-50%,-30px) scale(1.25)}100%{opacity:0;transform:translate(-50%,-120px) scale(1)}}
+.qz-score-pop{animation:qz-score-pop 1.3s ease-out both}
+/* cronômetro apertando: pulsa quando falta pouco */
+@keyframes qz-urgent{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+.qz-urgent{animation:qz-urgent .5s ease-in-out infinite}
+/* selo de combo entrando */
+@keyframes qz-combo-in{0%{opacity:0;transform:scale(0) rotate(-30deg)}70%{transform:scale(1.15) rotate(4deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+.qz-combo-in{animation:qz-combo-in .45s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes qz-combo-beat{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+.qz-combo-beat{animation:qz-combo-beat .9s ease-in-out infinite}
+/* palco tremendo no erro */
+@keyframes qz-stage-shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-8px)}30%{transform:translateX(7px)}45%{transform:translateX(-5px)}60%{transform:translateX(4px)}80%{transform:translateX(-2px)}}
+.qz-stage-shake{animation:qz-stage-shake .38s cubic-bezier(.36,.07,.19,.97)}
+/* ── SUSPENSE: entre o toque na resposta e a revelação ── */
+/* o palco escurece e um facho varre, como spot procurando a resposta */
+@keyframes qz-dim-in{0%{opacity:0}100%{opacity:1}}
+.qz-dim{animation:qz-dim-in .35s ease-out both}
+@keyframes qz-spot{0%{transform:translateX(-120%) skewX(-14deg)}100%{transform:translateX(320%) skewX(-14deg)}}
+.qz-spot{animation:qz-spot 1.1s ease-in-out infinite}
+/* a alternativa escolhida late esperando o veredito, cada vez mais rápido */
+@keyframes qz-waiting{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.09);filter:brightness(1.45)}}
+.qz-waiting{animation:qz-waiting .42s ease-in-out infinite}
+/* reticências pulsando no lugar da letra */
+@keyframes qz-dots{0%,20%{opacity:.25}50%{opacity:1}80%,100%{opacity:.25}}
+.qz-dot-1{animation:qz-dots .9s ease-in-out infinite}
+.qz-dot-2{animation:qz-dots .9s ease-in-out .15s infinite}
+.qz-dot-3{animation:qz-dots .9s ease-in-out .3s infinite}
+/* ── REVELAÇÃO ── */
+/* a certa dá um salto quando aparece */
+@keyframes qz-bounce-in{0%{transform:scale(1)}30%{transform:scale(1.28) rotate(-4deg)}55%{transform:scale(.94) rotate(2deg)}75%{transform:scale(1.1)}100%{transform:scale(1)}}
+.qz-bounce-in{animation:qz-bounce-in .6s cubic-bezier(.34,1.56,.64,1) both}
+.qz-wrong-shake{animation:qz-shake .4s ease both}
+/* anel de choque saindo do botão certo */
+@keyframes qz-ring{0%{opacity:.85;transform:scale(.6)}100%{opacity:0;transform:scale(2.1)}}
+.qz-ring{animation:qz-ring .7s ease-out both}
+/* faíscas voando do acerto */
+@keyframes qz-spark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
+.qz-spark{animation:qz-spark .8s ease-out both}
+/* ── ENTRADA DOS ELEMENTOS ── */
+/* cartão da pergunta entra deslizando de cima */
+@keyframes qz-card-in{0%{opacity:0;transform:translateY(-26px) scale(.94)}60%{transform:translateY(4px) scale(1.01)}100%{opacity:1;transform:none}}
+.qz-card-in{animation:qz-card-in .5s cubic-bezier(.34,1.4,.64,1) both}
+/* botões A/B/C/D sobem um atrás do outro */
+@keyframes qz-btn-in{0%{opacity:0;transform:translateY(22px) scale(.85)}100%{opacity:1;transform:none}}
+.qz-btn-in{animation:qz-btn-in .42s cubic-bezier(.34,1.5,.64,1) both}
+/* alternativas do cartão entram escalonadas */
+@keyframes qz-opt-in{0%{opacity:0;transform:translateX(-14px)}100%{opacity:1;transform:none}}
+.qz-opt-in{animation:qz-opt-in .34s ease-out both}
+/* ── AVANÇO AUTOMÁTICO ── */
+/* barrinha enchendo no botão, mostrando quanto falta pra próxima */
+@keyframes qz-next-fill{0%{width:0%}100%{width:100%}}
+.qz-next-fill{animation:qz-next-fill linear both}
+/* placar do header dá um pulo quando muda */
+@keyframes qz-bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+.qz-bump{animation:qz-bump .4s ease-out both}
+/* cronômetro treme nos últimos segundos */
+@keyframes qz-tick-shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-5deg)}75%{transform:rotate(5deg)}}
+.qz-tick-shake{animation:qz-tick-shake .28s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.qz-flash,.qz-score-pop,.qz-urgent,.qz-combo-in,.qz-combo-beat,.qz-stage-shake,.qz-dim,.qz-spot,.qz-waiting,.qz-dot-1,.qz-dot-2,.qz-dot-3,.qz-bounce-in,.qz-ring,.qz-spark,.qz-card-in,.qz-btn-in,.qz-opt-in,.qz-bump,.qz-tick-shake{animation:none!important}}
 `;
 
 // Paleta puxada das ilustrações: madeira azul (fundo), azul-ardósia (cortinas)
@@ -11163,20 +11338,72 @@ const QuizStage = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
+// Ritmo do jogo. "Relâmpago" agora vale o nome: cada pergunta tem relógio, e
+// o ponto derrete conforme o tempo passa — responder rápido vale quase o dobro.
+const QZ_SECONDS = 20;        // tempo de cada pergunta
+const QZ_BASE = 100;          // pontos garantidos por acerto
+const QZ_SPEED = 100;         // bônus máximo por rapidez (derrete linear até 0)
+const QZ_FAST_MS = 6000;      // responder abaixo disso acende o selo RELÂMPAGO
+const QZ_STREAK_BONUS = 50;   // por acerto seguido, a partir do 2º
+const QZ_STREAK_CAP = 4;      // teto do combo (4 x 50 = +200)
+const QZ_SUSPENSE_MS = 1500;  // tambor rufando antes de mostrar se acertou
+const QZ_NEXT_MS = 7000;      // tempo lendo o "por que" antes da próxima pergunta
+
+// Faixa etária: muda a linguagem que a IA usa nas perguntas e na explicação.
+const QZ_FAIXAS = [
+  { id: 'crianca', label: 'Criança', sub: '6 a 10 anos', emoji: '🧒',
+    guide: 'Linguagem bem simples, frases curtas, vocabulário do dia a dia de uma criança de 6 a 10 anos. Use exemplos concretos (brinquedos, animais, comida, escola). Evite termos técnicos.' },
+  { id: 'preteen', label: 'Pré-adolescente', sub: '11 a 13 anos', emoji: '🧑',
+    guide: 'Linguagem clara e direta para 11 a 13 anos. Pode usar termos da matéria, mas sempre explicando. Exemplos ligados ao cotidiano deles (jogos, esportes, internet).' },
+  { id: 'teen', label: 'Adolescente', sub: '14 a 17 anos', emoji: '🧑‍🎓',
+    guide: 'Linguagem de ensino médio, 14 a 17 anos. Pode exigir raciocínio e usar vocabulário técnico da disciplina. Perguntas que fazem pensar, não só lembrar.' },
+] as const;
+type QzFaixa = typeof QZ_FAIXAS[number]['id'];
+
 const QuizRelampago = ({ onExitApp }: { onExitApp: () => void }) => {
   const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
   const [topic, setTopic] = useState('');
+  const [faixa, setFaixa] = useState<QzFaixa>('preteen');
   const [error, setError] = useState('');
   const [questions, setQuestions] = useState<QuizQ[]>([]);
   const [idx, setIdx] = useState(0);
-  const [score, setScore] = useState(0);
+  const [score, setScore] = useState(0);       // acertos
+  const [points, setPoints] = useState(0);     // pontuação com rapidez + combo
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
+  // 'ask' = pergunta no ar · 'suspense' = respondeu, tambor rufando, resposta
+  // ainda escondida · 'reveal' = veredito na tela
+  const [stage, setStage] = useState<'ask' | 'suspense' | 'reveal'>('ask');
   const [paused, setPaused] = useState(false);
+  const [msLeft, setMsLeft] = useState(QZ_SECONDS * 1000);
+  const [soundOn, setSoundOn] = useState(true);
+  const [pop, setPop] = useState<{ key: number; val: number; fast: boolean } | null>(null);
+  const [flash, setFlash] = useState<{ key: number; ok: boolean } | null>(null);
+  const [log, setLog] = useState<{ picked: number | null; ok: boolean }[]>([]);
+  const [bump, setBump] = useState(0);          // faz o placar do header pular
+  const [autoLeft, setAutoLeft] = useState(QZ_NEXT_MS);
+
+  const startedAt = useRef(0);
+  const pausedAt = useRef(0);
+  const timerRef = useRef<number | null>(null);
+  const lastTickSec = useRef(-1);
+  const answeredRef = useRef(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const suspenseRef = useRef<number | null>(null);
+  const autoRef = useRef<number | null>(null);
+  // resultado calculado no instante do toque, aplicado só depois do suspense
+  const pendingRef = useRef<{ picked: number | null; ok: boolean; gain: number; fast: boolean; newStreak: number } | null>(null);
+
+  const beep = (fn: () => void) => { if (soundOn) fn(); };
 
   const fetchQuestions = async (): Promise<QuizQ[]> => {
-    const prompt = `Gere ${QUIZ_RELAMPAGO_TOTAL} perguntas de múltipla escolha sobre "${topic}", adequadas para uma turma de sala de aula.
+    const guide = QZ_FAIXAS.find(f => f.id === faixa)!.guide;
+    const prompt = `Gere ${QUIZ_RELAMPAGO_TOTAL} perguntas de múltipla escolha sobre "${topic}" para um quiz de sala de aula.
+PÚBLICO: ${guide}
 Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
-Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
+Inclua também "explain": UMA frase curta (máximo 140 caracteres) explicando POR QUE a resposta certa está certa, na linguagem do público acima. É o que a turma lê depois de responder, então precisa ensinar, não só repetir a alternativa.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0,"explain":"por que"}]} onde "correct" é o índice (0 a 3) da correta.`;
     const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
     const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
     const parsed = JSON.parse(raw);
@@ -11190,34 +11417,149 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     setError(''); setPhase('loading');
     try {
       const qs = testMode ? QUIZ_SAMPLE_QUESTIONS.slice(0, QUIZ_RELAMPAGO_TOTAL) : await fetchQuestions();
-      setQuestions(qs); setIdx(0); setScore(0); setSelected(null); setPaused(false);
+      setQuestions(qs);
+      setIdx(0); setScore(0); setPoints(0); setStreak(0); setBestStreak(0);
+      setSelected(null); setStage('ask'); setPaused(false); setLog([]); setPop(null); setAutoLeft(QZ_NEXT_MS);
       setPhase('play');
     } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
   };
 
-  const answer = (i: number) => {
-    if (selected !== null || paused) return;
-    setSelected(i);
-    if (i === questions[idx].correct) setScore(s => s + 1);
-    setTimeout(() => {
-      setIdx(cur => {
-        const next = cur + 1;
-        if (next >= questions.length) setPhase('end'); else setSelected(null);
-        return next;
-      });
-    }, 1500);
+  const clearTimer = () => { if (timerRef.current !== null) { clearInterval(timerRef.current); timerRef.current = null; } };
+  const clearSuspense = () => { if (suspenseRef.current !== null) { clearTimeout(suspenseRef.current); suspenseRef.current = null; } };
+  const clearAuto = () => { if (autoRef.current !== null) { clearInterval(autoRef.current); autoRef.current = null; } };
+
+  // Um passo do cronômetro da pergunta. Extraído porque a pausa precisa
+  // religar exatamente o mesmo relógio depois de reancorar o início.
+  const tickStep = () => {
+    const left = Math.max(0, QZ_SECONDS * 1000 - (Date.now() - startedAt.current));
+    setMsLeft(left);
+    const sec = Math.ceil(left / 1000);
+    if (left <= 5200 && sec !== lastTickSec.current && sec > 0) { lastTickSec.current = sec; beep(() => playTick(sec <= 3)); }
+    if (left <= 0) { clearTimer(); answer(null); }
   };
+
+  // Cronômetro da pergunta: passo de 50ms pro anel descer liso, estalo por
+  // segundo nos 5 finais. Zerou sem resposta = erro por tempo.
+  useEffect(() => {
+    if (phase !== 'play' || stage !== 'ask') { clearTimer(); return; }
+    answeredRef.current = false;
+    startedAt.current = Date.now();
+    lastTickSec.current = -1;
+    setMsLeft(QZ_SECONDS * 1000);
+    timerRef.current = window.setInterval(tickStep, 50);
+    return clearTimer;
+    // Só phase/idx/stage: `answer` e `beep` são recriados a cada render e
+    // reiniciariam o relógio no meio da pergunta se entrassem aqui.
+  }, [phase, idx, stage]);
+
+  // Pausa congela o relógio: guarda o que faltava e reancora o início ao voltar.
+  useEffect(() => {
+    if (phase !== 'play' || stage !== 'ask') return;
+    if (paused) { clearTimer(); pausedAt.current = msLeft; return; }
+    if (pausedAt.current > 0) {
+      startedAt.current = Date.now() - (QZ_SECONDS * 1000 - pausedAt.current);
+      pausedAt.current = 0;
+      timerRef.current = window.setInterval(tickStep, 50);
+    }
+    return clearTimer;
+  }, [paused]);
+
+  // Toque na resposta: NÃO revela nada ainda. Guarda o resultado, acende o
+  // suspense (palco escurece, tambor rufa, a escolhida late) e só depois de
+  // QZ_SUSPENSE_MS o veredito aparece — é o momento em que a turma prende a
+  // respiração.
+  const answer = (i: number | null) => {
+    if (answeredRef.current) return;
+    answeredRef.current = true;
+    clearTimer();
+    const elapsed = Math.min(QZ_SECONDS * 1000, Date.now() - startedAt.current);
+    const ok = i !== null && i === questions[idx]?.correct;
+    const speed = ok ? Math.round(QZ_SPEED * Math.max(0, 1 - elapsed / (QZ_SECONDS * 1000))) : 0;
+    const newStreak = ok ? streak + 1 : 0;
+    const combo = ok && newStreak >= 2 ? QZ_STREAK_BONUS * Math.min(newStreak - 1, QZ_STREAK_CAP) : 0;
+    pendingRef.current = { picked: i, ok, gain: ok ? QZ_BASE + speed + combo : 0, fast: elapsed < QZ_FAST_MS, newStreak };
+
+    setSelected(i);
+    setStage('suspense');
+    beep(() => playDrumroll(QZ_SUSPENSE_MS));
+    suspenseRef.current = window.setTimeout(reveal, QZ_SUSPENSE_MS);
+  };
+
+  // Fim do suspense: aplica o resultado e dispara toda a reação.
+  const reveal = () => {
+    const r = pendingRef.current;
+    if (!r) return;
+    pendingRef.current = null;
+    setStage('reveal');
+    setStreak(r.newStreak);
+    setBestStreak(b => Math.max(b, r.newStreak));
+    setLog(l => [...l, { picked: r.picked, ok: r.ok }]);
+    setFlash({ key: Date.now(), ok: r.ok });
+    setBump(b => b + 1);
+    if (r.ok) {
+      setScore(s => s + 1);
+      setPoints(p => p + r.gain);
+      setPop({ key: Date.now(), val: r.gain, fast: r.fast });
+      beep(() => playChime(true));
+      if (r.newStreak >= 2) setTimeout(() => beep(playZap), 130);
+    } else {
+      beep(() => playChime(false));
+      beep(() => playImpactThud(true));
+      const el = stageRef.current;
+      if (el) { el.classList.remove('qz-stage-shake'); void el.offsetWidth; el.classList.add('qz-stage-shake'); }
+    }
+  };
+
+  // Depois de revelar, o jogo espera QZ_NEXT_MS lendo o "por que" e vai sozinho
+  // pra próxima. A barrinha no botão mostra quanto falta; tocar no botão pula
+  // na hora e a pausa segura o avanço.
+  useEffect(() => {
+    if (phase !== 'play' || stage !== 'reveal') { clearAuto(); return; }
+    if (paused) { clearAuto(); return; }
+    const until = Date.now() + autoLeft;
+    autoRef.current = window.setInterval(() => {
+      const left = Math.max(0, until - Date.now());
+      setAutoLeft(left);
+      if (left <= 0) { clearAuto(); next(); }
+    }, 100);
+    return clearAuto;
+  }, [phase, stage, paused, idx]);
+
+  const next = () => {
+    clearSuspense(); clearAuto();
+    setPop(null); setFlash(null);
+    const nextIdx = idx + 1;
+    if (nextIdx >= questions.length) { setPhase('end'); beep(playFanfare); return; }
+    setIdx(nextIdx); setSelected(null); setStage('ask'); setAutoLeft(QZ_NEXT_MS);
+  };
+
+  // Teclado: 1-4 respondem, Enter/Espaço avançam — pro professor conduzir
+  // pelo notebook enquanto a turma grita a resposta na projeção.
+  useEffect(() => {
+    if (phase !== 'play') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (paused || stage === 'suspense') return;
+      if (stage === 'ask') {
+        const n = parseInt(e.key, 10);
+        if (n >= 1 && n <= 4) { e.preventDefault(); answer(n - 1); }
+      } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, stage, paused, idx, streak, questions]);
 
   // piso de tábuas azuis (combina com o fundo.png das ilustrações)
   const plankBg = 'repeating-linear-gradient(90deg, rgba(18,36,64,0.32) 0 2px, transparent 2px 32px), linear-gradient(180deg, #6f9fce, #47709e)';
   const letterColors = ['#dc4b4b', '#e0ab2e', '#3fae6c', '#3d7fd6'];
-  const letterColorsDark = ['#a82f2f', '#a97c14', '#2a7d49', '#265a99'];
   // acento roxo/violeta (do blazer da professora) — usado em CTA, títulos, foco
   const violet = 'linear-gradient(180deg,#8b6fc4,#6a4f96)';
   const q = questions[idx];
-  const answered = selected !== null;
-  const gotIt = answered && selected === q?.correct;
+  const answered = stage === 'reveal';        // veredito na tela
+  const waiting = stage === 'suspense';       // tambor rufando, nada revelado
+  const gotIt = answered && selected !== null && selected === q?.correct;
   const suggestions = ['Sistema Solar', 'Frações', 'Corpo Humano', 'Brasil Colônia', 'Verbos'];
+  const timePct = msLeft / (QZ_SECONDS * 1000);
+  const timeColor = timePct > 0.5 ? '#5fd39a' : timePct > 0.25 ? '#f2c14e' : '#f27272';
 
   // Professora "viva": enquanto a pergunta está no ar, ela faz ações ambientes
   // em rodízio (bebendo água, acenando, olhando cartão, arrumando cabelo, parada);
@@ -11225,6 +11567,9 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   const [actor, setActor] = useState('neutro');
   useEffect(() => {
     if (phase !== 'play') return;
+    // No suspense ela olha o cartão, como quem confere a resposta — é a pose
+    // que mais combina com "deixa eu ver se você acertou…".
+    if (waiting) { setActor('cartao'); return; }
     if (answered) { setActor(gotIt ? 'acertou' : 'errou'); return; }
     const idles = ['neutro', 'cartao', 'agua', 'acenar', 'cabelo', 'neutro'];
     setActor('cartao');
@@ -11232,7 +11577,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
       setActor(idles[Math.floor(Math.random() * idles.length)]);
     }, 5000);
     return () => clearInterval(id);
-  }, [phase, answered, gotIt, idx]);
+  }, [phase, answered, waiting, gotIt, idx]);
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col select-none">
@@ -11240,11 +11585,11 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
 
       {phase === 'setup' && (
         <QuizStage>
-          <div className="relative z-10 flex-1 flex flex-col px-6 py-6">
+          <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6">
             <button onClick={onExitApp} aria-label="Fechar" className="w-9 h-9 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white mb-2 active:scale-95 transition-transform">
               <X size={18} />
             </button>
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 max-w-sm mx-auto w-full">
+            <div className="flex flex-col items-center justify-center text-center gap-5 max-w-sm mx-auto w-full">
               {/* selo com a professora (ilustração) */}
               <div className="relative" style={{ animation: 'qz-float 3.5s ease-in-out infinite' }}>
                 <div className="w-28 h-28 rounded-full overflow-hidden shadow-2xl border-4" style={{ borderColor: '#c9b6e8', background: '#e9e2f5', boxShadow: '0 12px 30px rgba(0,0,0,0.45), 0 0 26px rgba(160,130,215,0.5)' }}>
@@ -11254,7 +11599,22 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               </div>
               <div>
                 <h1 className="text-3xl font-black text-white tracking-tight" style={{ textShadow: '0 2px 0 #3a2963, 0 0 22px rgba(160,130,215,0.6)' }}>Quiz Relâmpago</h1>
-                <p className="text-indigo-100/85 text-sm mt-2 leading-relaxed">{QUIZ_RELAMPAGO_TOTAL} perguntas rápidas pra turma toda responder junto.<br/>Escolha o tema da aula.</p>
+                <p className="text-indigo-100/85 text-sm mt-2 leading-relaxed">{QUIZ_RELAMPAGO_TOTAL} perguntas contra o relógio.<br/>Quanto mais rápido, mais ponto vale.</p>
+              </div>
+
+              {/* regras rápidas, em três selos */}
+              <div className="grid grid-cols-3 gap-2 w-full">
+                {[
+                  { icon: TimerIcon, t: `${QZ_SECONDS}s`, s: 'por pergunta' },
+                  { icon: Zap, t: `+${QZ_SPEED}`, s: 'se for rápido' },
+                  { icon: Flame, t: `+${QZ_STREAK_BONUS * QZ_STREAK_CAP}`, s: 'combo máximo' },
+                ].map((c, i) => (
+                  <div key={i} className="rounded-2xl px-2 py-2.5 border border-white/15" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <c.icon size={15} className="mx-auto mb-1 text-[#c9b6e8]" />
+                    <p className="text-white font-black text-sm leading-none">{c.t}</p>
+                    <p className="text-[9px] text-indigo-100/60 mt-1 leading-tight">{c.s}</p>
+                  </div>
+                ))}
               </div>
 
               {/* card do formulário */}
@@ -11274,11 +11634,31 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                     </button>
                   ))}
                 </div>
+
+                {/* faixa etária — muda a linguagem das perguntas e das explicações */}
+                <label className="block text-left text-[11px] font-bold text-indigo-200/90 tracking-wide mt-4 mb-1.5 ml-1">PARA QUEM É</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {QZ_FAIXAS.map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => setFaixa(f.id)}
+                      className="rounded-2xl px-1.5 py-2 border-2 transition active:scale-95"
+                      style={{
+                        background: faixa === f.id ? 'rgba(183,154,240,0.28)' : 'rgba(255,255,255,0.06)',
+                        borderColor: faixa === f.id ? '#c9b6e8' : 'rgba(255,255,255,0.15)',
+                      }}
+                    >
+                      <span className="block text-lg leading-none mb-1">{f.emoji}</span>
+                      <span className="block text-[10px] font-black text-white leading-tight">{f.label}</span>
+                      <span className="block text-[9px] text-indigo-100/60 leading-tight mt-0.5">{f.sub}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {error && <p className="text-rose-300 text-xs font-semibold -mt-1">{error}</p>}
 
-              <div className="w-full flex flex-col gap-2.5">
+              <div className="w-full flex flex-col gap-2.5 pb-2">
                 <button onClick={() => start(false)} className="relative overflow-hidden w-full rounded-2xl py-3.5 font-black text-white text-base border-2 shadow-xl active:scale-[0.98] transition-transform" style={{ background: violet, borderColor: '#c9b6e8' }}>
                   <span className="relative z-10 flex items-center justify-center gap-2"><Zap size={18} /> Começar o quiz</span>
                   <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)', animation: 'qz-shine 3.2s ease-in-out infinite' }} />
@@ -11309,28 +11689,45 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
       )}
 
       {phase === 'play' && q && (
-        <div className="flex-1 flex flex-col min-h-0" style={{ background: '#213a58' }}>
-          {/* HEADER — barra azul com progresso e placar */}
+        <div ref={stageRef} className="flex-1 flex flex-col min-h-0" style={{ background: '#213a58' }}>
+          {/* clarão verde/vermelho no instante da resposta */}
+          {flash && (
+            <div key={flash.key} aria-hidden className="qz-flash absolute inset-0 z-50 pointer-events-none" style={{ background: flash.ok ? '#3fae6c' : '#dc4b4b' }} />
+          )}
+
+          {/* HEADER — barra azul com progresso, acertos e pontos */}
           <div className="shrink-0 px-3 py-2.5 flex items-center gap-2.5 border-b-4 border-black/25" style={{ background: 'linear-gradient(180deg,#5a86b8,#3a5d88)' }}>
             <button onClick={onExitApp} aria-label="Fechar" className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
               <X size={18} />
             </button>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[11px] font-black text-white tracking-wide">PERGUNTA <span className="text-white text-sm">{idx + 1}</span> <span className="text-indigo-100/60">/ {questions.length}</span></p>
-                <span className="flex items-center gap-1 text-[11px] font-black text-emerald-200 bg-black/30 rounded-full px-2 py-0.5">
-                  <CheckCircle2 size={12} /> {score}
-                </span>
-              </div>
-              {/* progresso segmentado */}
-              <div className="flex gap-1">
-                {questions.map((_, i) => (
-                  <span key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-black/30">
-                    <span className="block h-full rounded-full transition-all duration-300" style={{ width: i < idx || (i === idx && answered) ? '100%' : '0%', background: i === idx ? '#efe6ff' : '#b79af0' }} />
+              <div className="flex items-center justify-between mb-1.5 gap-2">
+                <p className="text-[11px] font-black text-white tracking-wide shrink-0">PERGUNTA <span className="text-white text-sm">{idx + 1}</span> <span className="text-indigo-100/60">/ {questions.length}</span></p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="flex items-center gap-1 text-[11px] font-black text-emerald-200 bg-black/30 rounded-full px-2 py-0.5 shrink-0">
+                    <CheckCircle2 size={12} /> {score}
                   </span>
-                ))}
+                  <span key={bump} className="qz-bump flex items-center gap-1 text-[11px] font-black text-amber-200 bg-black/30 rounded-full px-2 py-0.5 shrink-0">
+                    <Zap size={12} /> {points}
+                  </span>
+                </div>
+              </div>
+              {/* progresso segmentado — verde no acerto, vermelho no erro */}
+              <div className="flex gap-1">
+                {questions.map((_, i) => {
+                  const r = log[i];
+                  const done = i < idx || (i === idx && answered);
+                  return (
+                    <span key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-black/30">
+                      <span className="block h-full rounded-full transition-all duration-300" style={{ width: done ? '100%' : '0%', background: r ? (r.ok ? '#5fd39a' : '#f27272') : '#efe6ff' }} />
+                    </span>
+                  );
+                })}
               </div>
             </div>
+            <button onClick={() => setSoundOn(s => !s)} aria-label={soundOn ? 'Desligar som' : 'Ligar som'} className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
+              {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
             <button onClick={() => setPaused(p => !p)} aria-label={paused ? 'Retomar' : 'Pausar'} className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
               {paused ? <Play size={16} /> : <Pause size={16} />}
             </button>
@@ -11373,6 +11770,66 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               </div>
               {/* luz de palco suave por cima */}
               <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
+
+              {/* SUSPENSE — o palco escurece e um facho varre procurando a
+                  resposta, enquanto o tambor rufa. Sai no instante da revelação. */}
+              {waiting && (
+                <>
+                  <div aria-hidden className="qz-dim absolute inset-0 pointer-events-none z-10" style={{ background: 'rgba(8,16,32,0.55)' }} />
+                  <div aria-hidden className="absolute inset-0 overflow-hidden pointer-events-none z-10">
+                    <div className="qz-spot absolute inset-y-0 w-1/3" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,240,190,0.35),transparent)' }} />
+                  </div>
+                  <div className="absolute inset-x-0 bottom-3 z-20 flex justify-center pointer-events-none">
+                    <div className="rounded-full px-4 py-1.5 border-2 border-white/50 shadow-xl" style={{ background: 'rgba(12,24,42,0.8)' }}>
+                      <p className="text-white font-black text-sm tracking-widest flex items-center gap-1">
+                        SERÁ<span className="qz-dot-1">.</span><span className="qz-dot-2">.</span><span className="qz-dot-3">.</span>
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* CRONÔMETRO — anel no canto do palco, pulsa e treme quando aperta */}
+              <div className={`absolute top-2.5 left-2.5 w-16 h-16 z-20 ${stage === 'ask' && !paused && timePct <= 0.25 ? 'qz-urgent' : ''}`}>
+                <svg viewBox="0 0 48 48" className={`w-full h-full -rotate-90 drop-shadow-lg ${stage === 'ask' && !paused && timePct <= 0.15 ? 'qz-tick-shake' : ''}`}>
+                  <circle cx="24" cy="24" r="20" fill="rgba(12,24,42,0.65)" stroke="rgba(255,255,255,0.18)" strokeWidth="5" />
+                  <circle
+                    cx="24" cy="24" r="20" fill="none" stroke={timeColor} strokeWidth="5" strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 20}
+                    strokeDashoffset={2 * Math.PI * 20 * (1 - (stage === 'ask' ? timePct : 0))}
+                    style={{ transition: 'stroke 0.3s' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-black text-white text-xl leading-none drop-shadow" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}>
+                    {stage === 'ask' ? Math.ceil(msLeft / 1000) : waiting ? '?' : '–'}
+                  </span>
+                </div>
+              </div>
+
+              {/* COMBO — selo de fogo no canto oposto, a partir de 2 seguidas */}
+              {streak >= 2 && (
+                <div key={streak} className="qz-combo-in absolute top-3 right-2.5">
+                  <div className="qz-combo-beat rounded-2xl px-2.5 py-1.5 shadow-xl border-2 border-white/70" style={{ background: 'linear-gradient(180deg,#f9a03c,#dc4b4b)' }}>
+                    <p className="text-white font-black text-sm leading-none flex items-center gap-1 drop-shadow">
+                      <Flame size={14} strokeWidth={3} /> {streak}
+                    </p>
+                    <p className="text-white/85 text-[8px] font-black tracking-widest leading-none mt-0.5">SEGUIDAS</p>
+                  </div>
+                </div>
+              )}
+
+              {/* pontos ganhos subindo no meio do palco */}
+              {pop && (
+                <div key={pop.key} className="qz-score-pop absolute left-1/2 top-1/2 z-20 pointer-events-none text-center">
+                  <p className="text-4xl font-black text-[#7bf0a6]" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>+{pop.val}</p>
+                  {pop.fast && (
+                    <p className="text-xs font-black text-amber-300 tracking-widest mt-0.5 flex items-center justify-center gap-0.5" style={{ textShadow: '0 2px 6px rgba(0,0,0,0.8)' }}>
+                      <Zap size={12} fill="currentColor" /> RELÂMPAGO
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* palco de tábuas azuis com a pergunta e as respostas */}
@@ -11381,7 +11838,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               <div aria-hidden className="absolute top-0 inset-x-0 h-2" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.25),transparent)' }} />
 
               {/* CARTÃO DA PERGUNTA — balão creme com bico apontando pro banner */}
-              <div key={idx} className="relative qz-anim-pop">
+              <div key={idx} className="relative qz-card-in">
                 <div aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-[#f7efdc]" style={{ boxShadow: '-2px -2px 4px rgba(0,0,0,0.08)' }} />
                 <div className="relative bg-[#f7efdc] rounded-3xl p-4 shadow-2xl border border-[#d8c9a4]">
                   {/* parafusos decorativos */}
@@ -11391,12 +11848,13 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                   <div className="space-y-2">
                     {q.options.map((opt, i) => {
                       const isCorrect = i === q.correct;
-                      const rowState = answered && isCorrect ? 'correct' : answered && selected === i ? 'wrong' : 'idle';
+                      const rowState = answered && isCorrect ? 'correct' : answered && selected === i ? 'wrong' : 'idle';   // 'idle' também durante o suspense
                       return (
                         <div
                           key={i}
-                          className="flex items-start gap-2.5 rounded-2xl px-3 py-2 transition-colors border"
+                          className="qz-opt-in flex items-start gap-2.5 rounded-2xl px-3 py-2 transition-colors border"
                           style={{
+                            animationDelay: `${0.12 + i * 0.06}s`,
                             background: rowState === 'correct' ? '#d8f2df' : rowState === 'wrong' ? '#fadada' : '#efe3c8',
                             borderColor: rowState === 'correct' ? '#3fae6c' : rowState === 'wrong' ? '#dc4b4b' : 'transparent',
                           }}
@@ -11415,8 +11873,11 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               </div>
 
               {/* faixa de instrução / feedback */}
-              <p className="text-center text-[12px] font-black tracking-wide mt-5 mb-3" style={{ color: answered ? (gotIt ? '#7bf0a6' : '#ff9a9a') : 'rgba(255,255,255,0.75)' }}>
-                {paused ? '⏸  JOGO PAUSADO' : answered ? (gotIt ? '✓  RESPOSTA CERTA!' : '✗  ERA A LETRA ' + String.fromCharCode(65 + q.correct)) : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
+              <p className="text-center text-[12px] font-black tracking-wide mt-5 mb-3" style={{ color: waiting ? '#ffd98a' : answered ? (gotIt ? '#7bf0a6' : '#ff9a9a') : 'rgba(255,255,255,0.75)' }}>
+                {paused ? '⏸  JOGO PAUSADO'
+                  : waiting ? (selected === null ? '⏱  ACABOU O TEMPO… VAMOS VER' : '🥁  SERÁ QUE É A LETRA ' + String.fromCharCode(65 + selected) + '?')
+                  : answered ? (gotIt ? '✓  RESPOSTA CERTA!' : selected === null ? '⏱  O TEMPO ACABOU — ERA A LETRA ' + String.fromCharCode(65 + q.correct) : '✗  ERA A LETRA ' + String.fromCharCode(65 + q.correct))
+                  : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
               </p>
 
               {/* BOTÕES A/B/C/D */}
@@ -11425,27 +11886,79 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                   const isCorrect = i === q.correct;
                   const isSel = selected === i;
                   const dim = answered && !isCorrect && !isSel;
-                  const animCls = answered && isCorrect ? '' : answered && isSel ? '' : '';
+                  // no suspense só a escolhida late; as outras apagam um pouco
+                  const dimWait = waiting && !isSel;
                   return (
                     <button
-                      key={i}
-                      disabled={answered || paused}
+                      key={`${idx}-${i}`}
+                      disabled={stage !== 'ask' || paused}
                       onClick={() => answer(i)}
-                      className="relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-[3px] active:translate-y-0.5 transition-all"
+                      className={`qz-btn-in relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-[3px] active:translate-y-0.5 transition-all ${waiting && isSel ? 'qz-waiting' : ''} ${answered && isCorrect ? 'qz-bounce-in' : ''} ${answered && isSel && !isCorrect ? 'qz-wrong-shake' : ''}`}
                       style={{
+                        animationDelay: stage === 'ask' ? `${0.18 + i * 0.07}s` : '0s',
                         background: letterColors[i],
                         borderColor: 'rgba(255,255,255,0.9)',
-                        opacity: dim ? 0.35 : 1,
-                        boxShadow: answered && isCorrect ? '0 0 0 3px #fff, 0 0 22px 4px rgba(123,240,166,0.8)' : answered && isSel ? '0 0 0 3px #fff, 0 0 18px 3px rgba(255,120,120,0.8)' : '0 4px 10px rgba(0,0,0,0.35)',
-                        animation: answered && isSel && !isCorrect ? 'qz-shake 0.4s ease' : 'none',
+                        opacity: dim ? 0.35 : dimWait ? 0.4 : 1,
+                        boxShadow: answered && isCorrect ? '0 0 0 3px #fff, 0 0 22px 4px rgba(123,240,166,0.8)'
+                          : answered && isSel ? '0 0 0 3px #fff, 0 0 18px 3px rgba(255,120,120,0.8)'
+                          : waiting && isSel ? '0 0 0 3px #fff, 0 0 24px 6px rgba(255,217,138,0.85)'
+                          : '0 4px 10px rgba(0,0,0,0.35)',
                       }}
                     >
                       <span aria-hidden className="absolute inset-x-1.5 top-1.5 h-1/3 rounded-t-xl pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.35),transparent)' }} />
-                      {answered && isCorrect ? <CheckCircle2 size={30} /> : answered && isSel ? <X size={30} /> : String.fromCharCode(65 + i)}
+                      {/* onda de choque + faíscas saindo da alternativa certa */}
+                      {answered && isCorrect && (
+                        <>
+                          <span aria-hidden className="qz-ring absolute inset-0 rounded-2xl border-4 border-emerald-200 pointer-events-none" />
+                          {[[-34, -30], [32, -34], [-30, 30], [34, 28], [0, -44], [0, 42]].map(([dx, dy], k) => (
+                            <span
+                              key={k}
+                              aria-hidden
+                              className="qz-spark absolute w-1.5 h-1.5 rounded-full bg-emerald-200 pointer-events-none"
+                              style={{ ['--dx' as any]: `${dx}px`, ['--dy' as any]: `${dy}px`, animationDelay: `${k * 0.03}s` }}
+                            />
+                          ))}
+                        </>
+                      )}
+                      {answered && isCorrect ? <CheckCircle2 size={30} />
+                        : answered && isSel ? <X size={30} />
+                        : waiting && isSel ? <span className="text-2xl tracking-tighter"><span className="qz-dot-1">.</span><span className="qz-dot-2">.</span><span className="qz-dot-3">.</span></span>
+                        : String.fromCharCode(65 + i)}
                     </button>
                   );
                 })}
               </div>
+
+              {/* POR QUE — a parte que ensina. Só aparece depois de responder, e
+                  o avanço é por botão (não automático) pra dar tempo de ler e
+                  do professor comentar com a turma. */}
+              {answered && (
+                <div className="qz-anim-pop mt-4">
+                  {q.explain && (
+                    <div className="rounded-2xl px-4 py-3 border-2 mb-2.5" style={{ background: 'rgba(20,32,56,0.55)', borderColor: 'rgba(201,182,232,0.45)' }}>
+                      <p className="text-[10px] font-black tracking-widest text-[#c9b6e8] mb-1 flex items-center gap-1">
+                        <Lightbulb size={12} /> POR QUE
+                      </p>
+                      <p className="text-sm text-white/90 leading-relaxed">{q.explain}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={next}
+                    className="relative overflow-hidden w-full rounded-2xl py-3.5 font-black text-white text-base border-2 shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+                    style={{ background: violet, borderColor: '#c9b6e8' }}
+                  >
+                    {/* enche sozinha até o avanço automático; tocar pula na hora */}
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 pointer-events-none"
+                      style={{ width: `${100 - (autoLeft / QZ_NEXT_MS) * 100}%`, background: 'rgba(255,255,255,0.22)', transition: 'width .1s linear' }}
+                    />
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      {idx + 1 >= questions.length ? <><Trophy size={18} /> Ver resultado</> : <>Próxima pergunta <ChevronRight size={18} /></>}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -11455,40 +11968,78 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         const pct = questions.length ? Math.round((score / questions.length) * 100) : 0;
         const stars = pct >= 90 ? 3 : pct >= 60 ? 2 : pct >= 30 ? 1 : 0;
         const msg = pct >= 90 ? 'Turma brilhante! 🌟' : pct >= 60 ? 'Mandaram muito bem!' : pct >= 30 ? 'Bom jogo — dá pra revisar e voltar!' : 'Bora revisar e tentar de novo!';
+        const misses = questions.map((qq, i) => ({ qq, i })).filter(({ i }) => log[i] && !log[i].ok);
         return (
           <QuizStage>
-            <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
-              <div className="text-6xl" style={{ animation: 'qz-float 3s ease-in-out infinite' }}>🏆</div>
-              <h2 className="text-2xl font-black text-white" style={{ textShadow: '0 2px 0 #3a2963, 0 0 20px rgba(160,130,215,0.5)' }}>Quiz concluído!</h2>
+            {stars >= 2 && <ConfettiBurst />}
+            <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6">
+              <div className="flex flex-col items-center text-center gap-4 max-w-sm mx-auto">
+                <div className="text-6xl" style={{ animation: 'qz-float 3s ease-in-out infinite' }}>🏆</div>
+                <h2 className="text-2xl font-black text-white" style={{ textShadow: '0 2px 0 #3a2963, 0 0 20px rgba(160,130,215,0.5)' }}>Quiz concluído!</h2>
 
-              {/* estrelas */}
-              <div className="flex gap-1.5">
-                {[0, 1, 2].map(s => (
-                  <Star key={s} size={30} className={s < stars ? 'text-yellow-300' : 'text-white/20'} fill={s < stars ? '#fde047' : 'transparent'} style={{ animation: s < stars ? `qz-rise .4s ease-out ${s * 0.12}s both` : 'none' }} />
-                ))}
-              </div>
-
-              {/* placar em anel */}
-              <div className="relative w-40 h-40 my-1">
-                <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-                  <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.28)" strokeWidth="12" />
-                  <circle cx="60" cy="60" r="52" fill="none" stroke="#b79af0" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${(pct / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`} style={{ transition: 'stroke-dasharray 1s ease' }} />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-black text-white">{score}<span className="text-xl text-indigo-100/60">/{questions.length}</span></span>
-                  <span className="text-xs font-bold text-indigo-100/75">{pct}% de acerto</span>
+                {/* estrelas */}
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map(s => (
+                    <Star key={s} size={30} className={s < stars ? 'text-yellow-300' : 'text-white/20'} fill={s < stars ? '#fde047' : 'transparent'} style={{ animation: s < stars ? `qz-rise .4s ease-out ${s * 0.12}s both` : 'none' }} />
+                  ))}
                 </div>
-              </div>
 
-              <p className="text-indigo-100 font-semibold">{msg}</p>
+                {/* placar em anel */}
+                <div className="relative w-40 h-40 my-1">
+                  <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.28)" strokeWidth="12" />
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="#b79af0" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${(pct / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`} style={{ transition: 'stroke-dasharray 1s ease' }} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-4xl font-black text-white">{score}<span className="text-xl text-indigo-100/60">/{questions.length}</span></span>
+                    <span className="text-xs font-bold text-indigo-100/75">{pct}% de acerto</span>
+                  </div>
+                </div>
 
-              <div className="w-full max-w-xs flex flex-col gap-2.5 mt-1">
-                <button onClick={() => { setPhase('setup'); setTopic(''); }} className="w-full rounded-2xl py-3 font-black text-white border-2 shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2" style={{ background: violet, borderColor: '#c9b6e8' }}>
-                  <RotateCcw size={18} /> Jogar de novo
-                </button>
-                <button onClick={onExitApp} className="w-full rounded-2xl py-2.5 font-bold text-indigo-100/90 bg-white/8 border border-white/20 active:scale-[0.98] transition-transform">
-                  Voltar aos Jogos
-                </button>
+                {/* pontos e melhor combo */}
+                <div className="grid grid-cols-2 gap-2.5 w-full">
+                  <div className="rounded-2xl px-3 py-2.5 border border-white/15" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <Zap size={15} className="mx-auto mb-1 text-amber-300" />
+                    <p className="text-white font-black text-xl leading-none">{points}</p>
+                    <p className="text-[9px] text-indigo-100/60 mt-1">pontos</p>
+                  </div>
+                  <div className="rounded-2xl px-3 py-2.5 border border-white/15" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <Flame size={15} className="mx-auto mb-1 text-orange-300" />
+                    <p className="text-white font-black text-xl leading-none">{bestStreak}</p>
+                    <p className="text-[9px] text-indigo-100/60 mt-1">melhor combo</p>
+                  </div>
+                </div>
+
+                <p className="text-indigo-100 font-semibold">{msg}</p>
+
+                {/* o que escapou — vira a pauta da revisão logo depois do jogo */}
+                {misses.length > 0 && (
+                  <div className="w-full rounded-2xl p-4 border border-white/15 text-left" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <p className="text-[10px] font-black tracking-widest text-rose-300 mb-2.5 flex items-center gap-1.5">
+                      <AlertCircle size={12} /> PARA REVISAR COM A TURMA
+                    </p>
+                    <div className="space-y-3">
+                      {misses.map(({ qq, i }) => (
+                        <div key={i} className="border-l-2 border-rose-400/60 pl-3">
+                          <p className="text-xs text-white/85 font-bold leading-snug">{i + 1}. {qq.q}</p>
+                          <p className="text-[11px] text-emerald-300 mt-0.5 leading-snug">
+                            {String.fromCharCode(65 + qq.correct)}) {qq.options[qq.correct]}
+                          </p>
+                          {qq.explain && <p className="text-[11px] text-indigo-100/70 mt-0.5 leading-snug">{qq.explain}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="w-full max-w-xs flex flex-col gap-2.5 mt-1 pb-2">
+                  <button onClick={() => { setPhase('setup'); setTopic(''); }} className="w-full rounded-2xl py-3 font-black text-white border-2 shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2" style={{ background: violet, borderColor: '#c9b6e8' }}>
+                    <RotateCcw size={18} /> Jogar de novo
+                  </button>
+                  <button onClick={onExitApp} className="w-full rounded-2xl py-2.5 font-bold text-indigo-100/90 bg-white/8 border border-white/20 active:scale-[0.98] transition-transform">
+                    Voltar aos Jogos
+                  </button>
+                </div>
               </div>
             </div>
           </QuizStage>
