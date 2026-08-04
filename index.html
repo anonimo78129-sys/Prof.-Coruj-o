@@ -13,10 +13,24 @@
     <meta property="og:image" content="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" />
     <meta name="twitter:card" content="summary" />
     <link rel="manifest" href="/manifest.json" />
-    <!-- Fontes pixel art da Batalha: Press Start 2P (8-bit, curtos) + VT323 (corpo) -->
+    <!-- Fontes pixel art da Batalha: Press Start 2P (8-bit, curtos) + VT323 (corpo).
+         Carregadas SEM bloquear a renderização: como <link rel="stylesheet"> normal,
+         esta folha de estilo é bloqueante e mora num domínio externo — se o
+         fonts.googleapis.com demora ou não responde (rede ruim, offline, rede de
+         escola que bloqueia), o parser trava antes do <div id="root"> e o app abre
+         em branco. Com media="print" o navegador baixa sem bloquear e o onload
+         promove para "all" quando chega. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+    </noscript>
     <link rel="icon" type="image/png" href="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" />
     <link rel="apple-touch-icon" href="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" />
     <title>Prof. Corujão — IA para Professores</title>
