@@ -24,7 +24,12 @@ export default defineConfig(({ mode }) => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           // Assets do jogo Escape (Mundo Perdido) somam ~130MB — ficam fora
           // do precache do service worker e carregam sob demanda.
-          globIgnores: ['escape-assets/**'],
+          // As ilustrações da Batalha e do Quiz Relâmpago (~12MB) também: com
+          // elas dentro, o precache passava de 15MB e a instalação do SW novo
+          // demorava tanto que o reload do autoUpdate pegava o service worker
+          // ocupado — a página ficava presa em readyState "loading" (tela
+          // branca) até o usuário recarregar de novo.
+          globIgnores: ['escape-assets/**', 'assets/battle/**'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
       }),
