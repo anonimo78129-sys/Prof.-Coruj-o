@@ -92,8 +92,9 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 
 ### PWA (App instalável)
 - Instalável no celular e no computador (Android, iOS, Windows, Mac)
-- Service worker com cache de ativos estáticos
-- Funciona offline (interface e dados em cache)
+- Notificações push mesmo com o app fechado (Firebase Cloud Messaging)
+- Service worker sem precache: cada atualização publicada vale na hora, sem
+  precisar limpar o cache e sem baixar megabytes a cada deploy
 
 ---
 

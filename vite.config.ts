@@ -21,11 +21,10 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['manifest.json'],
         manifest: false,
         injectManifest: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          // Assets do jogo Escape (Mundo Perdido) somam ~130MB — ficam fora
-          // do precache do service worker e carregam sob demanda.
-          globIgnores: ['escape-assets/**'],
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          // Precache vazio de propósito: o service worker não guarda mais nada
+          // (ver o comentário no topo de src/sw.ts). Ele existe só para o push
+          // do FCM e para o app continuar instalável.
+          globPatterns: [],
         },
       }),
     ],
