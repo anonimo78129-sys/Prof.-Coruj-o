@@ -8,7 +8,7 @@ import {
   Play, Clock, CheckCircle2, ChevronRight, ChevronDown,
   Sparkles, BookOpen, FileText, Presentation, GripVertical,
   Settings, Plus, Send, Loader2, FileQuestion, Image as ImageIcon,
-  Layers, MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Upload, Paperclip, Shield, LogOut, Trash2,
+  MessageCircle, MessageSquare, Camera, Database, Archive, Download, FileUp, Upload, Paperclip, Shield, LogOut, Trash2,
   MapPin, RefreshCw, ClipboardList, Coffee, Users, Library, Filter, HardDrive, FolderOpen, X,
   Wand2, Grid3x3, Puzzle, Dice5, Layers3, Trophy, ScrollText, AlertCircle, KeyRound, Lock, Pencil,
   Volume2, Shuffle, Swords, Crown, Zap, Gift, Pause, RotateCcw, Dices, Timer as TimerIcon, Star, Minus, Hand, Ticket, Siren,
@@ -17,7 +17,6 @@ import {
   Egg, Feather, Bird, Medal, Gem, Sprout, Flame, Rocket, Dumbbell, VolumeX, BookX, AlertTriangle, Footprints,
   Armchair, Music2, Fish, HeartCrack, PawPrint, Percent, Smartphone, TestTube, Landmark, Check,
   Lightbulb, Sparkle, Compass, FlaskConical, Pickaxe, Goal, Gamepad2, Skull, Palette, MessagesSquare, Circle, Heart,
-  Scissors, SkipForward, HelpCircle,
 } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -698,7 +697,7 @@ interface BackgroundTask {
   meta?: Record<string, any>;
 }
 
-const STUDIO_TASK_TYPES = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'escape', 'memory', 'sequencia', 'flashcard'] as const;
+const STUDIO_TASK_TYPES = ['story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'escape', 'memory', 'sequencia'] as const;
 const isStudioTaskType = (t: string) => (STUDIO_TASK_TYPES as readonly string[]).includes(t);
 
 interface UserProfile {
@@ -6960,7 +6959,7 @@ const CalendarScreen = ({
   );
 };
 
-type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'escape' | 'memory' | 'sequencia' | 'flashcard';
+type GameMode = 'story' | 'quiz' | 'wordsearch' | 'crossword' | 'bingo' | 'escape' | 'memory' | 'sequencia';
 type EscapeTheme = 'medieval' | 'lab' | 'detective' | 'space';
 
 const buildWordSearchGrid = (rawWords: string[], size = 15): { grid: string[][], placements: {word: string, row: number, col: number, dir: string}[] } => {
@@ -7361,8 +7360,7 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         'Palavras Cruzadas':     { ac:'#2563eb', light:'#eff6ff', emoji:'✏️' },
         'Bingo Educativo':       { ac:'#db2777', light:'#fdf2f8', emoji:'🎱' },
         'Jogo da Memoria':       { ac:'#0d9488', light:'#f0fdfa', emoji:'🃏' },
-        'Sequencia Didatica':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📋' },
-        'Flashcards':            { ac:'#ea580c', light:'#fff7ed', emoji:'🗂️' }
+        'Sequencia Didatica':    { ac:'#7c3aed', light:'#f5f3ff', emoji:'📋' }
       };
       // labels chegam acentuados; keys do objeto são sem acento — normaliza para casar
       var norm = function(s){ return s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); };
@@ -7508,14 +7506,12 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
         });
       }
 
-      // ── MEMORY / FLASHCARDS: cut hint próprio de cada jogo ─
+      // ── MEMORY: cut hint das fichas ──────────────────────
       var memGrid = document.querySelector('.memory-grid');
       if (memGrid) {
         var hint = document.createElement('p');
         hint.className = 'cut-hint';
-        hint.innerHTML = memGrid.classList.contains('flashcard-grid')
-          ? '✂&nbsp; Recorte os cartões pelas linhas tracejadas &mdash; <strong>frente</strong> e <strong>verso</strong> são cartas separadas: use a frente para perguntar e o verso para conferir a resposta.'
-          : '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
+        hint.innerHTML = '✂&nbsp; Recorte as fichas e embaralhe &mdash; <strong>conceitos</strong> com fundo colorido, <strong>definições</strong> com fundo branco.';
         memGrid.before(hint);
       }
 
@@ -8058,7 +8054,7 @@ const EstudioScreen = ({
     setIsGenerating(true);
     setResult(null);
     localGenActiveRef.current = true;
-    const modeLabels: Record<GameMode, string> = { story: 'Storytelling', quiz: 'Quiz', wordsearch: 'Caça-Palavras', crossword: 'Cruzadas', bingo: 'Bingo', escape: 'Escape Room', memory: 'Memória', sequencia: 'Sequência Didática', flashcard: 'Flashcards' };
+    const modeLabels: Record<GameMode, string> = { story: 'Storytelling', quiz: 'Quiz', wordsearch: 'Caça-Palavras', crossword: 'Cruzadas', bingo: 'Bingo', escape: 'Escape Room', memory: 'Memória', sequencia: 'Sequência Didática' };
     const taskId = addTask({
       type: activeMode,
       title: `${modeLabels[activeMode]}: ${topic.trim().slice(0, 40)}`,
@@ -8181,12 +8177,6 @@ Retorne em Markdown brasileiro com EXATAMENTE as seções abaixo (substitua [ ] 
 [Lista de materiais por etapa, priorizando recursos simples e acessíveis]
 
 NÃO use código nem tabelas Markdown. Português brasileiro natural.`;
-      } else if (activeMode === 'flashcard') {
-        prompt = `Gere ${count} flashcards de estudo sobre "${topic}" (${defaultSubject}, ${defaultLevel}) para revisão de conteúdo.
-FRENTE: pergunta curta, termo ou conceito-chave (máx. 12 palavras).
-VERSO: resposta/explicação clara e completa em 1-2 frases (máx. 30 palavras).
-Varie os tipos: definição, "o que é", causa/efeito, exemplo, comparação.
-Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji":"💡"}]}`;
       }
       let finalResult: any = null;
       if (activeMode === 'story') {
@@ -8278,7 +8268,6 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
     escape: { title: 'Escape Room', icon: KeyRound, color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200', desc: 'Enigmas encadeados temáticos para imprimir' },
     memory: { title: 'Memória', icon: Layers3, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', desc: 'Pares de conceito e definição para combinar' },
     sequencia: { title: 'Sequência Didática', icon: ClipboardList, color: 'text-violet-600', bg: 'bg-violet-50 border-violet-200', desc: 'Passo a passo completo com etapas, inclusão e avaliação' },
-    flashcard: { title: 'Flashcards', icon: Layers, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', desc: 'Cartões de revisão frente e verso para imprimir' },
   };
 
   const smallActivities: GameMode[] = ['sequencia', 'escape', 'story', 'quiz', 'wordsearch', 'crossword', 'bingo', 'memory'];
@@ -8297,7 +8286,6 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
     escape: { bg: 'bg-rose-600', icon: 'text-white', title: 'text-white' },
     memory: { bg: 'bg-teal-600', icon: 'text-white', title: 'text-white' },
     sequencia: { bg: 'bg-violet-600', icon: 'text-white', title: 'text-white' },
-    flashcard: { bg: 'bg-orange-600', icon: 'text-white', title: 'text-white' },
   };
 
   return (
@@ -8528,10 +8516,10 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       </div>
                     </>
                   )}
-                  {(activeMode === 'crossword' || activeMode === 'memory' || activeMode === 'flashcard') && (
+                  {(activeMode === 'crossword' || activeMode === 'memory') && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        {activeMode === 'memory' ? 'Quantidade de pares' : activeMode === 'flashcard' ? 'Quantidade de cartões' : 'Quantidade de palavras'}
+                        {activeMode === 'memory' ? 'Quantidade de pares' : 'Quantidade de palavras'}
                       </label>
                       <input type="number" min={5} max={20} value={count} onChange={e => setCount(parseInt(e.target.value) || 0)} onBlur={() => setCount(c => Math.max(5, Math.min(20, c || 10)))} className="w-full mt-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm" />
                     </div>
@@ -8631,7 +8619,7 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                 const activityLabels: Record<GameMode, string> = {
                   story: 'Metáfora Narrativa', quiz: 'Quiz Avaliativo', wordsearch: 'Caça-Palavras',
                   crossword: 'Palavras Cruzadas', bingo: 'Bingo Educativo', escape: 'Escape Room', memory: 'Jogo da Memória',
-                  sequencia: 'Sequência Didática', flashcard: 'Flashcards'
+                  sequencia: 'Sequência Didática'
                 };
                 const printOpts = {
                   title: result.title || topic,
@@ -8884,26 +8872,6 @@ Retorne APENAS JSON: {"title":"...","cards":[{"front":"...","back":"...","emoji"
                       </div>
                     )}
 
-                    {activeMode === 'flashcard' && result.cards && (
-                      <>
-                        <div className="instructions"><b>Como usar:</b> Imprima e recorte os cartões pelas linhas tracejadas. Frente e verso são cartas separadas: use a frente para perguntar e o verso para conferir a resposta. Ideal para revisão individual, em duplas ou jogo rápido de perguntas.</div>
-                        <div className="memory-grid flashcard-grid">
-                          {result.cards.map((c: any, i: number) => (
-                            <React.Fragment key={i}>
-                              <div className="memory-pair concept">
-                                {c.emoji && <span style={{fontSize:18,display:'block',marginBottom:2}}>{c.emoji}</span>}
-                                <span style={{fontSize:9,display:'block',opacity:0.6,marginBottom:2,letterSpacing:1}}>FRENTE · {i + 1}</span>
-                                {c.front}
-                              </div>
-                              <div className="memory-pair">
-                                <span style={{fontSize:9,display:'block',opacity:0.6,marginBottom:2,letterSpacing:1}}>VERSO · {i + 1}</span>
-                                {c.back}
-                              </div>
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
                 );
@@ -9436,6 +9404,118 @@ const playHealChime = () => {
       o.start(t);
       o.stop(t + 0.32);
       setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, (i * 90) + 500);
+    });
+  } catch { /* sem áudio disponível */ }
+};
+
+// Estalo curto do cronômetro nos segundos finais — fica mais agudo no aperto.
+const playTick = (urgent = false) => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(urgent ? 1600 : 1050, ctx.currentTime);
+    g.gain.setValueAtTime(urgent ? 0.055 : 0.03, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.07);
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.08);
+    setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, 200);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Raio: frequência despencando com chiado por cima — toca quando o combo sobe.
+const playZap = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(2200, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(280, ctx.currentTime + 0.18);
+    g.gain.setValueAtTime(0.09, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.24);
+
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(1800, ctx.currentTime);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.09, ctx.currentTime);
+    ng.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.14);
+    src.connect(filter); filter.connect(ng); ng.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.16);
+    setTimeout(() => { try { o.disconnect(); g.disconnect(); src.disconnect(); filter.disconnect(); ng.disconnect(); } catch {} }, 400);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Rufar de tambor: batidas de ruído acelerando com um zumbido subindo por
+// cima. Toca no intervalo de suspense, entre o toque na resposta e a revelação.
+const playDrumroll = (ms = 1400) => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const dur = ms / 1000;
+    const nodes: AudioNode[] = [];
+    const HITS = 20;
+    for (let i = 0; i < HITS; i++) {
+      const p = i / HITS;
+      const t = t0 + dur * Math.pow(p, 1.4);           // batidas acelerando no fim
+      const src = ctx.createBufferSource();
+      src.buffer = getNoiseBuffer(ctx);
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(600 + p * 700, t);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.035 + p * 0.05, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      src.connect(f); f.connect(g); g.connect(ctx.destination);
+      src.start(t); src.stop(t + 0.07);
+      nodes.push(src, f, g);
+    }
+    // zumbido grave subindo junto, pra sensação de "vai revelar"
+    const o = ctx.createOscillator();
+    const og = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(110, t0);
+    o.frequency.exponentialRampToValueAtTime(240, t0 + dur);
+    og.gain.setValueAtTime(0.0001, t0);
+    og.gain.exponentialRampToValueAtTime(0.07, t0 + dur * 0.75);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(og); og.connect(ctx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+    nodes.push(o, og);
+    setTimeout(() => { nodes.forEach(n => { try { n.disconnect(); } catch {} }); }, ms + 400);
+  } catch { /* sem áudio disponível */ }
+};
+
+// Fanfarra do fim de jogo — acorde ascendente, mais longo que o playHealChime.
+const playFanfare = () => {
+  try {
+    const ctx = getChimeCtx();
+    if (!ctx) return;
+    [523, 659, 784, 1046].forEach((freq, i) => {
+      const t = ctx.currentTime + i * 0.13;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.13, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.52);
+      setTimeout(() => { try { o.disconnect(); g.disconnect(); } catch {} }, (i * 130) + 800);
     });
   } catch { /* sem áudio disponível */ }
 };
@@ -11103,89 +11183,35 @@ onde "correct" é o índice (0 a 3) da alternativa correta.`;
   );
 };
 
-// ─── Rumo ao Milhão — quiz de escada de prêmios (turma vs turma) ──────────────
-type MilhaoQ = { q: string; options: string[]; correct: number };
-// 9 degraus; "safe" = parada segura (errar acima dela não zera: cai pra ela).
-const MILHAO_LADDER: { prize: number; safe?: boolean }[] = [
-  { prize: 1000 }, { prize: 2000 }, { prize: 5000, safe: true },
-  { prize: 10000 }, { prize: 25000 }, { prize: 50000, safe: true },
-  { prize: 100000 }, { prize: 500000 }, { prize: 1000000 },
-];
-const fmtPrize = (v: number) => v >= 1000000
-  ? `R$ ${(v / 1000000).toLocaleString('pt-BR')} ${v === 1000000 ? 'milhão' : 'milhões'}`
-  : `R$ ${v.toLocaleString('pt-BR')}`;
-
+// ─── Quiz Relâmpago — tipos e banco de perguntas de teste ────────────────────
+type QuizQ = { q: string; options: string[]; correct: number; explain?: string };
 // Banco fixo pra testar o jogo sem chamar a IA (rápido, sem gastar cota).
 // 18 perguntas, ordenadas fácil → difícil (mesmo formato do que a IA gera).
-const MILHAO_SAMPLE_QUESTIONS: MilhaoQ[] = [
-  { q: 'Quantos dias tem uma semana?', options: ['5', '6', '7', '8'], correct: 2 },
-  { q: 'De que cor é o céu num dia sem nuvens?', options: ['Verde', 'Azul', 'Cinza', 'Roxo'], correct: 1 },
-  { q: 'Quantas patas tem um cachorro?', options: ['2', '3', '4', '6'], correct: 2 },
-  { q: 'Qual é a capital do Brasil?', options: ['Rio de Janeiro', 'Brasília', 'São Paulo', 'Salvador'], correct: 1 },
-  { q: 'Quanto é 7 x 8?', options: ['54', '56', '58', '64'], correct: 1 },
-  { q: 'Quem escreveu "Dom Casmurro"?', options: ['José de Alencar', 'Machado de Assis', 'Clarice Lispector', 'Monteiro Lobato'], correct: 1 },
-  { q: 'Qual planeta é conhecido como Planeta Vermelho?', options: ['Vênus', 'Júpiter', 'Marte', 'Saturno'], correct: 2 },
-  { q: 'Qual é o maior oceano do mundo?', options: ['Atlântico', 'Índico', 'Ártico', 'Pacífico'], correct: 3 },
-  { q: 'Em que ano o Brasil foi "descoberto"?', options: ['1500', '1822', '1889', '1600'], correct: 0 },
-  { q: 'Qual é o osso mais longo do corpo humano?', options: ['Úmero', 'Fêmur', 'Tíbia', 'Rádio'], correct: 1 },
-  { q: 'Quantos lados tem um hexágono?', options: ['5', '6', '7', '8'], correct: 1 },
-  { q: 'Qual gás as plantas liberam na fotossíntese?', options: ['Gás carbônico', 'Nitrogênio', 'Oxigênio', 'Hidrogênio'], correct: 2 },
-  { q: 'Quem pintou a Mona Lisa?', options: ['Michelangelo', 'Van Gogh', 'Da Vinci', 'Picasso'], correct: 2 },
-  { q: 'Qual é o menor país do mundo?', options: ['Mônaco', 'San Marino', 'Vaticano', 'Liechtenstein'], correct: 2 },
-  { q: 'Quanto é a raiz quadrada de 144?', options: ['10', '11', '12', '14'], correct: 2 },
-  { q: 'Em que continente fica o deserto do Saara?', options: ['Ásia', 'África', 'Oceania', 'América'], correct: 1 },
-  { q: 'Qual elemento químico tem símbolo "Au"?', options: ['Prata', 'Alumínio', 'Ouro', 'Argônio'], correct: 2 },
-  { q: 'Quem foi o primeiro presidente do Brasil?', options: ['Getúlio Vargas', 'Deodoro da Fonseca', 'Pedro Álvares Cabral', 'Juscelino Kubitschek'], correct: 1 },
+const QUIZ_SAMPLE_QUESTIONS: QuizQ[] = [
+  { q: 'Quantos dias tem uma semana?', options: ['5', '6', '7', '8'], correct: 2, explain: 'A semana tem 7 dias: de segunda a domingo.' },
+  { q: 'De que cor é o céu num dia sem nuvens?', options: ['Verde', 'Azul', 'Cinza', 'Roxo'], correct: 1, explain: 'A luz do Sol se espalha no ar e a cor azul se espalha mais que as outras.' },
+  { q: 'Quantas patas tem um cachorro?', options: ['2', '3', '4', '6'], correct: 2, explain: 'Cachorro é um quadrúpede: anda sobre 4 patas.' },
+  { q: 'Qual é a capital do Brasil?', options: ['Rio de Janeiro', 'Brasília', 'São Paulo', 'Salvador'], correct: 1, explain: 'Brasília é a capital desde 1960, quando o governo saiu do Rio de Janeiro.' },
+  { q: 'Quanto é 7 x 8?', options: ['54', '56', '58', '64'], correct: 1, explain: '7 x 8 = 56. Dá pra conferir somando 7 oito vezes.' },
+  { q: 'Quem escreveu "Dom Casmurro"?', options: ['José de Alencar', 'Machado de Assis', 'Clarice Lispector', 'Monteiro Lobato'], correct: 1, explain: 'Machado de Assis publicou Dom Casmurro em 1899, com o famoso ciúme de Bentinho.' },
+  { q: 'Qual planeta é conhecido como Planeta Vermelho?', options: ['Vênus', 'Júpiter', 'Marte', 'Saturno'], correct: 2, explain: 'Marte parece vermelho porque o solo dele é cheio de ferro enferrujado.' },
+  { q: 'Qual é o maior oceano do mundo?', options: ['Atlântico', 'Índico', 'Ártico', 'Pacífico'], correct: 3, explain: 'O Pacífico é o maior: sozinho cobre quase um terço da superfície da Terra.' },
+  { q: 'Em que ano o Brasil foi "descoberto"?', options: ['1500', '1822', '1889', '1600'], correct: 0, explain: 'A frota de Cabral chegou ao litoral da Bahia em 1500 — mas já havia povos indígenas aqui.' },
+  { q: 'Qual é o osso mais longo do corpo humano?', options: ['Úmero', 'Fêmur', 'Tíbia', 'Rádio'], correct: 1, explain: 'O fêmur, o osso da coxa, é o mais longo e também o mais resistente.' },
+  { q: 'Quantos lados tem um hexágono?', options: ['5', '6', '7', '8'], correct: 1, explain: 'O prefixo "hexa" quer dizer seis: o hexágono tem 6 lados.' },
+  { q: 'Qual gás as plantas liberam na fotossíntese?', options: ['Gás carbônico', 'Nitrogênio', 'Oxigênio', 'Hidrogênio'], correct: 2, explain: 'As plantas absorvem gás carbônico e devolvem oxigênio para o ar.' },
+  { q: 'Quem pintou a Mona Lisa?', options: ['Michelangelo', 'Van Gogh', 'Da Vinci', 'Picasso'], correct: 2, explain: 'Leonardo da Vinci pintou a Mona Lisa por volta de 1503, na Itália.' },
+  { q: 'Qual é o menor país do mundo?', options: ['Mônaco', 'San Marino', 'Vaticano', 'Liechtenstein'], correct: 2, explain: 'O Vaticano tem menos de meio quilômetro quadrado e fica dentro de Roma.' },
+  { q: 'Quanto é a raiz quadrada de 144?', options: ['10', '11', '12', '14'], correct: 2, explain: '12 x 12 = 144, então a raiz quadrada de 144 é 12.' },
+  { q: 'Em que continente fica o deserto do Saara?', options: ['Ásia', 'África', 'Oceania', 'América'], correct: 1, explain: 'O Saara ocupa o norte da África e é o maior deserto quente do mundo.' },
+  { q: 'Qual elemento químico tem símbolo "Au"?', options: ['Prata', 'Alumínio', 'Ouro', 'Argônio'], correct: 2, explain: 'Au vem de "aurum", que quer dizer ouro em latim.' },
+  { q: 'Quem foi o primeiro presidente do Brasil?', options: ['Getúlio Vargas', 'Deodoro da Fonseca', 'Pedro Álvares Cabral', 'Juscelino Kubitschek'], correct: 1, explain: 'Deodoro da Fonseca assumiu em 1889, logo após a Proclamação da República.' },
 ];
 
-// Animações do show (lâmpadas, feixes, brilhos, entrada das alternativas).
-const MILHAO_CSS = `
-@keyframes milhao-twinkle{0%,100%{opacity:1}50%{opacity:.35}}
-@keyframes milhao-sway{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(-7deg)}}
-@keyframes milhao-sway-r{0%,100%{transform:rotate(14deg)}50%{transform:rotate(7deg)}}
-@keyframes milhao-shine{0%{transform:translateX(-140%) skewX(-18deg)}55%,100%{transform:translateX(340%) skewX(-18deg)}}
-@keyframes milhao-pop{0%{opacity:0;transform:translateY(10px) scale(.96)}100%{opacity:1;transform:none}}
-@keyframes milhao-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
-@keyframes milhao-glow{0%,100%{box-shadow:0 0 10px rgba(255,210,77,.9)}50%{box-shadow:0 0 20px 5px rgba(255,210,77,.95)}}
-@keyframes milhao-glow-green{0%,100%{box-shadow:0 4px 0 rgba(0,0,0,.35),0 0 4px rgba(52,211,153,.4)}50%{box-shadow:0 4px 0 rgba(0,0,0,.35),0 0 18px 4px rgba(52,211,153,.85)}}
-@keyframes milhao-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-@media (prefers-reduced-motion:reduce){.milhao-anim *{animation:none!important}}
-`;
-// Brilho que "varre" botões/placas douradas. Pai precisa de relative + overflow-hidden.
-const MilhaoShine = () => (
-  <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)', animation: 'milhao-shine 3s ease-in-out infinite' }} />
-);
 // Ilustração do cenário (fundo do palco) — cobre o placeholder em CSS quando existir.
-const LeilaoFundo = () => (
+const QuizFundo = () => (
   <img src="/assets/battle/fundo.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
 );
-// Ilustração do personagem (Corujão) no palco — PNG com fundo transparente recomendado.
-const LeilaoPersonagem = () => (
-  <img src="/assets/battle/personagem.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 h-full w-auto object-contain" style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
-);
-// Cortina esquerda do palco
-const LeilaoCortinaEsquerda = () => (
-  <img src="/assets/battle/cortina_esquerda.png" alt="" className="absolute inset-y-0 left-0 h-full w-auto object-contain pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
-);
-// Cortina direita (espelhada)
-const LeilaoCortinaDir = () => (
-  <img src="/assets/battle/cortina_esquerda.png" alt="" className="absolute inset-y-0 right-0 h-full w-auto object-contain pointer-events-none transform scale-x-[-1]" onError={e => { e.currentTarget.style.display = 'none'; }} />
-);
-
-// Manter as antigas para compatibilidade temporária (caso GamiMilhao ainda seja usado)
-const MilhaoBgArt = () => (
-  <img src="/assets/battle/milhao-cortina.jpg" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={e => { e.currentTarget.style.display = 'none'; }} />
-);
-const MilhaoCharacterArt = () => (
-  <img src="/assets/battle/milhao-personagem.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 h-40 w-auto object-contain" style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
-);
-// Times genéricos para quem ainda não criou equipes na aba Equipes.
-const MILHAO_FALLBACK = [
-  { name: 'Time Azul', emoji: '🔵', color: '#3b82f6' },
-  { name: 'Time Vermelho', emoji: '🔴', color: '#ef4444' },
-  { name: 'Time Verde', emoji: '🟢', color: '#22c55e' },
-  { name: 'Time Amarelo', emoji: '🟡', color: '#eab308' },
-];
 
 // QUIZ RELÂMPAGO — quiz rápido de turma inteira (sem equipes): 10 perguntas
 // geradas por IA sobre o tema, uma pergunta por vez, tela cheia estilo show
@@ -11231,6 +11257,69 @@ const QUIZ_CSS = `
 .qz-curtain-l img{transform-origin:top center;animation:qz-sway-l 5s ease-in-out .4s infinite}
 .qz-curtain-r img{transform-origin:top center;animation:qz-sway-r 5.4s ease-in-out .4s infinite}
 @media (prefers-reduced-motion:reduce){.qz-stage *,.qz-curtain-l img,.qz-curtain-r img{animation:none!important}.qz-curtain-l{transform:translateX(-30%)}.qz-curtain-r{transform:translateX(30%)}}
+/* clarão verde/vermelho no instante da resposta */
+@keyframes qz-flash{0%{opacity:.5}100%{opacity:0}}
+.qz-flash{animation:qz-flash .45s ease-out both}
+/* pontos ganhos subindo e sumindo */
+@keyframes qz-score-pop{0%{opacity:0;transform:translate(-50%,0) scale(.5)}25%{opacity:1;transform:translate(-50%,-30px) scale(1.25)}100%{opacity:0;transform:translate(-50%,-120px) scale(1)}}
+.qz-score-pop{animation:qz-score-pop 1.3s ease-out both}
+/* cronômetro apertando: pulsa quando falta pouco */
+@keyframes qz-urgent{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+.qz-urgent{animation:qz-urgent .5s ease-in-out infinite}
+/* selo de combo entrando */
+@keyframes qz-combo-in{0%{opacity:0;transform:scale(0) rotate(-30deg)}70%{transform:scale(1.15) rotate(4deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+.qz-combo-in{animation:qz-combo-in .45s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes qz-combo-beat{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+.qz-combo-beat{animation:qz-combo-beat .9s ease-in-out infinite}
+/* palco tremendo no erro */
+@keyframes qz-stage-shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-8px)}30%{transform:translateX(7px)}45%{transform:translateX(-5px)}60%{transform:translateX(4px)}80%{transform:translateX(-2px)}}
+.qz-stage-shake{animation:qz-stage-shake .38s cubic-bezier(.36,.07,.19,.97)}
+/* ── SUSPENSE: entre o toque na resposta e a revelação ── */
+/* o palco escurece e um facho varre, como spot procurando a resposta */
+@keyframes qz-dim-in{0%{opacity:0}100%{opacity:1}}
+.qz-dim{animation:qz-dim-in .35s ease-out both}
+@keyframes qz-spot{0%{transform:translateX(-120%) skewX(-14deg)}100%{transform:translateX(320%) skewX(-14deg)}}
+.qz-spot{animation:qz-spot 1.1s ease-in-out infinite}
+/* a alternativa escolhida late esperando o veredito, cada vez mais rápido */
+@keyframes qz-waiting{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.09);filter:brightness(1.45)}}
+.qz-waiting{animation:qz-waiting .42s ease-in-out infinite}
+/* reticências pulsando no lugar da letra */
+@keyframes qz-dots{0%,20%{opacity:.25}50%{opacity:1}80%,100%{opacity:.25}}
+.qz-dot-1{animation:qz-dots .9s ease-in-out infinite}
+.qz-dot-2{animation:qz-dots .9s ease-in-out .15s infinite}
+.qz-dot-3{animation:qz-dots .9s ease-in-out .3s infinite}
+/* ── REVELAÇÃO ── */
+/* a certa dá um salto quando aparece */
+@keyframes qz-bounce-in{0%{transform:scale(1)}30%{transform:scale(1.28) rotate(-4deg)}55%{transform:scale(.94) rotate(2deg)}75%{transform:scale(1.1)}100%{transform:scale(1)}}
+.qz-bounce-in{animation:qz-bounce-in .6s cubic-bezier(.34,1.56,.64,1) both}
+.qz-wrong-shake{animation:qz-shake .4s ease both}
+/* anel de choque saindo do botão certo */
+@keyframes qz-ring{0%{opacity:.85;transform:scale(.6)}100%{opacity:0;transform:scale(2.1)}}
+.qz-ring{animation:qz-ring .7s ease-out both}
+/* faíscas voando do acerto */
+@keyframes qz-spark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
+.qz-spark{animation:qz-spark .8s ease-out both}
+/* ── ENTRADA DOS ELEMENTOS ── */
+/* cartão da pergunta entra deslizando de cima */
+@keyframes qz-card-in{0%{opacity:0;transform:translateY(-26px) scale(.94)}60%{transform:translateY(4px) scale(1.01)}100%{opacity:1;transform:none}}
+.qz-card-in{animation:qz-card-in .5s cubic-bezier(.34,1.4,.64,1) both}
+/* botões A/B/C/D sobem um atrás do outro */
+@keyframes qz-btn-in{0%{opacity:0;transform:translateY(22px) scale(.85)}100%{opacity:1;transform:none}}
+.qz-btn-in{animation:qz-btn-in .42s cubic-bezier(.34,1.5,.64,1) both}
+/* alternativas do cartão entram escalonadas */
+@keyframes qz-opt-in{0%{opacity:0;transform:translateX(-14px)}100%{opacity:1;transform:none}}
+.qz-opt-in{animation:qz-opt-in .34s ease-out both}
+/* ── AVANÇO AUTOMÁTICO ── */
+/* barrinha enchendo no botão, mostrando quanto falta pra próxima */
+@keyframes qz-next-fill{0%{width:0%}100%{width:100%}}
+.qz-next-fill{animation:qz-next-fill linear both}
+/* placar do header dá um pulo quando muda */
+@keyframes qz-bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+.qz-bump{animation:qz-bump .4s ease-out both}
+/* cronômetro treme nos últimos segundos */
+@keyframes qz-tick-shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-5deg)}75%{transform:rotate(5deg)}}
+.qz-tick-shake{animation:qz-tick-shake .28s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.qz-flash,.qz-score-pop,.qz-urgent,.qz-combo-in,.qz-combo-beat,.qz-stage-shake,.qz-dim,.qz-spot,.qz-waiting,.qz-dot-1,.qz-dot-2,.qz-dot-3,.qz-bounce-in,.qz-ring,.qz-spark,.qz-card-in,.qz-btn-in,.qz-opt-in,.qz-bump,.qz-tick-shake{animation:none!important}}
 `;
 
 // Paleta puxada das ilustrações: madeira azul (fundo), azul-ardósia (cortinas)
@@ -11249,20 +11338,72 @@ const QuizStage = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
+// Ritmo do jogo. "Relâmpago" agora vale o nome: cada pergunta tem relógio, e
+// o ponto derrete conforme o tempo passa — responder rápido vale quase o dobro.
+const QZ_SECONDS = 20;        // tempo de cada pergunta
+const QZ_BASE = 100;          // pontos garantidos por acerto
+const QZ_SPEED = 100;         // bônus máximo por rapidez (derrete linear até 0)
+const QZ_FAST_MS = 6000;      // responder abaixo disso acende o selo RELÂMPAGO
+const QZ_STREAK_BONUS = 50;   // por acerto seguido, a partir do 2º
+const QZ_STREAK_CAP = 4;      // teto do combo (4 x 50 = +200)
+const QZ_SUSPENSE_MS = 1500;  // tambor rufando antes de mostrar se acertou
+const QZ_NEXT_MS = 7000;      // tempo lendo o "por que" antes da próxima pergunta
+
+// Faixa etária: muda a linguagem que a IA usa nas perguntas e na explicação.
+const QZ_FAIXAS = [
+  { id: 'crianca', label: 'Criança', sub: '6 a 10 anos', emoji: '🧒',
+    guide: 'Linguagem bem simples, frases curtas, vocabulário do dia a dia de uma criança de 6 a 10 anos. Use exemplos concretos (brinquedos, animais, comida, escola). Evite termos técnicos.' },
+  { id: 'preteen', label: 'Pré-adolescente', sub: '11 a 13 anos', emoji: '🧑',
+    guide: 'Linguagem clara e direta para 11 a 13 anos. Pode usar termos da matéria, mas sempre explicando. Exemplos ligados ao cotidiano deles (jogos, esportes, internet).' },
+  { id: 'teen', label: 'Adolescente', sub: '14 a 17 anos', emoji: '🧑‍🎓',
+    guide: 'Linguagem de ensino médio, 14 a 17 anos. Pode exigir raciocínio e usar vocabulário técnico da disciplina. Perguntas que fazem pensar, não só lembrar.' },
+] as const;
+type QzFaixa = typeof QZ_FAIXAS[number]['id'];
+
 const QuizRelampago = ({ onExitApp }: { onExitApp: () => void }) => {
   const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
   const [topic, setTopic] = useState('');
+  const [faixa, setFaixa] = useState<QzFaixa>('preteen');
   const [error, setError] = useState('');
-  const [questions, setQuestions] = useState<MilhaoQ[]>([]);
+  const [questions, setQuestions] = useState<QuizQ[]>([]);
   const [idx, setIdx] = useState(0);
-  const [score, setScore] = useState(0);
+  const [score, setScore] = useState(0);       // acertos
+  const [points, setPoints] = useState(0);     // pontuação com rapidez + combo
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
+  // 'ask' = pergunta no ar · 'suspense' = respondeu, tambor rufando, resposta
+  // ainda escondida · 'reveal' = veredito na tela
+  const [stage, setStage] = useState<'ask' | 'suspense' | 'reveal'>('ask');
   const [paused, setPaused] = useState(false);
+  const [msLeft, setMsLeft] = useState(QZ_SECONDS * 1000);
+  const [soundOn, setSoundOn] = useState(true);
+  const [pop, setPop] = useState<{ key: number; val: number; fast: boolean } | null>(null);
+  const [flash, setFlash] = useState<{ key: number; ok: boolean } | null>(null);
+  const [log, setLog] = useState<{ picked: number | null; ok: boolean }[]>([]);
+  const [bump, setBump] = useState(0);          // faz o placar do header pular
+  const [autoLeft, setAutoLeft] = useState(QZ_NEXT_MS);
 
-  const fetchQuestions = async (): Promise<MilhaoQ[]> => {
-    const prompt = `Gere ${QUIZ_RELAMPAGO_TOTAL} perguntas de múltipla escolha sobre "${topic}", adequadas para uma turma de sala de aula.
+  const startedAt = useRef(0);
+  const pausedAt = useRef(0);
+  const timerRef = useRef<number | null>(null);
+  const lastTickSec = useRef(-1);
+  const answeredRef = useRef(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const suspenseRef = useRef<number | null>(null);
+  const autoRef = useRef<number | null>(null);
+  // resultado calculado no instante do toque, aplicado só depois do suspense
+  const pendingRef = useRef<{ picked: number | null; ok: boolean; gain: number; fast: boolean; newStreak: number } | null>(null);
+
+  const beep = (fn: () => void) => { if (soundOn) fn(); };
+
+  const fetchQuestions = async (): Promise<QuizQ[]> => {
+    const guide = QZ_FAIXAS.find(f => f.id === faixa)!.guide;
+    const prompt = `Gere ${QUIZ_RELAMPAGO_TOTAL} perguntas de múltipla escolha sobre "${topic}" para um quiz de sala de aula.
+PÚBLICO: ${guide}
 Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
-Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
+Inclua também "explain": UMA frase curta (máximo 140 caracteres) explicando POR QUE a resposta certa está certa, na linguagem do público acima. É o que a turma lê depois de responder, então precisa ensinar, não só repetir a alternativa.
+Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0,"explain":"por que"}]} onde "correct" é o índice (0 a 3) da correta.`;
     const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
     const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
     const parsed = JSON.parse(raw);
@@ -11275,35 +11416,150 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     if (!testMode && !topic.trim()) { setError('Informe o tema do quiz.'); return; }
     setError(''); setPhase('loading');
     try {
-      const qs = testMode ? MILHAO_SAMPLE_QUESTIONS.slice(0, QUIZ_RELAMPAGO_TOTAL) : await fetchQuestions();
-      setQuestions(qs); setIdx(0); setScore(0); setSelected(null); setPaused(false);
+      const qs = testMode ? QUIZ_SAMPLE_QUESTIONS.slice(0, QUIZ_RELAMPAGO_TOTAL) : await fetchQuestions();
+      setQuestions(qs);
+      setIdx(0); setScore(0); setPoints(0); setStreak(0); setBestStreak(0);
+      setSelected(null); setStage('ask'); setPaused(false); setLog([]); setPop(null); setAutoLeft(QZ_NEXT_MS);
       setPhase('play');
     } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
   };
 
-  const answer = (i: number) => {
-    if (selected !== null || paused) return;
-    setSelected(i);
-    if (i === questions[idx].correct) setScore(s => s + 1);
-    setTimeout(() => {
-      setIdx(cur => {
-        const next = cur + 1;
-        if (next >= questions.length) setPhase('end'); else setSelected(null);
-        return next;
-      });
-    }, 1500);
+  const clearTimer = () => { if (timerRef.current !== null) { clearInterval(timerRef.current); timerRef.current = null; } };
+  const clearSuspense = () => { if (suspenseRef.current !== null) { clearTimeout(suspenseRef.current); suspenseRef.current = null; } };
+  const clearAuto = () => { if (autoRef.current !== null) { clearInterval(autoRef.current); autoRef.current = null; } };
+
+  // Um passo do cronômetro da pergunta. Extraído porque a pausa precisa
+  // religar exatamente o mesmo relógio depois de reancorar o início.
+  const tickStep = () => {
+    const left = Math.max(0, QZ_SECONDS * 1000 - (Date.now() - startedAt.current));
+    setMsLeft(left);
+    const sec = Math.ceil(left / 1000);
+    if (left <= 5200 && sec !== lastTickSec.current && sec > 0) { lastTickSec.current = sec; beep(() => playTick(sec <= 3)); }
+    if (left <= 0) { clearTimer(); answer(null); }
   };
+
+  // Cronômetro da pergunta: passo de 50ms pro anel descer liso, estalo por
+  // segundo nos 5 finais. Zerou sem resposta = erro por tempo.
+  useEffect(() => {
+    if (phase !== 'play' || stage !== 'ask') { clearTimer(); return; }
+    answeredRef.current = false;
+    startedAt.current = Date.now();
+    lastTickSec.current = -1;
+    setMsLeft(QZ_SECONDS * 1000);
+    timerRef.current = window.setInterval(tickStep, 50);
+    return clearTimer;
+    // Só phase/idx/stage: `answer` e `beep` são recriados a cada render e
+    // reiniciariam o relógio no meio da pergunta se entrassem aqui.
+  }, [phase, idx, stage]);
+
+  // Pausa congela o relógio: guarda o que faltava e reancora o início ao voltar.
+  useEffect(() => {
+    if (phase !== 'play' || stage !== 'ask') return;
+    if (paused) { clearTimer(); pausedAt.current = msLeft; return; }
+    if (pausedAt.current > 0) {
+      startedAt.current = Date.now() - (QZ_SECONDS * 1000 - pausedAt.current);
+      pausedAt.current = 0;
+      timerRef.current = window.setInterval(tickStep, 50);
+    }
+    return clearTimer;
+  }, [paused]);
+
+  // Toque na resposta: NÃO revela nada ainda. Guarda o resultado, acende o
+  // suspense (palco escurece, tambor rufa, a escolhida late) e só depois de
+  // QZ_SUSPENSE_MS o veredito aparece — é o momento em que a turma prende a
+  // respiração.
+  const answer = (i: number | null) => {
+    if (answeredRef.current) return;
+    answeredRef.current = true;
+    clearTimer();
+    const elapsed = Math.min(QZ_SECONDS * 1000, Date.now() - startedAt.current);
+    const ok = i !== null && i === questions[idx]?.correct;
+    const speed = ok ? Math.round(QZ_SPEED * Math.max(0, 1 - elapsed / (QZ_SECONDS * 1000))) : 0;
+    const newStreak = ok ? streak + 1 : 0;
+    const combo = ok && newStreak >= 2 ? QZ_STREAK_BONUS * Math.min(newStreak - 1, QZ_STREAK_CAP) : 0;
+    pendingRef.current = { picked: i, ok, gain: ok ? QZ_BASE + speed + combo : 0, fast: elapsed < QZ_FAST_MS, newStreak };
+
+    setSelected(i);
+    setStage('suspense');
+    beep(() => playDrumroll(QZ_SUSPENSE_MS));
+    suspenseRef.current = window.setTimeout(reveal, QZ_SUSPENSE_MS);
+  };
+
+  // Fim do suspense: aplica o resultado e dispara toda a reação.
+  const reveal = () => {
+    const r = pendingRef.current;
+    if (!r) return;
+    pendingRef.current = null;
+    setStage('reveal');
+    setStreak(r.newStreak);
+    setBestStreak(b => Math.max(b, r.newStreak));
+    setLog(l => [...l, { picked: r.picked, ok: r.ok }]);
+    setFlash({ key: Date.now(), ok: r.ok });
+    setBump(b => b + 1);
+    if (r.ok) {
+      setScore(s => s + 1);
+      setPoints(p => p + r.gain);
+      setPop({ key: Date.now(), val: r.gain, fast: r.fast });
+      beep(() => playChime(true));
+      if (r.newStreak >= 2) setTimeout(() => beep(playZap), 130);
+    } else {
+      beep(() => playChime(false));
+      beep(() => playImpactThud(true));
+      const el = stageRef.current;
+      if (el) { el.classList.remove('qz-stage-shake'); void el.offsetWidth; el.classList.add('qz-stage-shake'); }
+    }
+  };
+
+  // Depois de revelar, o jogo espera QZ_NEXT_MS lendo o "por que" e vai sozinho
+  // pra próxima. A barrinha no botão mostra quanto falta; tocar no botão pula
+  // na hora e a pausa segura o avanço.
+  useEffect(() => {
+    if (phase !== 'play' || stage !== 'reveal') { clearAuto(); return; }
+    if (paused) { clearAuto(); return; }
+    const until = Date.now() + autoLeft;
+    autoRef.current = window.setInterval(() => {
+      const left = Math.max(0, until - Date.now());
+      setAutoLeft(left);
+      if (left <= 0) { clearAuto(); next(); }
+    }, 100);
+    return clearAuto;
+  }, [phase, stage, paused, idx]);
+
+  const next = () => {
+    clearSuspense(); clearAuto();
+    setPop(null); setFlash(null);
+    const nextIdx = idx + 1;
+    if (nextIdx >= questions.length) { setPhase('end'); beep(playFanfare); return; }
+    setIdx(nextIdx); setSelected(null); setStage('ask'); setAutoLeft(QZ_NEXT_MS);
+  };
+
+  // Teclado: 1-4 respondem, Enter/Espaço avançam — pro professor conduzir
+  // pelo notebook enquanto a turma grita a resposta na projeção.
+  useEffect(() => {
+    if (phase !== 'play') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (paused || stage === 'suspense') return;
+      if (stage === 'ask') {
+        const n = parseInt(e.key, 10);
+        if (n >= 1 && n <= 4) { e.preventDefault(); answer(n - 1); }
+      } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, stage, paused, idx, streak, questions]);
 
   // piso de tábuas azuis (combina com o fundo.png das ilustrações)
   const plankBg = 'repeating-linear-gradient(90deg, rgba(18,36,64,0.32) 0 2px, transparent 2px 32px), linear-gradient(180deg, #6f9fce, #47709e)';
   const letterColors = ['#dc4b4b', '#e0ab2e', '#3fae6c', '#3d7fd6'];
-  const letterColorsDark = ['#a82f2f', '#a97c14', '#2a7d49', '#265a99'];
   // acento roxo/violeta (do blazer da professora) — usado em CTA, títulos, foco
   const violet = 'linear-gradient(180deg,#8b6fc4,#6a4f96)';
   const q = questions[idx];
-  const answered = selected !== null;
-  const gotIt = answered && selected === q?.correct;
+  const answered = stage === 'reveal';        // veredito na tela
+  const waiting = stage === 'suspense';       // tambor rufando, nada revelado
+  const gotIt = answered && selected !== null && selected === q?.correct;
   const suggestions = ['Sistema Solar', 'Frações', 'Corpo Humano', 'Brasil Colônia', 'Verbos'];
+  const timePct = msLeft / (QZ_SECONDS * 1000);
+  const timeColor = timePct > 0.5 ? '#5fd39a' : timePct > 0.25 ? '#f2c14e' : '#f27272';
 
   // Professora "viva": enquanto a pergunta está no ar, ela faz ações ambientes
   // em rodízio (bebendo água, acenando, olhando cartão, arrumando cabelo, parada);
@@ -11311,6 +11567,9 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
   const [actor, setActor] = useState('neutro');
   useEffect(() => {
     if (phase !== 'play') return;
+    // No suspense ela olha o cartão, como quem confere a resposta — é a pose
+    // que mais combina com "deixa eu ver se você acertou…".
+    if (waiting) { setActor('cartao'); return; }
     if (answered) { setActor(gotIt ? 'acertou' : 'errou'); return; }
     const idles = ['neutro', 'cartao', 'agua', 'acenar', 'cabelo', 'neutro'];
     setActor('cartao');
@@ -11318,7 +11577,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
       setActor(idles[Math.floor(Math.random() * idles.length)]);
     }, 5000);
     return () => clearInterval(id);
-  }, [phase, answered, gotIt, idx]);
+  }, [phase, answered, waiting, gotIt, idx]);
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col select-none">
@@ -11326,11 +11585,11 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
 
       {phase === 'setup' && (
         <QuizStage>
-          <div className="relative z-10 flex-1 flex flex-col px-6 py-6">
+          <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6">
             <button onClick={onExitApp} aria-label="Fechar" className="w-9 h-9 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white mb-2 active:scale-95 transition-transform">
               <X size={18} />
             </button>
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 max-w-sm mx-auto w-full">
+            <div className="flex flex-col items-center justify-center text-center gap-5 max-w-sm mx-auto w-full">
               {/* selo com a professora (ilustração) */}
               <div className="relative" style={{ animation: 'qz-float 3.5s ease-in-out infinite' }}>
                 <div className="w-28 h-28 rounded-full overflow-hidden shadow-2xl border-4" style={{ borderColor: '#c9b6e8', background: '#e9e2f5', boxShadow: '0 12px 30px rgba(0,0,0,0.45), 0 0 26px rgba(160,130,215,0.5)' }}>
@@ -11340,7 +11599,22 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               </div>
               <div>
                 <h1 className="text-3xl font-black text-white tracking-tight" style={{ textShadow: '0 2px 0 #3a2963, 0 0 22px rgba(160,130,215,0.6)' }}>Quiz Relâmpago</h1>
-                <p className="text-indigo-100/85 text-sm mt-2 leading-relaxed">{QUIZ_RELAMPAGO_TOTAL} perguntas rápidas pra turma toda responder junto.<br/>Escolha o tema da aula.</p>
+                <p className="text-indigo-100/85 text-sm mt-2 leading-relaxed">{QUIZ_RELAMPAGO_TOTAL} perguntas contra o relógio.<br/>Quanto mais rápido, mais ponto vale.</p>
+              </div>
+
+              {/* regras rápidas, em três selos */}
+              <div className="grid grid-cols-3 gap-2 w-full">
+                {[
+                  { icon: TimerIcon, t: `${QZ_SECONDS}s`, s: 'por pergunta' },
+                  { icon: Zap, t: `+${QZ_SPEED}`, s: 'se for rápido' },
+                  { icon: Flame, t: `+${QZ_STREAK_BONUS * QZ_STREAK_CAP}`, s: 'combo máximo' },
+                ].map((c, i) => (
+                  <div key={i} className="rounded-2xl px-2 py-2.5 border border-white/15" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <c.icon size={15} className="mx-auto mb-1 text-[#c9b6e8]" />
+                    <p className="text-white font-black text-sm leading-none">{c.t}</p>
+                    <p className="text-[9px] text-indigo-100/60 mt-1 leading-tight">{c.s}</p>
+                  </div>
+                ))}
               </div>
 
               {/* card do formulário */}
@@ -11360,11 +11634,31 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                     </button>
                   ))}
                 </div>
+
+                {/* faixa etária — muda a linguagem das perguntas e das explicações */}
+                <label className="block text-left text-[11px] font-bold text-indigo-200/90 tracking-wide mt-4 mb-1.5 ml-1">PARA QUEM É</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {QZ_FAIXAS.map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => setFaixa(f.id)}
+                      className="rounded-2xl px-1.5 py-2 border-2 transition active:scale-95"
+                      style={{
+                        background: faixa === f.id ? 'rgba(183,154,240,0.28)' : 'rgba(255,255,255,0.06)',
+                        borderColor: faixa === f.id ? '#c9b6e8' : 'rgba(255,255,255,0.15)',
+                      }}
+                    >
+                      <span className="block text-lg leading-none mb-1">{f.emoji}</span>
+                      <span className="block text-[10px] font-black text-white leading-tight">{f.label}</span>
+                      <span className="block text-[9px] text-indigo-100/60 leading-tight mt-0.5">{f.sub}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {error && <p className="text-rose-300 text-xs font-semibold -mt-1">{error}</p>}
 
-              <div className="w-full flex flex-col gap-2.5">
+              <div className="w-full flex flex-col gap-2.5 pb-2">
                 <button onClick={() => start(false)} className="relative overflow-hidden w-full rounded-2xl py-3.5 font-black text-white text-base border-2 shadow-xl active:scale-[0.98] transition-transform" style={{ background: violet, borderColor: '#c9b6e8' }}>
                   <span className="relative z-10 flex items-center justify-center gap-2"><Zap size={18} /> Começar o quiz</span>
                   <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)', animation: 'qz-shine 3.2s ease-in-out infinite' }} />
@@ -11395,28 +11689,45 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
       )}
 
       {phase === 'play' && q && (
-        <div className="flex-1 flex flex-col min-h-0" style={{ background: '#213a58' }}>
-          {/* HEADER — barra azul com progresso e placar */}
+        <div ref={stageRef} className="flex-1 flex flex-col min-h-0" style={{ background: '#213a58' }}>
+          {/* clarão verde/vermelho no instante da resposta */}
+          {flash && (
+            <div key={flash.key} aria-hidden className="qz-flash absolute inset-0 z-50 pointer-events-none" style={{ background: flash.ok ? '#3fae6c' : '#dc4b4b' }} />
+          )}
+
+          {/* HEADER — barra azul com progresso, acertos e pontos */}
           <div className="shrink-0 px-3 py-2.5 flex items-center gap-2.5 border-b-4 border-black/25" style={{ background: 'linear-gradient(180deg,#5a86b8,#3a5d88)' }}>
             <button onClick={onExitApp} aria-label="Fechar" className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
               <X size={18} />
             </button>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[11px] font-black text-white tracking-wide">PERGUNTA <span className="text-white text-sm">{idx + 1}</span> <span className="text-indigo-100/60">/ {questions.length}</span></p>
-                <span className="flex items-center gap-1 text-[11px] font-black text-emerald-200 bg-black/30 rounded-full px-2 py-0.5">
-                  <CheckCircle2 size={12} /> {score}
-                </span>
-              </div>
-              {/* progresso segmentado */}
-              <div className="flex gap-1">
-                {questions.map((_, i) => (
-                  <span key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-black/30">
-                    <span className="block h-full rounded-full transition-all duration-300" style={{ width: i < idx || (i === idx && answered) ? '100%' : '0%', background: i === idx ? '#efe6ff' : '#b79af0' }} />
+              <div className="flex items-center justify-between mb-1.5 gap-2">
+                <p className="text-[11px] font-black text-white tracking-wide shrink-0">PERGUNTA <span className="text-white text-sm">{idx + 1}</span> <span className="text-indigo-100/60">/ {questions.length}</span></p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="flex items-center gap-1 text-[11px] font-black text-emerald-200 bg-black/30 rounded-full px-2 py-0.5 shrink-0">
+                    <CheckCircle2 size={12} /> {score}
                   </span>
-                ))}
+                  <span key={bump} className="qz-bump flex items-center gap-1 text-[11px] font-black text-amber-200 bg-black/30 rounded-full px-2 py-0.5 shrink-0">
+                    <Zap size={12} /> {points}
+                  </span>
+                </div>
+              </div>
+              {/* progresso segmentado — verde no acerto, vermelho no erro */}
+              <div className="flex gap-1">
+                {questions.map((_, i) => {
+                  const r = log[i];
+                  const done = i < idx || (i === idx && answered);
+                  return (
+                    <span key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-black/30">
+                      <span className="block h-full rounded-full transition-all duration-300" style={{ width: done ? '100%' : '0%', background: r ? (r.ok ? '#5fd39a' : '#f27272') : '#efe6ff' }} />
+                    </span>
+                  );
+                })}
               </div>
             </div>
+            <button onClick={() => setSoundOn(s => !s)} aria-label={soundOn ? 'Desligar som' : 'Ligar som'} className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
+              {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
             <button onClick={() => setPaused(p => !p)} aria-label={paused ? 'Retomar' : 'Pausar'} className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0 active:scale-95 transition-transform">
               {paused ? <Play size={16} /> : <Pause size={16} />}
             </button>
@@ -11430,7 +11741,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                 metade cada), abrem balançando ao iniciar e param numa faixa de
                 25% de cada lado, ficando levemente balançando. */}
             <div className="w-full shrink-0 relative overflow-hidden" style={{ aspectRatio: '1200 / 760', background: '#7ba6d4' }}>
-              <LeilaoFundo />
+              <QuizFundo />
               {/* professora "viva": ações ambientes em rodízio enquanto a pergunta
                   está no ar (bebendo água, acenando, olhando cartão, arrumando
                   cabelo, parada) e reação no acerto/erro — animação de frames CSS */}
@@ -11459,6 +11770,66 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               </div>
               {/* luz de palco suave por cima */}
               <div aria-hidden className="absolute inset-x-0 top-0 h-1/2 pointer-events-none" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.22), transparent 70%)' }} />
+
+              {/* SUSPENSE — o palco escurece e um facho varre procurando a
+                  resposta, enquanto o tambor rufa. Sai no instante da revelação. */}
+              {waiting && (
+                <>
+                  <div aria-hidden className="qz-dim absolute inset-0 pointer-events-none z-10" style={{ background: 'rgba(8,16,32,0.55)' }} />
+                  <div aria-hidden className="absolute inset-0 overflow-hidden pointer-events-none z-10">
+                    <div className="qz-spot absolute inset-y-0 w-1/3" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,240,190,0.35),transparent)' }} />
+                  </div>
+                  <div className="absolute inset-x-0 bottom-3 z-20 flex justify-center pointer-events-none">
+                    <div className="rounded-full px-4 py-1.5 border-2 border-white/50 shadow-xl" style={{ background: 'rgba(12,24,42,0.8)' }}>
+                      <p className="text-white font-black text-sm tracking-widest flex items-center gap-1">
+                        SERÁ<span className="qz-dot-1">.</span><span className="qz-dot-2">.</span><span className="qz-dot-3">.</span>
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* CRONÔMETRO — anel no canto do palco, pulsa e treme quando aperta */}
+              <div className={`absolute top-2.5 left-2.5 w-16 h-16 z-20 ${stage === 'ask' && !paused && timePct <= 0.25 ? 'qz-urgent' : ''}`}>
+                <svg viewBox="0 0 48 48" className={`w-full h-full -rotate-90 drop-shadow-lg ${stage === 'ask' && !paused && timePct <= 0.15 ? 'qz-tick-shake' : ''}`}>
+                  <circle cx="24" cy="24" r="20" fill="rgba(12,24,42,0.65)" stroke="rgba(255,255,255,0.18)" strokeWidth="5" />
+                  <circle
+                    cx="24" cy="24" r="20" fill="none" stroke={timeColor} strokeWidth="5" strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 20}
+                    strokeDashoffset={2 * Math.PI * 20 * (1 - (stage === 'ask' ? timePct : 0))}
+                    style={{ transition: 'stroke 0.3s' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-black text-white text-xl leading-none drop-shadow" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}>
+                    {stage === 'ask' ? Math.ceil(msLeft / 1000) : waiting ? '?' : '–'}
+                  </span>
+                </div>
+              </div>
+
+              {/* COMBO — selo de fogo no canto oposto, a partir de 2 seguidas */}
+              {streak >= 2 && (
+                <div key={streak} className="qz-combo-in absolute top-3 right-2.5">
+                  <div className="qz-combo-beat rounded-2xl px-2.5 py-1.5 shadow-xl border-2 border-white/70" style={{ background: 'linear-gradient(180deg,#f9a03c,#dc4b4b)' }}>
+                    <p className="text-white font-black text-sm leading-none flex items-center gap-1 drop-shadow">
+                      <Flame size={14} strokeWidth={3} /> {streak}
+                    </p>
+                    <p className="text-white/85 text-[8px] font-black tracking-widest leading-none mt-0.5">SEGUIDAS</p>
+                  </div>
+                </div>
+              )}
+
+              {/* pontos ganhos subindo no meio do palco */}
+              {pop && (
+                <div key={pop.key} className="qz-score-pop absolute left-1/2 top-1/2 z-20 pointer-events-none text-center">
+                  <p className="text-4xl font-black text-[#7bf0a6]" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>+{pop.val}</p>
+                  {pop.fast && (
+                    <p className="text-xs font-black text-amber-300 tracking-widest mt-0.5 flex items-center justify-center gap-0.5" style={{ textShadow: '0 2px 6px rgba(0,0,0,0.8)' }}>
+                      <Zap size={12} fill="currentColor" /> RELÂMPAGO
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* palco de tábuas azuis com a pergunta e as respostas */}
@@ -11467,7 +11838,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               <div aria-hidden className="absolute top-0 inset-x-0 h-2" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.25),transparent)' }} />
 
               {/* CARTÃO DA PERGUNTA — balão creme com bico apontando pro banner */}
-              <div key={idx} className="relative qz-anim-pop">
+              <div key={idx} className="relative qz-card-in">
                 <div aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-[#f7efdc]" style={{ boxShadow: '-2px -2px 4px rgba(0,0,0,0.08)' }} />
                 <div className="relative bg-[#f7efdc] rounded-3xl p-4 shadow-2xl border border-[#d8c9a4]">
                   {/* parafusos decorativos */}
@@ -11477,12 +11848,13 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                   <div className="space-y-2">
                     {q.options.map((opt, i) => {
                       const isCorrect = i === q.correct;
-                      const rowState = answered && isCorrect ? 'correct' : answered && selected === i ? 'wrong' : 'idle';
+                      const rowState = answered && isCorrect ? 'correct' : answered && selected === i ? 'wrong' : 'idle';   // 'idle' também durante o suspense
                       return (
                         <div
                           key={i}
-                          className="flex items-start gap-2.5 rounded-2xl px-3 py-2 transition-colors border"
+                          className="qz-opt-in flex items-start gap-2.5 rounded-2xl px-3 py-2 transition-colors border"
                           style={{
+                            animationDelay: `${0.12 + i * 0.06}s`,
                             background: rowState === 'correct' ? '#d8f2df' : rowState === 'wrong' ? '#fadada' : '#efe3c8',
                             borderColor: rowState === 'correct' ? '#3fae6c' : rowState === 'wrong' ? '#dc4b4b' : 'transparent',
                           }}
@@ -11501,8 +11873,11 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               </div>
 
               {/* faixa de instrução / feedback */}
-              <p className="text-center text-[12px] font-black tracking-wide mt-5 mb-3" style={{ color: answered ? (gotIt ? '#7bf0a6' : '#ff9a9a') : 'rgba(255,255,255,0.75)' }}>
-                {paused ? '⏸  JOGO PAUSADO' : answered ? (gotIt ? '✓  RESPOSTA CERTA!' : '✗  ERA A LETRA ' + String.fromCharCode(65 + q.correct)) : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
+              <p className="text-center text-[12px] font-black tracking-wide mt-5 mb-3" style={{ color: waiting ? '#ffd98a' : answered ? (gotIt ? '#7bf0a6' : '#ff9a9a') : 'rgba(255,255,255,0.75)' }}>
+                {paused ? '⏸  JOGO PAUSADO'
+                  : waiting ? (selected === null ? '⏱  ACABOU O TEMPO… VAMOS VER' : '🥁  SERÁ QUE É A LETRA ' + String.fromCharCode(65 + selected) + '?')
+                  : answered ? (gotIt ? '✓  RESPOSTA CERTA!' : selected === null ? '⏱  O TEMPO ACABOU — ERA A LETRA ' + String.fromCharCode(65 + q.correct) : '✗  ERA A LETRA ' + String.fromCharCode(65 + q.correct))
+                  : 'TOQUE NA LETRA DA RESPOSTA CERTA'}
               </p>
 
               {/* BOTÕES A/B/C/D */}
@@ -11511,27 +11886,79 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                   const isCorrect = i === q.correct;
                   const isSel = selected === i;
                   const dim = answered && !isCorrect && !isSel;
-                  const animCls = answered && isCorrect ? '' : answered && isSel ? '' : '';
+                  // no suspense só a escolhida late; as outras apagam um pouco
+                  const dimWait = waiting && !isSel;
                   return (
                     <button
-                      key={i}
-                      disabled={answered || paused}
+                      key={`${idx}-${i}`}
+                      disabled={stage !== 'ask' || paused}
                       onClick={() => answer(i)}
-                      className="relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-[3px] active:translate-y-0.5 transition-all"
+                      className={`qz-btn-in relative aspect-square rounded-2xl flex items-center justify-center text-white font-black text-3xl border-[3px] active:translate-y-0.5 transition-all ${waiting && isSel ? 'qz-waiting' : ''} ${answered && isCorrect ? 'qz-bounce-in' : ''} ${answered && isSel && !isCorrect ? 'qz-wrong-shake' : ''}`}
                       style={{
+                        animationDelay: stage === 'ask' ? `${0.18 + i * 0.07}s` : '0s',
                         background: letterColors[i],
                         borderColor: 'rgba(255,255,255,0.9)',
-                        opacity: dim ? 0.35 : 1,
-                        boxShadow: answered && isCorrect ? '0 0 0 3px #fff, 0 0 22px 4px rgba(123,240,166,0.8)' : answered && isSel ? '0 0 0 3px #fff, 0 0 18px 3px rgba(255,120,120,0.8)' : '0 4px 10px rgba(0,0,0,0.35)',
-                        animation: answered && isSel && !isCorrect ? 'qz-shake 0.4s ease' : 'none',
+                        opacity: dim ? 0.35 : dimWait ? 0.4 : 1,
+                        boxShadow: answered && isCorrect ? '0 0 0 3px #fff, 0 0 22px 4px rgba(123,240,166,0.8)'
+                          : answered && isSel ? '0 0 0 3px #fff, 0 0 18px 3px rgba(255,120,120,0.8)'
+                          : waiting && isSel ? '0 0 0 3px #fff, 0 0 24px 6px rgba(255,217,138,0.85)'
+                          : '0 4px 10px rgba(0,0,0,0.35)',
                       }}
                     >
                       <span aria-hidden className="absolute inset-x-1.5 top-1.5 h-1/3 rounded-t-xl pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.35),transparent)' }} />
-                      {answered && isCorrect ? <CheckCircle2 size={30} /> : answered && isSel ? <X size={30} /> : String.fromCharCode(65 + i)}
+                      {/* onda de choque + faíscas saindo da alternativa certa */}
+                      {answered && isCorrect && (
+                        <>
+                          <span aria-hidden className="qz-ring absolute inset-0 rounded-2xl border-4 border-emerald-200 pointer-events-none" />
+                          {[[-34, -30], [32, -34], [-30, 30], [34, 28], [0, -44], [0, 42]].map(([dx, dy], k) => (
+                            <span
+                              key={k}
+                              aria-hidden
+                              className="qz-spark absolute w-1.5 h-1.5 rounded-full bg-emerald-200 pointer-events-none"
+                              style={{ ['--dx' as any]: `${dx}px`, ['--dy' as any]: `${dy}px`, animationDelay: `${k * 0.03}s` }}
+                            />
+                          ))}
+                        </>
+                      )}
+                      {answered && isCorrect ? <CheckCircle2 size={30} />
+                        : answered && isSel ? <X size={30} />
+                        : waiting && isSel ? <span className="text-2xl tracking-tighter"><span className="qz-dot-1">.</span><span className="qz-dot-2">.</span><span className="qz-dot-3">.</span></span>
+                        : String.fromCharCode(65 + i)}
                     </button>
                   );
                 })}
               </div>
+
+              {/* POR QUE — a parte que ensina. Só aparece depois de responder, e
+                  o avanço é por botão (não automático) pra dar tempo de ler e
+                  do professor comentar com a turma. */}
+              {answered && (
+                <div className="qz-anim-pop mt-4">
+                  {q.explain && (
+                    <div className="rounded-2xl px-4 py-3 border-2 mb-2.5" style={{ background: 'rgba(20,32,56,0.55)', borderColor: 'rgba(201,182,232,0.45)' }}>
+                      <p className="text-[10px] font-black tracking-widest text-[#c9b6e8] mb-1 flex items-center gap-1">
+                        <Lightbulb size={12} /> POR QUE
+                      </p>
+                      <p className="text-sm text-white/90 leading-relaxed">{q.explain}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={next}
+                    className="relative overflow-hidden w-full rounded-2xl py-3.5 font-black text-white text-base border-2 shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+                    style={{ background: violet, borderColor: '#c9b6e8' }}
+                  >
+                    {/* enche sozinha até o avanço automático; tocar pula na hora */}
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 pointer-events-none"
+                      style={{ width: `${100 - (autoLeft / QZ_NEXT_MS) * 100}%`, background: 'rgba(255,255,255,0.22)', transition: 'width .1s linear' }}
+                    />
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      {idx + 1 >= questions.length ? <><Trophy size={18} /> Ver resultado</> : <>Próxima pergunta <ChevronRight size={18} /></>}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -11541,1059 +11968,84 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         const pct = questions.length ? Math.round((score / questions.length) * 100) : 0;
         const stars = pct >= 90 ? 3 : pct >= 60 ? 2 : pct >= 30 ? 1 : 0;
         const msg = pct >= 90 ? 'Turma brilhante! 🌟' : pct >= 60 ? 'Mandaram muito bem!' : pct >= 30 ? 'Bom jogo — dá pra revisar e voltar!' : 'Bora revisar e tentar de novo!';
+        const misses = questions.map((qq, i) => ({ qq, i })).filter(({ i }) => log[i] && !log[i].ok);
         return (
           <QuizStage>
-            <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
-              <div className="text-6xl" style={{ animation: 'qz-float 3s ease-in-out infinite' }}>🏆</div>
-              <h2 className="text-2xl font-black text-white" style={{ textShadow: '0 2px 0 #3a2963, 0 0 20px rgba(160,130,215,0.5)' }}>Quiz concluído!</h2>
+            {stars >= 2 && <ConfettiBurst />}
+            <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6">
+              <div className="flex flex-col items-center text-center gap-4 max-w-sm mx-auto">
+                <div className="text-6xl" style={{ animation: 'qz-float 3s ease-in-out infinite' }}>🏆</div>
+                <h2 className="text-2xl font-black text-white" style={{ textShadow: '0 2px 0 #3a2963, 0 0 20px rgba(160,130,215,0.5)' }}>Quiz concluído!</h2>
 
-              {/* estrelas */}
-              <div className="flex gap-1.5">
-                {[0, 1, 2].map(s => (
-                  <Star key={s} size={30} className={s < stars ? 'text-yellow-300' : 'text-white/20'} fill={s < stars ? '#fde047' : 'transparent'} style={{ animation: s < stars ? `qz-rise .4s ease-out ${s * 0.12}s both` : 'none' }} />
-                ))}
-              </div>
-
-              {/* placar em anel */}
-              <div className="relative w-40 h-40 my-1">
-                <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-                  <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.28)" strokeWidth="12" />
-                  <circle cx="60" cy="60" r="52" fill="none" stroke="#b79af0" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${(pct / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`} style={{ transition: 'stroke-dasharray 1s ease' }} />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-black text-white">{score}<span className="text-xl text-indigo-100/60">/{questions.length}</span></span>
-                  <span className="text-xs font-bold text-indigo-100/75">{pct}% de acerto</span>
+                {/* estrelas */}
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map(s => (
+                    <Star key={s} size={30} className={s < stars ? 'text-yellow-300' : 'text-white/20'} fill={s < stars ? '#fde047' : 'transparent'} style={{ animation: s < stars ? `qz-rise .4s ease-out ${s * 0.12}s both` : 'none' }} />
+                  ))}
                 </div>
-              </div>
 
-              <p className="text-indigo-100 font-semibold">{msg}</p>
+                {/* placar em anel */}
+                <div className="relative w-40 h-40 my-1">
+                  <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.28)" strokeWidth="12" />
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="#b79af0" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${(pct / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`} style={{ transition: 'stroke-dasharray 1s ease' }} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-4xl font-black text-white">{score}<span className="text-xl text-indigo-100/60">/{questions.length}</span></span>
+                    <span className="text-xs font-bold text-indigo-100/75">{pct}% de acerto</span>
+                  </div>
+                </div>
 
-              <div className="w-full max-w-xs flex flex-col gap-2.5 mt-1">
-                <button onClick={() => { setPhase('setup'); setTopic(''); }} className="w-full rounded-2xl py-3 font-black text-white border-2 shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2" style={{ background: violet, borderColor: '#c9b6e8' }}>
-                  <RotateCcw size={18} /> Jogar de novo
-                </button>
-                <button onClick={onExitApp} className="w-full rounded-2xl py-2.5 font-bold text-indigo-100/90 bg-white/8 border border-white/20 active:scale-[0.98] transition-transform">
-                  Voltar aos Jogos
-                </button>
+                {/* pontos e melhor combo */}
+                <div className="grid grid-cols-2 gap-2.5 w-full">
+                  <div className="rounded-2xl px-3 py-2.5 border border-white/15" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <Zap size={15} className="mx-auto mb-1 text-amber-300" />
+                    <p className="text-white font-black text-xl leading-none">{points}</p>
+                    <p className="text-[9px] text-indigo-100/60 mt-1">pontos</p>
+                  </div>
+                  <div className="rounded-2xl px-3 py-2.5 border border-white/15" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <Flame size={15} className="mx-auto mb-1 text-orange-300" />
+                    <p className="text-white font-black text-xl leading-none">{bestStreak}</p>
+                    <p className="text-[9px] text-indigo-100/60 mt-1">melhor combo</p>
+                  </div>
+                </div>
+
+                <p className="text-indigo-100 font-semibold">{msg}</p>
+
+                {/* o que escapou — vira a pauta da revisão logo depois do jogo */}
+                {misses.length > 0 && (
+                  <div className="w-full rounded-2xl p-4 border border-white/15 text-left" style={{ background: 'rgba(20,32,56,0.42)' }}>
+                    <p className="text-[10px] font-black tracking-widest text-rose-300 mb-2.5 flex items-center gap-1.5">
+                      <AlertCircle size={12} /> PARA REVISAR COM A TURMA
+                    </p>
+                    <div className="space-y-3">
+                      {misses.map(({ qq, i }) => (
+                        <div key={i} className="border-l-2 border-rose-400/60 pl-3">
+                          <p className="text-xs text-white/85 font-bold leading-snug">{i + 1}. {qq.q}</p>
+                          <p className="text-[11px] text-emerald-300 mt-0.5 leading-snug">
+                            {String.fromCharCode(65 + qq.correct)}) {qq.options[qq.correct]}
+                          </p>
+                          {qq.explain && <p className="text-[11px] text-indigo-100/70 mt-0.5 leading-snug">{qq.explain}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="w-full max-w-xs flex flex-col gap-2.5 mt-1 pb-2">
+                  <button onClick={() => { setPhase('setup'); setTopic(''); }} className="w-full rounded-2xl py-3 font-black text-white border-2 shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2" style={{ background: violet, borderColor: '#c9b6e8' }}>
+                    <RotateCcw size={18} /> Jogar de novo
+                  </button>
+                  <button onClick={onExitApp} className="w-full rounded-2xl py-2.5 font-bold text-indigo-100/90 bg-white/8 border border-white/20 active:scale-[0.98] transition-transform">
+                    Voltar aos Jogos
+                  </button>
+                </div>
               </div>
             </div>
           </QuizStage>
         );
       })()}
     </div>
-  );
-};
-
-const LeilaoDoSaber = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
-  teams: GamiTeam[];
-  students: GamiStudent[];
-  subject: string;
-  level: string;
-  onClose: () => void;
-  onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
-  isAdmin?: boolean;
-}) => {
-  const hasRealTeams = teams.length >= 2;
-  const [pick, setPick] = useState<number[]>(hasRealTeams ? [0, 1] : [0, 1, 2, 3]);
-  const contestants = useMemo(() => pick.map(i => hasRealTeams
-    ? { teamIdx: i, name: teams[i]?.name ?? '?', emoji: teams[i]?.emoji ?? '🦉', color: teams[i]?.color ?? '#6366f1' }
-    : { teamIdx: -1, ...MILHAO_FALLBACK[i] }),
-  [hasRealTeams, pick, teams]);
-
-  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
-  const [topic, setTopic] = useState('');
-  const [difficulty, setDifficulty] = useState('média');
-  const [error, setError] = useState('');
-
-  const poolRef = useRef<MilhaoQ[]>([]);
-  const usedRef = useRef<Set<number>>(new Set());
-
-  // Estado da partida
-  const [round, setRound] = useState(0);
-  const [q, setQ] = useState<MilhaoQ | null>(null);
-  const [tstates, setTstates] = useState<{ status: 'playing' | 'stopped' | 'fallen' | 'won'; coins: number }[]>([]);
-  const [bids, setBids] = useState<(number | null)[]>([]);
-  const [answers, setAnswers] = useState<(number | null)[]>([]);
-  const [step, setStep] = useState<'bidding' | 'answering' | 'revealed' | 'decision'>('bidding');
-  const [hidden, setHidden] = useState<number[]>([]);
-  const [audience, setAudience] = useState<number[] | null>(null);
-  const [lifelines, setLifelines] = useState({ cartas: true, pular: true, plateia: true });
-  const [results, setResults] = useState<number[]>([]);
-  const [host, setHost] = useState('');
-  const [awarded, setAwarded] = useState(false);
-
-  const fetchPool = async (): Promise<MilhaoQ[]> => {
-    const prompt = `Gere 18 perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade base ${difficulty}.
-ORDENE da MAIS FÁCIL para a MAIS DIFÍCIL: as primeiras bem simples, as últimas desafiadoras.
-Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
-Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
-    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
-    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    const parsed = JSON.parse(raw);
-    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
-    if (valid.length < 4) throw new Error('poucas perguntas');
-    return valid;
-  };
-
-  const drawQuestion = (lvl: number): MilhaoQ => {
-    const pool = poolRef.current;
-    const third = Math.max(1, Math.floor(pool.length / 3));
-    const tier = lvl < 3 ? 0 : lvl < 6 ? 1 : 2;
-    const start = tier * third, endEx = tier === 2 ? pool.length : start + third;
-    let candidates: number[] = [];
-    for (let i = start; i < endEx; i++) if (!usedRef.current.has(i)) candidates.push(i);
-    if (candidates.length === 0) for (let i = start; i < endEx; i++) candidates.push(i);
-    if (candidates.length === 0) candidates = pool.map((_, i) => i);
-    const idx = candidates[Math.floor(Math.random() * candidates.length)];
-    usedRef.current.add(idx);
-    return pool[idx];
-  };
-
-  const lastSafePrize = (lvl: number) => {
-    let banked = 0;
-    for (let i = 0; i < lvl; i++) if (MILHAO_LADDER[i].safe) banked = MILHAO_LADDER[i].prize;
-    return banked;
-  };
-
-  const start = async (testMode = false) => {
-    if (!testMode && !topic.trim()) { setError('Informe o tema do jogo.'); return; }
-    if (pick.length < 2) { setError('Escolha pelo menos 2 equipes.'); return; }
-    setError(''); setPhase('loading');
-    try {
-      poolRef.current = testMode ? MILHAO_SAMPLE_QUESTIONS : await fetchPool();
-      usedRef.current = new Set();
-      setTstates(contestants.map(() => ({ status: 'playing', coins: 0 })));
-      setBids(contestants.map(() => null));
-      setAnswers(contestants.map(() => null));
-      setResults([]); setAwarded(false);
-      setRound(0); setHidden([]); setAudience(null);
-      setLifelines({ cartas: true, pular: true, plateia: true });
-      setQ(drawQuestion(0)); setStep('bidding');
-      setHost(`Pergunta ${MILHAO_LADDER[0].prize}! Fazam seus lances, Dragões…`);
-      setPhase('play');
-    } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
-  };
-
-  const allBid = contestants.every((_, i) => tstates[i]?.status !== 'playing' || bids[i] !== null);
-
-  const startAnswering = () => {
-    if (!allBid) return;
-    setStep('answering');
-    setHost('Observem a pergunta…');
-  };
-
-  const allAnswered = contestants.every((_, i) => tstates[i]?.status !== 'playing' || answers[i] !== null);
-
-  const revealAnswers = () => {
-    if (!q || step !== 'answering' || !allAnswered) return;
-    const last = round >= MILHAO_LADDER.length - 1;
-    const nt: { status: 'playing' | 'stopped' | 'fallen' | 'won'; coins: number }[] = tstates.map((ts, i) => {
-      if (ts.status !== 'playing') return ts;
-      const bid = bids[i] ?? 0;
-      if (answers[i] === q.correct) {
-        const newCoins = ts.coins + bid;
-        return { status: newCoins >= 1000000 ? 'won' : 'playing', coins: newCoins };
-      }
-      const safe = lastSafePrize(round);
-      const newCoins = Math.max(safe, ts.coins - bid);
-      return { status: newCoins === ts.coins ? 'playing' : 'fallen', coins: newCoins };
-    });
-    setTstates(nt);
-    setStep('revealed');
-    const ok = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] === q.correct && (nt[i]?.coins ?? 0) > 0).map(ct => ct.name);
-    const bad = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] !== q.correct).map(ct => ct.name);
-    setHost(
-      nt.some(t => t.status === 'won') && ok.length ? `CAMPEÃO! ${ok.join(' e ')} chegou ao MILHÃO!`
-      : ok.length && bad.length ? `${ok.join(', ')} ganham! ${bad.join(', ')} perdem.`
-      : ok.length ? `${ok.join(', ')} acertam!`
-      : `Ninguém acertou! A resposta era "${q.options[q.correct]}".`);
-  };
-
-  const finishGame = (states: { status: string; coins: number }[] = tstates) => {
-    setResults(states.map(t => t.coins));
-    setPhase('end');
-  };
-
-  const afterReveal = () => {
-    if (!tstates.some(t => t.status === 'playing') || tstates.some(t => t.status === 'won') || round >= MILHAO_LADDER.length - 1) { finishGame(); return; }
-    setBids(contestants.map(() => null));
-    setAnswers(contestants.map(() => null));
-    setStep('bidding');
-    setRound(round + 1); setQ(drawQuestion(round + 1));
-    setHost(`Próxima pergunta! Qual é o próximo lance?`);
-  };
-
-  const winnerIdx = useMemo(() => {
-    if (!results.length) return -1;
-    let best = 0;
-    results.forEach((p, i) => { if (p > results[best]) best = i; });
-    return results[best] > 0 ? best : -1;
-  }, [results]);
-
-  const awardWinner = () => {
-    if (awarded || winnerIdx < 0) return;
-    const c = contestants[winnerIdx];
-    if (c && c.teamIdx >= 0) {
-      const ids = students.filter(s => s.teamId === teams[c.teamIdx]?.id).map(s => s.id);
-      if (ids.length) onAwardTeam(c.teamIdx, ids, 3);
-    }
-    setAwarded(true);
-  };
-
-  const useCartas = () => {
-    if (!lifelines.cartas || !q || step !== 'answering') return;
-    const wrong = [0, 1, 2, 3].filter(i => i !== q.correct).sort(() => Math.random() - 0.5).slice(0, 2);
-    setHidden(wrong); setLifelines(l => ({ ...l, cartas: false }));
-    setAnswers(a => a.map(v => v !== null && wrong.includes(v) ? null : v));
-    setHost('Cartas! Duas alternativas erradas foram eliminadas.');
-  };
-  const usePular = () => {
-    if (!lifelines.pular || step !== 'answering') return;
-    setAnswers(contestants.map(() => null)); setHidden([]); setAudience(null);
-    setQ(drawQuestion(round)); setLifelines(l => ({ ...l, pular: false }));
-    setHost('Pulou! Pergunta nova, mesmo valor.');
-  };
-  const usePlateia = () => {
-    if (!lifelines.plateia || !q || step !== 'answering') return;
-    const visible = [0, 1, 2, 3].filter(i => !hidden.includes(i));
-    const dist = [0, 0, 0, 0];
-    const correctShare = 45 + Math.floor(Math.random() * 26);
-    dist[q.correct] = correctShare;
-    let rem = 100 - correctShare;
-    const others = visible.filter(i => i !== q.correct);
-    others.forEach((i, idx) => {
-      if (idx === others.length - 1) { dist[i] = rem; rem = 0; }
-      else { const s = Math.floor(Math.random() * (rem + 1)); dist[i] = s; rem -= s; }
-    });
-    setAudience(dist); setLifelines(l => ({ ...l, plateia: false }));
-    setHost('A plateia votou!');
-  };
-
-  const stage = (children: React.ReactNode) => (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[130] flex flex-col overflow-hidden"
-      style={{ background: 'linear-gradient(180deg,#33102e 0%,#1e0a22 55%,#0d0410 100%)' }}>
-      <style>{MILHAO_CSS}</style>
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 8%,rgba(255,214,80,0.18),transparent 55%)' }} />
-      </div>
-      <button onClick={onClose} className="absolute top-12 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
-      <div className="relative flex-1 overflow-y-auto no-scrollbar px-4 pt-16 pb-8">{children}</div>
-    </motion.div>
-  );
-
-  const showLogo = (
-    <div className="text-center mb-1">
-      <div className="relative inline-block overflow-hidden rounded-2xl border-2 border-amber-300/50 px-6 py-2" style={{ background: 'linear-gradient(180deg,rgba(85,42,0,0.55),rgba(30,12,0,0.72))', boxShadow: '0 0 30px -6px rgba(255,210,77,0.5), inset 0 1px 0 rgba(255,255,255,0.12)' }}>
-        <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>LEILÃO DO SABER</p>
-        <MilhaoShine />
-      </div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1.5">jogo de leilão entre dragões</p>
-    </div>
-  );
-
-  if (phase === 'setup' || phase === 'loading') return stage(
-    <div className="max-w-md mx-auto">
-      {showLogo}
-      {phase === 'setup' && (
-        <div className="space-y-3.5 mt-4">
-          <div className="bg-white/10 border border-white/15 rounded-2xl p-4 backdrop-blur">
-            <p className="text-sm text-white/85 leading-relaxed">Até 4 equipes jogam <b className="text-amber-300">ao mesmo tempo</b>. Cada pergunta: todos fazem um <b className="text-amber-300">lance (1-10 moedas)</b>, depois veem a pergunta. Acertou? <b className="text-amber-300">Ganha as moedas do lance</b>. Errou? <b className="text-amber-300">Perde</b> (mas as paradas seguras protegem moedas). Vence quem chegar a <b className="text-amber-300">1 milhão de moedas</b>!</p>
-          </div>
-          {error && <p className="text-sm text-red-200 font-medium bg-red-500/25 border border-red-400/40 rounded-xl p-3">{error}</p>}
-          <div>
-            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Tema do jogo</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Frações, Brasil Colônia…" className="w-full border border-white/15 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 bg-white/10 text-white placeholder-white/40" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Dificuldade base</label>
-            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/15 rounded-xl px-3 py-2.5 text-sm bg-white/10 text-white [&>option]:text-gray-900">
-              <option value="fácil">Fácil</option>
-              <option value="média">Média</option>
-              <option value="difícil">Difícil</option>
-            </select>
-          </div>
-          <div className="bg-white/10 rounded-2xl p-4 border border-white/15 backdrop-blur">
-            <p className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-2">Escolha as equipes (2 a 4) — jogam ao mesmo tempo</p>
-            <div className="flex flex-wrap gap-2">
-              {(hasRealTeams ? teams.slice(0, 8) : MILHAO_FALLBACK).map((t, i) => {
-                const on = pick.includes(i);
-                return (
-                  <button key={i} onClick={() => setPick(p => on ? p.filter(x => x !== i) : (p.length >= 4 ? p : [...p, i]))}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all inline-flex items-center gap-1 ${on ? 'text-white border-white/50 shadow-lg scale-105' : 'text-white/60 border-white/15 bg-white/[0.06]'}`}
-                    style={on ? { backgroundColor: t.color } : undefined}>
-                    <EmojiIcon emoji={t.emoji} size={12} /> {t.name}
-                  </button>
-                );
-              })}
-            </div>
-            {!hasRealTeams && <p className="text-[11px] text-white/45 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
-          </div>
-          <button onClick={() => start()} className="relative overflow-hidden w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-            <Coins size={20} /> Começar o leilão
-            <MilhaoShine />
-          </button>
-          <button onClick={() => start(true)} className="w-full text-amber-200 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 bg-white/[0.06] border border-dashed border-amber-300/40 active:scale-95 transition-transform">
-            <FlaskConical size={13} /> Testar com perguntas de exemplo (sem IA)
-          </button>
-        </div>
-      )}
-      {phase === 'loading' && (
-        <div className="flex flex-col items-center justify-center gap-4 py-24">
-          <Loader2 size={40} className="animate-spin text-amber-300" />
-          <p className="text-sm font-bold text-white/70">No ar em instantes… montando as perguntas.</p>
-        </div>
-      )}
-    </div>
-  );
-
-  if (phase === 'end') {
-    const ranking = contestants.map((ct, i) => ({ ct, coins: results[i] ?? 0 })).sort((a, b) => b.coins - a.coins);
-    const champ = ranking[0];
-    return stage(
-      <div className="max-w-md mx-auto">
-        <ConfettiBurst />
-        {showLogo}
-        {champ && champ.coins > 0 && (
-          <div className="text-center mt-4 mb-5">
-            <div className="relative inline-flex flex-col items-center" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
-              <Crown size={30} className="text-amber-300 mb-1" style={{ filter: 'drop-shadow(0 0 10px rgba(255,210,77,0.8))' }} />
-              <div className="w-20 h-20 rounded-full border-4 border-amber-300 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-[0_0_40px_-4px_rgba(255,210,77,0.8)]">
-                <EmojiIcon emoji={champ.ct.emoji} size={40} />
-              </div>
-            </div>
-            <p className="font-black text-white text-lg mt-3">{champ.ct.name} é campeão!</p>
-            <p className="font-black text-3xl mt-1" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.6)' }}>{fmtPrize(champ.coins)}</p>
-          </div>
-        )}
-        <div className="space-y-2">
-          {ranking.map((r, pos) => (
-            <div key={r.ct.name + pos} className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border-2 ${pos === 0 ? 'bg-amber-400/20 border-amber-400/70' : 'bg-white/[0.07] border-white/12'}`}>
-              <span className="font-black text-sm w-6 text-center text-white/80">{pos === 0 ? <Crown size={18} className="text-amber-300 inline" /> : `${pos + 1}º`}</span>
-              <EmojiIcon emoji={r.ct.emoji} size={20} />
-              <span className="flex-1 font-black text-white text-sm">{r.ct.name}</span>
-              <span className="font-black text-amber-300 tabular-nums text-sm">{fmtPrize(r.coins)}</span>
-            </div>
-          ))}
-        </div>
-        {winnerIdx >= 0 && contestants[winnerIdx]?.teamIdx >= 0 && !awarded && (
-          <button onClick={awardWinner} className="w-full mt-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
-            <Zap size={16} /> Dar +3 XP ao time campeão
-          </button>
-        )}
-        {awarded && <p className="text-emerald-300 text-sm font-bold text-center mt-3 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
-        <div className="flex gap-3 mt-3">
-          <button onClick={() => { setPhase('setup'); setResults([]); }} className="flex-1 text-amber-950 font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}><RotateCcw size={15} /> Jogar de novo</button>
-          <button onClick={onClose} className="flex-1 bg-white/10 border border-white/20 text-white/80 font-bold py-3 rounded-2xl text-sm">Sair</button>
-        </div>
-      </div>
-    );
-  }
-
-  const reveal = step === 'revealed';
-  const PALETTE = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[130] flex flex-col font-vt">
-      <style>{MILHAO_CSS}</style>
-      {/* ── PALCO ── */}
-      <div className="relative flex-1 overflow-hidden bg-white/5">
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#3a1030 0%,#2a0d3a 45%,#160718 100%)' }} />
-        <LeilaoFundo />
-        <LeilaoCortinaEsquerda />
-        <LeilaoCortinaDir />
-        <LeilaoPersonagem />
-        <button onClick={onClose} className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/55 text-white/90 border border-white/25 rounded-lg px-2.5 py-1.5 text-[11px] font-black active:scale-95 transition-transform"><X size={13} /> <span className="font-pixel text-[9px]">SAIR</span></button>
-        <span className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
-        {/* prêmio + times */}
-        <div className="absolute top-12 inset-x-14 z-10 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-1 mb-1">
-            {contestants.map((ct, i) => {
-              const st = tstates[i]?.status;
-              return (
-                <span key={i} className={`inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow border border-white/30 ${st === 'fallen' ? 'opacity-40 saturate-0' : st === 'stopped' ? 'opacity-70' : ''}`} style={{ backgroundColor: ct.color }}>
-                  <EmojiIcon emoji={ct.emoji} size={10} /> {ct.name}
-                  {st === 'stopped' && <Check size={9} strokeWidth={4} />}
-                  {st === 'fallen' && <X size={9} strokeWidth={4} />}
-                  {st === 'won' && <Crown size={9} />}
-                </span>
-              );
-            })}
-          </div>
-          <div className="relative inline-block overflow-hidden rounded-xl border border-amber-300/60 px-4 pt-1 pb-1.5" style={{ background: 'linear-gradient(180deg,rgba(70,35,0,0.72),rgba(25,10,0,0.85))', boxShadow: '0 0 18px -2px rgba(255,210,77,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
-            <p className="font-pixel text-[8px] text-amber-100/80 uppercase tracking-widest">Pergunta</p>
-            <p className="font-black text-2xl leading-none" style={{ color: '#ffd24d', textShadow: '0 0 16px rgba(255,210,77,0.7), 0 2px 0 rgba(90,40,0,0.6)' }}>{round + 1} de 9</p>
-            <MilhaoShine />
-          </div>
-        </div>
-        {/* balão do apresentador */}
-        <div className="absolute bottom-3 left-3 right-20 z-10 flex items-end gap-1.5">
-          <div className="w-9 h-9 shrink-0 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-lg"><Bird size={18} className="text-amber-200" /></div>
-          <div key={host} className="bg-white/95 rounded-2xl rounded-bl-sm px-3 py-2 shadow-xl" style={{ animation: 'milhao-pop 0.3s ease-out' }}>
-            <p className="font-vt text-[15px] text-gray-800 leading-tight">{host}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── PAINEL DE PERGUNTAS ── */}
-      <div className="bg-[#4a1b3e] border-t-4 border-[#2f1027] px-3 pt-3 pb-6 shrink-0 overflow-y-auto no-scrollbar max-h-[62%]">
-        {q && (
-          <>
-            <div key={`${round}-${q.q}`} className="relative bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3 min-h-[64px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_0_rgba(0,0,0,0.25)]" style={{ animation: 'milhao-pop 0.35s ease-out' }}>
-              {(['top-1.5 left-2', 'top-1.5 right-2', 'bottom-1.5 left-2', 'bottom-1.5 right-2'] as const).map(pos => (
-                <span key={pos} className={`absolute ${pos} w-1.5 h-1.5 rounded-full bg-[#c9b28a] border border-[#8a7a5a]`} />
-              ))}
-              <p className="font-vt text-xl text-[#3a3020] leading-snug">
-                {step === 'bidding' ? '🤔 Preparem-se para a pergunta!' : q.q}
-                <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed">Pergunta {round + 1} de {MILHAO_LADDER.length}</span>
-              </p>
-            </div>
-
-            {/* alternativas */}
-            {step !== 'bidding' && (
-              <div className="grid grid-cols-2 gap-2.5 max-w-lg w-full mx-auto my-4">
-                {q.options.map((opt, i) => {
-                  const isHidden = hidden.includes(i);
-                  const isCorrect = reveal && i === q.correct;
-                  const dimmed = reveal && !isCorrect;
-                  const anim = isCorrect ? 'milhao-glow-green 1.4s ease-in-out infinite'
-                    : `milhao-pop 0.35s ease-out ${i * 0.07}s backwards`;
-                  return (
-                    <div key={`${q.q}-${i}`}
-                      className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all border-2 border-black/25 shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_4px_0_rgba(0,0,0,0.35)] ${isHidden ? 'opacity-0 pointer-events-none' : ''} ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
-                      style={{ backgroundColor: PALETTE[i], animation: anim }}>
-                      <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
-                      <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
-                      <span className="shrink-0 flex gap-0.5">
-                        {contestants.map((ct, ti) => answers[ti] === i
-                          ? <span key={ti} className="w-2.5 h-2.5 rounded-full border border-white/80 shadow" style={{ backgroundColor: ct.color }} />
-                          : null)}
-                      </span>
-                      {audience && (
-                        <span className="shrink-0 flex flex-col items-end">
-                          <span className="font-pixel text-[9px] text-white/90 tabular-nums">{audience[i]}%</span>
-                          <span className="w-8 h-1.5 bg-black/25 rounded-full overflow-hidden mt-0.5"><span className="block h-full bg-white/80" style={{ width: `${audience[i]}%` }} /></span>
-                        </span>
-                      )}
-                      {isCorrect && <Check size={16} className="shrink-0 text-white" strokeWidth={3} />}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* FASE 1: lances */}
-            {step === 'bidding' && (
-              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
-                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
-                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
-                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
-                    <span className="ml-auto text-white font-black text-[11px]">{tstates[ti].coins} 🪙</span>
-                    <div className="flex gap-1 shrink-0">
-                      {[1, 2, 5, 10].map(bid => (
-                        <button key={bid} onClick={() => setBids(b => b.map((v, j) => j === ti ? bid : v))}
-                          className={`w-8 h-8 rounded-lg font-pixel text-[10px] font-bold transition-all ${bids[ti] === bid ? 'bg-amber-400 text-amber-950 ring-2 ring-white scale-110' : 'bg-white/20 text-white active:scale-95'}`}>
-                          {bid}</button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* FASE 2: respostas */}
-            {step === 'answering' && (
-              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
-                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
-                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
-                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
-                    <div className="flex gap-1.5 ml-auto shrink-0">
-                      {[0, 1, 2, 3].map(o => (
-                        <button key={o} disabled={hidden.includes(o)} onClick={() => setAnswers(a => a.map((v, j) => j === ti ? o : v))}
-                          className={`w-8 h-8 rounded-lg font-pixel text-[10px] text-white border-2 border-black/25 transition-all ${hidden.includes(o) ? 'opacity-0 pointer-events-none' : answers[ti] === o ? 'ring-2 ring-white scale-110' : 'opacity-50 active:scale-95'}`}
-                          style={{ backgroundColor: PALETTE[o] }}>{['A', 'B', 'C', 'D'][o]}</button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* ajudas */}
-            {step === 'answering' && (
-              <div className="grid grid-cols-3 gap-2 max-w-lg w-full mx-auto mb-3">
-                {([{ on: lifelines.cartas, fn: useCartas, Icon: Scissors, label: '50:50' },
-                   { on: lifelines.pular, fn: usePular, Icon: SkipForward, label: 'Pular' },
-                   { on: lifelines.plateia, fn: usePlateia, Icon: Users, label: 'Plateia' }] as const).map((a, i) => (
-                  <button key={i} onClick={a.fn} disabled={!a.on}
-                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 font-pixel text-[8px] transition-all ${a.on ? 'bg-[#33122b] border-black/30 text-amber-200 active:scale-95' : 'bg-[#33122b]/50 border-black/20 text-white/25 line-through'}`}>
-                    <a.Icon size={15} /> {a.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* ações */}
-            <div className="max-w-lg w-full mx-auto">
-              {step === 'bidding' && (
-                <button onClick={startAnswering} disabled={!allBid} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-                  <span className="font-pixel text-[10px]">REVELAR PERGUNTA</span>
-                  {allBid && <MilhaoShine />}
-                </button>
-              )}
-              {step === 'answering' && (
-                <button onClick={revealAnswers} disabled={!allAnswered} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-                  <span className="font-pixel text-[10px]">REVELAR RESPOSTA</span>
-                  {allAnswered && <MilhaoShine />}
-                </button>
-              )}
-              {step === 'revealed' && (
-                <button onClick={afterReveal} className="w-full bg-[#33122b] border-2 border-black/30 text-white font-black py-3 rounded-xl font-pixel text-[10px] active:translate-y-0.5">CONTINUAR</button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </motion.div>
-  );
-};
-
-const GamiMilhao = ({ teams, students, subject, level, onClose, onAwardTeam, isAdmin }: {
-  teams: GamiTeam[];
-  students: GamiStudent[];
-  subject: string;
-  level: string;
-  onClose: () => void;
-  onAwardTeam: (teamIdx: number, names: string[], points: number) => void;
-  isAdmin?: boolean;
-}) => {
-  const hasRealTeams = teams.length >= 2;
-  const [pick, setPick] = useState<number[]>(hasRealTeams ? [0, 1] : [0, 1, 2, 3]);
-  // Até 4 equipes jogam AO MESMO TEMPO: todas respondem cada pergunta e sobem juntas.
-  const contestants = useMemo(() => pick.map(i => hasRealTeams
-    ? { teamIdx: i, name: teams[i]?.name ?? '?', emoji: teams[i]?.emoji ?? '🦉', color: teams[i]?.color ?? '#6366f1' }
-    : { teamIdx: -1, ...MILHAO_FALLBACK[i] }),
-  [hasRealTeams, pick, teams]);
-
-  const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
-  const [topic, setTopic] = useState('');
-  const [difficulty, setDifficulty] = useState('média');
-  const [error, setError] = useState('');
-
-  const poolRef = useRef<MilhaoQ[]>([]);
-  const usedRef = useRef<Set<number>>(new Set());
-
-  // Estado da partida — todas as equipes respondem a MESMA pergunta ao mesmo tempo.
-  const [round, setRound] = useState(0);              // degrau atual da rodada (0..8)
-  const [q, setQ] = useState<MilhaoQ | null>(null);
-  const [tstates, setTstates] = useState<{ status: 'playing' | 'stopped' | 'fallen' | 'won'; prize: number }[]>([]);
-  const [answers, setAnswers] = useState<(number | null)[]>([]);       // resposta de cada equipe na rodada
-  const [decisions, setDecisions] = useState<('stop' | 'go' | null)[]>([]); // parar ou arriscar
-  const [step, setStep] = useState<'answering' | 'revealed' | 'decision'>('answering');
-  const [hidden, setHidden] = useState<number[]>([]);      // 50:50
-  const [audience, setAudience] = useState<number[] | null>(null); // plateia
-  const [lifelines, setLifelines] = useState({ cartas: true, pular: true, plateia: true }); // ajudas da turma, 1x cada
-  const [results, setResults] = useState<number[]>([]);   // prêmio final por equipe
-  const [host, setHost] = useState('');
-  const [awarded, setAwarded] = useState(false);
-
-  const fetchPool = async (): Promise<MilhaoQ[]> => {
-    const prompt = `Gere 18 perguntas de múltipla escolha sobre "${topic}" (disciplina: ${subject || 'geral'}, nível: ${level}), dificuldade base ${difficulty}.
-ORDENE da MAIS FÁCIL para a MAIS DIFÍCIL: as primeiras bem simples, as últimas desafiadoras.
-Cada pergunta: enunciado curto (máximo 120 caracteres), 4 alternativas curtas (máximo 40 caracteres cada), apenas UMA correta.
-Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","alt B","alt C","alt D"],"correct":0}]} onde "correct" é o índice (0 a 3) da correta.`;
-    const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt });
-    const raw = (response.text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    const parsed = JSON.parse(raw);
-    const valid = (parsed.questions || []).filter((x: any) => x?.q && Array.isArray(x.options) && x.options.length === 4 && typeof x.correct === 'number' && x.correct >= 0 && x.correct <= 3);
-    if (valid.length < 4) throw new Error('poucas perguntas');
-    return valid;
-  };
-
-  // Sorteia uma pergunta do "andar" de dificuldade certo (fácil/média/difícil),
-  // preferindo as ainda não usadas para dois times pegarem perguntas diferentes.
-  const drawQuestion = (lvl: number): MilhaoQ => {
-    const pool = poolRef.current;
-    const third = Math.max(1, Math.floor(pool.length / 3));
-    const tier = lvl < 3 ? 0 : lvl < 6 ? 1 : 2;
-    const start = tier * third, endEx = tier === 2 ? pool.length : start + third;
-    let candidates: number[] = [];
-    for (let i = start; i < endEx; i++) if (!usedRef.current.has(i)) candidates.push(i);
-    if (candidates.length === 0) for (let i = start; i < endEx; i++) candidates.push(i);
-    if (candidates.length === 0) candidates = pool.map((_, i) => i);
-    const idx = candidates[Math.floor(Math.random() * candidates.length)];
-    usedRef.current.add(idx);
-    return pool[idx];
-  };
-
-  const lastSafePrize = (lvl: number) => {
-    let banked = 0;
-    for (let i = 0; i < lvl; i++) if (MILHAO_LADDER[i].safe) banked = MILHAO_LADDER[i].prize;
-    return banked;
-  };
-
-  const start = async (testMode = false) => {
-    if (!testMode && !topic.trim()) { setError('Informe o tema do jogo.'); return; }
-    if (pick.length < 2) { setError('Escolha pelo menos 2 equipes.'); return; }
-    setError(''); setPhase('loading');
-    try {
-      poolRef.current = testMode ? MILHAO_SAMPLE_QUESTIONS : await fetchPool();
-      usedRef.current = new Set();
-      setTstates(contestants.map(() => ({ status: 'playing', prize: 0 })));
-      setAnswers(contestants.map(() => null));
-      setDecisions(contestants.map(() => null));
-      setResults([]); setAwarded(false);
-      setRound(0); setHidden([]); setAudience(null);
-      setLifelines({ cartas: true, pular: true, plateia: true });
-      setQ(drawQuestion(0)); setStep('answering');
-      setHost(`Valendo ${fmtPrize(MILHAO_LADDER[0].prize)}! Cada equipe marca a sua resposta.`);
-      setPhase('play');
-    } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
-  };
-
-  const allAnswered = contestants.every((_, i) => tstates[i]?.status !== 'playing' || answers[i] !== null);
-
-  const revealAnswers = () => {
-    if (!q || step !== 'answering' || !allAnswered) return;
-    const last = round >= MILHAO_LADDER.length - 1;
-    const nt: { status: 'playing' | 'stopped' | 'fallen' | 'won'; prize: number }[] = tstates.map((ts, i) => {
-      if (ts.status !== 'playing') return ts;
-      if (answers[i] === q.correct) return { status: last ? 'won' : 'playing', prize: MILHAO_LADDER[round].prize };
-      return { status: 'fallen', prize: lastSafePrize(round) };
-    });
-    setTstates(nt);
-    setStep('revealed');
-    const ok = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] === q.correct).map(ct => ct.name);
-    const bad = contestants.filter((_, i) => tstates[i]?.status === 'playing' && answers[i] !== q.correct).map(ct => ct.name);
-    setHost(
-      last && ok.length ? `INCRÍVEL! ${ok.join(' e ')} chegou ao MILHÃO!`
-      : ok.length && bad.length ? `${ok.join(', ')} sobe! ${bad.join(', ')} cai pra parada segura.`
-      : ok.length ? `Todas certas! Equipes chegam em ${fmtPrize(MILHAO_LADDER[round].prize)}.`
-      : `Ninguém acertou! A resposta era "${q.options[q.correct]}".`);
-  };
-
-  const finishGame = (states: { status: string; prize: number }[] = tstates) => {
-    setResults(states.map(t => t.prize));
-    setPhase('end');
-  };
-
-  const afterReveal = () => {
-    if (!tstates.some(t => t.status === 'playing') || round >= MILHAO_LADDER.length - 1) { finishGame(); return; }
-    setDecisions(contestants.map(() => null));
-    setStep('decision');
-    setHost(`Quem arrisca a próxima, valendo ${fmtPrize(MILHAO_LADDER[round + 1].prize)}? Cada equipe decide.`);
-  };
-
-  const allDecided = contestants.every((_, i) => tstates[i]?.status !== 'playing' || decisions[i] !== null);
-
-  const nextRound = () => {
-    if (!allDecided) return;
-    const nt = tstates.map((ts, i) => ts.status === 'playing' && decisions[i] === 'stop' ? { status: 'stopped' as const, prize: ts.prize } : ts);
-    setTstates(nt);
-    if (!nt.some(t => t.status === 'playing')) { finishGame(nt); return; }
-    const next = round + 1;
-    setRound(next); setQ(drawQuestion(next));
-    setAnswers(contestants.map(() => null)); setHidden([]); setAudience(null); setStep('answering');
-    setHost(`Valendo ${fmtPrize(MILHAO_LADDER[next].prize)}!`);
-  };
-
-  const winnerIdx = useMemo(() => {
-    if (!results.length) return -1;
-    let best = 0;
-    results.forEach((p, i) => { if (p > results[best]) best = i; });
-    return results[best] > 0 ? best : -1;
-  }, [results]);
-
-  const awardWinner = () => {
-    if (awarded || winnerIdx < 0) return;
-    const c = contestants[winnerIdx];
-    if (c && c.teamIdx >= 0) {
-      const ids = students.filter(s => s.teamId === teams[c.teamIdx]?.id).map(s => s.id);
-      if (ids.length) onAwardTeam(c.teamIdx, ids, 3);
-    }
-    setAwarded(true);
-  };
-
-  const useCartas = () => {
-    if (!lifelines.cartas || !q || step !== 'answering') return;
-    const wrong = [0, 1, 2, 3].filter(i => i !== q.correct).sort(() => Math.random() - 0.5).slice(0, 2);
-    setHidden(wrong); setLifelines(l => ({ ...l, cartas: false }));
-    setAnswers(a => a.map(v => v !== null && wrong.includes(v) ? null : v));
-    setHost('Cartas! Duas alternativas erradas foram eliminadas.');
-  };
-  const usePular = () => {
-    if (!lifelines.pular || step !== 'answering') return;
-    setAnswers(contestants.map(() => null)); setHidden([]); setAudience(null);
-    setQ(drawQuestion(round)); setLifelines(l => ({ ...l, pular: false }));
-    setHost('Pulou! Pergunta nova, mesmo valor.');
-  };
-  const usePlateia = () => {
-    if (!lifelines.plateia || !q || step !== 'answering') return;
-    const visible = [0, 1, 2, 3].filter(i => !hidden.includes(i));
-    const dist = [0, 0, 0, 0];
-    const correctShare = 45 + Math.floor(Math.random() * 26); // 45..70 %
-    dist[q.correct] = correctShare;
-    let rem = 100 - correctShare;
-    const others = visible.filter(i => i !== q.correct);
-    others.forEach((i, idx) => {
-      if (idx === others.length - 1) { dist[i] = rem; rem = 0; }
-      else { const s = Math.floor(Math.random() * (rem + 1)); dist[i] = s; rem -= s; }
-    });
-    setAudience(dist); setLifelines(l => ({ ...l, plateia: false }));
-    setHost('A plateia votou!');
-  };
-
-  // ── Palco do "programa" — fundo de estúdio com holofotes e cores vivas.
-  // É uma função (não um componente) de propósito: inlina o JSX, então os
-  // inputs do setup não remontam/perdem foco a cada tecla.
-  const stage = (children: React.ReactNode) => (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="milhao-anim fixed inset-0 z-[130] flex flex-col overflow-hidden"
-      style={{ background: 'linear-gradient(180deg,#33102e 0%,#1e0a22 55%,#0d0410 100%)' }}>
-      <style>{MILHAO_CSS}</style>
-      {/* cenário: cortinas, sanca com lâmpadas e feixes de luz */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 8%,rgba(255,214,80,0.18),transparent 55%)' }} />
-        <div className="absolute inset-y-0 left-0 w-1/5" style={{ background: 'linear-gradient(90deg,#7a0f1e,#c0293a 55%,transparent)' }} />
-        <div className="absolute inset-y-0 left-0 w-1/5" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)' }} />
-        <div className="absolute inset-y-0 right-0 w-1/5" style={{ background: 'linear-gradient(270deg,#7a0f1e,#c0293a 55%,transparent)' }} />
-        <div className="absolute inset-y-0 right-0 w-1/5" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)' }} />
-        <div className="absolute top-0 inset-x-0 h-8" style={{ background: 'linear-gradient(180deg,#a51a2a,#6e0d18)' }} />
-        <div className="absolute top-8 inset-x-0 h-[3px]" style={{ background: 'linear-gradient(90deg,#8a5a00,#ffd24d 30%,#ffd24d 70%,#8a5a00)' }} />
-        <div className="absolute top-10 inset-x-6 flex justify-between">
-          {Array.from({ length: 11 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)', animation: `milhao-twinkle 1.8s ease-in-out ${(i % 3) * 0.6}s infinite` }} />)}
-        </div>
-        <div className="absolute top-10 left-1/4 w-28 h-[130%] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.55),transparent 65%)', transformOrigin: 'top center', animation: 'milhao-sway 6s ease-in-out infinite' }} />
-        <div className="absolute top-10 right-1/4 w-28 h-[130%] blur-2xl opacity-40" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.55),transparent 65%)', transformOrigin: 'top center', animation: 'milhao-sway-r 6s ease-in-out infinite' }} />
-        <div className="absolute bottom-0 left-1/3 w-56 h-56 rounded-full blur-[90px]" style={{ background: 'rgba(124,58,237,0.35)' }} />
-      </div>
-      <MilhaoBgArt />
-      <button onClick={onClose} className="absolute top-12 right-4 z-20 w-9 h-9 rounded-full bg-black/40 border border-white/25 text-white/80 flex items-center justify-center backdrop-blur active:scale-90 transition-transform"><X size={17} /></button>
-      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-4 pt-16 pb-8">{children}</div>
-    </motion.div>
-  );
-
-  // Título estilo letreiro do programa
-  const showLogo = (
-    <div className="text-center mb-1">
-      <div className="relative inline-block overflow-hidden rounded-2xl border-2 border-amber-300/50 px-6 py-2" style={{ background: 'linear-gradient(180deg,rgba(85,42,0,0.55),rgba(30,12,0,0.72))', boxShadow: '0 0 30px -6px rgba(255,210,77,0.5), inset 0 1px 0 rgba(255,255,255,0.12)' }}>
-        <p className="font-black text-2xl tracking-tight leading-none" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.55), 0 2px 0 rgba(120,60,0,0.6)' }}>RUMO AO MILHÃO</p>
-        <MilhaoShine />
-      </div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-200/70 mt-1.5">o show do saber</p>
-    </div>
-  );
-
-  // ── SETUP / LOADING ──
-  if (phase === 'setup' || phase === 'loading') return stage(
-    <div className="max-w-md mx-auto">
-      {showLogo}
-      {phase === 'setup' && (
-        <div className="space-y-3.5 mt-4">
-          <div className="bg-white/10 border border-white/15 rounded-2xl p-4 backdrop-blur">
-            <p className="text-sm text-white/85 leading-relaxed">Até 4 equipes jogam <b className="text-amber-300">ao mesmo tempo</b>: todas respondem cada pergunta e sobem juntas a <b className="text-amber-300">escada do milhão</b>. Errou? Cai pra última <b className="text-emerald-300">parada segura</b> e sai do jogo. Entre as perguntas, cada equipe decide: <b className="text-amber-300">parar e garantir</b> ou arriscar. A turma tem 3 ajudas pra partida: <b className="text-white">50:50</b>, <b className="text-white">Pular</b> e <b className="text-white">Plateia</b>. Vence quem juntar o maior prêmio!</p>
-          </div>
-          {error && <p className="text-sm text-red-200 font-medium bg-red-500/25 border border-red-400/40 rounded-xl p-3">{error}</p>}
-          <div>
-            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Tema do jogo</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: Sistema Solar, Frações, Brasil Colônia…" className="w-full border border-white/15 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 bg-white/10 text-white placeholder-white/40" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-1 block">Dificuldade base</label>
-            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full border border-white/15 rounded-xl px-3 py-2.5 text-sm bg-white/10 text-white [&>option]:text-gray-900">
-              <option value="fácil">Fácil</option>
-              <option value="média">Média</option>
-              <option value="difícil">Difícil</option>
-            </select>
-          </div>
-          <div className="bg-white/10 rounded-2xl p-4 border border-white/15 backdrop-blur">
-            <p className="text-xs font-bold text-amber-200/80 uppercase tracking-wider mb-2">Escolha as equipes (2 a 4) — jogam ao mesmo tempo</p>
-            <div className="flex flex-wrap gap-2">
-              {(hasRealTeams ? teams.slice(0, 8) : MILHAO_FALLBACK).map((t, i) => {
-                const on = pick.includes(i);
-                return (
-                  <button key={i} onClick={() => setPick(p => on ? p.filter(x => x !== i) : (p.length >= 4 ? p : [...p, i]))}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all inline-flex items-center gap-1 ${on ? 'text-white border-white/50 shadow-lg scale-105' : 'text-white/60 border-white/15 bg-white/[0.06]'}`}
-                    style={on ? { backgroundColor: t.color } : undefined}>
-                    <EmojiIcon emoji={t.emoji} size={12} /> {t.name}
-                  </button>
-                );
-              })}
-            </div>
-            {!hasRealTeams && <p className="text-[11px] text-white/45 mt-2">Dica: crie equipes na aba Equipes para usar os nomes reais e dar XP ao time campeão.</p>}
-          </div>
-          <button onClick={() => start()} className="relative overflow-hidden w-full text-amber-950 font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_-4px_rgba(255,210,77,0.7)]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-            <Coins size={20} /> Começar o show
-            <MilhaoShine />
-          </button>
-          <button onClick={() => start(true)} className="w-full text-amber-200 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 bg-white/[0.06] border border-dashed border-amber-300/40 active:scale-95 transition-transform">
-            <FlaskConical size={13} /> Testar com perguntas de exemplo (sem IA)
-          </button>
-        </div>
-      )}
-      {phase === 'loading' && (
-        <div className="flex flex-col items-center justify-center gap-4 py-24">
-          <Loader2 size={40} className="animate-spin text-amber-300" />
-          <p className="text-sm font-bold text-white/70">No ar em instantes… montando as perguntas.</p>
-        </div>
-      )}
-    </div>
-  );
-
-  // ── END — grande final ──
-  if (phase === 'end') {
-    const ranking = contestants.map((ct, i) => ({ ct, prize: results[i] ?? 0 })).sort((a, b) => b.prize - a.prize);
-    const champ = ranking[0];
-    return stage(
-      <div className="max-w-md mx-auto">
-        <ConfettiBurst />
-        {showLogo}
-        {champ && champ.prize > 0 && (
-          <div className="text-center mt-4 mb-5">
-            <div className="relative inline-flex flex-col items-center" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
-              <Crown size={30} className="text-amber-300 mb-1" style={{ filter: 'drop-shadow(0 0 10px rgba(255,210,77,0.8))' }} />
-              <div className="w-20 h-20 rounded-full border-4 border-amber-300 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-[0_0_40px_-4px_rgba(255,210,77,0.8)]">
-                <EmojiIcon emoji={champ.ct.emoji} size={40} />
-              </div>
-            </div>
-            <p className="font-black text-white text-lg mt-3">{champ.ct.name} é campeão!</p>
-            <p className="font-black text-3xl mt-1" style={{ color: '#ffd24d', textShadow: '0 0 18px rgba(255,210,77,0.6)' }}>{fmtPrize(champ.prize)}</p>
-          </div>
-        )}
-        <div className="space-y-2">
-          {ranking.map((r, pos) => (
-            <div key={r.ct.name + pos} className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border-2 ${pos === 0 ? 'bg-amber-400/20 border-amber-400/70' : 'bg-white/[0.07] border-white/12'}`}>
-              <span className="font-black text-sm w-6 text-center text-white/80">{pos === 0 ? <Crown size={18} className="text-amber-300 inline" /> : `${pos + 1}º`}</span>
-              <EmojiIcon emoji={r.ct.emoji} size={20} />
-              <span className="flex-1 font-black text-white text-sm">{r.ct.name}</span>
-              <span className="font-black text-amber-300 tabular-nums text-sm">{fmtPrize(r.prize)}</span>
-            </div>
-          ))}
-        </div>
-        {winnerIdx >= 0 && contestants[winnerIdx]?.teamIdx >= 0 && !awarded && (
-          <button onClick={awardWinner} className="w-full mt-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2">
-            <Zap size={16} /> Dar +3 XP ao time campeão
-          </button>
-        )}
-        {awarded && <p className="text-emerald-300 text-sm font-bold text-center mt-3 flex items-center justify-center gap-1"><Check size={15} /> XP entregue!</p>}
-        <div className="flex gap-3 mt-3">
-          <button onClick={() => { setPhase('setup'); setResults([]); }} className="flex-1 text-amber-950 font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}><RotateCcw size={15} /> Jogar de novo</button>
-          <button onClick={onClose} className="flex-1 bg-white/10 border border-white/20 text-white/80 font-bold py-3 rounded-2xl text-sm">Sair</button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── PLAY — palco do show ──
-  const reveal = step === 'revealed' || step === 'decision';
-  const PALETTE = ['#e05252', '#f0a03c', '#5cb85c', '#5b8def'];
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="milhao-anim fixed inset-0 z-[130] flex flex-col font-vt">
-      <style>{MILHAO_CSS}</style>
-      {/* ── PALCO (arte no topo) ── */}
-      <div className="relative flex-1 overflow-hidden">
-        {/* Placeholder do palco em CSS (fica atrás). Some quando a arte real
-            /assets/battle/milhao-palco.jpg existir e carregar por cima. */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#3a1030 0%,#2a0d3a 45%,#160718 100%)' }} />
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 12%,rgba(255,214,80,0.16),transparent 55%)' }} />
-        {/* piso de madeira do palco */}
-        <div className="absolute bottom-0 inset-x-0 h-14" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 2px, transparent 2px 34px), linear-gradient(180deg,#6b3416,#3a1a0a)' }} />
-        <div className="absolute bottom-0 inset-x-0 h-14 opacity-40" style={{ background: 'radial-gradient(ellipse at 50% 0,rgba(255,214,80,0.5),transparent 65%)' }} />
-        {/* cortinas com dobras de tecido */}
-        <div className="absolute inset-y-0 left-0 w-1/4" style={{ background: 'linear-gradient(90deg,#7a0f1e,#c0293a 55%,transparent)' }} />
-        <div className="absolute inset-y-0 left-0 w-1/4" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(90deg,#000 45%,transparent 80%)' }} />
-        <div className="absolute inset-y-0 right-0 w-1/4" style={{ background: 'linear-gradient(270deg,#7a0f1e,#c0293a 55%,transparent)' }} />
-        <div className="absolute inset-y-0 right-0 w-1/4" style={{ background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.35) 0 5px, rgba(255,255,255,0.07) 5px 8px, transparent 8px 20px)', WebkitMaskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)', maskImage: 'linear-gradient(270deg,#000 45%,transparent 80%)' }} />
-        {/* sanca com trilho dourado e letreiro de lâmpadas */}
-        <div className="absolute top-0 inset-x-0 h-8" style={{ background: 'linear-gradient(180deg,#a51a2a,#6e0d18)' }} />
-        <div className="absolute top-8 inset-x-0 h-[3px]" style={{ background: 'linear-gradient(90deg,#8a5a00,#ffd24d 30%,#ffd24d 70%,#8a5a00)' }} />
-        <div className="absolute top-9 left-1/3 w-24 h-[130%] blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(94,240,240,0.6),transparent 60%)', transformOrigin: 'top center', animation: 'milhao-sway 6s ease-in-out infinite' }} />
-        <div className="absolute top-9 right-1/3 w-24 h-[130%] blur-2xl opacity-45" style={{ background: 'linear-gradient(180deg,rgba(255,190,80,0.6),transparent 60%)', transformOrigin: 'top center', animation: 'milhao-sway-r 6s ease-in-out infinite' }} />
-        <div className="absolute top-10 inset-x-8 flex justify-between">
-          {Array.from({ length: 9 }).map((_, i) => <span key={i} className="w-2 h-2 rounded-full bg-amber-300" style={{ boxShadow: '0 0 8px 2px rgba(255,200,60,0.8)', animation: `milhao-twinkle 1.8s ease-in-out ${(i % 3) * 0.6}s infinite` }} />)}
-        </div>
-        {/* brilhos espalhados pelo cenário */}
-        {[[16, 34], [82, 28], [30, 58], [70, 52]].map(([x, y], i) => (
-          <span key={i} className="absolute w-1 h-1 rounded-full bg-white/80" style={{ left: `${x}%`, top: `${y}%`, boxShadow: '0 0 6px 2px rgba(255,255,255,0.55)', animation: `milhao-twinkle 2.4s ease-in-out ${i * 0.5}s infinite` }} />
-        ))}
-        {/* cortina/cenário em arte real — cobre todo o placeholder de CSS acima quando existir */}
-        <MilhaoBgArt />
-        {/* apresentador — placeholder em CSS (fica atrás) coberto pela arte real do personagem quando existir */}
-        <div className="absolute inset-x-0 bottom-10 z-[1] flex flex-col items-center">
-          <div className="w-28 h-16 rounded-[50%]" style={{ background: 'radial-gradient(ellipse,rgba(255,220,120,0.35),transparent 70%)' }} />
-          <div className="relative w-full flex justify-center -mt-14" style={{ animation: 'milhao-float 3.4s ease-in-out infinite' }}>
-            <div className="w-16 h-16 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-xl"><Bird size={34} className="text-amber-200" /></div>
-            <MilhaoCharacterArt />
-          </div>
-        </div>
-
-        {/* ── OVERLAYS ── */}
-        <button onClick={onClose} className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-black/55 text-white/90 border border-white/25 rounded-lg px-2.5 py-1.5 text-[11px] font-black active:scale-95 transition-transform"><X size={13} /> <span className="font-pixel text-[9px]">SAIR</span></button>
-        <span className="absolute top-3 left-3 z-20 inline-flex items-center gap-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Ao vivo</span>
-        {/* prêmio + time */}
-        <div className="absolute top-12 inset-x-14 z-10 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-1 mb-1">
-            {contestants.map((ct, i) => {
-              const st = tstates[i]?.status;
-              return (
-                <span key={i} className={`inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow border border-white/30 ${st === 'fallen' ? 'opacity-40 saturate-0' : st === 'stopped' ? 'opacity-70' : ''}`} style={{ backgroundColor: ct.color }}>
-                  <EmojiIcon emoji={ct.emoji} size={10} /> {ct.name}
-                  {st === 'stopped' && <Check size={9} strokeWidth={4} />}
-                  {st === 'fallen' && <X size={9} strokeWidth={4} />}
-                  {st === 'won' && <Crown size={9} />}
-                </span>
-              );
-            })}
-          </div>
-          <div className="relative inline-block overflow-hidden rounded-xl border border-amber-300/60 px-4 pt-1 pb-1.5" style={{ background: 'linear-gradient(180deg,rgba(70,35,0,0.72),rgba(25,10,0,0.85))', boxShadow: '0 0 18px -2px rgba(255,210,77,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
-            <p className="font-pixel text-[8px] text-amber-100/80 uppercase tracking-widest">Valendo</p>
-            <p className="font-black text-2xl leading-none" style={{ color: '#ffd24d', textShadow: '0 0 16px rgba(255,210,77,0.7), 0 2px 0 rgba(90,40,0,0.6)' }}>{fmtPrize(MILHAO_LADDER[round].prize)}</p>
-            <MilhaoShine />
-          </div>
-        </div>
-        {/* escada de prêmios (lateral direita) */}
-        <div className="absolute top-1/2 -translate-y-1/2 right-2 z-10 w-14 border border-amber-300/25 rounded-xl p-1 flex flex-col-reverse gap-0.5 backdrop-blur" style={{ background: 'linear-gradient(180deg,rgba(20,8,30,0.72),rgba(0,0,0,0.6))' }}>
-          {MILHAO_LADDER.map((rung, i) => {
-            const isCur = i === round;
-            return (
-              <div key={i} className={`flex items-center justify-center gap-0.5 rounded-md text-[9px] font-black py-0.5 transition-all ${isCur ? 'bg-amber-300 text-amber-950 scale-110' : i < round ? 'text-emerald-300' : 'text-white/40'}`} style={isCur ? { animation: 'milhao-glow 1.6s ease-in-out infinite' } : undefined}>
-                {rung.safe && <Star size={8} className={isCur ? 'text-amber-900' : 'text-emerald-300'} />}{i + 1}
-                {contestants.map((ct, ti) => tstates[ti] && tstates[ti].status !== 'playing' && tstates[ti].prize === rung.prize
-                  ? <span key={ti} className="w-1.5 h-1.5 rounded-full border border-white/70" style={{ backgroundColor: ct.color }} />
-                  : null)}
-              </div>
-            );
-          })}
-        </div>
-        {/* balão de fala do apresentador */}
-        <div className="absolute bottom-3 left-3 right-20 z-10 flex items-end gap-1.5">
-          <div className="w-9 h-9 shrink-0 rounded-full border-2 border-amber-300/80 bg-gradient-to-br from-indigo-600 to-violet-800 flex items-center justify-center shadow-lg"><Bird size={18} className="text-amber-200" /></div>
-          <div key={host} className="bg-white/95 rounded-2xl rounded-bl-sm px-3 py-2 shadow-xl" style={{ animation: 'milhao-pop 0.3s ease-out' }}>
-            <p className="font-vt text-[15px] text-gray-800 leading-tight">{host}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── PAINEL DE PERGUNTAS (embaixo) — paleta vinho, combinando com o palco ── */}
-      <div className="bg-[#4a1b3e] border-t-4 border-[#2f1027] px-3 pt-3 pb-6 shrink-0 overflow-y-auto no-scrollbar max-h-[62%]">
-        {q && (
-          <>
-            <div key={`${round}-${q.q}`} className="relative bg-[#f8f0dc] border-2 border-[#5a4a3a] rounded-xl px-5 py-3 min-h-[64px] flex items-center max-w-lg w-full mx-auto shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_3px_0_rgba(0,0,0,0.25)]" style={{ animation: 'milhao-pop 0.35s ease-out' }}>
-              {(['top-1.5 left-2', 'top-1.5 right-2', 'bottom-1.5 left-2', 'bottom-1.5 right-2'] as const).map(pos => (
-                <span key={pos} className={`absolute ${pos} w-1.5 h-1.5 rounded-full bg-[#c9b28a] border border-[#8a7a5a]`} />
-              ))}
-              <p className="font-vt text-xl text-[#3a3020] leading-snug">
-                {q.q}
-                <span className="block font-pixel text-[8px] uppercase text-[#8a7a5a] mt-2 leading-relaxed">Pergunta {round + 1} de {MILHAO_LADDER.length} · valendo pra todas as equipes</span>
-              </p>
-            </div>
-
-            {/* alternativas — os pontinhos coloridos mostram a escolha de cada equipe */}
-            <div className="grid grid-cols-2 gap-2.5 max-w-lg w-full mx-auto my-4">
-              {q.options.map((opt, i) => {
-                const isHidden = hidden.includes(i);
-                const isCorrect = reveal && i === q.correct;
-                const dimmed = reveal && !isCorrect;
-                const anim = isCorrect ? 'milhao-glow-green 1.4s ease-in-out infinite'
-                  : `milhao-pop 0.35s ease-out ${i * 0.07}s backwards`;
-                return (
-                  <div key={`${q.q}-${i}`}
-                    className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all border-2 border-black/25 shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_4px_0_rgba(0,0,0,0.35)] ${isHidden ? 'opacity-0 pointer-events-none' : ''} ${dimmed ? 'opacity-35 saturate-0' : ''} ${isCorrect ? 'ring-2 ring-white scale-[1.02]' : ''}`}
-                    style={{ backgroundColor: PALETTE[i], animation: anim }}>
-                    <span className="w-6 h-6 shrink-0 rounded bg-black/20 flex items-center justify-center font-pixel text-[10px] text-white/90 leading-none">{['A', 'B', 'C', 'D'][i]}</span>
-                    <p className="flex-1 font-vt text-lg text-white leading-tight">{opt}</p>
-                    <span className="shrink-0 flex gap-0.5">
-                      {contestants.map((ct, ti) => answers[ti] === i
-                        ? <span key={ti} className="w-2.5 h-2.5 rounded-full border border-white/80 shadow" style={{ backgroundColor: ct.color }} />
-                        : null)}
-                    </span>
-                    {audience && (
-                      <span className="shrink-0 flex flex-col items-end">
-                        <span className="font-pixel text-[9px] text-white/90 tabular-nums">{audience[i]}%</span>
-                        <span className="w-8 h-1.5 bg-black/25 rounded-full overflow-hidden mt-0.5"><span className="block h-full bg-white/80" style={{ width: `${audience[i]}%` }} /></span>
-                      </span>
-                    )}
-                    {isCorrect && <Check size={16} className="shrink-0 text-white" strokeWidth={3} />}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* resposta de cada equipe (todas jogam ao mesmo tempo) */}
-            {step === 'answering' && (
-              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
-                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
-                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
-                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
-                    <div className="flex gap-1.5 ml-auto shrink-0">
-                      {[0, 1, 2, 3].map(o => (
-                        <button key={o} disabled={hidden.includes(o)} onClick={() => setAnswers(a => a.map((v, j) => j === ti ? o : v))}
-                          className={`w-8 h-8 rounded-lg font-pixel text-[10px] text-white border-2 border-black/25 transition-all ${hidden.includes(o) ? 'opacity-0 pointer-events-none' : answers[ti] === o ? 'ring-2 ring-white scale-110' : 'opacity-50 active:scale-95'}`}
-                          style={{ backgroundColor: PALETTE[o] }}>{['A', 'B', 'C', 'D'][o]}</button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* decisão de cada equipe: parar ou arriscar */}
-            {step === 'decision' && (
-              <div className="space-y-1.5 max-w-lg w-full mx-auto mb-3">
-                {contestants.map((ct, ti) => tstates[ti]?.status === 'playing' && (
-                  <div key={ti} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 bg-black/25 border border-white/10">
-                    <span className="inline-flex items-center gap-1 text-white font-black text-[10px] px-2 py-0.5 rounded-full min-w-0" style={{ backgroundColor: ct.color }}><EmojiIcon emoji={ct.emoji} size={10} /> <span className="truncate">{ct.name}</span></span>
-                    <div className="flex gap-1.5 ml-auto shrink-0">
-                      <button onClick={() => setDecisions(d => d.map((v, j) => j === ti ? 'stop' : v))}
-                        className={`px-2.5 py-1.5 rounded-lg border-2 font-pixel text-[8px] transition-all ${decisions[ti] === 'stop' ? 'bg-emerald-600 border-white text-white scale-105' : 'bg-emerald-900/60 border-black/25 text-emerald-200 active:scale-95'}`}>
-                        PARAR <span className="font-vt text-[11px]">{fmtPrize(tstates[ti].prize)}</span>
-                      </button>
-                      <button onClick={() => setDecisions(d => d.map((v, j) => j === ti ? 'go' : v))}
-                        className={`px-2.5 py-1.5 rounded-lg border-2 font-pixel text-[8px] transition-all ${decisions[ti] === 'go' ? 'border-white text-amber-950 scale-105' : 'border-black/25 text-amber-100 active:scale-95'}`}
-                        style={{ background: decisions[ti] === 'go' ? 'linear-gradient(135deg,#ffdf6b,#f59e0b)' : 'rgba(120,70,10,0.55)' }}>
-                        ARRISCAR
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* ajudas da turma (valem 1x no jogo todo) */}
-            {step === 'answering' && (
-              <div className="grid grid-cols-3 gap-2 max-w-lg w-full mx-auto mb-3">
-                {([{ on: lifelines.cartas, fn: useCartas, Icon: Scissors, label: '50:50' },
-                   { on: lifelines.pular, fn: usePular, Icon: SkipForward, label: 'Pular' },
-                   { on: lifelines.plateia, fn: usePlateia, Icon: Users, label: 'Plateia' }] as const).map((a, i) => (
-                  <button key={i} onClick={a.fn} disabled={!a.on}
-                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 font-pixel text-[8px] transition-all ${a.on ? 'bg-[#33122b] border-black/30 text-amber-200 active:scale-95' : 'bg-[#33122b]/50 border-black/20 text-white/25 line-through'}`}>
-                    <a.Icon size={15} /> {a.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* ações por passo */}
-            <div className="max-w-lg w-full mx-auto">
-              {step === 'answering' && (
-                <button onClick={revealAnswers} disabled={!allAnswered} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl text-base disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-                  <span className="font-pixel text-[10px]">REVELAR RESPOSTA</span>
-                  {allAnswered && <MilhaoShine />}
-                </button>
-              )}
-              {step === 'revealed' && (
-                <button onClick={afterReveal} className="w-full bg-[#33122b] border-2 border-black/30 text-white font-black py-3 rounded-xl font-pixel text-[10px] active:translate-y-0.5">CONTINUAR</button>
-              )}
-              {step === 'decision' && (
-                <button onClick={nextRound} disabled={!allDecided} className="relative overflow-hidden w-full text-amber-950 font-black py-3 rounded-xl disabled:opacity-30 disabled:grayscale shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none font-pixel text-[10px]" style={{ background: 'linear-gradient(90deg,#ffdf6b,#f59e0b)' }}>
-                  {decisions.some((d, i) => d === 'go' && tstates[i]?.status === 'playing') ? 'PRÓXIMA PERGUNTA' : 'GRANDE FINAL'}
-                  {allDecided && <MilhaoShine />}
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </motion.div>
   );
 };
 
