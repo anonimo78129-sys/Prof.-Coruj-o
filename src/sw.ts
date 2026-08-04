@@ -7,12 +7,47 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 declare const self: ServiceWorkerGlobalScope;
 
-// v1.2.0 — ativa a versão nova imediatamente: sem skipWaiting o SW atualizado
-// ficava "waiting" até TODAS as abas fecharem, prendendo usuários na versão antiga.
+// ─────────────────────────────────────────────────────────────────────────────
+// v2.0.0 — SEM PRECACHE.
+//
+// Antes este service worker pré-cacheava 15,7 MB e servia o index.html a partir
+// do cache. Isso custava caro e quebrava atualizações: depois de cada deploy o
+// SW antigo entregava um index.html velho apontando para bundles que já tinham
+// mudado, e o app abria em branco até o usuário limpar o cache na mão.
+//
+// O app não funciona offline de verdade de qualquer jeito — todo recurso de IA
+// depende do Gemini e a sincronização depende do Firestore (que tem persistência
+// offline própria, independente daqui). Então o precache pagava o preço de
+// atualizações quebradas sem entregar offline de verdade.
+//
+// O service worker continua existindo por dois motivos que não dão pra abrir
+// mão: notificações push do FCM em background e a instalabilidade do PWA
+// ("adicionar à tela inicial"), que o Chrome só oferece se houver um SW com
+// handler de fetch registrado.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Ativa a versão nova imediatamente: sem skipWaiting o SW atualizado ficava
+// "waiting" até TODAS as abas fecharem, prendendo usuários na versão antiga.
 self.skipWaiting();
 clientsClaim();
+
+// Com globPatterns: [] no vite.config.ts, o manifesto injetado aqui fica com uma
+// única entrada de 0 KB: o manifest.json, que vem do includeAssets. O index.html
+// e os bundles ficam de fora — é isso que importa, porque era o index.html vindo
+// do cache que quebrava as atualizações.
+//
+// Manter a chamada, em vez de apagá-la, resolve duas coisas: o build do
+// injectManifest exige a referência a self.__WB_MANIFEST, e o Workbox, ao
+// comparar esse manifesto mínimo com o que está em cache, apaga sozinho os
+// 15,7 MB de quem já tem a versão antiga instalada (medido: 112 arquivos e
+// 15,4 MB caem para 1 arquivo e 0,1 MB na segunda abertura).
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
+
+// Handler de fetch obrigatório para a instalabilidade do PWA. Não intercepta
+// nada de propósito: sem respondWith, cada requisição segue direto para a rede,
+// que é exatamente o comportamento que queremos agora.
+self.addEventListener('fetch', () => { /* passa direto para a rede */ });
 
 const NOTIF_ICON = 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png';
 
