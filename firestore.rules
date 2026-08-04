@@ -68,6 +68,81 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // SALAS DE JOGO — Quiz Relâmpago multijogador (equipes por QR code)
+    //
+    // Modelo de confiança em três camadas, porque nenhuma basta sozinha:
+    //
+    // 1. IDENTIDADE — cada celular entra com login anônimo e ganha um uid. O
+    //    documento da equipe tem o uid como id, então uma equipe não consegue
+    //    responder pela outra.
+    // 2. TEMPO HONESTO — a pontuação premia rapidez, então o incentivo é forjar
+    //    o relógio, não a resposta. Por isso `em` é obrigado a ser request.time:
+    //    quem mede é o servidor, não o aparelho do aluno.
+    // 3. PLACAR — quem calcula e grava pontos é só o aparelho do professor
+    //    (dono da sala). Aluno nenhum escreve pontuação em lugar nenhum.
+    // ═══════════════════════════════════════════════════════════════════════
+    match /salas/{codigo} {
+      function souDono() {
+        return isAuthenticated() && resource.data.professorUid == request.auth.uid;
+      }
+
+      // Qualquer um autenticado (inclusive anônimo) lê a sala: é assim que o
+      // celular da equipe recebe a pergunta, o status e o placar.
+      allow read: if isAuthenticated();
+
+      // Só o professor cria, e só em nome dele mesmo.
+      allow create: if isAuthenticated()
+                    && request.resource.data.professorUid == request.auth.uid;
+
+      // Só o dono conduz o jogo (avançar pergunta, revelar, gravar placar), e
+      // não pode transferir a sala para outra pessoa no meio.
+      allow update: if souDono()
+                    && request.resource.data.professorUid == resource.data.professorUid;
+
+      allow delete: if souDono();
+
+      // ── Equipes: identidade de quem entrou ────────────────────────────────
+      // O id do documento É o uid do celular, então a regra amarra sozinha.
+      // Campos de pontuação são proibidos aqui de propósito: o placar mora no
+      // documento da sala, onde só o professor escreve.
+      match /equipes/{equipeUid} {
+        function semPontuacao() {
+          return !request.resource.data.keys().hasAny(['pontos', 'acertos', 'streak']);
+        }
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+                      && request.auth.uid == equipeUid
+                      && semPontuacao();
+        allow update: if isAuthenticated()
+                      && request.auth.uid == equipeUid
+                      && semPontuacao();
+        // A equipe sai por conta própria; o professor limpa a sala no fim.
+        allow delete: if (isAuthenticated() && request.auth.uid == equipeUid)
+                      || (isAuthenticated()
+                          && get(/databases/$(database)/documents/salas/$(codigo)).data.professorUid == request.auth.uid);
+      }
+
+      // ── Respostas: uma por equipe por pergunta ────────────────────────────
+      // O id é "<indice>_<uid>", então tentar responder pela equipe alheia ou
+      // responder duas vezes esbarra na regra, não na boa vontade do cliente.
+      match /respostas/{respostaId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+                      && respostaId == string(request.resource.data.pergunta) + '_' + request.auth.uid
+                      && request.resource.data.equipeUid == request.auth.uid
+                      && request.resource.data.escolha is int
+                      && request.resource.data.escolha >= 0
+                      && request.resource.data.escolha <= 3
+                      // o relógio é o do servidor: rapidez não se forja
+                      && request.resource.data.em == request.time;
+        // Resposta dada não se muda. Só o professor limpa, ao encerrar.
+        allow update: if false;
+        allow delete: if isAuthenticated()
+                      && get(/databases/$(database)/documents/salas/$(codigo)).data.professorUid == request.auth.uid;
+      }
+    }
+
     match /users/{userId} {
       // Admins can list the entire users collection (needed for admin panel onSnapshot).
       // We use isAdminWithoutGet() to avoid recursive get() calls per document during list queries.

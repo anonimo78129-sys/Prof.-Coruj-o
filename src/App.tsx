@@ -29,6 +29,9 @@ import { selectBnccSkills, SUBJECT_OPTIONS } from './bncc-data';
 import EscapeGame from './escape/EscapeGame';
 import { QRCodeSVG } from 'qrcode.react';
 import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
+import SalaEquipe from './sala/SalaEquipe';
+import SalaProfessor from './sala/SalaProfessor';
+import { criarSala } from './sala/sala';
 import {
   escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
@@ -11431,6 +11434,10 @@ const QuizRelampago = ({ onExitApp }: { onExitApp: () => void }) => {
   const [bump, setBump] = useState(0);          // faz o placar do header pular
   const [autoLeft, setAutoLeft] = useState(QZ_NEXT_MS);
   const [imgsProntas, setImgsProntas] = useState(0);   // progresso do prefetch do palco
+  // 'tela' = turma toda numa tela só (modo original).
+  // 'equipes' = sala com QR, cada equipe no seu celular, competindo ao vivo.
+  const [modo, setModo] = useState<'tela' | 'equipes'>('tela');
+  const [codigoSala, setCodigoSala] = useState<string | null>(null);
 
   const startedAt = useRef(0);
   const pausedAt = useRef(0);
@@ -11477,12 +11484,20 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
       const qs = testMode ? QUIZ_SAMPLE_QUESTIONS.slice(0, QUIZ_RELAMPAGO_TOTAL) : await fetchQuestions();
       // Perguntas prontas, mas só entra em cena com o cenário na mão — ou quando
       // estourar o teto de espera, o que vier primeiro.
+      if (modo === 'equipes') {
+        // Sala: as perguntas viram estado compartilhado e quem joga são os
+        // celulares. Não espera o prefetch — o palco ilustrado é do modo de
+        // tela única; aqui a projeção mostra pergunta e placar.
+        const cod = await criarSala(qs, topic.trim() || 'Quiz Relâmpago', QZ_SECONDS);
+        setCodigoSala(cod);
+        return;
+      }
       await Promise.race([essencial, new Promise(r => setTimeout(r, QUIZ_PREFETCH_TIMEOUT))]);
       setQuestions(qs);
       setIdx(0); setScore(0); setPoints(0); setStreak(0); setBestStreak(0);
       setSelected(null); setStage('ask'); setPaused(false); setLog([]); setPop(null); setAutoLeft(QZ_NEXT_MS);
       setPhase('play');
-    } catch { setError('Não consegui gerar as perguntas. Tente novamente.'); setPhase('setup'); }
+    } catch { setError('Não consegui preparar o jogo. Tente novamente.'); setPhase('setup'); }
   };
 
   const clearTimer = () => { if (timerRef.current !== null) { clearInterval(timerRef.current); timerRef.current = null; } };
@@ -11643,6 +11658,16 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     return () => clearInterval(id);
   }, [phase, answered, waiting, gotIt, idx]);
 
+  // Sala criada: a tela do professor assume (lobby com QR, perguntas, placar).
+  if (codigoSala) {
+    return (
+      <SalaProfessor
+        codigo={codigoSala}
+        onFechar={() => { setCodigoSala(null); setPhase('setup'); }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col select-none">
       <style>{QUIZ_CSS}</style>
@@ -11663,7 +11688,10 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               </div>
               <div>
                 <h1 className="text-3xl font-black text-white tracking-tight" style={{ textShadow: '0 2px 0 #3a2963, 0 0 22px rgba(160,130,215,0.6)' }}>Quiz Relâmpago</h1>
-                <p className="text-indigo-100/85 text-sm mt-2 leading-relaxed">{QUIZ_RELAMPAGO_TOTAL} perguntas contra o relógio.<br/>Quanto mais rápido, mais ponto vale.</p>
+                <p className="text-indigo-100/85 text-sm mt-2 leading-relaxed">
+                  {QUIZ_RELAMPAGO_TOTAL} perguntas contra o relógio.<br/>
+                  {modo === 'equipes' ? 'As equipes competem ao vivo, cada uma no seu celular.' : 'Quanto mais rápido, mais ponto vale.'}
+                </p>
               </div>
 
               {/* regras rápidas, em três selos */}
@@ -11679,6 +11707,31 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                     <p className="text-[9px] text-indigo-100/60 mt-1 leading-tight">{c.s}</p>
                   </div>
                 ))}
+              </div>
+
+              {/* COMO VAI JOGAR — muda tudo depois daqui, então vem primeiro */}
+              <div className="w-full">
+                <p className="text-left text-[11px] font-bold text-indigo-200/90 tracking-wide mb-1.5 ml-1">COMO VAI JOGAR</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { v: 'tela' as const, emoji: '📺', t: 'Numa tela só', s: 'A turma responde junto' },
+                    { v: 'equipes' as const, emoji: '📱', t: 'Equipes por QR', s: 'Cada equipe no celular' },
+                  ]).map(o => (
+                    <button
+                      key={o.v}
+                      onClick={() => setModo(o.v)}
+                      className="rounded-2xl px-3 py-3 border-2 text-left transition active:scale-95"
+                      style={{
+                        background: modo === o.v ? 'rgba(183,154,240,0.28)' : 'rgba(255,255,255,0.06)',
+                        borderColor: modo === o.v ? '#c9b6e8' : 'rgba(255,255,255,0.15)',
+                      }}
+                    >
+                      <span className="block text-xl leading-none mb-1">{o.emoji}</span>
+                      <span className="block text-xs font-black text-white leading-tight">{o.t}</span>
+                      <span className="block text-[10px] text-indigo-100/60 leading-tight mt-0.5">{o.s}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* card do formulário */}
@@ -11724,7 +11777,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
 
               <div className="w-full flex flex-col gap-2.5 pb-2">
                 <button onClick={() => start(false)} className="relative overflow-hidden w-full rounded-2xl py-3.5 font-black text-white text-base border-2 shadow-xl active:scale-[0.98] transition-transform" style={{ background: violet, borderColor: '#c9b6e8' }}>
-                  <span className="relative z-10 flex items-center justify-center gap-2"><Zap size={18} /> Começar o quiz</span>
+                  <span className="relative z-10 flex items-center justify-center gap-2"><Zap size={18} /> {modo === 'equipes' ? 'Abrir a sala' : 'Começar o quiz'}</span>
                   <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 pointer-events-none" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)', animation: 'qz-shine 3.2s ease-in-out infinite' }} />
                 </button>
                 <button onClick={() => start(true)} className="w-full rounded-2xl py-2.5 font-bold text-indigo-100/90 text-sm bg-white/8 border border-white/20 active:scale-[0.98] transition-transform">
@@ -15135,6 +15188,22 @@ function AppInner() {
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const [globalAnnouncement, setGlobalAnnouncement] = useState<{message:string,active:boolean,updatedAt:number}|null>(null);
 
+  // Aluno chegando pelo QR (#sala=CODIGO). Precisa ser resolvido ANTES do
+  // portão de login: quem escaneia não tem conta de professor, entra anônimo e
+  // vai direto para a sala, sem passar pelo app do professor.
+  const [salaAluno, setSalaAluno] = useState<string | null>(() => {
+    const h = typeof window !== 'undefined' ? window.location.hash : '';
+    return h.startsWith('#sala=') ? h.slice('#sala='.length).toUpperCase().slice(0, 8) : null;
+  });
+  useEffect(() => {
+    const aoTrocarHash = () => {
+      const h = window.location.hash;
+      setSalaAluno(h.startsWith('#sala=') ? h.slice('#sala='.length).toUpperCase().slice(0, 8) : null);
+    };
+    window.addEventListener('hashchange', aoTrocarHash);
+    return () => window.removeEventListener('hashchange', aoTrocarHash);
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -15781,6 +15850,17 @@ function AppInner() {
 
   if (!isAuthLoaded) {
     return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FE]"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
+  }
+
+  // A sala do aluno vem antes de tudo: nem o portão de login, nem o app do
+  // professor. É a única tela que um usuário anônimo enxerga.
+  if (salaAluno) {
+    return (
+      <SalaEquipe
+        codigo={salaAluno}
+        onSair={() => { window.location.hash = ''; setSalaAluno(null); }}
+      />
+    );
   }
 
   if (!user) {
