@@ -20,6 +20,7 @@ export default function SalaEquipe({ codigo, onSair }: { codigo: string; onSair:
   const [entrando, setEntrando] = useState(false);
   const [nome, setNome] = useState('');
   const [emoji, setEmoji] = useState(EMOJIS[0]);
+  const [refId, setRefId] = useState<string | undefined>(undefined);
   const [escolha, setEscolha] = useState<number | null>(null);
   const perguntaAnterior = useRef(-1);
 
@@ -59,7 +60,12 @@ export default function SalaEquipe({ codigo, onSair }: { codigo: string; onSair:
     if (!limpo) { setErro('Digite o nome da equipe.'); return; }
     setErro(''); setEntrando(true);
     try {
-      await entrarNaSala(codigo, { nome: limpo.slice(0, 22), emoji, cor: CORES[Math.floor(Math.random() * CORES.length)] });
+      await entrarNaSala(codigo, {
+        nome: limpo.slice(0, 22),
+        emoji,
+        cor: CORES[Math.floor(Math.random() * CORES.length)],
+        ...(refId ? { refId } : {}),
+      });
     } catch { setErro('Não consegui entrar na sala. Tente de novo.'); }
     setEntrando(false);
   };
@@ -87,7 +93,7 @@ export default function SalaEquipe({ codigo, onSair }: { codigo: string; onSair:
 
   // ── Ainda não escolheu a equipe ────────────────────────────────────────────
   if (!jaEntrou) {
-    const sugeridas = (sala as any)?.equipesSugeridas as Equipe[] | undefined;
+    const sugeridas = sala?.equipesSugeridas;
     const ocupados = new Set(Object.values(equipes).map(e => e.nome));
     return (
       <Palco>
@@ -108,7 +114,7 @@ export default function SalaEquipe({ codigo, onSair }: { codigo: string; onSair:
                     <button
                       key={i}
                       disabled={tomada}
-                      onClick={() => { setNome(s.nome); setEmoji(s.emoji || EMOJIS[i % EMOJIS.length]); }}
+                      onClick={() => { setNome(s.nome); setEmoji(s.emoji || EMOJIS[i % EMOJIS.length]); setRefId(s.refId); }}
                       className="rounded-2xl px-3 py-3 border-2 text-left active:scale-95 transition disabled:opacity-35"
                       style={{ background: nome === s.nome ? 'rgba(183,154,240,0.3)' : 'rgba(255,255,255,0.08)', borderColor: nome === s.nome ? '#c9b6e8' : 'rgba(255,255,255,0.15)' }}
                     >
@@ -128,7 +134,7 @@ export default function SalaEquipe({ codigo, onSair }: { codigo: string; onSair:
             </p>
             <input
               value={nome}
-              onChange={e => setNome(e.target.value)}
+              onChange={e => { setNome(e.target.value); setRefId(undefined); }}
               onKeyDown={e => { if (e.key === 'Enter') entrar(); }}
               placeholder="Ex.: Os Foguetes"
               maxLength={22}

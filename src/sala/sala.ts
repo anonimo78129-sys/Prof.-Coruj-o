@@ -37,6 +37,7 @@ export const criarSala = async (
   perguntas: SalaPergunta[],
   tema: string,
   segundos: number,
+  equipesSugeridas: Equipe[] = [],
 ): Promise<string> => {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('sem professor logado');
@@ -52,6 +53,7 @@ export const criarSala = async (
       perguntas,
       placar: {},
       segundos,
+      ...(equipesSugeridas.length ? { equipesSugeridas } : {}),
     };
     try {
       await setDoc(salaRef(codigo), { ...sala, criadaEm: serverTimestamp(), perguntaIniciadaEm: null });

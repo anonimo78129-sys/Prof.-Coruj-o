@@ -39,6 +39,13 @@ export interface Sala {
   placar: Record<string, PlacarEquipe>;
   segundos: number;
   criadaEm: Timestamp | null;
+  /**
+   * Equipes já cadastradas na turma, copiadas para cá na criação da sala. O
+   * aluno não consegue ler a Gamificação do professor (é documento privado
+   * dele), então a lista precisa viajar junto com a sala para aparecer como
+   * opção de um toque no celular.
+   */
+  equipesSugeridas?: Equipe[];
 }
 
 /** Identidade da equipe. Sem pontuação de propósito — as regras proíbem. */
@@ -46,6 +53,12 @@ export interface Equipe {
   nome: string;
   emoji: string;
   cor: string;
+  /**
+   * Id da equipe cadastrada na Gamificação da turma, quando a equipe entrou
+   * escolhendo da lista em vez de digitar um nome novo. É o que permite devolver
+   * o XP para as pessoas certas no fim do jogo.
+   */
+  refId?: string;
 }
 
 export interface Resposta {

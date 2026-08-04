@@ -11410,7 +11410,15 @@ const QZ_FAIXAS = [
 ] as const;
 type QzFaixa = typeof QZ_FAIXAS[number]['id'];
 
-const QuizRelampago = ({ onExitApp }: { onExitApp: () => void }) => {
+const QuizRelampago = ({ onExitApp, user, schedules }: {
+  onExitApp: () => void;
+  user: any;
+  schedules: ClassSchedule[];
+}) => {
+  // Gamificação da turma: de onde saem as equipes já cadastradas (para o aluno
+  // entrar num toque) e para onde volta o XP no fim do jogo.
+  const [gamiClasses, setGamiClasses] = useFirestoreSync<ClassGamification>('gamification', user, []);
+  const [turmaId, setTurmaId] = useState('');
   const [phase, setPhase] = useState<'setup' | 'loading' | 'play' | 'end'>('setup');
   const [topic, setTopic] = useState('');
   const [faixa, setFaixa] = useState<QzFaixa>('preteen');
@@ -11488,7 +11496,11 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
         // Sala: as perguntas viram estado compartilhado e quem joga são os
         // celulares. Não espera o prefetch — o palco ilustrado é do modo de
         // tela única; aqui a projeção mostra pergunta e placar.
-        const cod = await criarSala(qs, topic.trim() || 'Quiz Relâmpago', QZ_SECONDS);
+        const turma = gamiClasses.find(c => c.id === turmaId);
+        const sugeridas = (turma?.teams ?? []).map(t => ({
+          nome: t.name, emoji: t.emoji, cor: t.color, refId: t.id,
+        }));
+        const cod = await criarSala(qs, topic.trim() || 'Quiz Relâmpago', QZ_SECONDS, sugeridas);
         setCodigoSala(cod);
         return;
       }
@@ -11601,6 +11613,33 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     return clearAuto;
   }, [phase, stage, paused, idx]);
 
+  /**
+   * Devolve o resultado para a Gamificação: cada equipe do pódio vira XP para os
+   * alunos dela. Só entra equipe que veio da lista cadastrada (tem `refId`) —
+   * quem digitou nome novo não existe na turma e não teria a quem creditar.
+   */
+  const premiarEquipes = (classificacao: { refId?: string; nome: string; posicao: number }[]) => {
+    const turma = gamiClasses.find(c => c.id === turmaId);
+    if (!turma) { toast.error('Turma não encontrada.'); return; }
+    const premio = (pos: number) => (pos === 1 ? 10 : pos === 2 ? 6 : pos === 3 ? 4 : 2);
+    let atualizada = turma;
+    let premiados = 0;
+    for (const eq of classificacao) {
+      if (!eq.refId) continue;
+      const alunos = atualizada.students.filter(a => a.teamId === eq.refId).map(a => a.id);
+      if (!alunos.length) continue;
+      atualizada = gamiApplyAward(
+        atualizada, alunos,
+        { label: `Quiz Relâmpago — ${eq.posicao}º lugar`, points: premio(eq.posicao), emoji: '⚡' },
+        gamiWeekKey(),
+      );
+      premiados += alunos.length;
+    }
+    if (!premiados) { toast.error('Nenhuma equipe da lista tinha alunos cadastrados.'); return; }
+    setGamiClasses(gamiClasses.map(c => (c.id === turmaId ? atualizada : c)));
+    toast.success(`XP creditado para ${premiados} aluno(s)!`);
+  };
+
   const next = () => {
     clearSuspense(); clearAuto();
     setPop(null); setFlash(null);
@@ -11664,6 +11703,7 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
       <SalaProfessor
         codigo={codigoSala}
         onFechar={() => { setCodigoSala(null); setPhase('setup'); }}
+        onPremiar={turmaId ? premiarEquipes : undefined}
       />
     );
   }
@@ -11751,6 +11791,37 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                     </button>
                   ))}
                 </div>
+
+                {/* Turma — só no modo de equipes, e só se houver turma com equipes
+                    cadastradas. É o que faz a equipe entrar num toque no celular
+                    (em vez de digitar) e o que permite devolver o XP no fim. */}
+                {modo === 'equipes' && (() => {
+                  const comEquipes = gamiClasses.filter(c => (c.teams?.length ?? 0) > 0);
+                  if (!comEquipes.length) return null;
+                  const nomeDaTurma = (id: string) => schedules.find(t => t.id === id)?.name || 'Turma';
+                  return (
+                    <>
+                      <label className="block text-left text-[11px] font-bold text-indigo-200/90 tracking-wide mt-4 mb-1.5 ml-1">TURMA (OPCIONAL)</label>
+                      <select
+                        value={turmaId}
+                        onChange={e => setTurmaId(e.target.value)}
+                        className="w-full rounded-2xl px-4 py-3 text-sm font-semibold text-[#2f2148] bg-[#f3eefb] outline-none focus:ring-2 focus:ring-[#b79af0]"
+                      >
+                        <option value="">Equipes digitam o nome</option>
+                        {comEquipes.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {nomeDaTurma(c.id)} · {c.teams.length} equipe(s)
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-left text-[10px] text-indigo-100/50 mt-1.5 ml-1 leading-snug">
+                        {turmaId
+                          ? 'As equipes da turma aparecem no celular do aluno, e o XP volta pra Gamificação no fim.'
+                          : 'Sem turma, cada equipe digita o próprio nome e o jogo não credita XP.'}
+                      </p>
+                    </>
+                  );
+                })()}
 
                 {/* faixa etária — muda a linguagem das perguntas e das explicações */}
                 <label className="block text-left text-[11px] font-bold text-indigo-200/90 tracking-wide mt-4 mb-1.5 ml-1">PARA QUEM É</label>
@@ -17087,7 +17158,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         {screen === 'escape' && <EscapeGame onExitApp={() => setScreen('estudio')} />}
 
         {/* Quiz Relâmpago — quiz rápido em overlay de tela cheia */}
-        {screen === 'quizrelampago' && <QuizRelampago onExitApp={() => setScreen('estudio')} />}
+        {screen === 'quizrelampago' && <QuizRelampago onExitApp={() => setScreen('estudio')} user={user} schedules={schedules} />}
 
         <GlobalTaskIndicator 
           tasks={activeTasks} 

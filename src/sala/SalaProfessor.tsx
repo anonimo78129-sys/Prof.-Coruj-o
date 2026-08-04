@@ -5,7 +5,7 @@ import {
   calcularPlacar, encerrar, iniciarPergunta, limparRespostas, ordenar,
   ouvirEquipes, ouvirRespostas, ouvirSala, revelar, salaUrl,
 } from './sala';
-import type { Equipe, Resposta, Sala } from './tipos';
+import type { Equipe, EquipeComPlacar, Resposta, Sala } from './tipos';
 
 const CORES = ['#dc4b4b', '#e0ab2e', '#3fae6c', '#3d7fd6'];
 
@@ -17,7 +17,17 @@ const CORES = ['#dc4b4b', '#e0ab2e', '#3fae6c', '#3d7fd6'];
  * a última equipe responde ou quando o tempo acaba — o que vier primeiro. Sem
  * isso, uma equipe com o celular travado congelaria a aula inteira.
  */
-export default function SalaProfessor({ codigo, onFechar }: { codigo: string; onFechar: () => void }) {
+export default function SalaProfessor({ codigo, onFechar, onPremiar }: {
+  codigo: string;
+  onFechar: () => void;
+  /**
+   * Devolve o resultado para a Gamificação da turma. Só chega aqui se as equipes
+   * entraram escolhendo da lista cadastrada (elas trazem `refId`); equipe que
+   * digitou nome novo não tem alunos para premiar.
+   */
+  onPremiar?: (classificacao: EquipeComPlacar[]) => void;
+}) {
+  const [premiado, setPremiado] = useState(false);
   const [sala, setSala] = useState<Sala | null>(null);
   const [equipes, setEquipes] = useState<Record<string, Equipe>>({});
   const [respostas, setRespostas] = useState<Resposta[]>([]);
@@ -279,6 +289,16 @@ export default function SalaProfessor({ codigo, onFechar }: { codigo: string; on
           ))}
         </div>
 
+        {onPremiar && classificacao.some(e => e.refId) && (
+          <button
+            onClick={() => { onPremiar(classificacao); setPremiado(true); }}
+            disabled={premiado}
+            className="w-full rounded-2xl py-3.5 font-black text-emerald-950 border-2 mt-2 active:scale-[0.98] transition disabled:opacity-55"
+            style={{ background: 'linear-gradient(180deg,#7bf0a6,#3fae6c)', borderColor: '#c8f6dd' }}
+          >
+            {premiado ? <><Check size={18} className="inline mr-2" /> XP creditado na turma</> : <><Zap size={18} className="inline mr-2" /> Dar XP para as equipes</>}
+          </button>
+        )}
         <button onClick={fechar} className="w-full rounded-2xl py-3.5 font-black text-white border-2 mt-2" style={{ background: 'linear-gradient(180deg,#8b6fc4,#6a4f96)', borderColor: '#c9b6e8' }}>
           <Trophy size={18} className="inline mr-2" /> Encerrar a sala
         </button>
