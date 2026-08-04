@@ -11219,6 +11219,53 @@ const QuizFundo = () => (
 // A/B/C/D coloridos com feedback de acerto/erro).
 const QUIZ_RELAMPAGO_TOTAL = 10;
 
+// As imagens do palco somam ~11MB em PNG. Numa internet lenta elas chegariam no
+// meio da partida — a cortina apareceria depois, a professora reagiria atrasada.
+// Por isso baixam durante a tela de "Preparando o palco", aproveitando o tempo
+// em que a IA já está gerando as perguntas.
+//
+// Mas esperar as 21 é burrice: a 400 kbps isso levaria uns 4 minutos. A lista é
+// dividida pelo momento em que cada imagem é realmente vista.
+
+// Aparece no instante em que o jogo abre — vale a pena segurar por estas (~2,3MB).
+const QUIZ_STAGE_ESSENCIAL = [
+  '/assets/battle/fundo.png',
+  '/assets/battle/cortina-esq.png',
+  '/assets/battle/cortina-dir.png',
+  '/assets/battle/balcao.png',
+  '/assets/battle/personagem.png',
+];
+
+// Frames de reação e das ações ambientes (~8,7MB): a primeira só é usada quando
+// alguém responde, o que leva no mínimo os segundos do cronômetro mais o
+// suspense. Baixam em segundo plano, sem segurar o início do jogo.
+const QUIZ_STAGE_REACOES = [
+  '/assets/battle/cabelo.png',
+  ...['acertou', 'errou', 'agua', 'cartao', 'acenar'].flatMap(nome => [1, 2, 3].map(i => `/assets/battle/${nome}-${i}.png`)),
+];
+
+// Teto de espera pelo essencial. Estourou, o jogo começa assim mesmo e o resto
+// chega durante a partida — melhor um cenário incompleto do que a turma parada
+// olhando tela de carregamento.
+const QUIZ_PREFETCH_TIMEOUT = 8000;
+
+/**
+ * Baixa as imagens em paralelo, avisando o progresso. Nunca rejeita: imagem que
+ * falha conta como concluída, senão uma única 404 prenderia o jogo no timeout.
+ */
+const prefetchImages = (urls: string[], onProgress?: (prontas: number) => void): Promise<void> => {
+  let prontas = 0;
+  return Promise.all(
+    urls.map(url => new Promise<void>(resolve => {
+      const img = new Image();
+      const done = () => { prontas++; onProgress?.(prontas); resolve(); };
+      img.onload = done;
+      img.onerror = done;
+      img.src = url;
+    }))
+  ).then(() => undefined);
+};
+
 const QUIZ_CSS = `
 @keyframes qz-twinkle{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes qz-shine{0%{transform:translateX(-160%) skewX(-18deg)}55%,100%{transform:translateX(360%) skewX(-18deg)}}
@@ -11383,6 +11430,7 @@ const QuizRelampago = ({ onExitApp }: { onExitApp: () => void }) => {
   const [log, setLog] = useState<{ picked: number | null; ok: boolean }[]>([]);
   const [bump, setBump] = useState(0);          // faz o placar do header pular
   const [autoLeft, setAutoLeft] = useState(QZ_NEXT_MS);
+  const [imgsProntas, setImgsProntas] = useState(0);   // progresso do prefetch do palco
 
   const startedAt = useRef(0);
   const pausedAt = useRef(0);
@@ -11414,9 +11462,22 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
 
   const start = async (testMode = false) => {
     if (!testMode && !topic.trim()) { setError('Informe o tema do quiz.'); return; }
-    setError(''); setPhase('loading');
+    setError(''); setPhase('loading'); setImgsProntas(0);
+    // Tudo começa a baixar JUNTO com a geração das perguntas: os segundos que a
+    // IA leva para responder saem de graça para o download. A diferença é que só
+    // o cenário essencial segura o início; os frames de reação seguem baixando
+    // sozinhos, já que ninguém os vê antes da primeira resposta.
+    const essencial = prefetchImages(QUIZ_STAGE_ESSENCIAL, setImgsProntas);
+    // Os frames de reação só entram na fila DEPOIS do essencial terminar. Se
+    // disparassem junto, os 8,7MB deles disputariam banda com os 2,3MB que
+    // seguram o início — medido: com os dois em paralelo, nem numa rede de
+    // 4 Mbps o fundo do palco chegava a tempo.
+    void essencial.then(() => prefetchImages(QUIZ_STAGE_REACOES));
     try {
       const qs = testMode ? QUIZ_SAMPLE_QUESTIONS.slice(0, QUIZ_RELAMPAGO_TOTAL) : await fetchQuestions();
+      // Perguntas prontas, mas só entra em cena com o cenário na mão — ou quando
+      // estourar o teto de espera, o que vier primeiro.
+      await Promise.race([essencial, new Promise(r => setTimeout(r, QUIZ_PREFETCH_TIMEOUT))]);
       setQuestions(qs);
       setIdx(0); setScore(0); setPoints(0); setStreak(0); setBestStreak(0);
       setSelected(null); setStage('ask'); setPaused(false); setLog([]); setPop(null); setAutoLeft(QZ_NEXT_MS);
@@ -11572,7 +11633,10 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
     if (waiting) { setActor('cartao'); return; }
     if (answered) { setActor(gotIt ? 'acertou' : 'errou'); return; }
     const idles = ['neutro', 'cartao', 'agua', 'acenar', 'cabelo', 'neutro'];
-    setActor('cartao');
+    // Começa em 'neutro' de propósito: essa pose usa o personagem.png, que vem
+    // no lote essencial do prefetch. As outras poses são frames do lote adiado —
+    // abrir com uma delas deixava o palco sem professora até o download chegar.
+    setActor('neutro');
     const id = setInterval(() => {
       setActor(idles[Math.floor(Math.random() * idles.length)]);
     }, 5000);
@@ -11680,9 +11744,26 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
               <div className="absolute inset-0 rounded-full border-4 border-transparent" style={{ borderTopColor: '#c4b0ec', borderRightColor: '#c4b0ec', animation: 'qz-spin 0.9s linear infinite' }} />
               <div className="absolute inset-0 flex items-center justify-center text-3xl" style={{ animation: 'qz-float 2.4s ease-in-out infinite' }}>⚡</div>
             </div>
-            <div className="text-center">
+            <div className="text-center px-8 w-full max-w-xs">
               <p className="text-white font-black text-lg">Preparando o palco…</p>
               <p className="text-indigo-100/75 text-sm mt-1">Gerando {QUIZ_RELAMPAGO_TOTAL} perguntas sobre {topic || 'o tema'}.</p>
+
+              {/* Progresso do download do cenário. Fica visível porque, em rede
+                  lenta, é o que explica a espera — sem isso o professor só vê
+                  uma tela parada e acha que travou. */}
+              <div className="mt-5">
+                <div className="h-1.5 rounded-full overflow-hidden bg-black/30">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((imgsProntas / QUIZ_STAGE_ESSENCIAL.length) * 100)}%`, background: '#c4b0ec' }}
+                  />
+                </div>
+                <p className="text-[10px] font-bold text-indigo-100/60 mt-1.5">
+                  {imgsProntas >= QUIZ_STAGE_ESSENCIAL.length
+                    ? 'Cenário pronto'
+                    : `Baixando o cenário · ${imgsProntas} de ${QUIZ_STAGE_ESSENCIAL.length}`}
+                </p>
+              </div>
             </div>
           </div>
         </QuizStage>
@@ -11750,7 +11831,10 @@ Retorne APENAS JSON válido: {"questions":[{"q":"pergunta","options":["alt A","a
                 className={`qz-actor qz-actor-${actor} absolute inset-0 pointer-events-none`}
                 style={{ filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.5))' }}
               />
-              {/* preload dos frames pra não piscar na primeira troca */}
+              {/* Rede de segurança: normalmente estes frames já vieram no
+                  prefetch da tela de carregamento e aqui só batem no cache do
+                  navegador. Se o prefetch estourou o teto de espera, é isto que
+                  garante que eles cheguem em vez de piscar na primeira troca. */}
               <div aria-hidden style={{ display: 'none' }}>
                 {['acertou-1', 'acertou-2', 'acertou-3', 'errou-1', 'errou-2', 'errou-3', 'agua-1', 'agua-2', 'agua-3', 'acenar-1', 'acenar-2', 'acenar-3', 'cartao-1', 'cartao-2', 'cartao-3', 'cabelo'].map(n => (
                   <img key={n} src={`/assets/battle/${n}.png`} alt="" />
