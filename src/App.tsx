@@ -30,11 +30,10 @@ import EscapeGame from './escape/EscapeGame';
 import { QRCodeSVG } from 'qrcode.react';
 import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
 import {
-  escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
+  escapeHtml, shuffleArray, isAdminAccount,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
   AI_PRICING, estimateCostUSD,
 } from './utils';
-import { INFORMATICA_LESSONS, JOGOS_LESSONS } from './seed-lessons';
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -15364,54 +15363,6 @@ const AdminScreen = ({ user, initialTab, clearInitialTab }: { user: any, initial
   );
 };
 
-const generateTurmaItems = (
-  seedPrefix: string,
-  turmaName: string,
-  classDays: number[],
-  startDateStr: string,
-  lessons: { title: string; topic: string }[],
-  holidayISOs: Set<string>,
-  anchorIndex: number = 0,
-): ClassItem[] => {
-  const items: ClassItem[] = [];
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  const [yr, mo, dy] = startDateStr.split('-').map(Number);
-  // startDateStr é a data da aula de índice `anchorIndex`. Recua para achar a data da aula 0,
-  // contando para trás apenas dias de aula válidos (pulando feriados), para que as aulas
-  // anteriores ao ponto de partida fiquem retroativas (já realizadas).
-  let cur = new Date(yr, mo - 1, dy, 12, 0, 0, 0);
-  let back = anchorIndex;
-  while (back > 0) {
-    cur.setDate(cur.getDate() - 1);
-    const iso = toISODate(cur);
-    if (classDays.includes(cur.getDay()) && !holidayISOs.has(iso)) {
-      back--;
-    }
-  }
-  let guard = 3000;
-  let i = 0;
-  while (i < lessons.length && guard > 0) {
-    const iso = toISODate(cur);
-    if (classDays.includes(cur.getDay()) && !holidayISOs.has(iso)) {
-      const lesson = lessons[i];
-      items.push({
-        id: `${seedPrefix}-${i}`,
-        title: lesson.title,
-        date: `${cur.getDate()} ${MONTH_ABBR_IMPORT[cur.getMonth()]}`,
-        status: cur.getTime() <= today.getTime() ? 'done' : 'pending',
-        className: turmaName,
-        timestamp: cur.getTime(),
-        topic: lesson.topic,
-      });
-      i++;
-    }
-    cur.setDate(cur.getDate() + 1);
-    guard--;
-  }
-  return items;
-};
-
 function AppInner() {
   const [user, setUser] = useState<any>(null);
   const [isAuthLoaded, setIsAuthLoaded] = useState(false);
@@ -16507,45 +16458,6 @@ function AppInner() {
     return newItems;
   };
 
-  const seedAdminData = () => {
-    const holidayISOs = buildHolidayISOs(customEvents as any);
-    // Todas as turmas aos sábados, em horários sequenciais de 2h
-    const turmaDefs: { id: string; name: string; subject: string; time: string; color: string }[] = [
-      { id: 'seed-t1', name: 'Turma 1', subject: 'Informática',      time: '07:00', color: '#4F46E5' },
-      { id: 'seed-t2', name: 'Turma 2', subject: 'Informática',      time: '09:00', color: '#7C3AED' },
-      { id: 'seed-t3', name: 'Turma 3', subject: 'Informática',      time: '11:00', color: '#0891B2' },
-      { id: 'seed-t4', name: 'Turma 4', subject: 'Criação de Jogos', time: '13:00', color: '#D97706' },
-      { id: 'seed-t5', name: 'Turma 5', subject: 'Informática',      time: '15:00', color: '#059669' },
-    ];
-    // Upsert: cria a turma se não existir, ou corrige dias/horário se já existir
-    const updatedSchedules = [...schedules];
-    for (const def of turmaDefs) {
-      const idx = updatedSchedules.findIndex(s => s.name === def.name);
-      if (idx >= 0) {
-        updatedSchedules[idx] = { ...updatedSchedules[idx], days: [6], subject: def.subject, time: def.time, color: def.color };
-      } else {
-        updatedSchedules.push({ id: def.id, name: def.name, days: [6], subject: def.subject, time: def.time, color: def.color });
-      }
-    }
-    // Regenera as aulas seed do zero (remove as antigas para corrigir dias errados)
-    const keptClasses = classes.filter(c => !c.id.startsWith('seed-t'));
-    const allItems: ClassItem[] = [
-      ...generateTurmaItems('seed-t1', 'Turma 1', [6], '2026-06-13', INFORMATICA_LESSONS, holidayISOs),
-      ...generateTurmaItems('seed-t2', 'Turma 2', [6], '2026-04-18', INFORMATICA_LESSONS, holidayISOs),
-      // Turma 3: cronograma completo (38 aulas). Em 14/03 está na 2ª aula de Excel (índice 19);
-      // as aulas anteriores ficam retroativas (já realizadas).
-      ...generateTurmaItems('seed-t3', 'Turma 3', [6], '2026-03-14', INFORMATICA_LESSONS, holidayISOs, 19),
-      ...generateTurmaItems('seed-t4', 'Turma 4', [6], '2026-03-14', JOGOS_LESSONS, holidayISOs),
-      // Turma 5: cronograma completo (38 aulas). Em 14/03 está na 1ª aula de Word (índice 12);
-      // as aulas anteriores ficam retroativas (já realizadas).
-      ...generateTurmaItems('seed-t5', 'Turma 5', [6], '2026-03-14', INFORMATICA_LESSONS, holidayISOs, 12),
-    ];
-    setSchedules(updatedSchedules);
-    setClasses([...keptClasses, ...allItems]);
-    const done = allItems.filter(i => i.status === 'done').length;
-    toast.success(`5 turmas e ${allItems.length} aulas importadas (${done} já realizadas)!`);
-  };
-
   const generatePlan = async (optTopic?: string, optClassId?: string) => {
     const targetTopic = optTopic || plannerTopic;
     const targetClassId = optClassId || plannerSelectedClassId;
@@ -17115,17 +17027,6 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
         )}
       </AnimatePresence>
 
-      {canSeedTurmas(profile, user) && (
-        <div className="fixed bottom-24 right-4 z-[55]">
-          <button
-            onClick={seedAdminData}
-            className="bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
-            title="Importar turmas pré-definidas (admin)"
-          >
-            <Upload size={13} /> Importar turmas
-          </button>
-        </div>
-      )}
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
           {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} profile={profile} profileLoaded={profileLoaded} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} isAdmin={isAdminAccount(profile, user)} openPlanoAula={() => { setAdminInitialTab('plano'); setScreen('admin'); }} setSelectedDate={(d: Date) => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  escapeHtml, shuffleArray, isAdminAccount, canSeedTurmas,
+  escapeHtml, shuffleArray, isAdminAccount,
   formatApiError, fmtBytes, toISODate, guessMimeType,
   AI_PRICING, estimateCostUSD,
 } from './utils';
@@ -31,21 +31,16 @@ describe('shuffleArray', () => {
   });
 });
 
-describe('isAdminAccount / canSeedTurmas', () => {
+describe('isAdminAccount', () => {
   it('reconhece admin por role', () => {
     expect(isAdminAccount({ role: 'admin' }, null)).toBe(true);
-    expect(canSeedTurmas({ role: 'admin' }, null)).toBe(true);
   });
   it('reconhece admin bootstrap por e-mail (case-insensitive)', () => {
     expect(isAdminAccount(null, { email: 'LYELSONMF520@gmail.com' })).toBe(true);
   });
   it('nega usuário comum', () => {
     expect(isAdminAccount({ role: 'user' }, { email: 'x@y.com' })).toBe(false);
-    expect(canSeedTurmas(null, { email: 'x@y.com' })).toBe(false);
-  });
-  it('conta de seed pode importar turmas mas não é admin', () => {
-    expect(canSeedTurmas(null, { email: 'slilica69@gmail.com' })).toBe(true);
-    expect(isAdminAccount(null, { email: 'slilica69@gmail.com' })).toBe(false);
+    expect(isAdminAccount(null, { email: 'x@y.com' })).toBe(false);
   });
 });
 
