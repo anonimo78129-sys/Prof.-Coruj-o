@@ -14359,6 +14359,16 @@ const USERS_PAGE_SIZE = 20;
 // Painel do Plano de Aula. Vive em dois lugares: na aba do Painel Admin e no
 // modal aberto pelo atalho da Home — por isso o estado e a leitura do
 // Firestore moram aqui dentro, e não na tela que hospeda.
+// formatApiError só reconhece falhas da IA e devolve a mensagem padrão para
+// todo o resto — o que transforma um erro do Firestore em "não consegui" sem
+// pista nenhuma. Aqui o código do erro (permission-denied, unavailable...)
+// entra na mensagem, que é o que diz onde está o problema.
+const planoErroMsg = (e: any, fallback: string): string => {
+  const base = formatApiError(e, fallback);
+  const codigo = e?.code || '';
+  return codigo ? `${base} [${codigo}]` : base;
+};
+
 const PlanoAulaPanel = ({ user, showHeading = true }: { user: any, showHeading?: boolean }) => {
   const [turmas, setTurmas] = useState<PlanoTurma[]>([]);
   const [turmasLoaded, setTurmasLoaded] = useState(false);
@@ -14366,13 +14376,20 @@ const PlanoAulaPanel = ({ user, showHeading = true }: { user: any, showHeading?:
   const [newTurma, setNewTurma] = useState({ nome: '', inicio: '' });
   const [turmaSaving, setTurmaSaving] = useState(false);
   const [confirmDeleteTurmaId, setConfirmDeleteTurmaId] = useState<string | null>(null);
+  const [turmasErro, setTurmasErro] = useState('');
 
   useEffect(() => {
     if (!user?.uid) return;
     const unsub = onSnapshot(collection(db, `users/${user.uid}/planoAula`), snap => {
       setTurmas(snap.docs.map(d => d.data() as PlanoTurma));
+      setTurmasErro('');
       setTurmasLoaded(true);
-    }, () => setTurmasLoaded(true));
+    }, (e: any) => {
+      // Sem isto, uma leitura negada viraria a tela de "nenhuma turma
+      // cadastrada" — o professor acharia que está tudo certo e vazio.
+      setTurmasErro(planoErroMsg(e, 'Não consegui carregar as turmas.'));
+      setTurmasLoaded(true);
+    });
     return unsub;
   }, [user?.uid]);
 
@@ -14396,7 +14413,7 @@ const PlanoAulaPanel = ({ user, showHeading = true }: { user: any, showHeading?:
       setNewTurma({ nome: '', inicio: '' });
       setOpenTurmaId(turma.id);
     } catch (e: any) {
-      toast.error(formatApiError(e, 'Não consegui salvar a turma.'));
+      toast.error(planoErroMsg(e, 'Não consegui salvar a turma.'));
     } finally {
       setTurmaSaving(false);
     }
@@ -14409,7 +14426,7 @@ const PlanoAulaPanel = ({ user, showHeading = true }: { user: any, showHeading?:
       setConfirmDeleteTurmaId(null);
       if (openTurmaId === id) setOpenTurmaId(null);
     } catch (e: any) {
-      toast.error(formatApiError(e, 'Não consegui apagar a turma.'));
+      toast.error(planoErroMsg(e, 'Não consegui apagar a turma.'));
     }
   };
 
@@ -14424,7 +14441,7 @@ const PlanoAulaPanel = ({ user, showHeading = true }: { user: any, showHeading?:
       await setDoc(doc(db, `users/${user.uid}/planoAula`, turma.id), { concluidas }, { merge: true });
     } catch (e: any) {
       setTurmas(list => list.map(t => t.id === turma.id ? turma : t));
-      toast.error(formatApiError(e, 'Não consegui marcar essa aula.'));
+      toast.error(planoErroMsg(e, 'Não consegui marcar essa aula.'));
     }
   };
 
@@ -14477,7 +14494,13 @@ const PlanoAulaPanel = ({ user, showHeading = true }: { user: any, showHeading?:
                 </div>
               );
             })}
-            {turmas.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhuma turma cadastrada.</p>}
+            {turmasErro && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-2xl">
+                <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-600 font-medium break-words">{turmasErro}</p>
+              </div>
+            )}
+            {turmas.length === 0 && !turmasErro && <p className="text-sm text-gray-400 text-center py-4">Nenhuma turma cadastrada.</p>}
           </div>
         )}
 
