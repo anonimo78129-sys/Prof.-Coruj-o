@@ -1043,13 +1043,16 @@ const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, 
   );
 };
 
-const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], profile: UserProfile, profileLoaded?: boolean, notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
+const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded, notifications, setNotifications, setSelectedDate, openFerramenta, schedules, isAdmin, openPlanoAula }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], profile: UserProfile, profileLoaded?: boolean, notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[], isAdmin?: boolean, openPlanoAula?: () => void }) => {
   const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
     { title: 'Jogos', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
     { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
     { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
     { title: 'Kit IA', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => openFerramenta?.(null) },
-    { title: 'Diário', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openFerramenta?.('diario') },
+    // Só na conta admin o atalho do Diário dá lugar ao Plano de Aula.
+    isAdmin
+      ? { title: 'Plano de Aula', icon: GraduationCap, action: () => openPlanoAula?.() }
+      : { title: 'Diário', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openFerramenta?.('diario') },
     { title: 'Biblioteca', illustration: 'https://i.ibb.co/GQMXCYWq/Sem-nome-1300-x-1300-px-20260615-160107-0000.png', action: () => setScreen('biblioteca') },
   ];
 
@@ -14348,7 +14351,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
 const USERS_PAGE_SIZE = 20;
 
-const AdminScreen = ({ user }: { user: any }) => {
+const AdminScreen = ({ user, initialTab, clearInitialTab }: { user: any, initialTab?: string | null, clearInitialTab?: () => void }) => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -14443,6 +14446,14 @@ const AdminScreen = ({ user }: { user: any }) => {
       if (snap.exists()) setHolidays(snap.data().list || []);
     }).catch(() => {});
   }, [activeTab]);
+
+  // Atalho da Home abre o painel já na aba pedida (mesmo padrão do initialTool
+  // das Ferramentas).
+  useEffect(() => {
+    if (initialTab !== 'plano') return;
+    setActiveTab('plano');
+    clearInitialTab?.();
+  }, [initialTab, clearInitialTab]);
 
   useEffect(() => {
     if (activeTab !== 'plano' || !user?.uid) return;
@@ -15468,6 +15479,7 @@ function AppInner() {
     return () => window.removeEventListener('hashchange', openSharedGame);
   }, []);
   const [ferramentasTool, setFerramentasTool] = useState<string | null>(null);
+  const [adminInitialTab, setAdminInitialTab] = useState<string | null>(null);
   const [gamiInitialTool, setGamiInitialTool] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<number>(new Date().getDate());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -17116,7 +17128,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
       )}
       <div className="max-w-md mx-auto h-screen relative px-6 pt-12 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait">
-          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} profile={profile} profileLoaded={profileLoaded} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} setSelectedDate={(d: Date) => {
+          {screen === 'home' && <HomeScreen key="home" setScreen={setScreen} setPlannerMode={setPlannerMode} classes={classes} profile={profile} profileLoaded={profileLoaded} notifications={allNotifications} setNotifications={handleSetNotifications} openFerramenta={(tool) => { setFerramentasTool(tool); setScreen('ferramentas'); }} isAdmin={isAdminAccount(profile, user)} openPlanoAula={() => { setAdminInitialTab('plano'); setScreen('admin'); }} setSelectedDate={(d: Date) => {
             setSelectedDate(d.getDate());
             setCurrentMonth(d.getMonth());
             setCurrentYear(d.getFullYear());
@@ -17286,7 +17298,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
           {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} initialLiveTool={gamiInitialTool} clearInitialLiveTool={() => setGamiInitialTool(null)} />}
           {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
-          {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" user={user} />}
+          {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" user={user} initialTab={adminInitialTab} clearInitialTab={() => setAdminInitialTab(null)} />}
         </AnimatePresence>
 
         {/* Mundo Perdido — jogo Escape em overlay de tela cheia (fora do
