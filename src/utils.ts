@@ -27,11 +27,8 @@ export const shuffleArray = <T,>(arr: readonly T[]): T[] => {
 // A autorização real é aplicada nas regras do Firestore/Storage; estas listas
 // controlam apenas a exibição de recursos de admin no cliente.
 export const ADMIN_BOOTSTRAP_EMAILS = ['lyelsonmf520@gmail.com'];
-export const SEED_IMPORT_EMAILS = [...ADMIN_BOOTSTRAP_EMAILS, 'slilica69@gmail.com'];
 export const isAdminAccount = (profile: { role?: string } | null | undefined, user: { email?: string | null } | null | undefined): boolean =>
   profile?.role === 'admin' || ADMIN_BOOTSTRAP_EMAILS.includes((user?.email || '').toLowerCase());
-export const canSeedTurmas = (profile: { role?: string } | null | undefined, user: { email?: string | null } | null | undefined): boolean =>
-  profile?.role === 'admin' || SEED_IMPORT_EMAILS.includes((user?.email || '').toLowerCase());
 
 // ── Mensagens de erro amigáveis para falhas da API de IA ────────────────────
 export const formatApiError = (error: any, defaultMsg: string): string => {
