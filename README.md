@@ -156,6 +156,14 @@ O arquivo `firebase-applet-config.json` na raiz contém a configuração do proj
 3. Substitua o conteúdo de `firebase-applet-config.json` com os dados do seu projeto
 4. Publique as regras: `firebase deploy --only firestore:rules,storage:rules`
 
+> **Atenção ao banco nomeado.** O app não usa o Firestore `(default)`: ele abre o
+> banco indicado em `firestoreDatabaseId` do `firebase-applet-config.json`
+> (`src/firebase.ts` passa esse id para o `initializeFirestore`). Por isso o
+> `firebase.json` traz a chave `firestore.database` com esse mesmo id — sem ela o
+> deploy publica as regras no `(default)`, um banco que o app nem lê, e o
+> `firestore.rules` do repositório nunca chega em produção. Trocando de projeto,
+> atualize o id nos **dois** arquivos.
+
 ---
 
 ## Build para Produção
