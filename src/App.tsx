@@ -5754,6 +5754,86 @@ const getDefaultHolidays = (year: number) => {
   return [...national, ...commemorative];
 };
 
+// ── Plano de Aula (Admin) ───────────────────────────────────────────────────
+// Grade do curso de informática, vinda da planilha PLANO_DE_AULA_TABELA.xlsx.
+// São 36 aulas de sábado, sempre na mesma ordem, iguais para todas as turmas.
+const PLANO_MODULOS: { modulo: string; aulas: number }[] = [
+  { modulo: 'IPD',         aulas: 1 },
+  { modulo: 'WINDOWS',     aulas: 7 },
+  { modulo: 'DIGITAÇÃO',   aulas: 4 },
+  { modulo: 'WORD',        aulas: 6 },
+  { modulo: 'EXCEL',       aulas: 6 },
+  { modulo: 'POWER-POINT', aulas: 5 },
+  { modulo: 'POWER-BI',    aulas: 5 },
+  { modulo: 'INTERNET',    aulas: 2 },
+];
+
+// As 36 linhas achatadas: { n: 1..36, modulo, aulaDoModulo }
+const PLANO_GRADE: { n: number; modulo: string; aulaDoModulo: number }[] = (() => {
+  const linhas: { n: number; modulo: string; aulaDoModulo: number }[] = [];
+  PLANO_MODULOS.forEach(({ modulo, aulas }) => {
+    for (let i = 1; i <= aulas; i++) linhas.push({ n: linhas.length + 1, modulo, aulaDoModulo: i });
+  });
+  return linhas;
+})();
+
+const PLANO_TOTAL_AULAS = PLANO_GRADE.length;
+const PLANO_DIA_SEMANA = 6; // sábado
+
+// Feriados nacionais (só 'holiday', sem datas comemorativas) dos anos informados,
+// como Set de 'YYYY-MM-DD'. Mesma extração de buildHolidayISOs, mas com a janela
+// de anos que a turma realmente atravessa.
+const feriadosISOsDosAnos = (anos: number[]): Set<string> => {
+  const isos = new Set<string>();
+  anos.forEach(y => getDefaultHolidays(y)
+    .filter(h => h.type === 'holiday')
+    .forEach(h => isos.add(h.date.split(' ')[0])));
+  return isos;
+};
+
+// Gera as datas das aulas a partir da data de início: pega o primeiro sábado
+// que não seja feriado e segue de 7 em 7 dias, empurrando para o sábado
+// seguinte sempre que cair feriado.
+const gerarDatasPlano = (startISO: string, total: number = PLANO_TOTAL_AULAS): string[] => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) return [];
+  const [y, m, d] = startISO.split('-').map(Number);
+  const cur = new Date(y, m - 1, d, 12, 0, 0, 0);
+  // A turma leva ~total semanas; +2 anos de folga cobre qualquer atraso por feriado.
+  const feriados = feriadosISOsDosAnos([y, y + 1, y + 2]);
+  const datas: string[] = [];
+  let guard = total * 20 + 400;
+  while (cur.getDay() !== PLANO_DIA_SEMANA && guard > 0) { cur.setDate(cur.getDate() + 1); guard--; }
+  while (datas.length < total && guard > 0) {
+    if (!feriados.has(toISODate(cur))) datas.push(toISODate(cur));
+    cur.setDate(cur.getDate() + 7);
+    guard--;
+  }
+  return datas;
+};
+
+// Índices de PLANO_GRADE agrupados por módulo, para a lista da turma.
+const PLANO_GRUPOS = (() => {
+  let cursor = 0;
+  return PLANO_MODULOS.map(({ modulo, aulas }) => {
+    const indices = Array.from({ length: aulas }, (_, i) => cursor + i);
+    cursor += aulas;
+    return { modulo, indices };
+  });
+})();
+
+const fmtDataAula = (iso: string) =>
+  new Date(iso + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+interface PlanoTurma {
+  id: string;
+  uid: string;
+  nome: string;
+  inicio: string;      // YYYY-MM-DD — a data que o professor digitou
+  datas: string[];     // as 36 datas, congeladas na criação da turma
+  concluidas: number[];// números das aulas já dadas
+  criadoEm: number;
+}
+
 const HolidaySuggestion = ({ holidayName }: { holidayName: string }) => {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -14268,12 +14348,12 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
 const USERS_PAGE_SIZE = 20;
 
-const AdminScreen = () => {
+const AdminScreen = ({ user }: { user: any }) => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [sysUsers, setSysUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca' | 'metrics' | 'holidays'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedbacks' | 'biblioteca' | 'metrics' | 'holidays' | 'plano'>('users');
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState<'all' | 'pro' | 'free' | 'limit' | 'admin'>('all');
   const [confirmDeleteFbId, setConfirmDeleteFbId] = useState<string | null>(null);
@@ -14288,6 +14368,14 @@ const AdminScreen = () => {
   const [holidays, setHolidays] = useState<{id: string, name: string, date: string}[]>([]);
   const [newHoliday, setNewHoliday] = useState({ name: '', date: '' });
   const [holidaySaving, setHolidaySaving] = useState(false);
+
+  // ── Plano de Aula state ───────────────────────────────────────────────────
+  const [turmas, setTurmas] = useState<PlanoTurma[]>([]);
+  const [turmasLoaded, setTurmasLoaded] = useState(false);
+  const [openTurmaId, setOpenTurmaId] = useState<string | null>(null);
+  const [newTurma, setNewTurma] = useState({ nome: '', inicio: '' });
+  const [turmaSaving, setTurmaSaving] = useState(false);
+  const [confirmDeleteTurmaId, setConfirmDeleteTurmaId] = useState<string | null>(null);
 
   // ── Biblioteca state ──────────────────────────────────────────────────────
   const [libItems, setLibItems] = useState<LibraryItem[]>([]);
@@ -14355,6 +14443,67 @@ const AdminScreen = () => {
       if (snap.exists()) setHolidays(snap.data().list || []);
     }).catch(() => {});
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'plano' || !user?.uid) return;
+    const unsub = onSnapshot(collection(db, `users/${user.uid}/planoAula`), snap => {
+      setTurmas(snap.docs.map(d => d.data() as PlanoTurma));
+      setTurmasLoaded(true);
+    }, () => setTurmasLoaded(true));
+    return unsub;
+  }, [activeTab, user?.uid]);
+
+  const saveTurma = async () => {
+    const nome = newTurma.nome.trim();
+    if (!nome || !newTurma.inicio || !user?.uid) return;
+    setTurmaSaving(true);
+    try {
+      const datas = gerarDatasPlano(newTurma.inicio);
+      if (!datas.length) { toast.error('Não consegui gerar as datas dessa turma.'); return; }
+      const turma: PlanoTurma = {
+        id: Math.random().toString(36).slice(2, 11),
+        uid: user.uid,
+        nome,
+        inicio: datas[0],
+        datas,
+        concluidas: [],
+        criadoEm: Date.now(),
+      };
+      await setDoc(doc(db, `users/${user.uid}/planoAula`, turma.id), turma);
+      setNewTurma({ nome: '', inicio: '' });
+      setOpenTurmaId(turma.id);
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Não consegui salvar a turma.'));
+    } finally {
+      setTurmaSaving(false);
+    }
+  };
+
+  const deleteTurma = async (id: string) => {
+    if (!user?.uid) return;
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/planoAula`, id));
+      setConfirmDeleteTurmaId(null);
+      if (openTurmaId === id) setOpenTurmaId(null);
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Não consegui apagar a turma.'));
+    }
+  };
+
+  // Marca/desmarca uma aula. Grava o doc inteiro da turma — são 36 números, é barato.
+  const toggleAulaConcluida = async (turma: PlanoTurma, n: number) => {
+    if (!user?.uid) return;
+    const concluidas = turma.concluidas.includes(n)
+      ? turma.concluidas.filter(x => x !== n)
+      : [...turma.concluidas, n].sort((a, b) => a - b);
+    setTurmas(list => list.map(t => t.id === turma.id ? { ...t, concluidas } : t));
+    try {
+      await setDoc(doc(db, `users/${user.uid}/planoAula`, turma.id), { concluidas }, { merge: true });
+    } catch (e: any) {
+      setTurmas(list => list.map(t => t.id === turma.id ? turma : t));
+      toast.error(formatApiError(e, 'Não consegui marcar essa aula.'));
+    }
+  };
 
   const handleUpload = async () => {
     if (!uploadFile || !uploadForm.title.trim()) { setUploadErr('Preencha o título e selecione um arquivo.'); return; }
@@ -14526,6 +14675,11 @@ const AdminScreen = () => {
     if (!q) return list;
     return list.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
   }, [sysUsers, userSearch, userFilter]);
+  const turmasOrdenadas = useMemo(() => [...turmas].sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0)), [turmas]);
+  const turmaAberta = turmas.find(t => t.id === openTurmaId) || null;
+  // Prévia da data real da 1ª aula — passa pelo mesmo gerador que vai gravar.
+  const primeiraAulaPreview = newTurma.inicio ? (gerarDatasPlano(newTurma.inicio, 1)[0] || '') : '';
+
   const usersPageCount = Math.ceil(filteredUsers.length / USERS_PAGE_SIZE);
   const pagedUsers = filteredUsers.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
 
@@ -14567,6 +14721,7 @@ const AdminScreen = () => {
           { id: 'biblioteca', label: 'Biblioteca', icon: Library },
           { id: 'metrics', label: 'Métricas', icon: Database },
           { id: 'holidays', label: 'Feriados', icon: CalendarIcon },
+          { id: 'plano', label: 'Plano de Aula', icon: GraduationCap },
         ]}
         active={activeTab}
         onChange={id => setActiveTab(id as any)}
@@ -15060,6 +15215,138 @@ const AdminScreen = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'plano' && (
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-50 mb-8">
+          {!turmaAberta ? (
+            <>
+              <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2"><GraduationCap size={18} className="text-indigo-500" /> Plano de Aula</h3>
+              <p className="text-xs text-gray-400 mb-5">
+                {PLANO_TOTAL_AULAS} aulas de sábado em {PLANO_MODULOS.length} módulos. Você informa a data da primeira aula uma vez e o app monta o calendário inteiro, pulando feriados nacionais.
+              </p>
+
+              {!turmasLoaded ? (
+                <div className="flex justify-center py-8"><Loader2 size={22} className="animate-spin text-indigo-400" /></div>
+              ) : (
+                <div className="space-y-2 mb-5">
+                  {turmasOrdenadas.map(t => {
+                    const feitas = t.concluidas.length;
+                    const pct = Math.round((feitas / PLANO_TOTAL_AULAS) * 100);
+                    const proximaIdx = t.datas.findIndex((_, i) => !t.concluidas.includes(i + 1));
+                    const concluida = proximaIdx === -1;
+                    const confirmando = confirmDeleteTurmaId === t.id;
+                    return (
+                      <div key={t.id} className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => setOpenTurmaId(t.id)} className="flex-1 min-w-0 text-left">
+                            <p className="text-sm font-bold text-gray-900 truncate">{t.nome}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {concluida
+                                ? 'Turma concluída 🎉'
+                                : `Próxima aula ${proximaIdx + 1} · ${fmtDataAula(t.datas[proximaIdx])}`}
+                            </p>
+                          </button>
+                          <span className="text-xs font-black text-indigo-600 tabular-nums shrink-0">{feitas}/{PLANO_TOTAL_AULAS}</span>
+                          <button
+                            onClick={() => confirmando ? deleteTurma(t.id) : setConfirmDeleteTurmaId(t.id)}
+                            className={`p-1.5 rounded-lg transition-colors shrink-0 ${confirmando ? 'bg-red-500 text-white text-[10px] font-black px-2' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}>
+                            {confirmando ? 'Apagar?' : <Trash2 size={16} />}
+                          </button>
+                          <button onClick={() => setOpenTurmaId(t.id)} className="text-gray-300 shrink-0"><ChevronRight size={18} /></button>
+                        </div>
+                        <div className="h-1.5 bg-gray-200 rounded-full mt-2.5 overflow-hidden">
+                          <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {turmas.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhuma turma cadastrada.</p>}
+                </div>
+              )}
+
+              <div className="space-y-2 border-t border-gray-100 pt-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nova turma</p>
+                <input
+                  type="text"
+                  placeholder="Nome da turma (ex: Turma A - manhã)"
+                  value={newTurma.nome}
+                  onChange={e => setNewTurma(t => ({ ...t, nome: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={newTurma.inicio}
+                    onChange={e => setNewTurma(t => ({ ...t, inicio: e.target.value }))}
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white"
+                  />
+                  <button onClick={saveTurma} disabled={turmaSaving || !newTurma.nome.trim() || !newTurma.inicio}
+                    className="bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl disabled:opacity-50 flex items-center gap-1.5 text-sm">
+                    {turmaSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Criar
+                  </button>
+                </div>
+                {primeiraAulaPreview && (
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                    <CalendarDays size={12} className="text-indigo-400 shrink-0" />
+                    {primeiraAulaPreview === newTurma.inicio
+                      ? `Primeira aula em ${fmtDataAula(primeiraAulaPreview)}.`
+                      : `Primeira aula em ${fmtDataAula(primeiraAulaPreview)} — o primeiro sábado livre a partir da data escolhida.`}
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setOpenTurmaId(null)} className="text-xs font-bold text-indigo-600 flex items-center gap-1 mb-3">
+                <ChevronRight size={14} className="rotate-180" /> Todas as turmas
+              </button>
+              <h3 className="font-bold text-gray-900 flex items-center gap-2"><GraduationCap size={18} className="text-indigo-500" /> {turmaAberta.nome}</h3>
+              <p className="text-xs text-gray-400 mt-0.5 mb-3">
+                {turmaAberta.concluidas.length} de {PLANO_TOTAL_AULAS} aulas concluídas · início em {fmtDataAula(turmaAberta.datas[0])}
+              </p>
+              <div className="h-1.5 bg-gray-200 rounded-full mb-5 overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${Math.round((turmaAberta.concluidas.length / PLANO_TOTAL_AULAS) * 100)}%` }} />
+              </div>
+
+              <div className="space-y-4">
+                {PLANO_GRUPOS.map(grupo => (
+                  <div key={grupo.modulo}>
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-wider mb-1.5">
+                      {grupo.modulo} <span className="text-gray-300">· {grupo.indices.length} {grupo.indices.length === 1 ? 'aula' : 'aulas'}</span>
+                    </p>
+                    <div className="space-y-1.5">
+                      {grupo.indices.map(i => {
+                        const linha = PLANO_GRADE[i];
+                        const data = turmaAberta.datas[i];
+                        const feita = turmaAberta.concluidas.includes(linha.n);
+                        return (
+                          <button
+                            key={linha.n}
+                            onClick={() => toggleAulaConcluida(turmaAberta, linha.n)}
+                            className={`w-full flex items-center gap-3 p-2.5 rounded-2xl border text-left transition-colors ${feita ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100 hover:border-indigo-200'}`}>
+                            {feita
+                              ? <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
+                              : <Circle size={20} className="text-gray-300 shrink-0" />}
+                            <span className={`text-xs font-black tabular-nums w-7 shrink-0 ${feita ? 'text-emerald-600' : 'text-indigo-500'}`}>{linha.n}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-bold truncate ${feita ? 'text-emerald-800 line-through' : 'text-gray-900'}`}>
+                                {linha.modulo} · Aula {linha.aulaDoModulo}
+                              </p>
+                              <p className={`text-xs ${feita ? 'text-emerald-500' : 'text-gray-400'}`}>
+                                {data ? `Sábado, ${fmtDataAula(data)}` : 'Sem data'}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </motion.div>
@@ -16999,7 +17286,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
           {screen === 'gamificacao' && <GamificacaoScreen key="gamificacao" schedules={schedules} user={user} profile={profile} setScreen={setScreen} initialLiveTool={gamiInitialTool} clearInitialLiveTool={() => setGamiInitialTool(null)} />}
           {screen === 'ferramentas' && <FerramentasScreen key="ferramentas" profile={profile} schedules={schedules} user={user} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} initialTool={ferramentasTool} clearInitialTool={() => setFerramentasTool(null)} classes={classes} />}
           {screen === 'acervo' && <AcervoScreen key="acervo" savedResources={savedResources} setSavedResources={setSavedResources} profile={profile} setScreen={setScreen} notifications={allNotifications} setNotifications={handleSetNotifications} />}
-          {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" />}
+          {screen === 'admin' && isAdminAccount(profile, user) && <AdminScreen key="admin" user={user} />}
         </AnimatePresence>
 
         {/* Mundo Perdido — jogo Escape em overlay de tela cheia (fora do
