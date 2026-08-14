@@ -1051,7 +1051,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
     { title: 'Kit IA', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => openFerramenta?.(null) },
     // Só na conta admin o atalho do Diário dá lugar ao Plano de Aula.
     isAdmin
-      ? { title: 'Plano de Aula', icon: GraduationCap, action: () => openPlanoAula?.() }
+      ? { title: 'Plano de Aula', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openPlanoAula?.() }
       : { title: 'Diário', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openFerramenta?.('diario') },
     { title: 'Biblioteca', illustration: 'https://i.ibb.co/GQMXCYWq/Sem-nome-1300-x-1300-px-20260615-160107-0000.png', action: () => setScreen('biblioteca') },
   ];
