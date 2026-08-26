@@ -4,7 +4,8 @@
 # Prof. Corujão — IA para Professores Brasileiros
 
 **Assistente pedagógico com IA para professores da educação básica brasileira.**  
-Planos de aula BNCC, slides, atividades, gamificação de turma, diário de classe e muito mais — tudo em português.
+Planos de aula BNCC, slides, atividades e provas; jogos ao vivo com a turma; gamificação,
+diário de classe, calendário e cronograma do curso — tudo em português.
 
 [![Deploy](https://img.shields.io/badge/deploy-Firebase-orange?logo=firebase)](https://firebase.google.com/)
 [![PWA](https://img.shields.io/badge/PWA-instalável-blue?logo=googlechrome)](https://web.dev/progressive-web-apps/)
@@ -37,16 +38,25 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 | Material de Vídeo | Transforma vídeos do YouTube em aula e atividades |
 | Material do meu PDF | Gera materiais a partir do seu livro ou apostila |
 
-### Jogos Educativos (IA)
-- Quiz interativo
+### Atividades lúdicas (IA)
+Geradas a partir do tema e do nível da turma, para imprimir ou projetar:
+- Quiz
 - Caça-palavras
 - Palavras cruzadas
 - Bingo
 - Escape Room temático (Medieval / Laboratório / Detetive / Espaço)
 - Jogo da Memória
 - Sequência (ordenar eventos/etapas)
-- Flashcards
-- Jogo de história narrativa
+- Storytelling (história narrativa)
+
+### Jogos ao vivo com a turma
+- **Quiz Relâmpago** — formato de programa de auditório: cronômetro por pergunta, suspense
+  antes de revelar a resposta e bônus por rapidez e por acerto seguido. No modo multijogador,
+  cada equipe entra pelo celular lendo um QR e todas respondem à mesma pergunta ao mesmo tempo,
+  com placar ao vivo na projeção. No fim, o professor credita o XP na Gamificação.
+- **Batalha de Revisão** — duelo de perguntas entre as equipes da turma, com pontuação por
+  acerto. Pode ser enviada por link ou QR.
+- **Mundo Perdido** — aventura narrativa de escape, com trilha sonora e ilustrações próprias.
 
 ### Gamificação de Turma
 - Sistema de **XP e moedas** por comportamento e participação
@@ -62,6 +72,18 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Cadastro de turmas com dias da semana e **horários reais por dia**
 - Cores personalizadas e perfil de turma (nível, escola, turno)
 - Sincronização em tempo real via Firestore
+
+### Cronograma do Curso
+Acompanhamento de um curso de módulos fixos, turma por turma — não confundir com o
+**Plano de Aula** gerado por IA, ali em cima, que produz o plano de uma aula avulsa.
+- Grade fixa de 36 aulas de sábado em 8 módulos (IPD, Windows, Digitação, Word,
+  Excel, PowerPoint, Power BI e Internet)
+- Você informa a data da primeira aula uma vez e o app monta o calendário inteiro,
+  pulando os feriados nacionais — inclusive os móveis, como Carnaval e Corpus Christi
+- Quantas turmas quiser, cada uma com nome e data de início próprios
+- No dia a dia, basta marcar a aula como concluída; o card mostra o progresso e a
+  data da próxima
+- Visível apenas para a conta administradora
 
 ### Calendário & Importação por PDF
 - Calendário mensal com eventos, feriados e aulas
@@ -80,6 +102,10 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Busca por título e filtro por tipo
 - Remoção com confirmação
 
+### Biblioteca Compartilhada
+- Materiais publicados pela administração, disponíveis para todos os professores
+- Upload com título, tipo, disciplina e ano, com medidor do espaço usado
+
 ### Chat IA (Corujão)
 - Chat pedagógico em português com suporte a anexos (imagens, PDFs)
 - Histórico sincronizado no Firestore
@@ -89,6 +115,16 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Nome, escola, área e nível de ensino
 - Painel de estatísticas: turmas, materiais e gerações de IA
 - Edição de dados e zona de configuração
+
+### Painel Admin
+Visível só para a conta administradora:
+- **Usuários** — busca, filtros (PRO, gratuito, no limite, admins), liberação de PRO e exportação em CSV
+- **Feedbacks** — o que os professores enviam pelo app
+- **Biblioteca** — envio e remoção dos materiais compartilhados
+- **Métricas** — uso de tokens, gerações e custo estimado da IA, por mês
+- **Feriados** — feriados globais, que entram no calendário de todos os professores
+- **Plano de Aula** — o cronograma do curso descrito acima
+- **Aviso Global** — recado que aparece para todo mundo, ligado e desligado por ali
 
 ### PWA (App instalável)
 - Instalável no celular e no computador (Android, iOS, Windows, Mac)
