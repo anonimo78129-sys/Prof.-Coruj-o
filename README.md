@@ -5,7 +5,7 @@
 
 **Assistente pedagógico com IA para professores da educação básica brasileira.**  
 Planos de aula BNCC, slides, atividades e provas; jogos ao vivo com a turma; gamificação,
-diário de classe, calendário e cronograma do curso — tudo em português.
+diário de classe e calendário — tudo em português.
 
 [![Deploy](https://img.shields.io/badge/deploy-Firebase-orange?logo=firebase)](https://firebase.google.com/)
 [![PWA](https://img.shields.io/badge/PWA-instalável-blue?logo=googlechrome)](https://web.dev/progressive-web-apps/)
@@ -73,18 +73,6 @@ Geradas a partir do tema e do nível da turma, para imprimir ou projetar:
 - Cores personalizadas e perfil de turma (nível, escola, turno)
 - Sincronização em tempo real via Firestore
 
-### Cronograma do Curso
-Acompanhamento de um curso de módulos fixos, turma por turma — não confundir com o
-**Plano de Aula** gerado por IA, ali em cima, que produz o plano de uma aula avulsa.
-- Grade fixa de 36 aulas de sábado em 8 módulos (IPD, Windows, Digitação, Word,
-  Excel, PowerPoint, Power BI e Internet)
-- Você informa a data da primeira aula uma vez e o app monta o calendário inteiro,
-  pulando os feriados nacionais — inclusive os móveis, como Carnaval e Corpus Christi
-- Quantas turmas quiser, cada uma com nome e data de início próprios
-- No dia a dia, basta marcar a aula como concluída; o card mostra o progresso e a
-  data da próxima
-- Visível apenas para a conta administradora
-
 ### Calendário & Importação por PDF
 - Calendário mensal com eventos, feriados e aulas
 - **Importação de Calendário Letivo via PDF** — a IA extrai todos os feriados, recessos, reuniões e eventos
@@ -123,7 +111,6 @@ Visível só para a conta administradora:
 - **Biblioteca** — envio e remoção dos materiais compartilhados
 - **Métricas** — uso de tokens, gerações e custo estimado da IA, por mês
 - **Feriados** — feriados globais, que entram no calendário de todos os professores
-- **Plano de Aula** — o cronograma do curso descrito acima
 - **Aviso Global** — recado que aparece para todo mundo, ligado e desligado por ali
 
 ### PWA (App instalável)
