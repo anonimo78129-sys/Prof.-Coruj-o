@@ -1,6 +1,7 @@
 {
   "short_name": "Prof. Corujão",
   "name": "Prof. Corujão - IA Educacional",
+  "description": "Assistente pedagógico com IA para professores brasileiros: planos BNCC, slides, atividades, jogos ao vivo com a turma, gamificação e diário de classe.",
   "icons": [
     {
       "src": "/icon-512.png",

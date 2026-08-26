@@ -4,7 +4,8 @@
 # Prof. Corujão — IA para Professores Brasileiros
 
 **Assistente pedagógico com IA para professores da educação básica brasileira.**  
-Planos de aula BNCC, slides, atividades, gamificação de turma, diário de classe e muito mais — tudo em português.
+Planos de aula BNCC, slides, atividades e provas; jogos ao vivo com a turma; gamificação,
+diário de classe e calendário — tudo em português.
 
 [![Deploy](https://img.shields.io/badge/deploy-Firebase-orange?logo=firebase)](https://firebase.google.com/)
 [![PWA](https://img.shields.io/badge/PWA-instalável-blue?logo=googlechrome)](https://web.dev/progressive-web-apps/)
@@ -37,16 +38,25 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 | Material de Vídeo | Transforma vídeos do YouTube em aula e atividades |
 | Material do meu PDF | Gera materiais a partir do seu livro ou apostila |
 
-### Jogos Educativos (IA)
-- Quiz interativo
+### Atividades lúdicas (IA)
+Geradas a partir do tema e do nível da turma, para imprimir ou projetar:
+- Quiz
 - Caça-palavras
 - Palavras cruzadas
 - Bingo
 - Escape Room temático (Medieval / Laboratório / Detetive / Espaço)
 - Jogo da Memória
 - Sequência (ordenar eventos/etapas)
-- Flashcards
-- Jogo de história narrativa
+- Storytelling (história narrativa)
+
+### Jogos ao vivo com a turma
+- **Quiz Relâmpago** — formato de programa de auditório: cronômetro por pergunta, suspense
+  antes de revelar a resposta e bônus por rapidez e por acerto seguido. No modo multijogador,
+  cada equipe entra pelo celular lendo um QR e todas respondem à mesma pergunta ao mesmo tempo,
+  com placar ao vivo na projeção. No fim, o professor credita o XP na Gamificação.
+- **Batalha de Revisão** — duelo de perguntas entre as equipes da turma, com pontuação por
+  acerto. Pode ser enviada por link ou QR.
+- **Mundo Perdido** — aventura narrativa de escape, com trilha sonora e ilustrações próprias.
 
 ### Gamificação de Turma
 - Sistema de **XP e moedas** por comportamento e participação
@@ -80,6 +90,10 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Busca por título e filtro por tipo
 - Remoção com confirmação
 
+### Biblioteca Compartilhada
+- Materiais publicados pela administração, disponíveis para todos os professores
+- Upload com título, tipo, disciplina e ano, com medidor do espaço usado
+
 ### Chat IA (Corujão)
 - Chat pedagógico em português com suporte a anexos (imagens, PDFs)
 - Histórico sincronizado no Firestore
@@ -89,6 +103,15 @@ Planos de aula BNCC, slides, atividades, gamificação de turma, diário de clas
 - Nome, escola, área e nível de ensino
 - Painel de estatísticas: turmas, materiais e gerações de IA
 - Edição de dados e zona de configuração
+
+### Painel Admin
+Visível só para a conta administradora:
+- **Usuários** — busca, filtros (PRO, gratuito, no limite, admins), liberação de PRO e exportação em CSV
+- **Feedbacks** — o que os professores enviam pelo app
+- **Biblioteca** — envio e remoção dos materiais compartilhados
+- **Métricas** — uso de tokens, gerações e custo estimado da IA, por mês
+- **Feriados** — feriados globais, que entram no calendário de todos os professores
+- **Aviso Global** — recado que aparece para todo mundo, ligado e desligado por ali
 
 ### PWA (App instalável)
 - Instalável no celular e no computador (Android, iOS, Windows, Mac)
@@ -155,14 +178,6 @@ O arquivo `firebase-applet-config.json` na raiz contém a configuração do proj
 2. Ative **Authentication** (Google), **Firestore**, **Storage** e **Cloud Messaging**
 3. Substitua o conteúdo de `firebase-applet-config.json` com os dados do seu projeto
 4. Publique as regras: `firebase deploy --only firestore:rules,storage:rules`
-
-> **Atenção ao banco nomeado.** O app não usa o Firestore `(default)`: ele abre o
-> banco indicado em `firestoreDatabaseId` do `firebase-applet-config.json`
-> (`src/firebase.ts` passa esse id para o `initializeFirestore`). Por isso o
-> `firebase.json` traz a chave `firestore.database` com esse mesmo id — sem ela o
-> deploy publica as regras no `(default)`, um banco que o app nem lê, e o
-> `firestore.rules` do repositório nunca chega em produção. Trocando de projeto,
-> atualize o id nos **dois** arquivos.
 
 ---
 
