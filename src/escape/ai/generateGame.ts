@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { resolveApiKey, GEMINI_MODEL } from './gemini';
 import { DEFAULT_NARRATIVE_CHOICES } from '../data/narrative';
 import type { GameConfig, MCQuestion, MatchPair, NarrativeChoice } from '../types/game';
@@ -162,7 +162,7 @@ export async function generateGame(subject: string, level: string, instructions?
     config: {
       responseMimeType: 'application/json',
       responseSchema,
-      temperature: 0.85,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
     },
   });
 
@@ -223,7 +223,7 @@ Regras: 4 alternativas plausíveis, apenas 1 correta (índice 0–3), factualmen
   const response = await client.models.generateContent({
     model: GEMINI_MODEL,
     contents: prompt,
-    config: { responseMimeType: 'application/json', responseSchema: questionSchema, temperature: 0.9 },
+    config: { responseMimeType: 'application/json', responseSchema: questionSchema, thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
   });
 
   const text = response.text ?? '';
@@ -257,7 +257,7 @@ Conceito: termo técnico/importante. Definição: explicação clara e didática
   const response = await client.models.generateContent({
     model: GEMINI_MODEL,
     contents: prompt,
-    config: { responseMimeType: 'application/json', responseSchema: pairSchema, temperature: 0.9 },
+    config: { responseMimeType: 'application/json', responseSchema: pairSchema, thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
   });
 
   const text = response.text ?? '';

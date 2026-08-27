@@ -88,12 +88,20 @@ export const guessMimeType = (file: File): string => {
   return 'application/pdf';
 };
 
+// ── Modelo de IA ────────────────────────────────────────────────────────────
+// Fonte única do nome do modelo. Fica aqui, num arquivo sem dependência
+// nenhuma, porque o App.tsx e o jogo Escape precisam do mesmo valor — e
+// mantê-lo duplicado é como se esquece metade numa migração de modelo.
+export const AI_MODEL = 'gemini-3.6-flash';
+
 // ── Preços da API (exibição no painel admin) ────────────────────────────────
-// Valores do gemini-2.5-flash em USD por 1M de tokens + câmbio de referência.
+// Valores do gemini-3.6-flash em USD por 1M de tokens + câmbio de referência.
+// ATENÇÃO: estes são os preços promocionais, válidos até 31/12/2026. A partir
+// de 01/01/2027 passam a ser 1.50 (entrada) e 7.50 (saída) — o dobro.
 // Fonte única: quando o preço mudar, atualize APENAS aqui.
 export const AI_PRICING = {
-  inputUsdPer1M: 0.075,
-  outputUsdPer1M: 0.30,
+  inputUsdPer1M: 0.75,
+  outputUsdPer1M: 3.75,
   usdToBrl: 5.2,
 };
 export const estimateCostUSD = (inputTokens: number, outputTokens: number): number =>

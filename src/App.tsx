@@ -18,7 +18,7 @@ import {
   Armchair, Music2, Fish, HeartCrack, PawPrint, Percent, Smartphone, TestTube, Landmark, Check,
   Lightbulb, Sparkle, Compass, FlaskConical, Pickaxe, Goal, Gamepad2, Skull, Palette, MessagesSquare, Circle, Heart,
 } from 'lucide-react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { auth, db, storage, logOut, getFcmToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential, deleteUser } from './firebase';
@@ -32,7 +32,7 @@ import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
 import {
   escapeHtml, shuffleArray, isAdminAccount,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
-  AI_PRICING, estimateCostUSD,
+  AI_PRICING, estimateCostUSD, AI_MODEL,
 } from './utils';
 
 const apiKey = process.env.GEMINI_API_KEY;
@@ -40,8 +40,6 @@ if (!apiKey) {
   console.error("CRITICAL: GEMINI_API_KEY está ausente no ambiente!");
 }
 const ai = new GoogleGenAI({ apiKey: apiKey || 'fake-key-para-evitar-crash' });
-
-const AI_MODEL = 'gemini-2.5-flash';
 
 // ── Emoji → ícone ────────────────────────────────────────────────────────────
 // Boa parte da UI (avatares, medalhas, comportamentos, recompensas, equipes)
@@ -348,11 +346,22 @@ const generateContentWithRetry = async (params: Parameters<typeof ai.models.gene
     throw new Error('Chave da IA não configurada. Contate o suporte.');
   }
   if (!params.model) params.model = AI_MODEL;
+  // Raciocínio mínimo por padrão. No Gemini 3 o padrão da API é pensar bastante
+  // antes de responder, o que joga o tempo até a primeira palavra de ~3s para
+  // ~12s — insuportável no chat e nas gerações curtas, que são a maioria das
+  // chamadas daqui. Quem precisa de raciocínio profundo (plano de aula, slides)
+  // passa thinkingLevel: HIGH explicitamente e sobrescreve este padrão.
+  if (!params.config?.thinkingConfig) {
+    params.config = { ...params.config, thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } };
+  }
   const result = await withRetry(() => withTimeout(ai.models.generateContent(params), 60000, 'geração de conteúdo'));
   const usage = (result as any).usageMetadata;
   if (usage) {
     _pendingInputTokens += usage.promptTokenCount || 0;
-    _pendingOutputTokens += usage.candidatesTokenCount || 0;
+    // thoughtsTokenCount é um campo SEPARADO de candidatesTokenCount, mas o
+    // Google cobra os dois como saída. Sem somá-lo, o custo no painel admin
+    // sairia subestimado justamente nas gerações que mais pensam.
+    _pendingOutputTokens += (usage.candidatesTokenCount || 0) + (usage.thoughtsTokenCount || 0);
   }
   return result;
 };
@@ -16253,8 +16262,9 @@ ${avaliacaoBlock}
 [2 ou 3 referências bibliográficas em formato ABNT${isEarlyChildhood ? ' — inclua documentos BNCC e Referencial Curricular Nacional para Educação Infantil (RCNEI)' : ''}]`;
 
       // Plano de aula exige raciocínio pedagógico real (sequência didática,
-      // BNCC, adequação de nível) — vale a pena um orçamento extra de "pensar antes de responder".
-      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
+      // BNCC, adequação de nível) — aqui vale pagar a espera extra de pensar
+      // antes de responder, porque a tela de carregamento já segura o professor.
+      const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } } });
       const planDraft = response.text || '';
 
       // ── Validação local determinística das habilidades BNCC ──────────────
@@ -16296,9 +16306,9 @@ ${avaliacaoBlock}
 
       if (type === 'slides') {
         const prompt = getSlidesPrompt(targetTopic, className, plannerTone, plannerComplexity, plannerFocus, plannerGroundingContent, plannerSlideCount, selectedClass?.level);
-        // Coreografia de layouts + planejamento do arco do deck se beneficiam de
-        // um orçamento extra de raciocínio antes de responder.
-        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingBudget: 4096 } } });
+        // Coreografia de layouts + planejamento do arco do deck se beneficiam
+        // de raciocínio profundo; como o plano de aula, a espera é aceitável aqui.
+        const response = await generateContentWithRetry({ model: AI_MODEL, contents: prompt, config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } } });
         let text = (response.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim();
         // Recover JSON even if the model wraps it in extra text
         const firstBrace = text.indexOf('{');
