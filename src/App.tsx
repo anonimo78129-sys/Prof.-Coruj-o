@@ -8310,8 +8310,9 @@ NÃO use código nem tabelas Markdown. Português brasileiro natural.`;
         onClick={() => openBattle?.()}
         aria-label="Abrir Batalha de Revisão"
         className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
+        style={{ aspectRatio: '1100 / 532', background: '#5E7D8A' }}
       >
-        <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" className="w-full h-auto block select-none" draggable={false} />
+        <img src="/assets/battle/quaquemagia.jpg" alt="QuaqueMagia — Arena do Conhecimento" width={1100} height={532} className="absolute inset-0 w-full h-full object-cover select-none" draggable={false} />
       </button>
 
       {/* MUNDO PERDIDO — abre o jogo Escape (aventura narrativa) */}
@@ -8319,8 +8320,9 @@ NÃO use código nem tabelas Markdown. Português brasileiro natural.`;
         aria-label="Mundo Perdido — Escape Room"
         onClick={() => setScreen('escape')}
         className="w-full relative overflow-hidden rounded-[2rem] border-2 border-white/70 mb-4 shadow-xl active:scale-[0.98] transition-transform"
+        style={{ aspectRatio: '1100 / 532', background: '#3F6B5B' }}
       >
-        <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" className="w-full h-auto block select-none" draggable={false} />
+        <img src="/assets/battle/mundo-perdido.jpg" alt="Mundo Perdido — Escape Room" width={1100} height={532} className="absolute inset-0 w-full h-full object-cover select-none" draggable={false} />
       </button>
 
       {/* QUIZ RELÂMPAGO — card com mini-palco montado das ilustrações
