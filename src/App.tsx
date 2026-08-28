@@ -2054,29 +2054,36 @@ const buildDocx = async (
   docType: 'plan' | 'exam' | 'activities',
   opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): Promise<Blob> => {
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation, Footer } = await import('docx');
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation, Footer, Header, PageNumber } = await import('docx');
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
   const gabMd  = sepIdx >= 0 ? rawMd.slice(sepIdx + SEP.length) : '';
 
-  // Cor única da marca (indigo) para todos os tipos de documento
-  const ac = '4338CA';
-  const dk = '312E81';
+  // Plano de aula sai na ABNT (NBR 14724): documento de entrega, então Arial 12,
+  // entrelinha 1,5, justificado, margens 3-2-2-3 e tudo em preto. Prova e
+  // atividade seguem com o layout da marca, que é material de uso em sala.
+  const abnt = docType === 'plan';
+  // Cor única da marca (indigo) — no ABNT vira preto, que a norma pede
+  const ac = abnt ? '000000' : '4338CA';
+  const dk = abnt ? '000000' : '312E81';
+  const szCorpo  = abnt ? 24 : 22;  // 12pt na norma, 11pt no layout da marca
+  const szSecao  = abnt ? 24 : 24;
+  const szTitulo = abnt ? 24 : 28;
 
   const parseInline = (text: string) => {
     const runs: InstanceType<typeof TextRun>[] = [];
     const rx = /(\*\*[^*]+?\*\*|\*[^*]+?\*)/g;
     let last = 0; let m: RegExpExecArray | null;
     while ((m = rx.exec(text)) !== null) {
-      if (m.index > last) runs.push(new TextRun({ text: text.slice(last, m.index), size: 22 }));
+      if (m.index > last) runs.push(new TextRun({ text: text.slice(last, m.index), size: szCorpo }));
       const t = m[0];
-      if (t.startsWith('**')) runs.push(new TextRun({ text: t.slice(2, -2), bold: true, size: 22 }));
-      else runs.push(new TextRun({ text: t.slice(1, -1), italics: true, size: 22 }));
+      if (t.startsWith('**')) runs.push(new TextRun({ text: t.slice(2, -2), bold: true, size: szCorpo }));
+      else runs.push(new TextRun({ text: t.slice(1, -1), italics: true, size: szCorpo }));
       last = m.index + t.length;
     }
-    if (last < text.length) runs.push(new TextRun({ text: text.slice(last), size: 22 }));
-    return runs.length ? runs : [new TextRun({ text: '', size: 22 })];
+    if (last < text.length) runs.push(new TextRun({ text: text.slice(last), size: szCorpo }));
+    return runs.length ? runs : [new TextRun({ text: '', size: szCorpo })];
   };
 
   const hr = () => new Paragraph({
@@ -2094,14 +2101,14 @@ const buildDocx = async (
     md.split('\n').map(line => {
       if (!line.trim()) return new Paragraph({ children: [new TextRun('')], spacing: { after: 60 } });
       if (line.startsWith('### '))
-        return new Paragraph({ children: [new TextRun({ text: line.slice(4), bold: true, color: dk, size: 22 })], spacing: { before: 120, after: 60 } });
+        return new Paragraph({ children: [new TextRun({ text: line.slice(4), bold: true, color: dk, size: szCorpo })], spacing: { before: 120, after: 60 } });
       if (line.startsWith('## '))
-        return new Paragraph({ children: [new TextRun({ text: line.slice(3), bold: true, color: dk, size: 22 })], spacing: { before: 160, after: 80 } });
+        return new Paragraph({ children: [new TextRun({ text: line.slice(3), bold: true, color: dk, size: szCorpo })], spacing: { before: 160, after: 80 } });
       if (line.startsWith('- ') || line.startsWith('* '))
-        return new Paragraph({ children: [new TextRun({ text: '• ', size: 22 }), ...parseInline(line.slice(2))], indent: { left: 360 }, spacing: { after: 40 } });
+        return new Paragraph({ children: [new TextRun({ text: '• ', size: szCorpo }), ...parseInline(line.slice(2))], indent: { left: 360 }, spacing: { after: 40 } });
       if (/^\d+\. /.test(line)) {
         const num = line.match(/^(\d+)\./)?.[1] || '1';
-        return new Paragraph({ children: [new TextRun({ text: `${num}. `, size: 22 }), ...parseInline(line.replace(/^\d+\. /, ''))], indent: { left: 360 }, spacing: { after: 40 } });
+        return new Paragraph({ children: [new TextRun({ text: `${num}. `, size: szCorpo }), ...parseInline(line.replace(/^\d+\. /, ''))], indent: { left: 360 }, spacing: { after: 40 } });
       }
       return new Paragraph({ children: parseInline(line), spacing: { after: 60 } });
     });
@@ -2136,7 +2143,7 @@ const buildDocx = async (
 
     // Title
     docChildren.push(new Paragraph({
-      children: [new TextRun({ text: 'PLANO DE AULA', bold: true, size: 28, color: dk })],
+      children: [new TextRun({ text: 'PLANO DE AULA', bold: true, size: szTitulo, color: dk })],
       alignment: AlignmentType.CENTER,
       spacing: { before: 160, after: 160 },
     }));
@@ -2162,7 +2169,7 @@ const buildDocx = async (
     for (const { label, keys } of secDefs) {
       const content = get(...keys);
       docChildren.push(new Paragraph({
-        children: [new TextRun({ text: label, bold: true, size: 22, color: dk })],
+        children: [new TextRun({ text: label, bold: true, size: szCorpo, color: dk })],
         border: sectionBox,
         spacing: { before: 140, after: 60 },
         indent: { left: 80, right: 80 },
@@ -2188,14 +2195,14 @@ const buildDocx = async (
 
     // Student name underline
     docChildren.push(new Paragraph({
-      children: [new TextRun({ text: 'NOME DO(A) ALUNO(A): ', bold: true, size: 22 })],
+      children: [new TextRun({ text: 'NOME DO(A) ALUNO(A): ', bold: true, size: szCorpo })],
       border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '555555' } },
       spacing: { before: 80, after: 200 },
     }));
 
     // Centered document title
     docChildren.push(new Paragraph({
-      children: [new TextRun({ text: `${typeLabel}: ${opts.topic || ''}`, bold: true, size: 28, color: ac })],
+      children: [new TextRun({ text: `${typeLabel}: ${opts.topic || ''}`, bold: true, size: szTitulo, color: ac })],
       alignment: AlignmentType.CENTER,
       spacing: { before: 80, after: 200 },
     }));
@@ -2214,8 +2221,15 @@ const buildDocx = async (
       }
 
       if (line.startsWith('## ')) {
-        docChildren.push(new Paragraph({
-          children: [new TextRun({ text: line.slice(3), bold: true, color: dk, size: 24 })],
+        // No ABNT o título de seção é só negrito à esquerda. A caixa de borda é
+        // do layout da marca — e com a cor virando preto ela ficaria pior ainda.
+        docChildren.push(new Paragraph(abnt ? {
+          children: [new TextRun({ text: line.slice(3).toUpperCase(), bold: true, color: dk, size: szSecao })],
+          alignment: AlignmentType.LEFT,
+          spacing: { before: 240, after: 120 },
+          keepNext: true,
+        } : {
+          children: [new TextRun({ text: line.slice(3), bold: true, color: dk, size: szSecao })],
           border: {
             top: { style: BorderStyle.SINGLE, size: 4, color: ac },
             bottom: { style: BorderStyle.SINGLE, size: 4, color: ac },
@@ -2239,7 +2253,7 @@ const buildDocx = async (
 
       if (/^\( \) [A-D]\)/.test(line.trim())) {
         docChildren.push(new Paragraph({
-          children: [new TextRun({ text: '○  ', size: 22 }), ...parseInline(line.replace(/^\( \)/, '').trim())],
+          children: [new TextRun({ text: '○  ', size: szCorpo }), ...parseInline(line.replace(/^\( \)/, '').trim())],
           indent: { left: 480 },
           spacing: { after: 40 },
         }));
@@ -2248,7 +2262,7 @@ const buildDocx = async (
 
       if (/^\*[^*].*[^*]\*$/.test(line.trim())) {
         docChildren.push(new Paragraph({
-          children: [new TextRun({ text: line.trim().slice(1, -1), italics: true, size: 22 })],
+          children: [new TextRun({ text: line.trim().slice(1, -1), italics: true, size: szCorpo })],
           alignment: AlignmentType.RIGHT,
           spacing: { before: 80, after: 80 },
         }));
@@ -2258,19 +2272,21 @@ const buildDocx = async (
       docChildren.push(new Paragraph({
         children: parseInline(line),
         spacing: { after: 60 },
+        // 1,25cm de recuo na primeira linha, como a norma pede
+        ...(abnt ? { indent: { firstLine: 709 } } : {}),
       }));
     }
 
     if (gabMd) {
       docChildren.push(new Paragraph({
-        children: [new TextRun({ text: 'GABARITO', bold: true, size: 28, color: 'FFFFFF' })],
+        children: [new TextRun({ text: 'GABARITO', bold: true, size: szTitulo, color: 'FFFFFF' })],
         shading: { fill: dk, type: ShadingType.CLEAR, color: 'auto' },
         alignment: AlignmentType.CENTER,
         spacing: { before: 200, after: 160 },
         pageBreakBefore: true,
       }));
       docChildren.push(new Paragraph({
-        children: [new TextRun({ text: `${typeLabel}: ${opts.topic || ''}`, bold: true, size: 24, color: ac })],
+        children: [new TextRun({ text: `${typeLabel}: ${opts.topic || ''}`, bold: true, size: szSecao, color: ac })],
         spacing: { after: 160 },
       }));
       for (const line of gabMd.replace(/^## Gabarito[^\n]*\n?/, '').split('\n')) {
@@ -2290,10 +2306,35 @@ const buildDocx = async (
     })],
   });
 
+  // Paginação no canto superior direito, como a norma pede. Aqui dá para fazer
+  // de verdade — na impressão do navegador não dá, porque o Chrome não suporta
+  // as caixas de margem do @page.
+  const cabecalhoPaginas = new Header({
+    children: [new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [new TextRun({ children: [PageNumber.CURRENT], size: szCorpo, font: 'Arial' })],
+    })],
+  });
+
+  // Margens em twips: 1cm = 566,93. ABNT = 3cm esquerda e superior, 2cm direita
+  // e inferior.
+  const margemAbnt  = { top: 1701, bottom: 1134, left: 1701, right: 1134 };
+  const margemMarca = { top: 1134, bottom: 1417, left: 1417, right: 1417 };
+
   const wordDoc = new Document({
+    ...(abnt ? {
+      styles: {
+        default: {
+          document: {
+            run: { font: 'Arial', size: szCorpo, color: '000000' },
+            paragraph: { spacing: { line: 360 }, alignment: AlignmentType.JUSTIFIED },
+          },
+        },
+      },
+    } : {}),
     sections: [{
-      properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT }, margin: { top: 1134, bottom: 1417, left: 1417, right: 1417 } } },
-      footers: { default: brandFooter },
+      properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.PORTRAIT }, margin: abnt ? margemAbnt : margemMarca } },
+      ...(abnt ? { headers: { default: cabecalhoPaginas } } : { footers: { default: brandFooter } }),
       children: docChildren,
     }],
   });
@@ -8925,13 +8966,58 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .replace(/^\( \) (.+)$\n?/gm, '<div class="opt"><span class="opt-bubble"></span><span>$1</span></div>')
     // Linhas de resposta (10+ underscores) → linha limpa com borda inferior
     .replace(/^_{10,}[ \t]*$\n?/gm, '<div class="answer-line"></div>')
+    // Citação longa (markdown "> texto"). O conteúdo já passou por escapeHtml,
+    // então o sinal de maior chega como &gt;. Na ABNT vira recuo de 4cm.
+    .replace(/(?:^&gt; ?.*$\n?)+/gm, (blk) =>
+      `<blockquote>${blk.replace(/^&gt; ?/gm, '').trim().replace(/\n/g, '<br>')}</blockquote>\n`)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^---$/gm, '<hr>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
     .replace(/\n/g, '<br>');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
+  // ── Plano de aula sai em ABNT (NBR 14724) ─────────────────────────────────
+  // Documento que o professor entrega para a coordenação ou para a faculdade,
+  // então segue a norma: Arial 12, entrelinha 1,5, texto justificado, recuo de
+  // 1,25cm na primeira linha e margens 3-2-2-3. Os demais tipos (atividade,
+  // prova, ferramentas do Kit) mantêm o layout colorido, que é material de uso
+  // em sala e ficaria pior engessado na norma.
+  const abnt = type === 'plan';
+
+  const estiloAbnt = `
+    @page { size: A4; margin: 3cm 2cm 2cm 3cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; line-height: 1.5;
+           color: #000; text-align: justify; margin: 0; }
+    .id-bloco { text-align: center; margin-bottom: 1.2cm; }
+    .id-escola { font-weight: bold; text-transform: uppercase; }
+    .id-linha { margin-top: .15cm; }
+    .doc-titulo { text-align: center; text-transform: uppercase; font-weight: bold; margin: 1cm 0 .8cm; }
+    h1 { font-size: 12pt; font-weight: bold; text-transform: uppercase; text-align: left;
+         text-indent: 0; margin: .8cm 0 .3cm; page-break-after: avoid; }
+    h2 { font-size: 12pt; font-weight: bold; text-align: left; text-indent: 0;
+         margin: .6cm 0 .25cm; page-break-after: avoid; }
+    h3 { font-size: 12pt; font-weight: normal; font-style: italic; text-align: left;
+         text-indent: 0; margin: .45cm 0 .2cm; page-break-after: avoid; }
+    p { text-indent: 1.25cm; margin: 0 0 .25cm; }
+    ul { margin: .2cm 0 .3cm 1.9cm; padding: 0; }
+    li { margin: .1cm 0; text-align: justify; }
+    /* Citação com mais de três linhas: recuo de 4cm, corpo 10, espaço simples */
+    blockquote { margin: .4cm 0 .4cm 4cm; font-size: 10pt; line-height: 1; text-indent: 0; }
+    /* Tabela no padrão IBGE adotado pela ABNT: aberta nas laterais */
+    table { width: 100%; border-collapse: collapse; font-size: 10pt; margin: .4cm 0; }
+    th, td { padding: 4pt 6pt; text-align: left; vertical-align: top;
+             border-left: none; border-right: none; }
+    thead th { border-top: 1px solid #000; border-bottom: 1px solid #000; font-weight: bold; }
+    tbody tr:last-child td { border-bottom: 1px solid #000; }
+    strong { font-weight: bold; }
+    hr { border: none; border-top: 1px solid #000; margin: .5cm 0; }
+    .answer-line { border-bottom: 1px solid #000; height: 22px; width: 100%; margin: 0 0 4px; }
+    .opt { display: flex; align-items: center; gap: 8px; margin: 3px 0 3px 1.25cm; text-indent: 0; }
+    .opt-bubble { width: 11px; height: 11px; border: 1px solid #000; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  `;
+
+  const estiloPadrao = `
     @page { size: A4${printOpts?.landscape ? ' landscape' : ''}; margin: ${printOpts?.landscape ? '1.4cm' : '2cm'}; }
     * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.6; margin: 0; font-size: 12px; }
@@ -8948,6 +9034,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     h3 { font-size: 12px; font-weight: 700; color: #334155; margin: 10px 0 4px; }
     p, li { margin: 4px 0; font-size: 11.5px; }
     ul { padding-left: 20px; margin: 4px 0; }
+    blockquote { margin: 8px 0 8px 24px; padding-left: 10px; border-left: 3px solid #c7d2fe; color: #475569; font-size: 11px; }
     hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
     strong { font-weight: 800; color: #0f172a; }
     table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: ${printOpts?.landscape ? '11.5px' : '10.5px'}; }
@@ -8958,7 +9045,16 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .opt-bubble { width: 11px; height: 11px; border: 1.5px solid #64748b; border-radius: 50%; flex-shrink: 0; display: inline-block; }
     .answer-line { border-bottom: 1px solid #94a3b8; height: 22px; width: 100%; max-width: 640px; margin: 0 0 4px; }
     .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
-  </style></head><body>
+  `;
+
+  const cabecalhoAbnt = `
+  <div class="id-bloco">
+    <div class="id-escola">${escapeHtml(schoolName || '')}</div>
+    <div class="id-linha">${escapeHtml(teacherName || '')}</div>
+  </div>
+  <div class="doc-titulo">${escapeHtml(title)}</div>`;
+
+  const cabecalhoPadrao = `
   <div class="header">
     <div class="header-left">
       <div class="tag">${typeLabel}</div>
@@ -8971,9 +9067,15 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
         <div class="field"><div class="field-label">TURMA</div><div class="field-val"></div></div>
       </div>
     </div>
-  </div>
+  </div>`;
+
+  // Rodapé de marca sai no ABNT: é documento que vai ser entregue.
+  const rodape = abnt ? '' : '<div class="footer">Prof. Corujão | Material gerado por IA · Revise antes de usar</div>';
+
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${abnt ? estiloAbnt : estiloPadrao}</style></head><body>
+  ${abnt ? cabecalhoAbnt : cabecalhoPadrao}
   <div class="content">${htmlContent}</div>
-  <div class="footer">Prof. Corujão | Material gerado por IA · Revise antes de usar</div>
+  ${rodape}
   <script>window.onload = () => { window.print(); }<\/script>
   </body></html>`);
   w.document.close();
