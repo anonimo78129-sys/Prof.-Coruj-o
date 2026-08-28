@@ -7225,6 +7225,19 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
           <div class="field"><span class="field-label">N&ordm;</span><div class="field-line tiny"></div></div>
           <div class="field full"><span class="field-label">PROFESSOR(A)</span><div class="field-line">${escapeHtml(opts.teacherName || '')}</div></div>
         </div>`;
+  // Sequência Didática é planejamento que o professor entrega — mesma norma do
+  // plano de aula (NBR 14724). Os demais modos são material de sala e seguem
+  // com o layout colorido.
+  const abnt = isTeacherDoc;
+
+  const headerAbnt = `
+    <div class="abnt-id">
+      <div class="abnt-escola">${escapeHtml(opts.schoolName || '')}</div>
+      <div class="abnt-linha">${escapeHtml(opts.teacherName || '')}</div>
+      <div class="abnt-linha">${escapeHtml([opts.subject, opts.level, opts.className].filter(Boolean).join(' — '))}</div>
+    </div>
+    <div class="abnt-titulo">${escapeHtml(opts.title)}</div>`;
+
   const headerHtml = `
     <div class="page-header">
       <div class="header-inner">
@@ -7395,8 +7408,36 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
     /* ── UTIL ─────────────────────────────────────────────── */
     .hide-on-screen { display:block; }
     button { display:none; }
-  </style></head><body>
-    ${headerHtml}
+  </style>${abnt ? `<style>
+    @page { size: A4; margin: 3cm 2cm 2cm 3cm; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; line-height: 1.5;
+           color: #000; background: #fff; text-align: justify; margin: 0; }
+    .abnt-id { text-align: center; margin-bottom: 1.2cm; }
+    .abnt-escola { font-weight: bold; text-transform: uppercase; }
+    .abnt-linha { margin-top: .15cm; }
+    .abnt-titulo { text-align: center; text-transform: uppercase; font-weight: bold; margin: 1cm 0 .8cm; }
+    .markdown-body { font-size: 12pt; line-height: 1.5; color: #000; text-align: justify; }
+    .markdown-body h1, .markdown-body h2 { font-size: 12pt; font-weight: bold; color: #000;
+      text-transform: uppercase; text-align: left; text-indent: 0; background: none; border: none;
+      padding: 0; margin: .8cm 0 .3cm; page-break-after: avoid; }
+    .markdown-body h3, .markdown-body h4 { font-size: 12pt; font-weight: bold; color: #000;
+      text-align: left; text-indent: 0; background: none; border: none; padding: 0;
+      margin: .5cm 0 .25cm; page-break-after: avoid; }
+    .markdown-body p { text-indent: 1.25cm; margin: 0 0 .25cm; color: #000; }
+    .markdown-body ul, .markdown-body ol { margin: .2cm 0 .3cm 1.9cm; padding: 0; }
+    .markdown-body li { margin: .1cm 0; text-align: justify; color: #000; }
+    .markdown-body li::marker { color: #000; }
+    .markdown-body strong { font-weight: bold; color: #000; }
+    .markdown-body blockquote { margin: .4cm 0 .4cm 4cm; padding: 0; border: none;
+      font-size: 10pt; line-height: 1; text-indent: 0; color: #000; font-style: normal; }
+    .markdown-body table { width: 100%; border-collapse: collapse; font-size: 10pt; margin: .4cm 0; }
+    .markdown-body th, .markdown-body td { padding: 4pt 6pt; text-align: left; vertical-align: top;
+      border-left: none; border-right: none; background: none; color: #000; }
+    .markdown-body thead th { border-top: 1px solid #000; border-bottom: 1px solid #000; font-weight: bold; }
+    .markdown-body tbody tr:last-child td { border-bottom: 1px solid #000; }
+    .markdown-body hr { border: none; border-top: 1px solid #000; margin: .5cm 0; }
+  </style>` : ''}</head><body>
+    ${abnt ? headerAbnt : headerHtml}
     ${node.innerHTML}
     <script>
     (function(){
@@ -7745,10 +7786,13 @@ const printGameResult = (opts: { title: string, subject?: string, level?: string
       }
 
       // ── marca d'água: injetada após TODO o conteúdo dinâmico ──
+      // Fica de fora na ABNT: é documento que vai ser entregue.
+      if (!${abnt}) {
       var _wm = document.createElement('div');
       _wm.textContent = 'Prof. Corujão';
       _wm.style.cssText = 'position:fixed;bottom:3mm;right:4mm;font-size:7px;color:#9ca3af;letter-spacing:0.5px;opacity:0.55;font-style:italic;pointer-events:none;z-index:9999;';
       document.body.appendChild(_wm);
+      }
 
       setTimeout(function(){ window.print(); }, 600);
     })();
