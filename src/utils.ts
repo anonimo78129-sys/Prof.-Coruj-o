@@ -88,6 +88,28 @@ export const guessMimeType = (file: File): string => {
   return 'application/pdf';
 };
 
+// ── Área de conhecimento (BNCC) ─────────────────────────────────────────────
+// O formulário de plano de aula pede a área além do componente curricular. O
+// app só guarda o componente, então a área é deduzida daqui. Sem chute: o que
+// não estiver mapeado volta vazio, e o professor preenche à mão no papel.
+const AREAS_BNCC: { area: string; componentes: string[] }[] = [
+  { area: 'Linguagens',            componentes: ['portugu', 'redaç', 'redac', 'arte', 'educaç', 'educac', 'ingl', 'espanhol', 'literatura', 'linguagens'] },
+  { area: 'Matemática',            componentes: ['matem'] },
+  { area: 'Ciências da Natureza',  componentes: ['ciênc', 'cienc', 'biolog', 'físic', 'fisic', 'quím', 'quim'] },
+  { area: 'Ciências Humanas',      componentes: ['históri', 'histori', 'geograf', 'filosof', 'sociolog'] },
+  { area: 'Ensino Religioso',      componentes: ['religi'] },
+];
+export const areaDoConhecimento = (componente: string | undefined | null): string => {
+  const c = (componente || '').toLowerCase().trim();
+  if (!c) return '';
+  // Ciências Humanas antes de Ciências da Natureza: "ciências humanas" casaria
+  // com o prefixo "ciênc" da Natureza e cairia na área errada.
+  if (/ciênc|cienc/.test(c) && /human|social/.test(c)) return 'Ciências Humanas';
+  for (const { area, componentes } of AREAS_BNCC)
+    if (componentes.some(k => c.includes(k))) return area;
+  return '';
+};
+
 // ── Modelo de IA ────────────────────────────────────────────────────────────
 // Fonte única do nome do modelo. Fica aqui, num arquivo sem dependência
 // nenhuma, porque o App.tsx e o jogo Escape precisam do mesmo valor — e

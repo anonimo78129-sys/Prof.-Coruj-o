@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  escapeHtml, shuffleArray, isAdminAccount,
+  escapeHtml, shuffleArray, isAdminAccount, areaDoConhecimento,
   formatApiError, fmtBytes, toISODate, guessMimeType,
   AI_PRICING, estimateCostUSD,
 } from './utils';
@@ -89,5 +89,24 @@ describe('estimateCostUSD', () => {
     expect(estimateCostUSD(1_000_000, 0)).toBeCloseTo(AI_PRICING.inputUsdPer1M);
     expect(estimateCostUSD(0, 1_000_000)).toBeCloseTo(AI_PRICING.outputUsdPer1M);
     expect(estimateCostUSD(0, 0)).toBe(0);
+  });
+});
+
+describe('areaDoConhecimento', () => {
+  it('mapeia os componentes mais comuns', () => {
+    expect(areaDoConhecimento('Língua Portuguesa')).toBe('Linguagens');
+    expect(areaDoConhecimento('Matemática')).toBe('Matemática');
+    expect(areaDoConhecimento('Ciências')).toBe('Ciências da Natureza');
+    expect(areaDoConhecimento('História')).toBe('Ciências Humanas');
+    expect(areaDoConhecimento('Ensino Religioso')).toBe('Ensino Religioso');
+  });
+  it('não confunde Ciências Humanas com Ciências da Natureza', () => {
+    expect(areaDoConhecimento('Ciências Humanas')).toBe('Ciências Humanas');
+    expect(areaDoConhecimento('Ciências da Natureza')).toBe('Ciências da Natureza');
+  });
+  it('devolve vazio quando não sabe, em vez de chutar', () => {
+    expect(areaDoConhecimento('Robótica')).toBe('');
+    expect(areaDoConhecimento('')).toBe('');
+    expect(areaDoConhecimento(undefined)).toBe('');
   });
 });
