@@ -4,7 +4,9 @@
 
 const LS_KEY = 'eter_gemini_key';
 
-export const GEMINI_MODEL = 'gemini-2.5-flash';
+// Reexporta a fonte única em utils.ts — o utils não tem dependência nenhuma,
+// então importá-lo aqui não puxa nada de pesado para o bundle do aluno.
+export { AI_MODEL as GEMINI_MODEL } from '../../utils';
 
 // Resolve a chave: prioridade para a variável de build (Vercel/.env);
 // fallback para uma chave que o professor cole no app (salva localmente).
