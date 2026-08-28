@@ -2135,8 +2135,16 @@ const buildDocx = async (
     // ── Cabeçalho de identificação, no formato do formulário da escola ──────
     // Rótulo em negrito e valor logo ao lado, dentro da mesma célula — é assim
     // que o modelo faz. Campo que o app não sabe fica vazio para preencher à mão.
-    const celulaIdent = (rotulo: string, valor: string, colSpan = 1) => new TableCell({
+    // Largura em twips, não em porcentagem: com porcentagem o Word monta a
+    // grade com colunas de 100 twips e espreme a tabela inteira. A4 (11906)
+    // menos as margens ABNT de 3cm à esquerda e 2cm à direita.
+    const LARG = 11906 - 1701 - 1134;
+    const COLS = [Math.round(LARG * 0.40), Math.round(LARG * 0.20), Math.round(LARG * 0.20), 0];
+    COLS[3] = LARG - COLS[0] - COLS[1] - COLS[2];
+
+    const celulaIdent = (rotulo: string, valor: string, colSpan = 1, col = 0) => new TableCell({
       columnSpan: colSpan,
+      width: { size: COLS.slice(col, col + colSpan).reduce((a2, b2) => a2 + b2, 0), type: WidthType.DXA },
       children: [new Paragraph({ children: [
         new TextRun({ text: `${rotulo}: `, bold: true, size: szCorpo }),
         new TextRun({ text: valor, size: szCorpo }),
@@ -2144,22 +2152,31 @@ const buildDocx = async (
       margins: { top: 60, bottom: 60, left: 90, right: 90 },
     });
 
+    // Régua dourada do topo do modelo — no Word é um parágrafo só com borda
+    // inferior, que é como se desenha uma linha horizontal em .docx.
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: '', size: 2 })],
+      border: { bottom: { style: BorderStyle.SINGLE, size: 18, color: 'E8A33D' } },
+      spacing: { after: 240 },
+    }));
+
     docChildren.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: LARG, type: WidthType.DXA },
+      columnWidths: COLS,
       rows: [
-        new TableRow({ children: [celulaIdent('ÁREA DE CONHECIMENTO', opts.area || '', 4)] }),
+        new TableRow({ children: [celulaIdent('ÁREA DE CONHECIMENTO', opts.area || '', 4, 0)] }),
         new TableRow({ children: [
-          celulaIdent('EIXO/UNIDADE TEMÁTICA', opts.topic || ''),
-          celulaIdent('ANO/SÉRIE', opts.level || ''),
-          celulaIdent('TURMA', opts.className || ''),
-          celulaIdent('TURNO', turnoStr),
+          celulaIdent('EIXO/UNIDADE TEMÁTICA', opts.topic || '', 1, 0),
+          celulaIdent('ANO/SÉRIE', opts.level || '', 1, 1),
+          celulaIdent('TURMA', opts.className || '', 1, 2),
+          celulaIdent('TURNO', turnoStr, 1, 3),
         ] }),
-        new TableRow({ children: [celulaIdent('COMPONENTE CURRICULAR', opts.subject || '', 4)] }),
+        new TableRow({ children: [celulaIdent('COMPONENTE CURRICULAR', opts.subject || '', 4, 0)] }),
         new TableRow({ children: [
-          celulaIdent('QUANTIDADE DE AULAS', opts.duration ? String(opts.duration) : '', 2),
-          celulaIdent('DURAÇÃO', opts.lessonTime ? `${opts.lessonTime} min` : '', 2),
+          celulaIdent('QUANTIDADE DE AULAS', opts.duration ? String(opts.duration) : '', 2, 0),
+          celulaIdent('DURAÇÃO', opts.lessonTime ? `${opts.lessonTime} min` : '', 2, 2),
         ] }),
-        new TableRow({ children: [celulaIdent('PROFESSOR (A)', opts.teacher || '', 4)] }),
+        new TableRow({ children: [celulaIdent('PROFESSOR (A)', opts.teacher || '', 4, 0)] }),
       ],
     }));
 
@@ -2189,17 +2206,19 @@ const buildDocx = async (
     for (const { label, keys } of secDefs) {
       const content = get(...keys);
       linhasPlano.push(new TableRow({ children: [new TableCell({
+        width: { size: LARG, type: WidthType.DXA },
         shading: { fill: 'EEECE1', type: ShadingType.CLEAR, color: 'auto' },
         children: [new Paragraph({ children: [new TextRun({ text: `${label}:`, bold: true, size: szCorpo, color: dk })] })],
         margins: { top: 60, bottom: 60, left: 90, right: 90 },
       })] }));
       const corpo = mdParas(content);
       linhasPlano.push(new TableRow({ children: [new TableCell({
+        width: { size: LARG, type: WidthType.DXA },
         children: corpo.length ? corpo : [new Paragraph({ children: [new TextRun({ text: '', size: szCorpo })] })],
         margins: { top: 90, bottom: 90, left: 90, right: 90 },
       })] }));
     }
-    docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: linhasPlano }));
+    docChildren.push(new Table({ width: { size: LARG, type: WidthType.DXA }, columnWidths: [LARG], rows: linhasPlano }));
 
   } else {
     const isExam = docType === 'exam';
