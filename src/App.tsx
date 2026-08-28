@@ -2470,7 +2470,11 @@ const sanitizeSlideData = (parsed: any): any => {
 // Generic blob download — appends a temporary <a> to document.body so the
 // browser treats it as a real anchor click (avoids the "ghost click" problem
 // where some browsers silently block programmatic downloads after the first).
-const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
+// Devolve como o arquivo foi entregue: 'share' quando abriu o menu nativo (o
+// professor já viu o que aconteceu e escolhe ali mesmo em que app abrir),
+// 'download' quando caiu no download clássico — que no computador acontece sem
+// nada aparecer na tela, e por isso precisa de aviso.
+const downloadBlob = async (blob: Blob, filename: string): Promise<'share' | 'download'> => {
   // Em PWA no celular (standalone) o download de blob via <a download> é
   // frequentemente bloqueado em silêncio. Tentamos primeiro o menu nativo de
   // compartilhar/salvar (Arquivos, Drive, etc.), que funciona no mobile.
@@ -2479,11 +2483,11 @@ const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
     const nav = navigator as any;
     if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
       await nav.share({ files: [file], title: filename });
-      return;
+      return 'share';
     }
   } catch (e: any) {
     // Usuário cancelou o menu de compartilhamento → não cai no fallback
-    if (e?.name === 'AbortError') return;
+    if (e?.name === 'AbortError') return 'share';
     // Qualquer outro erro → tenta o download clássico abaixo
   }
   // Fallback (desktop e navegadores sem Web Share de arquivos)
@@ -2499,6 +2503,7 @@ const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
     try { document.body.removeChild(a); } catch { /* already removed */ }
     URL.revokeObjectURL(url);
   }, 30_000);
+  return 'download';
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3230,7 +3235,8 @@ const PlannerScreen = ({
       const repaired = await repairPptxContentTypes(rawBlob);
       const blob = new Blob([repaired], { type: PPTX_MIME });
       const safeName = presentationData.presentationTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'Apresentacao';
-      await downloadBlob(blob, `Aula_${safeName}.pptx`);
+      const viaPptx = await downloadBlob(blob, `Aula_${safeName}.pptx`);
+      if (viaPptx === 'download') toast.success(`Aula_${safeName}.pptx salvo nos Downloads.`);
     } catch (e) {
       console.error(e);
       toast.error('A apresentação não saiu dessa vez. Confere a conexão e tenta de novo.');
@@ -3545,7 +3551,12 @@ const PlannerScreen = ({
                           });
                           const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
                           const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                          await downloadBlob(blob, filename);
+                          const via = await downloadBlob(blob, filename);
+                          // No menu nativo o professor já vê o que aconteceu e
+                          // escolhe onde abrir. No download clássico não aparece
+                          // nada na tela, então o aviso diz o nome do arquivo e
+                          // onde procurar.
+                          if (via === 'download') toast.success(`${filename} salvo nos Downloads. Abra pelo seu programa de Word.`);
                         } catch (e) {
                           console.error('Erro ao exportar Word:', e);
                           toast.error('O documento Word fugiu! Tenta gerar de novo.');
