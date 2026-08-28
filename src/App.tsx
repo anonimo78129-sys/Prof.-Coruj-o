@@ -9021,7 +9021,10 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^---$/gm, '<hr>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`);
+    // As quebras entre os <li> precisam sumir aqui: adiante todo \n vira <br>,
+    // e um <br> solto como filho de <ul> é inválido e abre uma linha em branco
+    // depois de cada item — a lista saía com o dobro da altura.
+    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m.replace(/\n/g, '')}</ul>`);
 
   // O recuo de 1,25cm da ABNT é text-indent, que só existe em elemento de
   // bloco — em texto solto separado por <br> ele não pega. Então, e só no
