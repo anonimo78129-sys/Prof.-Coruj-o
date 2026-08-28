@@ -8987,7 +8987,10 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
   const today = new Date().toLocaleDateString('pt-BR');
   // Escapa o texto ANTES das transformações de markdown: só o HTML gerado aqui
   // dentro (h1/ul/table/…) chega vivo ao document.write.
-  const htmlContent = escapeHtml(content)
+  // Plano de aula sai em ABNT (NBR 14724) — ver o bloco de estilo abaixo.
+  const abnt = type === 'plan';
+
+  const htmlContent0 = escapeHtml(content)
     // Tabelas markdown (GFM) → <table>
     .replace(/(^\|.+\|[ \t]*\n\|[-:| \t]+\|[ \t]*\n(?:^\|.+\|[ \t]*\n?)*)/gm, (tbl) => {
       const rows = tbl.trim().split('\n').filter(r => r.trim().startsWith('|'));
@@ -9018,15 +9021,32 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^---$/gm, '<hr>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
-    .replace(/\n/g, '<br>');
+    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`);
+
+  // O recuo de 1,25cm da ABNT é text-indent, que só existe em elemento de
+  // bloco — em texto solto separado por <br> ele não pega. Então, e só no
+  // ABNT, cada linha de corpo vira um <p> de verdade.
+  const emParagrafos = (h: string) => h
+    // garante que um fechamento de bloco não fique colado no texto seguinte
+    .replace(/<\/(ul|ol|table|blockquote|h[1-6])>/g, '</$1>\n')
+    .split('\n')
+    .map(linha => {
+      const t = linha.trim();
+      if (!t) return '';
+      // linhas que já são bloco (abertura ou fechamento) passam intactas
+      if (/^<\/?(?:h[1-6]|ul|ol|li|table|thead|tbody|tfoot|tr|td|th|div|hr|blockquote)\b/i.test(t)) return t;
+      return `<p>${t}</p>`;
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  const htmlContent = abnt ? emParagrafos(htmlContent0) : htmlContent0.replace(/\n/g, '<br>');
   // ── Plano de aula sai em ABNT (NBR 14724) ─────────────────────────────────
   // Documento que o professor entrega para a coordenação ou para a faculdade,
   // então segue a norma: Arial 12, entrelinha 1,5, texto justificado, recuo de
   // 1,25cm na primeira linha e margens 3-2-2-3. Os demais tipos (atividade,
   // prova, ferramentas do Kit) mantêm o layout colorido, que é material de uso
   // em sala e ficaria pior engessado na norma.
-  const abnt = type === 'plan';
 
   const estiloAbnt = `
     @page { size: A4; margin: 3cm 2cm 2cm 3cm; }
