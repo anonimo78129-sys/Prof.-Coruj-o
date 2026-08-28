@@ -30,7 +30,7 @@ import EscapeGame from './escape/EscapeGame';
 import { QRCodeSVG } from 'qrcode.react';
 import { decodeBattle, battleShareUrl, type SharedBattle } from './battleShare';
 import {
-  escapeHtml, shuffleArray, isAdminAccount,
+  escapeHtml, shuffleArray, isAdminAccount, areaDoConhecimento,
   formatApiError, fmtBytes, fileToBase64, toISODate, guessMimeType,
   AI_PRICING, estimateCostUSD, AI_MODEL,
 } from './utils';
@@ -2052,9 +2052,9 @@ SAÍDA: JSON estrito apenas com os dados: { "title": "...", "text": "...", "illu
 const buildDocx = async (
   rawMd: string,
   docType: 'plan' | 'exam' | 'activities',
-  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
+  opts: { school?: string; teacher?: string; subject?: string; topic?: string; className?: string; level?: string; area?: string; duration?: number; lessonTime?: number; turn?: string; examValue?: number; examDuration?: number }
 ): Promise<Blob> => {
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation, Footer, Header, PageNumber } = await import('docx');
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, ShadingType, PageOrientation, Footer, Header, PageNumber, Table, TableRow, TableCell, WidthType } = await import('docx');
   const SEP = '\n---GABARITO---\n';
   const sepIdx = rawMd.indexOf(SEP);
   const mainMd = sepIdx >= 0 ? rawMd.slice(0, sepIdx) : rawMd;
@@ -2113,7 +2113,7 @@ const buildDocx = async (
       return new Paragraph({ children: parseInline(line), spacing: { after: 60 } });
     });
 
-  const docChildren: InstanceType<typeof Paragraph>[] = [];
+  const docChildren: (InstanceType<typeof Paragraph> | InstanceType<typeof Table>)[] = [];
 
   if (docType === 'plan') {
     const secs: Record<string, string> = {};
@@ -2130,22 +2130,44 @@ const buildDocx = async (
       return '';
     };
 
-    const turnoStr = opts.turn ? opts.turn.charAt(0).toUpperCase() + opts.turn.slice(1) : '____________';
+    const turnoStr = opts.turn ? opts.turn.charAt(0).toUpperCase() + opts.turn.slice(1) : '';
 
-    // Header info block
-    docChildren.push(infoLine(`ESCOLA: ${opts.school || '____________'}`));
-    docChildren.push(infoLine(`ÁREA DE CONHECIMENTO: ${get('ÁREA DE CONHECIMENTO', 'AREA DE CONHECIMENTO')}`));
-    docChildren.push(infoLine(`EIXO/UNIDADE TEMÁTICA: ${get('EIXO/UNIDADE TEMÁTICA', 'EIXO', 'UNIDADE TEMÁTICA')}   |   ANO/SÉRIE: ${opts.className || '____________'}   |   TURNO: ${turnoStr}`));
-    docChildren.push(infoLine(`COMPONENTE CURRICULAR: ${opts.subject || '____________'}`));
-    docChildren.push(infoLine(`QUANTIDADE DE AULAS: ${opts.duration ?? '___'}   |   DURAÇÃO: ${opts.lessonTime ? opts.lessonTime + ' min por aula' : '____________'}`));
-    docChildren.push(infoLine(`PROFESSOR(A): ${opts.teacher || '____________'}`));
-    docChildren.push(hr());
+    // ── Cabeçalho de identificação, no formato do formulário da escola ──────
+    // Rótulo em negrito e valor logo ao lado, dentro da mesma célula — é assim
+    // que o modelo faz. Campo que o app não sabe fica vazio para preencher à mão.
+    const celulaIdent = (rotulo: string, valor: string, colSpan = 1) => new TableCell({
+      columnSpan: colSpan,
+      children: [new Paragraph({ children: [
+        new TextRun({ text: `${rotulo}: `, bold: true, size: szCorpo }),
+        new TextRun({ text: valor, size: szCorpo }),
+      ] })],
+      margins: { top: 60, bottom: 60, left: 90, right: 90 },
+    });
+
+    docChildren.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [celulaIdent('ÁREA DE CONHECIMENTO', opts.area || '', 4)] }),
+        new TableRow({ children: [
+          celulaIdent('EIXO/UNIDADE TEMÁTICA', opts.topic || ''),
+          celulaIdent('ANO/SÉRIE', opts.level || ''),
+          celulaIdent('TURMA', opts.className || ''),
+          celulaIdent('TURNO', turnoStr),
+        ] }),
+        new TableRow({ children: [celulaIdent('COMPONENTE CURRICULAR', opts.subject || '', 4)] }),
+        new TableRow({ children: [
+          celulaIdent('QUANTIDADE DE AULAS', opts.duration ? String(opts.duration) : '', 2),
+          celulaIdent('DURAÇÃO', opts.lessonTime ? `${opts.lessonTime} min` : '', 2),
+        ] }),
+        new TableRow({ children: [celulaIdent('PROFESSOR (A)', opts.teacher || '', 4)] }),
+      ],
+    }));
 
     // Title
     docChildren.push(new Paragraph({
       children: [new TextRun({ text: 'PLANO DE AULA', bold: true, size: szTitulo, color: dk })],
       alignment: AlignmentType.CENTER,
-      spacing: { before: 160, after: 160 },
+      spacing: { before: 400, after: 160 },
     }));
 
     // Content sections
@@ -2160,23 +2182,24 @@ const buildDocx = async (
       { label: 'REFERÊNCIAS', keys: ['REFERÊNCIAS', 'REFERENCIAS'] },
     ];
 
-    const sectionBox = {
-      top: { style: BorderStyle.SINGLE, size: 4, color: ac },
-      bottom: { style: BorderStyle.SINGLE, size: 4, color: ac },
-      left: { style: BorderStyle.SINGLE, size: 4, color: ac },
-      right: { style: BorderStyle.SINGLE, size: 4, color: ac },
-    };
+    // ── Corpo do plano, no formato do formulário ────────────────────────────
+    // Cada seção são duas linhas: a faixa sombreada com o rótulo e a célula
+    // com o conteúdo logo abaixo.
+    const linhasPlano: InstanceType<typeof TableRow>[] = [];
     for (const { label, keys } of secDefs) {
       const content = get(...keys);
-      docChildren.push(new Paragraph({
-        children: [new TextRun({ text: label, bold: true, size: szCorpo, color: dk })],
-        border: sectionBox,
-        spacing: { before: 140, after: 60 },
-        indent: { left: 80, right: 80 },
-      }));
-      docChildren.push(...mdParas(content));
-      docChildren.push(hr());
+      linhasPlano.push(new TableRow({ children: [new TableCell({
+        shading: { fill: 'EEECE1', type: ShadingType.CLEAR, color: 'auto' },
+        children: [new Paragraph({ children: [new TextRun({ text: `${label}:`, bold: true, size: szCorpo, color: dk })] })],
+        margins: { top: 60, bottom: 60, left: 90, right: 90 },
+      })] }));
+      const corpo = mdParas(content);
+      linhasPlano.push(new TableRow({ children: [new TableCell({
+        children: corpo.length ? corpo : [new Paragraph({ children: [new TextRun({ text: '', size: szCorpo })] })],
+        margins: { top: 90, bottom: 90, left: 90, right: 90 },
+      })] }));
     }
+    docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: linhasPlano }));
 
   } else {
     const isExam = docType === 'exam';
@@ -3493,6 +3516,8 @@ const PlannerScreen = ({
                             subject: selectedClass?.subject || profile.subject || '',
                             topic,
                             className: selectedClass?.name || '',
+                            level: selectedClass?.level || '',
+                            area: areaDoConhecimento(selectedClass?.subject || profile.subject || ''),
                             duration,
                             lessonTime,
                             turn,
@@ -3517,12 +3542,25 @@ const PlannerScreen = ({
                   <button
                     onClick={() => {
                       const docType = mode === 'exam' ? 'exam' : mode === 'activities' ? 'activities' : 'plan';
+                      const componente = selectedClass?.subject || profile.subject || '';
                       printPlannerContent(
                         topic || 'Material',
                         currentResult as string,
                         docType,
                         profileName,
-                        selectedClass?.school || profileSchoolName
+                        selectedClass?.school || profileSchoolName,
+                        // Campos do cabeçalho do formulário. O que o app não sabe
+                        // vai vazio, para o professor completar à mão.
+                        { ident: {
+                          area: areaDoConhecimento(componente),
+                          eixo: topic,
+                          anoSerie: selectedClass?.level || '',
+                          turma: selectedClass?.name || '',
+                          turno: turn || '',
+                          componente,
+                          qtdAulas: duration ? String(duration) : '',
+                          duracao: lessonTime ? `${lessonTime} min` : '',
+                        } }
                       );
                     }}
                     className="px-4 bg-gray-100 text-gray-700 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
@@ -8980,7 +9018,13 @@ NÃO use código nem tabelas Markdown. Português brasileiro natural.`;
   );
 };
 
-const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string, printOpts?: { landscape?: boolean }) => {
+// Campos do cabeçalho do formulário de plano de aula (modelo da escola).
+interface PlanoIdent {
+  area?: string; eixo?: string; anoSerie?: string; turma?: string; turno?: string;
+  componente?: string; qtdAulas?: string; duracao?: string;
+}
+
+const printPlannerContent = (title: string, content: string, type: 'plan' | 'activities' | 'exam' | string, teacherName?: string, schoolName?: string, printOpts?: { landscape?: boolean; ident?: PlanoIdent }) => {
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão. Permita pop-ups e tente de novo.'); return; }
   const typeLabel = ({ plan: 'Plano de Aula', activities: 'Atividades', exam: 'Avaliação' } as Record<string, string>)[type] || escapeHtml(type);
@@ -8990,7 +9034,9 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
   // Plano de aula sai em ABNT (NBR 14724) — ver o bloco de estilo abaixo.
   const abnt = type === 'plan';
 
-  const htmlContent0 = escapeHtml(content)
+  // A mesma cadeia serve para o documento inteiro e para o texto de cada célula
+  // do formulário — por isso virou função em vez de expressão solta.
+  const inlineParaHtml = (texto: string) => escapeHtml(texto)
     // Tabelas markdown (GFM) → <table>
     .replace(/(^\|.+\|[ \t]*\n\|[-:| \t]+\|[ \t]*\n(?:^\|.+\|[ \t]*\n?)*)/gm, (tbl) => {
       const rows = tbl.trim().split('\n').filter(r => r.trim().startsWith('|'));
@@ -9026,6 +9072,8 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     // depois de cada item — a lista saía com o dobro da altura.
     .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m.replace(/\n/g, '')}</ul>`);
 
+  const htmlContent0 = inlineParaHtml(content);
+
   // O recuo de 1,25cm da ABNT é text-indent, que só existe em elemento de
   // bloco — em texto solto separado por <br> ele não pega. Então, e só no
   // ABNT, cada linha de corpo vira um <p> de verdade.
@@ -9043,6 +9091,50 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .filter(Boolean)
     .join('\n');
 
+  // No modelo da escola o plano é um formulário: cada "## SEÇÃO" do markdown
+  // vira uma faixa sombreada com o rótulo, e o texto que vem depois ocupa a
+  // célula logo abaixo. Por isso aqui o corpo é fatiado por seção, em vez de
+  // sair como texto corrido.
+  const linhasDoFormulario = () => {
+    const secoes: { rotulo: string; corpo: string }[] = [];
+    const partes = content.split(/^## +/m);
+    // o que vier antes da primeira seção é preâmbulo da IA e não entra no formulário
+    for (const parte of partes.slice(1)) {
+      const quebra = parte.indexOf('\n');
+      const rotulo = (quebra < 0 ? parte : parte.slice(0, quebra)).trim();
+      const corpo = quebra < 0 ? '' : parte.slice(quebra + 1).trim();
+      if (rotulo) secoes.push({ rotulo, corpo });
+    }
+    if (!secoes.length) return '';
+    return secoes.map(({ rotulo, corpo }) => {
+      const corpoHtml = emParagrafos(inlineParaHtml(corpo)) || '&nbsp;';
+      return `<tr><th class="faixa">${escapeHtml(rotulo.replace(/:$/, ''))}:</th></tr>
+              <tr><td class="celula">${corpoHtml}</td></tr>`;
+    }).join('\n');
+  };
+
+  const id = printOpts?.ident || {};
+  const campo = (v?: string) => escapeHtml(v || '');
+  const formularioAbnt = `
+    <div class="regua"></div>
+    <table class="ident">
+      <tr><td colspan="4"><b>ÁREA DE CONHECIMENTO:</b> ${campo(id.area)}</td></tr>
+      <tr>
+        <td><b>EIXO/UNIDADE TEMÁTICA:</b> ${campo(id.eixo)}</td>
+        <td><b>ANO/SÉRIE:</b> ${campo(id.anoSerie)}</td>
+        <td><b>TURMA:</b> ${campo(id.turma)}</td>
+        <td><b>TURNO:</b> ${campo(id.turno)}</td>
+      </tr>
+      <tr><td colspan="4"><b>COMPONENTE CURRICULAR:</b> ${campo(id.componente)}</td></tr>
+      <tr>
+        <td colspan="2"><b>QUANTIDADE DE AULAS:</b> ${campo(id.qtdAulas)}</td>
+        <td colspan="2"><b>DURAÇÃO:</b> ${campo(id.duracao)}</td>
+      </tr>
+      <tr><td colspan="4"><b>PROFESSOR (A):</b> ${campo(teacherName)}</td></tr>
+    </table>
+    <div class="titulo-plano">PLANO DE AULA</div>
+    <table class="plano">${linhasDoFormulario()}</table>`;
+
   const htmlContent = abnt ? emParagrafos(htmlContent0) : htmlContent0.replace(/\n/g, '<br>');
   // ── Plano de aula sai em ABNT (NBR 14724) ─────────────────────────────────
   // Documento que o professor entrega para a coordenação ou para a faculdade,
@@ -9052,36 +9144,35 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
   // em sala e ficaria pior engessado na norma.
 
   const estiloAbnt = `
-    @page { size: A4; margin: 3cm 2cm 2cm 3cm; }
-    * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; line-height: 1.5;
-           color: #000; text-align: justify; margin: 0; }
-    .id-bloco { text-align: center; margin-bottom: 1.2cm; }
-    .id-escola { font-weight: bold; text-transform: uppercase; }
-    .id-linha { margin-top: .15cm; }
-    .doc-titulo { text-align: center; text-transform: uppercase; font-weight: bold; margin: 1cm 0 .8cm; }
-    h1 { font-size: 12pt; font-weight: bold; text-transform: uppercase; text-align: left;
-         text-indent: 0; margin: .8cm 0 .3cm; page-break-after: avoid; }
-    h2 { font-size: 12pt; font-weight: bold; text-align: left; text-indent: 0;
-         margin: .6cm 0 .25cm; page-break-after: avoid; }
-    h3 { font-size: 12pt; font-weight: normal; font-style: italic; text-align: left;
-         text-indent: 0; margin: .45cm 0 .2cm; page-break-after: avoid; }
-    p { text-indent: 1.25cm; margin: 0 0 .25cm; }
-    ul { margin: .2cm 0 .3cm 1.9cm; padding: 0; }
-    li { margin: .1cm 0; text-align: justify; }
-    /* Citação com mais de três linhas: recuo de 4cm, corpo 10, espaço simples */
-    blockquote { margin: .4cm 0 .4cm 4cm; font-size: 10pt; line-height: 1; text-indent: 0; }
-    /* Tabela no padrão IBGE adotado pela ABNT: aberta nas laterais */
-    table { width: 100%; border-collapse: collapse; font-size: 10pt; margin: .4cm 0; }
-    th, td { padding: 4pt 6pt; text-align: left; vertical-align: top;
-             border-left: none; border-right: none; }
-    thead th { border-top: 1px solid #000; border-bottom: 1px solid #000; font-weight: bold; }
-    tbody tr:last-child td { border-bottom: 1px solid #000; }
-    strong { font-weight: bold; }
-    hr { border: none; border-top: 1px solid #000; margin: .5cm 0; }
-    .answer-line { border-bottom: 1px solid #000; height: 22px; width: 100%; margin: 0 0 4px; }
-    .opt { display: flex; align-items: center; gap: 8px; margin: 3px 0 3px 1.25cm; text-indent: 0; }
-    .opt-bubble { width: 11px; height: 11px; border: 1px solid #000; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+    @page { size: A4 portrait; margin: 2cm 1.6cm; }
+    * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4;
+           color: #000; margin: 0; }
+    /* régua dourada do topo do modelo */
+    .regua { height: 3px; background: #E8A33D; margin-bottom: .5cm; }
+    table.ident, table.plano { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    table.ident { margin-bottom: .9cm; }
+    table.ident td { border: 1px solid #000; padding: 5pt 7pt; font-size: 10.5pt;
+                     vertical-align: middle; word-wrap: break-word; }
+    .titulo-plano { text-align: center; font-weight: bold; font-size: 12pt;
+                    letter-spacing: .5px; margin: 0 0 .25cm; }
+    /* faixa sombreada com o rótulo da seção, como no modelo */
+    table.plano th.faixa { background: #EEECE1; border: 1px solid #000; padding: 5pt 7pt;
+                           text-align: left; font-weight: bold; font-size: 10.5pt;
+                           text-transform: uppercase; }
+    table.plano td.celula { border: 1px solid #000; border-top: none; padding: 7pt;
+                            font-size: 11pt; text-align: justify; vertical-align: top; }
+    /* dentro da célula o texto é corrido: sem recuo, que atrapalharia a leitura em caixa */
+    .celula p { margin: 0 0 .18cm; text-indent: 0; }
+    .celula p:last-child { margin-bottom: 0; }
+    .celula ul, .celula ol { margin: .1cm 0 .18cm 1.5em; padding: 0; }
+    .celula li { margin: .06cm 0; }
+    .celula strong { font-weight: bold; }
+    .celula blockquote { margin: .2cm 0 .2cm 2.5cm; font-size: 9.5pt; line-height: 1.15; }
+    .celula table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: .2cm 0; }
+    .celula th, .celula td { border: 1px solid #000; padding: 3pt 5pt; text-align: left; vertical-align: top; }
+    .celula h1, .celula h2, .celula h3 { font-size: 11pt; font-weight: bold; margin: .2cm 0 .1cm; }
+    tr { page-break-inside: avoid; }
   `;
 
   const estiloPadrao = `
@@ -9114,12 +9205,6 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
     .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
   `;
 
-  const cabecalhoAbnt = `
-  <div class="id-bloco">
-    <div class="id-escola">${escapeHtml(schoolName || '')}</div>
-    <div class="id-linha">${escapeHtml(teacherName || '')}</div>
-  </div>
-  <div class="doc-titulo">${escapeHtml(title)}</div>`;
 
   const cabecalhoPadrao = `
   <div class="header">
@@ -9140,8 +9225,7 @@ const printPlannerContent = (title: string, content: string, type: 'plan' | 'act
   const rodape = abnt ? '' : '<div class="footer">Prof. Corujão | Material gerado por IA · Revise antes de usar</div>';
 
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${abnt ? estiloAbnt : estiloPadrao}</style></head><body>
-  ${abnt ? cabecalhoAbnt : cabecalhoPadrao}
-  <div class="content">${htmlContent}</div>
+  ${abnt ? formularioAbnt : cabecalhoPadrao + `<div class="content">${htmlContent}</div>`}
   ${rodape}
   <script>window.onload = () => { window.print(); }<\/script>
   </body></html>`);
