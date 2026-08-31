@@ -855,7 +855,7 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
   <div className="mb-3 relative z-50">
     {typeof bannerImage === 'string' ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
-        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" decoding="async" fetchPriority="high" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
       </div>
     ) : bannerPlaceholder ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] border-b-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
@@ -1094,7 +1094,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
           </button>
         </div>
         <div className="absolute right-0 bottom-0 w-36 h-36 md:w-40 md:h-40 z-0">
-          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
       </div>
 
@@ -1105,7 +1105,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
             <button key={action.title} onClick={action.action} className="flex flex-col items-center gap-3 relative group">
               <div className={`w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-sm bg-white border-[1.5px] border-indigo-600 flex flex-col items-center justify-center relative`}>
                 {action.illustration ? (
-                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 ) : action.icon ? (
                   <action.icon size={26} className="text-indigo-600" strokeWidth={2.2} />
                 ) : null}
