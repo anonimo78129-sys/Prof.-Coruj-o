@@ -1193,7 +1193,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
 
           if (upcoming.length === 0) return (
             <div className="flex flex-col items-center justify-center py-8 text-center bg-gray-50/50 rounded-3xl border border-gray-100 border-dashed">
-              <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/vazio.webp" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <h3 className="text-gray-600 font-bold mb-1">Sem aulas próximas</h3>
               <p className="text-gray-400 text-sm max-w-[200px]">Adicione aulas no cronograma para ver aqui.</p>
             </div>
@@ -6003,7 +6003,7 @@ const DayDetailScreen = ({
           </Reorder.Group>
         ) : (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-            <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+            <img src="/assets/icons/vazio.webp" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
             <h3 className="text-lg font-bold text-gray-900 mb-2">Dia Livre</h3>
             <p className="text-gray-500 text-sm max-w-[200px]">Nenhum evento programado para este dia.</p>
           </div>
@@ -13278,7 +13278,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
         ) : students.length === 0 ? (
           <div className="py-6 space-y-4">
             <div className="text-center">
-              <img src="https://i.ibb.co/Y7df80LZ/1781545849687.png" alt="Corujão" className="w-24 h-auto object-contain mx-auto" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/diario-modal.webp" alt="Corujão" className="w-24 h-auto object-contain mx-auto" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
               <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo, um nome por linha. Funciona nas duas telas.</p>
             </div>
@@ -13593,7 +13593,7 @@ const GamificacaoScreen = ({
   if (schedules.length === 0) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center min-h-[70vh] gap-6 px-6 text-center">
-        <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+        <img src="/assets/icons/vazio.webp" alt="" className="w-32 h-auto object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         <div>
           <h2 className="text-xl font-black text-gray-900 mb-2">Nenhuma turma cadastrada</h2>
           <p className="text-gray-500 text-sm">Cadastre suas turmas na Agenda para ativar a gamificação.</p>
@@ -13726,7 +13726,7 @@ const GamificacaoScreen = ({
           <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
             {currentCls.students.length === 0 ? (
               <div className="text-center py-10">
-                <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                <img src="/assets/icons/vazio.webp" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 <p className="text-gray-500 mt-3 text-sm font-bold">Nenhum aluno ainda</p>
                 <p className="text-gray-400 text-xs mt-1">Adicione alunos abaixo para começar.</p>
               </div>
@@ -16861,7 +16861,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               <>
                 <div className="flex flex-col items-center text-center mb-6">
                   <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
-                    <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    <img src="/assets/icons/vazio.webp" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                   <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
                   <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em poucos passos.</p>
