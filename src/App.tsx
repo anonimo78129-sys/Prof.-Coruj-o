@@ -13618,7 +13618,7 @@ const GamificacaoScreen = ({
       {/* Placeholder no topo (mesmo padrão do Header bannerPlaceholder) */}
       <div className="mb-3 relative z-50">
         <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] overflow-hidden">
-          <img src="https://i.ibb.co/tTT0VWnH/Design-sem-nome-20260616-142319-0000.png" alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+          <img src="/assets/banners/turma-gamificada.webp" alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
         {/* Título e controles da turma */}
         <div className="flex items-center justify-between pt-28 mb-1">
