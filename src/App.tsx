@@ -495,7 +495,7 @@ class ErrorBoundary extends React.Component<
         <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/mascote.webp" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
             <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem. Só recarregue a página.</p>
@@ -855,7 +855,7 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
   <div className="mb-3 relative z-50">
     {typeof bannerImage === 'string' ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
-        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" decoding="async" fetchPriority="high" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
       </div>
     ) : bannerPlaceholder ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] border-b-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
@@ -1053,12 +1053,12 @@ const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, 
 
 const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], profile: UserProfile, profileLoaded?: boolean, notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
   const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
-    { title: 'Jogos', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
-    { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
-    { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
-    { title: 'Kit IA', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => openFerramenta?.(null) },
-    { title: 'Diário', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openFerramenta?.('diario') },
-    { title: 'Biblioteca', illustration: 'https://i.ibb.co/GQMXCYWq/Sem-nome-1300-x-1300-px-20260615-160107-0000.png', action: () => setScreen('biblioteca') },
+    { title: 'Jogos', illustration: '/assets/icons/jogos.webp', action: () => setScreen('estudio') },
+    { title: 'Atividades', illustration: '/assets/icons/atividades.webp', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
+    { title: 'Slides', illustration: '/assets/icons/slides.webp', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
+    { title: 'Kit IA', illustration: '/assets/icons/kit-ia.webp', action: () => openFerramenta?.(null) },
+    { title: 'Diário', illustration: '/assets/icons/diario.webp', action: () => openFerramenta?.('diario') },
+    { title: 'Biblioteca', illustration: '/assets/icons/biblioteca.webp', action: () => setScreen('biblioteca') },
   ];
 
   const currentHour = new Date().getHours();
@@ -1080,7 +1080,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title={headerTitle} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
+      <Header setScreen={setScreen} title={headerTitle} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/home.webp" />
       
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2rem] p-6 text-white shadow-lg mb-8 relative overflow-hidden">
         <div className="relative z-10">
@@ -1094,7 +1094,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
           </button>
         </div>
         <div className="absolute right-0 bottom-0 w-36 h-36 md:w-40 md:h-40 z-0">
-          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+          <img src="/assets/icons/mascote-magico.webp" alt="Mascote Mágico" className="w-full h-full object-contain" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
       </div>
 
@@ -1105,7 +1105,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
             <button key={action.title} onClick={action.action} className="flex flex-col items-center gap-3 relative group">
               <div className={`w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-sm bg-white border-[1.5px] border-indigo-600 flex flex-col items-center justify-center relative`}>
                 {action.illustration ? (
-                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 ) : action.icon ? (
                   <action.icon size={26} className="text-indigo-600" strokeWidth={2.2} />
                 ) : null}
@@ -1193,7 +1193,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
 
           if (upcoming.length === 0) return (
             <div className="flex flex-col items-center justify-center py-8 text-center bg-gray-50/50 rounded-3xl border border-gray-100 border-dashed">
-              <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/vazio.webp" alt="" className="w-32 h-auto object-contain mb-4 rounded-xl opacity-60" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <h3 className="text-gray-600 font-bold mb-1">Sem aulas próximas</h3>
               <p className="text-gray-400 text-sm max-w-[200px]">Adicione aulas no cronograma para ver aqui.</p>
             </div>
@@ -2470,7 +2470,11 @@ const sanitizeSlideData = (parsed: any): any => {
 // Generic blob download — appends a temporary <a> to document.body so the
 // browser treats it as a real anchor click (avoids the "ghost click" problem
 // where some browsers silently block programmatic downloads after the first).
-const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
+// Devolve como o arquivo foi entregue: 'share' quando abriu o menu nativo (o
+// professor já viu o que aconteceu e escolhe ali mesmo em que app abrir),
+// 'download' quando caiu no download clássico — que no computador acontece sem
+// nada aparecer na tela, e por isso precisa de aviso.
+const downloadBlob = async (blob: Blob, filename: string): Promise<'share' | 'download'> => {
   // Em PWA no celular (standalone) o download de blob via <a download> é
   // frequentemente bloqueado em silêncio. Tentamos primeiro o menu nativo de
   // compartilhar/salvar (Arquivos, Drive, etc.), que funciona no mobile.
@@ -2479,11 +2483,11 @@ const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
     const nav = navigator as any;
     if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
       await nav.share({ files: [file], title: filename });
-      return;
+      return 'share';
     }
   } catch (e: any) {
     // Usuário cancelou o menu de compartilhamento → não cai no fallback
-    if (e?.name === 'AbortError') return;
+    if (e?.name === 'AbortError') return 'share';
     // Qualquer outro erro → tenta o download clássico abaixo
   }
   // Fallback (desktop e navegadores sem Web Share de arquivos)
@@ -2499,6 +2503,7 @@ const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
     try { document.body.removeChild(a); } catch { /* already removed */ }
     URL.revokeObjectURL(url);
   }, 30_000);
+  return 'download';
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3230,7 +3235,8 @@ const PlannerScreen = ({
       const repaired = await repairPptxContentTypes(rawBlob);
       const blob = new Blob([repaired], { type: PPTX_MIME });
       const safeName = presentationData.presentationTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'Apresentacao';
-      await downloadBlob(blob, `Aula_${safeName}.pptx`);
+      const viaPptx = await downloadBlob(blob, `Aula_${safeName}.pptx`);
+      if (viaPptx === 'download') toast.success(`Aula_${safeName}.pptx salvo nos Downloads.`);
     } catch (e) {
       console.error(e);
       toast.error('A apresentação não saiu dessa vez. Confere a conexão e tenta de novo.');
@@ -3545,7 +3551,12 @@ const PlannerScreen = ({
                           });
                           const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
                           const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                          await downloadBlob(blob, filename);
+                          const via = await downloadBlob(blob, filename);
+                          // No menu nativo o professor já vê o que aconteceu e
+                          // escolhe onde abrir. No download clássico não aparece
+                          // nada na tela, então o aviso diz o nome do arquivo e
+                          // onde procurar.
+                          if (via === 'download') toast.success(`${filename} salvo nos Downloads. Abra pelo seu programa de Word.`);
                         } catch (e) {
                           console.error('Erro ao exportar Word:', e);
                           toast.error('O documento Word fugiu! Tenta gerar de novo.');
@@ -4619,7 +4630,7 @@ const ChatScreen = ({
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
               >
                 {msg.role !== 'user' && (
-                  <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-11 h-11 object-contain shrink-0 mb-4" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                  <img src="/assets/icons/mascote.webp" alt="" className="w-11 h-11 object-contain shrink-0 mb-4" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 )}
                 <div
                   onTouchStart={() => startLongPress(cleanText)}
@@ -4667,7 +4678,7 @@ const ChatScreen = ({
               transition={{ type: 'spring', stiffness: 380, damping: 28 }}
               className="flex justify-start items-end gap-2"
             >
-              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-11 h-11 object-contain shrink-0 mb-1" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/mascote.webp" alt="" className="w-11 h-11 object-contain shrink-0 mb-1" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-50 flex flex-col gap-1.5 max-w-[240px]">
                 <div className="flex gap-2 items-center">
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
@@ -4972,7 +4983,7 @@ const ProfileScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
+      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/perfil.webp" />
       
       <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 rounded-[2rem] p-6 shadow-lg mb-8 flex flex-col items-center text-center">
         <div className="absolute -top-14 -right-14 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
@@ -5992,7 +6003,7 @@ const DayDetailScreen = ({
           </Reorder.Group>
         ) : (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-            <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+            <img src="/assets/icons/vazio.webp" alt="Calendário Vazio" className="w-48 h-auto object-contain mb-6 rounded-3xl opacity-80" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
             <h3 className="text-lg font-bold text-gray-900 mb-2">Dia Livre</h3>
             <p className="text-gray-500 text-sm max-w-[200px]">Nenhum evento programado para este dia.</p>
           </div>
@@ -6825,7 +6836,7 @@ const CalendarScreen = ({
         profile={profile} 
         notifications={notifications}
         setNotifications={setNotifications}
-        bannerImage="https://i.ibb.co/x8t6Wmp7/20260419-204249-0002.png"
+        bannerImage="/assets/banners/cronograma.webp"
       >
         <div className="flex items-center gap-2 shrink-0">
           {onImport && (
@@ -8440,7 +8451,7 @@ NÃO use código nem tabelas Markdown. Português brasileiro natural.`;
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" light />
+      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/jogos.webp" light />
 
       <div className="px-1 mb-6">
         <p className="text-sm text-indigo-100 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
@@ -12856,7 +12867,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/fz8jPCN3/Design-sem-nome-20260616-144136-0000.png" />
+      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/kit-professor.webp" />
 
       {/* Diário de Classe — destaque */}
       <button
@@ -13267,7 +13278,7 @@ const DiarioModal = ({ user, schedules, profile, onClose, setScreen, classes }: 
         ) : students.length === 0 ? (
           <div className="py-6 space-y-4">
             <div className="text-center">
-              <img src="https://i.ibb.co/Y7df80LZ/1781545849687.png" alt="Corujão" className="w-24 h-auto object-contain mx-auto" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/diario-modal.webp" alt="Corujão" className="w-24 h-auto object-contain mx-auto" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <p className="text-gray-700 text-sm font-bold mt-3">Nenhum aluno nessa turma ainda.</p>
               <p className="text-[11px] text-gray-400 mt-1">Cole a lista da chamada abaixo, um nome por linha. Funciona nas duas telas.</p>
             </div>
@@ -13582,7 +13593,7 @@ const GamificacaoScreen = ({
   if (schedules.length === 0) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center min-h-[70vh] gap-6 px-6 text-center">
-        <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-32 h-auto object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+        <img src="/assets/icons/vazio.webp" alt="" className="w-32 h-auto object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         <div>
           <h2 className="text-xl font-black text-gray-900 mb-2">Nenhuma turma cadastrada</h2>
           <p className="text-gray-500 text-sm">Cadastre suas turmas na Agenda para ativar a gamificação.</p>
@@ -13607,7 +13618,7 @@ const GamificacaoScreen = ({
       {/* Placeholder no topo (mesmo padrão do Header bannerPlaceholder) */}
       <div className="mb-3 relative z-50">
         <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] overflow-hidden">
-          <img src="https://i.ibb.co/tTT0VWnH/Design-sem-nome-20260616-142319-0000.png" alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+          <img src="/assets/banners/turma-gamificada.webp" alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
         {/* Título e controles da turma */}
         <div className="flex items-center justify-between pt-28 mb-1">
@@ -13715,7 +13726,7 @@ const GamificacaoScreen = ({
           <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
             {currentCls.students.length === 0 ? (
               <div className="text-center py-10">
-                <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                <img src="/assets/icons/vazio.webp" alt="" className="w-28 h-auto object-contain mx-auto mb-2" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 <p className="text-gray-500 mt-3 text-sm font-bold">Nenhum aluno ainda</p>
                 <p className="text-gray-400 text-xs mt-1">Adicione alunos abaixo para começar.</p>
               </div>
@@ -14444,7 +14455,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/d0my4Y3R/Design-sem-nome-20260614-135925-0000.png" />
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/biblioteca.webp" />
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
@@ -15179,7 +15190,7 @@ const AdminScreen = ({ user }: { user: any }) => {
                       <p className="text-2xl font-black text-indigo-700">${currentCost.toFixed(5)}</p>
                       <p className="text-xs text-indigo-400">{current.gens.toLocaleString()} gerações · {(current.inp + current.out).toLocaleString()} tokens</p>
                     </div>
-                    <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-12 h-12 object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    <img src="/assets/icons/mascote.webp" alt="Corujão" className="w-12 h-12 object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                 )}
                 <div className="flex items-end gap-2 h-24">
@@ -15697,7 +15708,7 @@ function AppInner() {
         const body = `${s.subject ? s.subject + ' — ' : ''}${s.name}${s.time ? ' às ' + s.time : ''}`;
         try {
           const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
-          if (reg) await reg.showNotification(title, { body, tag, icon: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png', data: { url: '/' } });
+          if (reg) await reg.showNotification(title, { body, tag, icon: '/assets/icons/notification.png', data: { url: '/' } });
           else new Notification(title, { body, tag });
         } catch { /* ambiente sem suporte — segue sem lembrete */ }
       }
@@ -15757,7 +15768,7 @@ function AppInner() {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
         playChime(true);
-        const opts = { body: 'Você será avisado(a) 30 minutos antes de cada aula.', icon: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' };
+        const opts = { body: 'Você será avisado(a) 30 minutos antes de cada aula.', icon: '/assets/icons/notification.png' };
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
         if (reg) await reg.showNotification('Notificações ativadas! 🦉', opts);
         else new Notification('Notificações ativadas! 🦉', opts);
@@ -16025,7 +16036,7 @@ function AppInner() {
     return (
       <div
         className="min-h-screen bg-cover bg-center flex flex-col items-center justify-center p-6 relative"
-        style={{ backgroundImage: 'url(https://i.ibb.co/XZyfzNYw/Design-sem-nome-20260426-213935-0000.png)' }}
+        style={{ backgroundImage: 'url(/assets/login-bg.webp)' }}
       >
         <div className="relative z-10 w-full max-w-sm flex flex-col items-center gap-6">
           <motion.h1
@@ -16850,7 +16861,7 @@ REGRAS: Substitua TODOS os [ ] por conteúdo real sobre "${targetTopic}". PROIBI
               <>
                 <div className="flex flex-col items-center text-center mb-6">
                   <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
-                    <img src="https://i.ibb.co/FbhRcLsz/Sem-nome-1300-x-1300-px-20260616-150714-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    <img src="/assets/icons/vazio.webp" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                   <h2 className="text-2xl font-black text-gray-900">Bem-vindo ao Prof. Corujão!</h2>
                   <p className="text-sm text-gray-500 mt-1">Vamos configurar seu perfil em poucos passos.</p>
