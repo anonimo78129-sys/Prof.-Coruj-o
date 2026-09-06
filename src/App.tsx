@@ -1080,7 +1080,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title={headerTitle} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/ymFbKT6r/20260419-204248-0000.png" />
+      <Header setScreen={setScreen} title={headerTitle} subtitle={greeting} profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/home.webp" />
       
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2rem] p-6 text-white shadow-lg mb-8 relative overflow-hidden">
         <div className="relative z-10">
@@ -4983,7 +4983,7 @@ const ProfileScreen = ({
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/XZmvBD0Q/7-20260419-213906-0002.png" />
+      <Header setScreen={setScreen} title="Meu Perfil" subtitle="Configurações" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/perfil.webp" />
       
       <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 rounded-[2rem] p-6 shadow-lg mb-8 flex flex-col items-center text-center">
         <div className="absolute -top-14 -right-14 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
@@ -6836,7 +6836,7 @@ const CalendarScreen = ({
         profile={profile} 
         notifications={notifications}
         setNotifications={setNotifications}
-        bannerImage="https://i.ibb.co/x8t6Wmp7/20260419-204249-0002.png"
+        bannerImage="/assets/banners/cronograma.webp"
       >
         <div className="flex items-center gap-2 shrink-0">
           {onImport && (
@@ -8451,7 +8451,7 @@ NÃO use código nem tabelas Markdown. Português brasileiro natural.`;
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/tPMphWm0/Design-sem-nome-20260520-142758-0000.png" light />
+      <Header setScreen={setScreen} title="Jogos" subtitle="Gamificação de Aulas" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/jogos.webp" light />
 
       <div className="px-1 mb-6">
         <p className="text-sm text-indigo-100 leading-relaxed">Transforme qualquer conteúdo em batalhas, escape rooms e atividades gamificadas que prendem a atenção da turma.</p>
@@ -12867,7 +12867,7 @@ REGRAS: fidelidade total ao material anexado, não invente conteúdo externo. Po
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/fz8jPCN3/Design-sem-nome-20260616-144136-0000.png" />
+      <Header setScreen={setScreen} title="Kit do Professor" subtitle="Ferramentas inteligentes" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/kit-professor.webp" />
 
       {/* Diário de Classe — destaque */}
       <button
@@ -14455,7 +14455,7 @@ const LibraryScreen = ({ user, setScreen, profile, notifications, setNotificatio
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-40">
-      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="https://i.ibb.co/d0my4Y3R/Design-sem-nome-20260614-135925-0000.png" />
+      <Header setScreen={setScreen} title="Biblioteca" subtitle="Materiais prontos para download" profile={profile} notifications={notifications} setNotifications={setNotifications} bannerImage="/assets/banners/biblioteca.webp" />
 
       {/* Daily quota card */}
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4 space-y-3">
