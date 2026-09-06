@@ -49,7 +49,7 @@ precacheAndRoute(self.__WB_MANIFEST);
 // que é exatamente o comportamento que queremos agora.
 self.addEventListener('fetch', () => { /* passa direto para a rede */ });
 
-const NOTIF_ICON = 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png';
+const NOTIF_ICON = '/assets/icons/notification.png';
 
 // ── FCM: notificações push em background (app fechado) ──────────────────────
 // Recebemos mensagens "data-only" do servidor e exibimos manualmente para ter

@@ -15708,7 +15708,7 @@ function AppInner() {
         const body = `${s.subject ? s.subject + ' — ' : ''}${s.name}${s.time ? ' às ' + s.time : ''}`;
         try {
           const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
-          if (reg) await reg.showNotification(title, { body, tag, icon: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png', data: { url: '/' } });
+          if (reg) await reg.showNotification(title, { body, tag, icon: '/assets/icons/notification.png', data: { url: '/' } });
           else new Notification(title, { body, tag });
         } catch { /* ambiente sem suporte — segue sem lembrete */ }
       }
@@ -15768,7 +15768,7 @@ function AppInner() {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
         playChime(true);
-        const opts = { body: 'Você será avisado(a) 30 minutos antes de cada aula.', icon: 'https://i.ibb.co/9mG1MVP1/20260417-114358-0000.png' };
+        const opts = { body: 'Você será avisado(a) 30 minutos antes de cada aula.', icon: '/assets/icons/notification.png' };
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
         if (reg) await reg.showNotification('Notificações ativadas! 🦉', opts);
         else new Notification('Notificações ativadas! 🦉', opts);
