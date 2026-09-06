@@ -1053,12 +1053,12 @@ const EventItem = ({ e, onComplete, color, onPrepare, onReschedule }: { e: any, 
 
 const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded, notifications, setNotifications, setSelectedDate, openFerramenta, schedules }: { setScreen: (s: Screen) => void, setPlannerMode: (m: PlannerMode) => void, classes: ClassItem[], profile: UserProfile, profileLoaded?: boolean, notifications?: any[], setNotifications?: (n: any[]) => void, setSelectedDate: (d: Date) => void, openFerramenta?: (tool: string | null) => void, schedules?: ClassSchedule[] }) => {
   const quickActions: { title: string; illustration?: string; icon?: any; action: () => void }[] = [
-    { title: 'Jogos', illustration: 'https://i.ibb.co/5h18j8Lc/20260520-143227-0000.png', action: () => setScreen('estudio') },
-    { title: 'Atividades', illustration: 'https://i.ibb.co/hx6b429b/20260416-183802-0002.png', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
-    { title: 'Slides', illustration: 'https://i.ibb.co/fYK9t24q/20260416-184831-0000.png', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
-    { title: 'Kit IA', illustration: 'https://i.ibb.co/vCp6TFqs/20260416-185756-0000.png', action: () => openFerramenta?.(null) },
-    { title: 'Diário', illustration: 'https://i.ibb.co/Y7df80LZ/1781545849687.png', action: () => openFerramenta?.('diario') },
-    { title: 'Biblioteca', illustration: 'https://i.ibb.co/GQMXCYWq/Sem-nome-1300-x-1300-px-20260615-160107-0000.png', action: () => setScreen('biblioteca') },
+    { title: 'Jogos', illustration: '/assets/icons/jogos.webp', action: () => setScreen('estudio') },
+    { title: 'Atividades', illustration: '/assets/icons/atividades.webp', action: () => { setPlannerMode('activities'); setScreen('planner'); } },
+    { title: 'Slides', illustration: '/assets/icons/slides.webp', action: () => { setPlannerMode('slides'); setScreen('planner'); } },
+    { title: 'Kit IA', illustration: '/assets/icons/kit-ia.webp', action: () => openFerramenta?.(null) },
+    { title: 'Diário', illustration: '/assets/icons/diario.webp', action: () => openFerramenta?.('diario') },
+    { title: 'Biblioteca', illustration: '/assets/icons/biblioteca.webp', action: () => setScreen('biblioteca') },
   ];
 
   const currentHour = new Date().getHours();
@@ -16036,7 +16036,7 @@ function AppInner() {
     return (
       <div
         className="min-h-screen bg-cover bg-center flex flex-col items-center justify-center p-6 relative"
-        style={{ backgroundImage: 'url(https://i.ibb.co/XZyfzNYw/Design-sem-nome-20260426-213935-0000.png)' }}
+        style={{ backgroundImage: 'url(/assets/login-bg.webp)' }}
       >
         <div className="relative z-10 w-full max-w-sm flex flex-col items-center gap-6">
           <motion.h1
