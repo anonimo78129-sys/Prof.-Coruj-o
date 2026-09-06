@@ -495,7 +495,7 @@ class ErrorBoundary extends React.Component<
         <div className="min-h-screen bg-[#F8F9FE] flex flex-col items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-xl border border-red-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/mascote.webp" alt="Corujão" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ih, o Corujão tropeçou!</h2>
             <p className="text-sm text-gray-500 mb-2">Algo inesperado aconteceu. Seus dados estão salvos na nuvem. Só recarregue a página.</p>
@@ -1094,7 +1094,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
           </button>
         </div>
         <div className="absolute right-0 bottom-0 w-36 h-36 md:w-40 md:h-40 z-0">
-          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+          <img src="/assets/icons/mascote-magico.webp" alt="Mascote Mágico" className="w-full h-full object-contain" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
       </div>
 
@@ -4630,7 +4630,7 @@ const ChatScreen = ({
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
               >
                 {msg.role !== 'user' && (
-                  <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-11 h-11 object-contain shrink-0 mb-4" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                  <img src="/assets/icons/mascote.webp" alt="" className="w-11 h-11 object-contain shrink-0 mb-4" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 )}
                 <div
                   onTouchStart={() => startLongPress(cleanText)}
@@ -4678,7 +4678,7 @@ const ChatScreen = ({
               transition={{ type: 'spring', stiffness: 380, damping: 28 }}
               className="flex justify-start items-end gap-2"
             >
-              <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="" className="w-11 h-11 object-contain shrink-0 mb-1" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+              <img src="/assets/icons/mascote.webp" alt="" className="w-11 h-11 object-contain shrink-0 mb-1" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
               <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-50 flex flex-col gap-1.5 max-w-[240px]">
                 <div className="flex gap-2 items-center">
                   <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
@@ -15190,7 +15190,7 @@ const AdminScreen = ({ user }: { user: any }) => {
                       <p className="text-2xl font-black text-indigo-700">${currentCost.toFixed(5)}</p>
                       <p className="text-xs text-indigo-400">{current.gens.toLocaleString()} gerações · {(current.inp + current.out).toLocaleString()} tokens</p>
                     </div>
-                    <img src="https://i.ibb.co/JwXsb4D4/20260521-154229-0000.png" alt="Corujão" className="w-12 h-12 object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    <img src="/assets/icons/mascote.webp" alt="Corujão" className="w-12 h-12 object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                 )}
                 <div className="flex items-end gap-2 h-24">
