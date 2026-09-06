@@ -22,6 +22,13 @@
          promove para "all" quando chega. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Todas as ilustrações do app (tela de entrada, banners de topo, atalhos
+         da Home) vêm do i.ibb.co. Sem isto, a PRIMEIRA imagem só começa a
+         baixar depois de DNS + TCP + TLS com esse host — algo entre 300ms e
+         600ms de espera no celular, antes do primeiro byte de imagem. O
+         preconnect abre essa conexão junto com o HTML. -->
+    <link rel="preconnect" href="https://i.ibb.co" crossorigin />
+    <link rel="dns-prefetch" href="https://i.ibb.co" />
     <link
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap"
       rel="stylesheet"

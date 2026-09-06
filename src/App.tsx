@@ -855,7 +855,7 @@ const Header = ({ title, subtitle, profile, notifications = [], setNotifications
   <div className="mb-3 relative z-50">
     {typeof bannerImage === 'string' ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 flex flex-col items-center justify-center z-[-1] shadow-sm overflow-hidden bg-transparent">
-        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+        <img src={bannerImage} alt="Banner" className="w-full h-full object-cover top-center" decoding="async" fetchPriority="high" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
       </div>
     ) : bannerPlaceholder ? (
       <div className="absolute -top-12 -left-6 -right-6 h-36 z-[-1] border-b-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
@@ -1094,7 +1094,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
           </button>
         </div>
         <div className="absolute right-0 bottom-0 w-36 h-36 md:w-40 md:h-40 z-0">
-          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+          <img src="https://i.ibb.co/Q4fQx6f/20260419-215411-0000.png" alt="Mascote Mágico" className="w-full h-full object-contain" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
         </div>
       </div>
 
@@ -1105,7 +1105,7 @@ const HomeScreen = ({ setScreen, setPlannerMode, classes, profile, profileLoaded
             <button key={action.title} onClick={action.action} className="flex flex-col items-center gap-3 relative group">
               <div className={`w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-sm bg-white border-[1.5px] border-indigo-600 flex flex-col items-center justify-center relative`}>
                 {action.illustration ? (
-                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                  <img src={action.illustration} alt={action.title} className="w-full h-full object-cover" decoding="async" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none'; }} />
                 ) : action.icon ? (
                   <action.icon size={26} className="text-indigo-600" strokeWidth={2.2} />
                 ) : null}
@@ -2470,7 +2470,11 @@ const sanitizeSlideData = (parsed: any): any => {
 // Generic blob download — appends a temporary <a> to document.body so the
 // browser treats it as a real anchor click (avoids the "ghost click" problem
 // where some browsers silently block programmatic downloads after the first).
-const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
+// Devolve como o arquivo foi entregue: 'share' quando abriu o menu nativo (o
+// professor já viu o que aconteceu e escolhe ali mesmo em que app abrir),
+// 'download' quando caiu no download clássico — que no computador acontece sem
+// nada aparecer na tela, e por isso precisa de aviso.
+const downloadBlob = async (blob: Blob, filename: string): Promise<'share' | 'download'> => {
   // Em PWA no celular (standalone) o download de blob via <a download> é
   // frequentemente bloqueado em silêncio. Tentamos primeiro o menu nativo de
   // compartilhar/salvar (Arquivos, Drive, etc.), que funciona no mobile.
@@ -2479,11 +2483,11 @@ const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
     const nav = navigator as any;
     if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
       await nav.share({ files: [file], title: filename });
-      return;
+      return 'share';
     }
   } catch (e: any) {
     // Usuário cancelou o menu de compartilhamento → não cai no fallback
-    if (e?.name === 'AbortError') return;
+    if (e?.name === 'AbortError') return 'share';
     // Qualquer outro erro → tenta o download clássico abaixo
   }
   // Fallback (desktop e navegadores sem Web Share de arquivos)
@@ -2499,6 +2503,7 @@ const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
     try { document.body.removeChild(a); } catch { /* already removed */ }
     URL.revokeObjectURL(url);
   }, 30_000);
+  return 'download';
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3230,7 +3235,8 @@ const PlannerScreen = ({
       const repaired = await repairPptxContentTypes(rawBlob);
       const blob = new Blob([repaired], { type: PPTX_MIME });
       const safeName = presentationData.presentationTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'Apresentacao';
-      await downloadBlob(blob, `Aula_${safeName}.pptx`);
+      const viaPptx = await downloadBlob(blob, `Aula_${safeName}.pptx`);
+      if (viaPptx === 'download') toast.success(`Aula_${safeName}.pptx salvo nos Downloads.`);
     } catch (e) {
       console.error(e);
       toast.error('A apresentação não saiu dessa vez. Confere a conexão e tenta de novo.');
@@ -3545,7 +3551,12 @@ const PlannerScreen = ({
                           });
                           const label = docType === 'plan' ? 'plano' : docType === 'exam' ? 'avaliacao' : 'atividades';
                           const filename = `${label}-${(topic || 'material').replace(/\s+/g, '-')}.docx`;
-                          await downloadBlob(blob, filename);
+                          const via = await downloadBlob(blob, filename);
+                          // No menu nativo o professor já vê o que aconteceu e
+                          // escolhe onde abrir. No download clássico não aparece
+                          // nada na tela, então o aviso diz o nome do arquivo e
+                          // onde procurar.
+                          if (via === 'download') toast.success(`${filename} salvo nos Downloads. Abra pelo seu programa de Word.`);
                         } catch (e) {
                           console.error('Erro ao exportar Word:', e);
                           toast.error('O documento Word fugiu! Tenta gerar de novo.');
