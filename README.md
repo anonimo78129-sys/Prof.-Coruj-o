@@ -9,7 +9,7 @@ diário de classe e calendário — tudo em português.
 
 [![Deploy](https://img.shields.io/badge/deploy-Firebase-orange?logo=firebase)](https://firebase.google.com/)
 [![PWA](https://img.shields.io/badge/PWA-instalável-blue?logo=googlechrome)](https://web.dev/progressive-web-apps/)
-[![Gemini](https://img.shields.io/badge/IA-Gemini%202.5%20Flash-purple?logo=google)](https://aistudio.google.com/)
+[![Gemini](https://img.shields.io/badge/IA-Gemini%203.6%20Flash-purple?logo=google)](https://aistudio.google.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 
@@ -136,7 +136,7 @@ Visível só para a conta administradora:
 | Front-end | React 19 + TypeScript 5.8 |
 | Estilo | Tailwind CSS 4 |
 | Animações | Framer Motion (motion/react) |
-| IA | Google Gemini 2.5 Flash (`@google/genai`) |
+| IA | Google Gemini 3.6 Flash (`@google/genai`) |
 | Banco de dados | Firebase Firestore (sync em tempo real) |
 | Autenticação | Firebase Auth (Google) |
 | Armazenamento | Firebase Storage |
