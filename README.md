@@ -52,19 +52,25 @@ Geradas a partir do tema e do nível da turma, para imprimir ou projetar:
 A Sequência Didática também pode ser gerada a partir do Estúdio, mas é documento do professor — veja em Planejamento com IA.
 
 ### Jogos ao vivo com a turma
-- **Quiz Relâmpago** — formato de programa de auditório: cronômetro por pergunta, suspense
-  antes de revelar a resposta e bônus por rapidez e por acerto seguido. No modo multijogador,
-  cada equipe entra pelo celular lendo um QR e todas respondem à mesma pergunta ao mesmo tempo,
-  com placar ao vivo na projeção. No fim, o professor credita o XP na Gamificação.
-- **Batalha de Revisão** — duelo de perguntas entre as equipes da turma, com pontuação por
-  acerto. Pode ser enviada por link ou QR.
-- **Mundo Perdido** — aventura narrativa de escape, com trilha sonora e ilustrações próprias.
+Todos rodam numa tela só (projetor ou o celular do professor) — não é cada aluno com o próprio
+placar num dispositivo separado:
+- **Quiz Relâmpago** — formato de programa de auditório: 10 perguntas geradas por IA sobre o
+  tema, 20 segundos por pergunta, suspense de 1,5s antes de revelar a resposta certa, bônus de
+  pontos por rapidez e por sequência de acertos.
+- **Batalha de Revisão** — duelo por turnos entre duas equipes: cada equipe tem pontos de vida,
+  acerto tira vida do adversário (com bônus para quem está perdendo e por resposta rápida), três
+  acertos seguidos curam vida. O banco de perguntas pode ser reaproveitado por link ou QR, sem
+  gastar IA de novo. Ao final, o professor credita XP para a equipe vencedora.
+- **Mundo Perdido** — aventura de escape room com história, cenários e trilha sonora próprios
+  (tema de floresta e ecologia), jogada no aparelho de cada aluno com progresso salvo
+  automaticamente. O professor pode trocar as perguntas da aventura por um quiz gerado por IA
+  sobre o conteúdo da aula, mantendo a mesma história.
 
 ### Gamificação de Turma
-- Sistema de **XP e moedas** por comportamento e participação
+- Sistema de **XP e moedas** por comportamento e participação, creditado pelo professor
 - **Equipes** com personalização de nome, emoji e cor
-- **Missões semanais** com meta e recompensa configurável
-- **Loja de recompensas** onde alunos trocam moedas por prêmios
+- **Loja de recompensas** cadastrada pelo professor; o resgate também é feito por ele, debitando
+  as moedas do aluno
 - **Hall da Fama** com pódio dos melhores alunos por temporada
 - Log de todas as ações (pontuação, compras, recompensas)
 - Suporte a cadastro em massa de alunos
