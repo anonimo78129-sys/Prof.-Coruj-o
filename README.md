@@ -26,6 +26,7 @@ diário de classe e calendário — tudo em português.
 - **Provas** — questões objetivas e discursivas com gabarito
 - **Sequência Didática** — sequências completas com múltiplas aulas
 - **Estúdio** — chat avançado com histórico, contexto de turma e geração de materiais em múltiplas etapas
+- **Exportação** — planos, atividades e provas em Word (.docx); slides em PowerPoint (.pptx)
 
 ### Ferramentas Pedagógicas
 | Ferramenta | Descrição |
@@ -46,8 +47,9 @@ Geradas a partir do tema e do nível da turma, para imprimir ou projetar:
 - Bingo
 - Escape Room temático (Medieval / Laboratório / Detetive / Espaço)
 - Jogo da Memória
-- Sequência (ordenar eventos/etapas)
-- Storytelling (história narrativa)
+- Storytelling
+
+A Sequência Didática também pode ser gerada a partir do Estúdio, mas é documento do professor — veja em Planejamento com IA.
 
 ### Jogos ao vivo com a turma
 - **Quiz Relâmpago** — formato de programa de auditório: cronômetro por pergunta, suspense
@@ -104,18 +106,24 @@ Geradas a partir do tema e do nível da turma, para imprimir ou projetar:
 - Painel de estatísticas: turmas, materiais e gerações de IA
 - Edição de dados e zona de configuração
 
+### Planos — Gratuito e PRO
+- Conta gratuita tem limite de gerações de IA; ao atingir o limite, o professor é convidado a virar PRO
+- Conta PRO tem gerações ilimitadas
+- Liberação e remoção de PRO por professor, feita pela administração no Painel Admin
+- Uso de tokens, gerações e custo estimado da IA é registrado por professor e por mês
+
 ### Painel Admin
 Visível só para a conta administradora:
 - **Usuários** — busca, filtros (PRO, gratuito, no limite, admins), liberação de PRO e exportação em CSV
 - **Feedbacks** — o que os professores enviam pelo app
 - **Biblioteca** — envio e remoção dos materiais compartilhados
-- **Métricas** — uso de tokens, gerações e custo estimado da IA, por mês
+- **Métricas** — uso de tokens, gerações e custo estimado da IA por mês, e o Aviso Global (recado que aparece para todo mundo, ligado e desligado por ali)
 - **Feriados** — feriados globais, que entram no calendário de todos os professores
-- **Aviso Global** — recado que aparece para todo mundo, ligado e desligado por ali
 
 ### PWA (App instalável)
 - Instalável no celular e no computador (Android, iOS, Windows, Mac)
 - Notificações push mesmo com o app fechado (Firebase Cloud Messaging)
+- Lembrete automático de aula por notificação push, ~30 minutos antes do horário marcado
 - Service worker sem precache: cada atualização publicada vale na hora, sem
   precisar limpar o cache e sem baixar megabytes a cada deploy
 
@@ -134,6 +142,8 @@ Visível só para a conta administradora:
 | Armazenamento | Firebase Storage |
 | Notificações | Firebase Cloud Messaging (FCM) |
 | Imagens | Pixabay API (opcional) / Unsplash fallback |
+| Exportação | Word (docx) / PowerPoint (pptxgenjs) |
+| Cloud Functions | Firebase Functions (lembrete de aula agendado) |
 | Build | Vite 6 + vite-plugin-pwa |
 | Deploy | Firebase Hosting / Vercel / Cloud Run |
 
